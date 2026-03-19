@@ -154,18 +154,41 @@ else
   SCORE=$((SCORE + 5))
 fi
 
-# --- Check 10: Imperative voice / no dead content (5 pts) ---
+# --- Check 10: Imperative voice (5 pts) ---
 HEDGE_COUNT=$(echo "$CONTENT" | grep -ciE "you (might|could|should|may) (want to|consider|possibly)" || true)
-TODO_COUNT=$(echo "$CONTENT" | grep -ciE "(TODO|FIXME|HACK|XXX|placeholder)" || true)
 
-if [[ $HEDGE_COUNT -eq 0 ]] && [[ $TODO_COUNT -eq 0 ]]; then
+if [[ $HEDGE_COUNT -eq 0 ]]; then
   SCORE=$((SCORE + 5))
-elif [[ $HEDGE_COUNT -le 2 ]] && [[ $TODO_COUNT -eq 0 ]]; then
+elif [[ $HEDGE_COUNT -le 2 ]]; then
   SCORE=$((SCORE + 3))
   ISSUES+=("minor_hedging")
 else
-  if [[ $HEDGE_COUNT -gt 2 ]]; then ISSUES+=("excessive_hedging"); fi
-  if [[ $TODO_COUNT -gt 0 ]]; then ISSUES+=("has_todo_or_placeholder_text"); fi
+  ISSUES+=("excessive_hedging")
+fi
+
+# --- Check 11: No dead content (10 pts) ---
+TODO_COUNT=$(echo "$CONTENT" | grep -ciE "(TODO|FIXME|HACK|XXX|placeholder)" || true)
+EMPTY_SECTION_COUNT=$(echo "$CONTENT" | grep -cE "^##" || true)
+EMPTY_SECTIONS=0
+# Check for headers followed by only blank lines or next header (empty sections)
+while IFS= read -r line_num; do
+  [[ -z "$line_num" ]] && continue
+  NEXT_CONTENT=$(echo "$CONTENT" | tail -n +"$((line_num + 1))" | head -5 | grep -cvE "^$|^#" || true)
+  if [[ $NEXT_CONTENT -eq 0 ]]; then
+    EMPTY_SECTIONS=$((EMPTY_SECTIONS + 1))
+  fi
+done < <(echo "$CONTENT" | grep -nE "^##" | cut -d: -f1)
+
+if [[ $TODO_COUNT -eq 0 ]] && [[ $EMPTY_SECTIONS -eq 0 ]]; then
+  SCORE=$((SCORE + 10))
+elif [[ $TODO_COUNT -eq 0 ]]; then
+  SCORE=$((SCORE + 7))
+  ISSUES+=("has_empty_sections:$EMPTY_SECTIONS")
+else
+  ISSUES+=("has_todo_or_placeholder_text:$TODO_COUNT")
+  if [[ $EMPTY_SECTIONS -gt 0 ]]; then
+    ISSUES+=("has_empty_sections:$EMPTY_SECTIONS")
+  fi
 fi
 
 # --- Safe JSON Output (no injection) ---
