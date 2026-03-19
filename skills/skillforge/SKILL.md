@@ -2,159 +2,218 @@
 name: skillforge
 description: >
   Autonomous skill improvement engine — the autoresearch loop for Claude Code
-  skills. Takes any SKILL.md as input and iteratively improves it with 6
-  measurable dimensions: structure, trigger accuracy, output quality, edge
-  coverage, token efficiency, composability. Use this skill whenever the user
-  mentions improving, optimizing, auditing, benchmarking, debugging, or
-  iterating on any Claude Code or Codex skill. Trigger phrases include:
-  "make this skill better", "optimize my skill", "my skill doesn't trigger",
-  "skill output is wrong", "audit skill quality", "run skill evals",
-  "improve trigger accuracy", "skill needs work", "harden this skill",
-  "benchmark my skill", "skill quality score". Also use when someone says
-  "the skill isn't working right", "can you review my skill", "iterate on
-  this skill overnight", or pastes a SKILL.md asking for feedback. Use even
-  when the user just shares a SKILL.md without explicit instructions — they
-  likely want analysis or improvement. Works with any skill: custom, community,
-  built-in, project-local, or global. Do NOT use for creating brand-new skills
-  from scratch (that's skill-creator's job) — SkillForge improves existing ones.
-  After skill-creator builds v1, SkillForge grinds it to production quality.
+  skills. Define a GOAL, primary METRIC, and VERIFY method; SkillForge iterates
+  autonomously with fixed time budgets, mechanical scoring, and NEVER pauses.
+  Use for improving any skill on any domain: trigger accuracy, output quality,
+  edge coverage, token efficiency, composability, or custom metrics. Works with
+  community, custom, project-local, or global skills. Trigger phrases: "make
+  this skill better", "optimize my skill", "iterate on this skill overnight",
+  "improve [metric] from X to Y", "audit skill", "review my skill", "harden
+  skill", "benchmark skill", or paste SKILL.md for auto-analysis. Also use when
+  user shares skill without explicit instructions. Do NOT use for brand-new
+  skills from scratch — use skill-creator first, then come to SkillForge.
 ---
 
 # SkillForge — Autonomous Skill Improvement Engine
 
-Based on [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) —
-the principle that **constraint + mechanical metric + autonomous iteration = compounding gains**,
-applied to the meta-problem of improving Claude Code skills themselves.
+**Why this works:** Constraint + clear metric + autonomous iteration = compounding gains.
+Small atomic changes with mechanical verification compound because each kept improvement
+builds on the last — like gradient descent for skill quality.
 
-## Core Loop
+Based on [Karpathy's autoresearch](https://github.com/karpathy/autoresearch),
+[Uditgoenka's generalized autoresearch](https://github.com/uditgoenka/autoresearch-general),
+and [Olelehmann's binary eval framework](https://github.com/olelehmann/skill-eval).
+
+## Quick Start (Simplest Usage)
 
 ```
-INPUT: Path to target skill (SKILL.md + references/)
-SETUP: Analyze → Generate eval suite → Establish baseline score
-LOOP (FOREVER or N iterations):
-  1. Review skill + eval results + improvement log
-  2. Pick ONE improvement (based on gap analysis + what worked/failed)
-  3. Apply atomic change to SKILL.md or references
-  4. Git commit (before verification)
-  5. Run eval suite → compute quality score
-  6. Score improved → keep. Worse → git revert. Crash → fix or skip.
-  7. Log result to skillforge-results.tsv
-  8. Repeat. NEVER STOP unless goal met or user interrupts.
+/skillforge
+Target: path/to/SKILL.md
+Goal: Make the skill trigger correctly for deployment scenarios
+```
+
+SkillForge will auto-select metrics, generate evals, and run 30 iterations.
+Or customize with explicit metric + time budget.
+
+## Core Loop (NEVER Pauses)
+
+```
+INPUT: Skill path + GOAL + PRIMARY METRIC + VERIFY method + time budget
+SETUP: Read ALL files → Analyze → Generate eval suite → Baseline (#0)
+LOOP (fixed time or N iterations, continues until goal met or budget exhausted):
+  Exp N: Review skill + results + git history
+  → Pick ONE atomic change (based on gaps + what worked/failed in history)
+  → Edit SKILL.md or references
+  → Commit with message: "skillforge exp-N: [description]"
+  → Run VERIFY command, compute PRIMARY METRIC
+  → Metric improved? Keep. Worse? Revert. Error? Fix or skip.
+  → Append to history/ dir with diffs
+  → Loop continues until timeout or user stops
+  CONSTRAINT: Fixed iterations prevent infinite loops; autonomous mode means
+  NO prompts between iterations, just continuous improvement.
 ```
 
 ## When to Use
 
-- **Skill not triggering** → Run `/skillforge:analyze` then `/skillforge` to fix description
-- **Skill output quality low** → Run `/skillforge` with output-quality metric
-- **New skill needs hardening** → Run `/skillforge` to add edge cases + examples
-- **Skill too verbose / too terse** → Run `/skillforge` with token-efficiency metric
-- **Community skill needs adaptation** → Analyze → Fork → Improve
+- **Skill not triggering properly** → `/skillforge` on trigger-accuracy metric
+- **Outputs are wrong or incomplete** → Set goal, metric is binary eval pass rate
+- **Need to harden for edge cases** → Focus on edge-coverage metric
+- **Skill too verbose** → Optimize token-efficiency metric
+- **Any custom goal** → Define GOAL, pick/create METRIC, set VERIFY command
 
-## Quick Start
+## Interface: GOAL + METRIC + VERIFY
+
+Instead of always using 6 dimensions, start with user intent:
 
 ```
 /skillforge
 Target: .claude/skills/my-skill/SKILL.md
-Goal: Improve trigger accuracy from ~60% to 90%+
-```
-
-Or with more control:
-
-```
-/skillforge
-Target: ~/.claude/skills/deploy/SKILL.md
-Goal: Improve output quality — all test cases produce correct deployments
-Metric: eval pass rate % (higher is better)
+Goal: Fix skill to handle deployment scenarios correctly
+Metric: Binary eval pass rate % (custom: run eval suite, count passing tests)
+Verify: bash scripts/run-eval.sh
+Time budget: 2 hours
 Iterations: 30
 ```
 
-## Quality Dimensions (Metrics)
+The 6 default dimensions are available as presets, but **not required**.
 
-SkillForge scores skills across 6 measurable dimensions:
+## Quality Dimensions (Defaults, Customizable)
 
-| Dimension | What It Measures | How |
-|-----------|-----------------|-----|
-| **Structure** | Frontmatter, progressive disclosure, file organization | Automated lint script |
-| **Trigger accuracy** | Does the skill activate for the right prompts? | Eval suite with positive/negative triggers |
-| **Output quality** | Does following the skill produce correct results? | Test cases with assertions |
-| **Edge coverage** | Does the skill handle unusual inputs gracefully? | Edge-case eval suite |
-| **Token efficiency** | Minimal instructions for maximum effect | Instruction density scoring |
-| **Composability** | Works well with other skills, doesn't conflict | Cross-skill interference tests |
+| Dimension | Metric | How | Pass Rate |
+|-----------|--------|-----|-----------|
+| **Structure** | Frontmatter lint score | `scripts/analyze-skill.sh` | ≥ 90% |
+| **Trigger accuracy** | Positive/negative trigger pass rate | Eval suite, count matches | ≥ 85% |
+| **Output quality** | Binary eval pass rate | Test cases with assertions | ≥ 90% |
+| **Edge coverage** | Edge-case test pass rate | Malformed input, corner cases | ≥ 80% |
+| **Token efficiency** | Instruction density (words per feature) | `scripts/score-skill.py` | ≤ target |
+| **Composability** | Cross-skill conflict tests | Run with other skills | 0 conflicts |
 
-Read `references/metrics-catalog.md` for detailed scoring rubrics.
+See `references/metrics-catalog.md` for detailed rubrics and custom metric setup.
+
+## Custom Metrics
+
+SkillForge supports any measurable metric:
+
+```
+Metric: "Time to first correct output (ms)"
+Verify: time bash scripts/run-eval.sh | grep "passed"
+Better: lower (invert scoring if needed)
+
+Metric: "Coverage of domain-specific vocabulary"
+Verify: grep -c "technical_term" eval-results.txt
+Better: higher
+```
+
+Metrics must be computable by a shell command returning a number.
+See `references/metrics-catalog.md#custom` for examples.
 
 ## Subcommands
 
 | Command | Purpose |
 |---------|---------|
-| `/skillforge` | Full autonomous improvement loop |
-| `/skillforge:analyze` | Deep skill analysis — structure, gaps, anti-patterns |
-| `/skillforge:bench` | Benchmark current skill quality (baseline) |
-| `/skillforge:eval` | Run evaluation suite against skill |
-| `/skillforge:report` | Generate improvement report with recommendations |
+| `/skillforge` | Autonomous loop with GOAL + METRIC |
+| `/skillforge:analyze` | Skill analysis, gaps, anti-patterns, baseline |
+| `/skillforge:bench` | Single evaluation run, current score |
+| `/skillforge:eval` | Run eval suite, show results |
+| `/skillforge:report` | Generate improvement summary + diffs |
 
-## Setup Phase (Before Loop)
+## Before the Loop (Setup Phase)
 
-1. **Read target skill** — Load SKILL.md + all references, understand intent
-2. **Analyze structure** — Run `scripts/analyze-skill.sh` for structural lint
-3. **Generate eval suite** — Create test prompts (positive triggers, negative triggers, edge cases)
-4. **Establish baseline** — Score all 6 dimensions, record as iteration #0
-5. **Identify top gaps** — Rank dimensions by improvement potential
-6. **Confirm with user** — Show analysis + proposed improvement plan, then begin
+1. Read ALL files — SKILL.md + all references + related skills. Extract context.
+2. Parse GOAL + METRIC + VERIFY from user input. Use defaults if not specified.
+3. Run baseline — Execute VERIFY command, record initial metric as exp #0.
+4. Generate eval suite if none exists. Use examples from SKILL.md as seeds.
+5. Validate eval suite — Run it once, verify assertions parse correctly.
+6. Show gap analysis with estimated iterations. Start NEVER-PAUSE mode on confirm.
 
-## Autonomous Loop Protocol
+## Autonomous Loop (Eight-Phase Protocol)
 
-Each iteration follows the 8-phase protocol. Read `references/improvement-protocol.md`
-for the detailed phase-by-phase instructions.
+Each iteration follows `references/improvement-protocol.md`. Immutable rules:
 
-**Critical rules during the loop:**
+1. Make ONE change per experiment. Run `git diff` to verify scope before commit, because atomic edits isolate what caused improvement.
+2. Use mechanical verification only. Run VERIFY command, check the number, decide keep/discard. This prevents subjective drift over iterations.
+3. Revert on regression: `git revert HEAD`. This enables bold experimentation because rollback is safe.
+4. Read ALL files before each change. This prevents contradictions and ensures history informs the next change.
+5. Write descriptive commits: `skillforge exp-7: add deployment edge cases`. Git history is memory — past diffs reveal successful patterns.
+6. When stuck (5+ discards): Re-read files, review history, try structural changes or the opposite of what failed. This avoids local optima.
+7. Never modify VERIFY during loop. The metric is fixed; the skill is the variable. Otherwise results are incomparable.
+8. Log everything to `history/` — diffs, metric values, status. This ensures future iterations analyze what worked.
 
-1. **ONE change per iteration** — When something breaks, you need to know exactly why. Bundled changes make rollback a guessing game and waste iterations.
-2. **Mechanical verification only** — "Looks better" kills autonomous loops. If you can't score it with a command, the loop can't learn from it. Run the eval suite, compare numbers.
-3. **Automatic rollback** — The loop's power comes from safe experimentation. `git revert` on regression means you can try bold changes without risk. This is what makes overnight runs possible.
-4. **Simplicity wins** — LLMs pay attention tax on every token. Equal quality with fewer instructions is strictly better because it leaves more context window for the user's actual task.
-5. **Git is memory** — Commits are how the agent learns patterns across iterations. Descriptive messages like `skillforge: triggers add deployment synonyms` let it read history and avoid repeating failed approaches.
-6. **When stuck after 5 discards** — Re-read ALL files fresh, review the results log for patterns, try combining two near-misses, or try the opposite of what hasn't been working. Plateaus often break with structural changes, not incremental tweaks.
-7. **Never modify the eval suite during the loop** — Changing the metric mid-run invalidates all previous comparisons. The eval suite is the fixed reference; the skill is the variable.
-8. **Log everything** — The TSV is your experiment journal. Even discarded changes teach you something. Append to `skillforge-results.tsv` after every iteration.
+## History Directory (Experiment Diffs)
 
-## Results Tracking
+SkillForge maintains a `history/` subdirectory with timestamped diffs:
 
-```tsv
-iteration	commit	structure	triggers	quality	edges	efficiency	composability	total	status	description
-0	a1b2c3d	72	58	65	40	80	70	64.2	baseline	initial state
-1	b2c3d4e	72	65	65	40	80	70	65.3	keep	expand trigger description with edge phrases
-2	-	72	62	65	40	80	70	64.8	discard	add negative trigger examples (too verbose)
+```
+skillforge/history/
+├── exp-001-baseline.txt
+├── exp-001-to-002.diff
+├── exp-002-to-003.diff
+├── exp-003-baseline.json     ← scores only, no revert
+├── results.jsonl             ← experiment log (JSONL)
 ```
 
-## Improvement Strategies (Priority Order)
+Result lines: `exp | commit | metric | status | description`
 
-1. **Fix structural issues** — Missing frontmatter fields, no progressive disclosure
-2. **Expand trigger description** — Add synonyms, edge phrases, negative boundaries
-3. **Add examples** — Input/output pairs that demonstrate correct behavior
-4. **Add edge-case handling** — What to do with malformed input, missing context
-5. **Optimize token density** — Remove redundant instructions, compress verbose sections
-6. **Add reference files** — Move deep content out of SKILL.md into references/
-7. **Improve composability** — Add explicit handoff points for related skills
+Diffs enable future runs to spot patterns: "what improved metric in the past?"
 
-Read `references/skill-patterns.md` for common patterns and anti-patterns.
+## Improvement Strategies (Priority)
 
-## Chaining with skill-creator
+1. Fix structural issues first — Run `bash scripts/analyze-skill.sh` to detect gaps.
+2. Expand trigger description — Add synonyms, edge cases, negative boundaries.
+3. Add input/output examples — Write 3+ concrete before/after pairs per feature.
+4. Add edge-case handling — Test with malformed input, missing context, empty files.
+5. Optimize token density — Remove redundancy, compress verbose phrasing.
+6. Extract reference files — Move deep content from SKILL.md to `references/`.
+7. Verify composability — Check handoff points and run with adjacent skills.
 
-SkillForge and Anthropic's `skill-creator` are complementary:
+See `references/skill-patterns.md` for patterns + anti-patterns.
 
-- **skill-creator** builds v1 — captures intent, writes the draft, runs initial test cases with human review
-- **SkillForge** grinds v1 to production — autonomous loop, mechanical metrics, overnight improvement
+## Example: Real Improvement Session
 
-**Recommended workflow:**
-1. `/skill-creator` → draft skill, run 2-3 test cases, get user feedback, iterate manually
-2. User confirms "good enough to start grinding"
-3. `/skillforge` → autonomous improvement with 30+ iterations, measurable scores
-4. `/skillforge:report` → review what changed, confirm improvements
-5. If new capabilities needed → back to `/skill-creator`
+```
+Goal: Make "audit" trigger work for all audit-related requests
+Metric: Binary eval pass rate (run eval suite, count passing tests)
+Verify: bash scripts/run-eval.sh | grep "PASS" | wc -l
+Time budget: 1 hour
+Iterations: 20
 
-SkillForge will never create a new skill from scratch. If the user asks for that,
-suggest using `skill-creator` first, then come back for autonomous improvement.
+Baseline (exp #0): 60% (12/20 tests pass)
+
+Exp 1: Add synonyms to description
+  Change: "audit" → "audit, review, assess, inspect, evaluate"
+  Result: 65% (13/20)
+  Keep: ✓
+
+Exp 2: Add negative trigger examples
+  Change: Add examples of when NOT to trigger
+  Result: 70% (14/20)
+  Keep: ✓
+
+Exp 3: Add edge case for partial audit
+  Change: Handle "just check the trigger accuracy" (partial audit)
+  Result: 75% (15/20)
+  Keep: ✓
+
+[Continue until goal met or iterations exhausted]
+```
+
+## Skill-Creator Handoff
+
+SkillForge and `skill-creator` are complementary:
+
+- **skill-creator** → v1 draft, initial tests, human review
+- **SkillForge** → autonomous grinding, 30+ iterations, production quality
+
+**Workflow:**
+1. `/skill-creator` → draft, manual iterations, user confirms "ready to grind"
+2. `/skillforge` → 30+ autonomous iterations, mechanical metrics, history
+3. `/skillforge:report` → review changes, approve, merge
+4. If new capabilities needed → back to `/skill-creator`
+
+SkillForge never creates skills from scratch. If the user wants a new skill
+from scratch, instead use `skill-creator`. If the user wants to debug a skill
+that crashes, suggest using the `systematic-debugging` skill first, then return
+to SkillForge for iteration.
 
 ## Files in This Skill
 
@@ -162,13 +221,17 @@ suggest using `skill-creator` first, then come back for autonomous improvement.
 skillforge/
 ├── SKILL.md                          ← You are here
 ├── references/
-│   ├── improvement-protocol.md       ← 8-phase loop detail
-│   ├── metrics-catalog.md            ← Scoring rubrics per dimension
+│   ├── improvement-protocol.md       ← Detailed 8-phase loop
+│   ├── metrics-catalog.md            ← Scoring rubrics + custom metrics
 │   └── skill-patterns.md             ← Patterns, anti-patterns, examples
 ├── scripts/
-│   ├── analyze-skill.sh              ← Structural linting
-│   └── score-skill.py                ← Quality scoring engine
-└── templates/
-    ├── eval-suite-template.json      ← Eval suite skeleton
-    └── improvement-log-template.tsv  ← Results tracking template
+│   ├── analyze-skill.sh              ← Structure lint
+│   ├── score-skill.py                ← Dimension scoring
+│   ├── run-eval.sh                   ← Unified eval runner
+│   └── progress.py                   ← Progress tracking + ASCII charts
+├── templates/
+│   ├── eval-suite-template.json      ← Eval skeleton
+│   └── improvement-log-template.jsonl ← History template (JSONL)
+└── history/                          ← Experiment diffs + results
+    └── results.jsonl
 ```
