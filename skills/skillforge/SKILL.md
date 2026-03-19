@@ -16,15 +16,10 @@ description: >
 
 # SkillForge — Autonomous Skill Improvement Engine
 
-**Why this works:** Constraint + clear metric + autonomous iteration = compounding gains.
-Small atomic changes with mechanical verification compound because each kept improvement
-builds on the last — like gradient descent for skill quality.
+Constraint + clear metric + autonomous iteration = compounding gains. Each kept
+improvement builds on the last — gradient descent for skill quality.
 
-Based on [Karpathy's autoresearch](https://github.com/karpathy/autoresearch),
-[Uditgoenka's generalized autoresearch](https://github.com/uditgoenka/autoresearch-general),
-and [Olelehmann's binary eval framework](https://github.com/olelehmann/skill-eval).
-
-## Quick Start (Simplest Usage)
+## Quick Start
 
 ```
 /skillforge
@@ -64,19 +59,15 @@ LOOP (fixed time or N iterations, continues until goal met or budget exhausted):
 
 ## Interface: GOAL + METRIC + VERIFY
 
-Instead of always using 6 dimensions, start with user intent:
-
 ```
 /skillforge
 Target: .claude/skills/my-skill/SKILL.md
 Goal: Fix skill to handle deployment scenarios correctly
-Metric: Binary eval pass rate % (custom: run eval suite, count passing tests)
+Metric: Binary eval pass rate %
 Verify: bash scripts/run-eval.sh
 Time budget: 2 hours
 Iterations: 30
 ```
-
-The 6 default dimensions are available as presets, but **not required**.
 
 **Regression guards:** Set floor constraints to prevent one dimension from
 regressing while improving another:
@@ -107,20 +98,14 @@ See `references/metrics-catalog.md` for detailed rubrics and custom metric setup
 
 ## Custom Metrics
 
-SkillForge supports any measurable metric:
+Define any metric computable by a shell command returning a number:
 
 ```
 Metric: "Time to first correct output (ms)"
 Verify: time bash scripts/run-eval.sh | grep "passed"
-Better: lower (invert scoring if needed)
-
-Metric: "Coverage of domain-specific vocabulary"
-Verify: grep -c "technical_term" eval-results.txt
-Better: higher
 ```
 
-Metrics must be computable by a shell command returning a number.
-See `references/metrics-catalog.md#custom` for examples.
+See `references/metrics-catalog.md#custom` for setup and examples.
 
 ## Subcommands
 
@@ -145,14 +130,14 @@ See `references/metrics-catalog.md#custom` for examples.
 
 Each iteration follows `references/improvement-protocol.md`. Immutable rules:
 
-1. Make ONE change per experiment. Run `git diff` to verify scope before commit, because atomic edits isolate what caused improvement.
-2. Use mechanical verification only. Run VERIFY command, check the number, decide keep/discard. This prevents subjective drift over iterations.
-3. Revert on regression: `git revert HEAD`. This enables bold experimentation because rollback is safe.
-4. Read ALL files before each change. This prevents contradictions and ensures history informs the next change.
-5. Write descriptive commits: `skillforge exp-7: add deployment edge cases`. Git history is memory — past diffs reveal successful patterns.
-6. When stuck (5+ discards): Re-read files, review history, try structural changes or the opposite of what failed. This avoids local optima.
-7. Never modify VERIFY during loop. The metric is fixed; the skill is the variable. Otherwise results are incomparable.
-8. Log everything to `history/` — diffs, metric values, status. This ensures future iterations analyze what worked.
+1. ONE change per experiment. Run `git diff` to verify scope, because atomic edits isolate causation.
+2. Mechanical verification only. Run VERIFY, check the number, keep or discard. This prevents subjective drift.
+3. Revert on regression: `git revert HEAD`. This ensures safe experimentation.
+4. Re-read ALL files before each change. This prevents contradictions.
+5. Write descriptive commits: `skillforge exp-7: add deployment edge cases`.
+6. When stuck (5+ discards): re-read files, review history, try the opposite. This avoids local optima.
+7. Never modify VERIFY during loop. The metric is fixed; the skill is the variable.
+8. Log everything to `history/` — diffs, metric values, keep/discard status.
 
 ## Cross-Session Learning
 
@@ -220,7 +205,7 @@ this order and pick the first with a gap > 10 points from target:
 6. Extract reference files — Move deep content from SKILL.md to `references/`.
 7. Verify composability — Check handoff points and run with adjacent skills.
 
-See `references/skill-patterns.md` for patterns + anti-patterns.
+See `references/metrics-catalog.md` for patterns and anti-patterns per dimension.
 
 ## Example: Real Improvement Session
 
