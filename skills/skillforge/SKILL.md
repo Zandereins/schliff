@@ -119,27 +119,25 @@ See `references/metrics-catalog.md#custom` for examples.
 
 ## Before the Loop (Setup Phase)
 
-1. **Read ALL files** — SKILL.md + all references + related skills. Know the context.
-2. **User defines GOAL + METRIC + VERIFY** — Or accept defaults (structure + triggers + quality).
-3. **Run baseline** — Execute VERIFY command, compute initial PRIMARY METRIC. Record as exp #0.
-4. **Generate eval suite** — If none exists, create from goal + examples in SKILL.md.
-5. **Show analysis** — Gaps, improvement opportunities, estimated iterations to goal.
-6. **User confirms** — "Ready to improve?" Then enter NEVER-PAUSE mode.
+1. Read ALL files — SKILL.md + all references + related skills. Extract context.
+2. Parse GOAL + METRIC + VERIFY from user input. Use defaults if not specified.
+3. Run baseline — Execute VERIFY command, record initial metric as exp #0.
+4. Generate eval suite if none exists. Use examples from SKILL.md as seeds.
+5. Validate eval suite — Run it once, verify assertions parse correctly.
+6. Show gap analysis with estimated iterations. Start NEVER-PAUSE mode on confirm.
 
 ## Autonomous Loop (Eight-Phase Protocol)
 
-Each experiment (iteration) follows these phases. See `references/improvement-protocol.md` for details.
+Each iteration follows `references/improvement-protocol.md`. Immutable rules:
 
-**Immutable rules:**
-
-1. **ONE change per experiment** — Why: Atomic edits enable clean revert + isolate what caused improvement. Always use `git diff` to verify scope before commit.
-2. **Mechanical verification only** — Why: Subjective "looks better" drifts over iterations. VERIFY command is law. Run it, check the number, decide. No exceptions.
-3. **Automatic rollback on regression** — Why: Safe experimentation enables bold changes. Use `git revert HEAD` on metric decline. Never accumulate regressions.
-4. **Read ALL files before each change** — This prevents contradictions and ensures patterns from history inform the next change.
-5. **Git history is memory** — Descriptive commits like `skillforge exp-7: add deployment edge cases` enable the loop to learn what works, because past diffs reveal successful patterns.
-6. **When stuck (5+ discards)** — Re-read files fresh, review results history, try structural changes, try the opposite of a failed approach. This avoids local optima.
-7. **Never modify VERIFY during loop** — The metric is fixed; the skill is the variable. Otherwise results across iterations are incomparable.
-8. **Log everything to history/** — Include diffs, metric values, status. This ensures future iterations can analyze what worked and why.
+1. Make ONE change per experiment. Run `git diff` to verify scope before commit, because atomic edits isolate what caused improvement.
+2. Use mechanical verification only. Run VERIFY command, check the number, decide keep/discard. This prevents subjective drift over iterations.
+3. Revert on regression: `git revert HEAD`. This enables bold experimentation because rollback is safe.
+4. Read ALL files before each change. This prevents contradictions and ensures history informs the next change.
+5. Write descriptive commits: `skillforge exp-7: add deployment edge cases`. Git history is memory — past diffs reveal successful patterns.
+6. When stuck (5+ discards): Re-read files, review history, try structural changes or the opposite of what failed. This avoids local optima.
+7. Never modify VERIFY during loop. The metric is fixed; the skill is the variable. Otherwise results are incomparable.
+8. Log everything to `history/` — diffs, metric values, status. This ensures future iterations analyze what worked.
 
 ## History Directory (Experiment Diffs)
 
@@ -160,13 +158,13 @@ Diffs enable future runs to spot patterns: "what improved metric in the past?"
 
 ## Improvement Strategies (Priority)
 
-1. **Fix structural issues** — Missing frontmatter, bad organization
-2. **Expand trigger description** — Add synonyms, edge cases, negative boundaries
-3. **Add input/output examples** — 3+ concrete examples per feature
-4. **Add edge-case handling** — Malformed input, missing context, unusual requests
-5. **Optimize token density** — Remove redundancy, compress verbose sections
-6. **Add reference files** — Move content out of SKILL.md to references/
-7. **Improve composability** — Explicit handoff points for related skills
+1. Fix structural issues first — Run `bash scripts/analyze-skill.sh` to detect gaps.
+2. Expand trigger description — Add synonyms, edge cases, negative boundaries.
+3. Add input/output examples — Write 3+ concrete before/after pairs per feature.
+4. Add edge-case handling — Test with malformed input, missing context, empty files.
+5. Optimize token density — Remove redundancy, compress verbose phrasing.
+6. Extract reference files — Move deep content from SKILL.md to `references/`.
+7. Verify composability — Check handoff points and run with adjacent skills.
 
 See `references/skill-patterns.md` for patterns + anti-patterns.
 
