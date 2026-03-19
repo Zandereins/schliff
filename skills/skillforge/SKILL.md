@@ -212,7 +212,10 @@ SkillForge and `skill-creator` are complementary:
 3. `/skillforge:report` → review changes, approve, merge
 4. If new capabilities needed → back to `/skill-creator`
 
-SkillForge never creates skills from scratch. Suggest skill-creator first.
+SkillForge never creates skills from scratch. If the user wants a new skill
+from scratch, instead use `skill-creator`. If the user wants to debug a skill
+that crashes, suggest using the `systematic-debugging` skill first, then return
+to SkillForge for iteration.
 
 ## Files in This Skill
 
