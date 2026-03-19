@@ -2,9 +2,9 @@
   "schema_version": "1.0",
   "name": "SkillForge",
   "slug": "skillforge",
-  "tagline": "Autonomous skill improvement engine — autoresearch for skills",
-  "description": "Takes any Claude Code skill as input and iteratively improves it with measurable metrics: trigger accuracy, output quality, edge-case coverage, token efficiency. Based on Karpathy's autoresearch loop pattern.",
-  "categories": ["productivity", "developer-tools", "meta"],
+  "tagline": "Improve your Claude Code skills automatically — measurable quality, overnight iteration",
+  "description": "Takes any Claude Code skill as input and iteratively improves it with measurable metrics across 6 dimensions: structure, trigger accuracy, output quality, edge-case coverage, token efficiency, and composability. The agent-assisted loop makes one atomic change per iteration, keeps improvements, auto-reverts regressions, and logs everything. Based on Karpathy's autoresearch loop pattern. Requires: python3, bash, git.",
+  "categories": ["productivity", "developer-tools"],
   "author": {
     "name": "Zandereins",
     "github": "https://github.com/Zandereins"
