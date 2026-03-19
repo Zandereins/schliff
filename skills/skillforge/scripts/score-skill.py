@@ -170,10 +170,36 @@ def _extract_description(content: str) -> str:
     return ""
 
 
+# --- Synonym expansion for trigger matching ---
+# Maps common synonyms to canonical terms found in skill descriptions
+SYNONYM_TABLE = {
+    "enhance": "improve", "optimize": "improve", "refine": "improve",
+    "polish": "improve", "boost": "improve", "upgrade": "improve",
+    "fix up": "improve", "tune": "improve", "tweak": "improve",
+    "activate": "trigger", "fire": "trigger", "match": "trigger",
+    "invoke": "trigger", "detect": "trigger",
+    "assess": "audit", "inspect": "audit", "review": "audit",
+    "evaluate": "audit", "examine": "audit", "check": "audit",
+    "test": "eval", "validate": "eval", "verify": "eval",
+    "grind": "iterate", "loop": "iterate", "repeat": "iterate",
+    "verbose": "efficiency", "bloated": "efficiency", "concise": "efficiency",
+    "lean": "efficiency", "trim": "efficiency", "compact": "efficiency",
+}
+
+
 def _tokenize_meaningful(text: str) -> list[str]:
-    """Extract meaningful words (4+ chars, not stopwords)."""
+    """Extract meaningful words (4+ chars, not stopwords), with synonym expansion."""
     words = re.findall(r"\b[a-z]{4,}\b", text.lower())
-    return [w for w in words if w not in STOPWORDS]
+    result = []
+    for w in words:
+        if w in STOPWORDS:
+            continue
+        # Expand synonyms: add both the original and canonical form
+        canonical = SYNONYM_TABLE.get(w)
+        result.append(w)
+        if canonical and canonical not in result:
+            result.append(canonical)
+    return result
 
 
 def _extract_key_phrases(text: str) -> list[str]:
