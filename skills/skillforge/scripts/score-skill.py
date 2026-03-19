@@ -67,7 +67,7 @@ def _score_structure_inline(skill_path: str) -> dict:
     issues = []
 
     try:
-        content = Path(skill_path).read_text(encoding="utf-8")
+        content = Path(skill_path).read_text(encoding="utf-8", errors="replace")
     except FileNotFoundError:
         return {"score": 0, "issues": ["file_not_found"], "details": {}}
 
@@ -202,16 +202,6 @@ def _tokenize_meaningful(text: str) -> list[str]:
     return result
 
 
-def _extract_key_phrases(text: str) -> list[str]:
-    """Extract domain-specific bigrams and key phrases from text."""
-    text_lower = text.lower()
-    words = re.findall(r"\b[a-z]+\b", text_lower)
-    bigrams = []
-    for i in range(len(words) - 1):
-        bigrams.append(f"{words[i]}_{words[i+1]}")
-    return bigrams
-
-
 def _has_skill_domain_signal(prompt: str) -> float:
     """Check if prompt is about skills (not generic code/config).
 
@@ -262,7 +252,7 @@ def score_triggers(skill_path: str, eval_suite: Optional[dict]) -> dict:
     if not eval_suite or "triggers" not in eval_suite:
         return {"score": -1, "issues": ["no_trigger_eval_suite"], "details": {}}
 
-    content = Path(skill_path).read_text(encoding="utf-8")
+    content = Path(skill_path).read_text(encoding="utf-8", errors="replace")
     description = _extract_description(content)
 
     if not description:
@@ -393,7 +383,7 @@ def score_efficiency(skill_path: str) -> dict:
     headers or code blocks. It should reward delivering more value in
     fewer words.
     """
-    content = Path(skill_path).read_text(encoding="utf-8")
+    content = Path(skill_path).read_text(encoding="utf-8", errors="replace")
     full_content = content
 
     # Strip frontmatter for body analysis
@@ -553,7 +543,7 @@ def score_composability(skill_path: str) -> dict:
     - No conflicting tool assumptions (20 pts)
     """
     try:
-        content = Path(skill_path).read_text(encoding="utf-8")
+        content = Path(skill_path).read_text(encoding="utf-8", errors="replace")
     except FileNotFoundError:
         return {"score": 0, "issues": ["file_not_found"], "details": {}}
 
