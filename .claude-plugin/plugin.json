@@ -11,5 +11,9 @@
   "compatibility": {
     "claude_code": ">=1.0.0",
     "platforms": ["linux", "macos", "windows"]
+  },
+  "dependencies": {
+    "required": ["python3", "bash", "git"],
+    "optional": ["jq"]
   }
 }

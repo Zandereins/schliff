@@ -12,12 +12,25 @@ Outputs composite score and per-dimension breakdown.
 
 import argparse
 import json
+import math
 import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from typing import Optional
 from pathlib import Path
+
+
+# --- Stopwords for trigger scoring (common words that add noise) ---
+STOPWORDS = {
+    "this", "that", "with", "from", "have", "will", "been", "were", "they",
+    "their", "them", "what", "when", "where", "which", "about", "into",
+    "your", "some", "than", "then", "also", "just", "more", "very", "here",
+    "there", "each", "make", "like", "help", "want", "need", "file", "files",
+    "code", "using", "used", "uses", "does", "doing", "done", "should",
+    "could", "would", "please", "claude", "skill", "create", "created",
+}
 
 
 def score_structure(skill_path: str) -> dict:
@@ -78,12 +91,18 @@ def _score_structure_inline(skill_path: str) -> dict:
         score += 5
         issues.append("long_skill_md")
 
-    # Examples
-    example_count = len(re.findall(r"(?i)(example|input.*output|```)", content))
-    if example_count >= 3:
+    # Examples — match the improved bash script logic
+    real_examples = len(re.findall(
+        r"(?i)(example\s*[0-9:#]|input.*output|e\.g\.|for instance|for example)",
+        content
+    ))
+    code_block_pairs = len(re.findall(r"```", content)) // 2
+    if real_examples >= 2:
         score += 10
-    elif example_count >= 1:
+    elif real_examples >= 1 or (real_examples + code_block_pairs // 3) >= 2:
         score += 5
+    else:
+        issues.append("no_real_examples")
 
     # Headers
     header_count = len(re.findall(r"^##\s", content, re.MULTILINE))
@@ -122,120 +141,433 @@ def _score_structure_inline(skill_path: str) -> dict:
     return {"score": min(score, 100), "issues": issues, "details": {"line_count": len(lines)}}
 
 
+def _extract_description(content: str) -> str:
+    """Extract the description field from YAML frontmatter.
+
+    Handles all common YAML formats:
+      description: inline text
+      description: >
+        block text
+      description: |
+        block text
+    """
+    # Try block scalar first (> or |)
+    match = re.search(
+        r"^description:\s*[>|]-?\s*\n((?:[ \t]+.+\n)*)",
+        content, re.MULTILINE
+    )
+    if match:
+        return match.group(1).strip()
+
+    # Try inline
+    match = re.search(r'^description:\s*"?(.+?)"?\s*$', content, re.MULTILINE)
+    if match:
+        return match.group(1).strip()
+
+    return ""
+
+
+def _tokenize_meaningful(text: str) -> list[str]:
+    """Extract meaningful words (4+ chars, not stopwords)."""
+    words = re.findall(r"\b[a-z]{4,}\b", text.lower())
+    return [w for w in words if w not in STOPWORDS]
+
+
 def score_triggers(skill_path: str, eval_suite: Optional[dict]) -> dict:
-    """Score trigger accuracy using eval suite."""
+    """Score trigger accuracy using eval suite.
+
+    Uses TF-IDF-inspired scoring instead of naive word overlap:
+    1. Extracts meaningful terms (stopwords removed)
+    2. Weights rare/specific terms higher than common ones
+    3. Handles negation in description ("do NOT use for X")
+    4. Requires higher threshold for positive triggers
+    """
     if not eval_suite or "triggers" not in eval_suite:
         return {"score": -1, "issues": ["no_trigger_eval_suite"], "details": {}}
 
     content = Path(skill_path).read_text(encoding="utf-8")
+    description = _extract_description(content)
 
-    # Extract description from frontmatter
-    desc_match = re.search(
-        r"^description:\s*>?\s*\n((?:\s+.+\n)*)", content, re.MULTILINE
-    )
-    if not desc_match:
-        desc_match = re.search(r"^description:\s*(.+)$", content, re.MULTILINE)
+    if not description:
+        return {"score": 0, "issues": ["empty_description"], "details": {}}
 
-    description = desc_match.group(1).strip() if desc_match else ""
     desc_lower = description.lower()
+
+    # Extract negative boundaries from description
+    neg_patterns = re.findall(
+        r"(?:do not|don't|NOT|never)\s+(?:use\s+)?(?:for|when|if|with)?\s*(.+?)(?:\.|,|$)",
+        description, re.IGNORECASE
+    )
+    negative_terms = set()
+    for pat in neg_patterns:
+        negative_terms.update(_tokenize_meaningful(pat))
+
+    # Meaningful description terms (excluding negated ones for positive matching)
+    desc_terms = _tokenize_meaningful(desc_lower)
+    desc_term_set = set(desc_terms)
+    positive_desc_terms = desc_term_set - negative_terms
+
+    # Build IDF-like weights: terms that appear in fewer triggers are more discriminative
+    all_trigger_terms = []
+    for trigger in eval_suite["triggers"]:
+        prompt = trigger.get("prompt", "")
+        all_trigger_terms.extend(_tokenize_meaningful(prompt))
+
+    term_doc_freq = Counter()
+    for trigger in eval_suite["triggers"]:
+        prompt_terms = set(_tokenize_meaningful(trigger.get("prompt", "")))
+        for t in prompt_terms:
+            term_doc_freq[t] += 1
+
+    num_triggers = len(eval_suite["triggers"])
 
     correct = 0
     total = 0
+    details_per_trigger = []
 
     for trigger in eval_suite["triggers"]:
-        prompt = trigger.get("prompt", "").lower()
+        prompt = trigger.get("prompt", "")
         expected = trigger.get("should_trigger", True)
         total += 1
 
-        # Simple heuristic: check if key terms from the prompt appear in description
-        prompt_words = set(re.findall(r"\b\w{4,}\b", prompt))
-        desc_words = set(re.findall(r"\b\w{4,}\b", desc_lower))
-        overlap = len(prompt_words & desc_words)
-        would_trigger = overlap >= 2
+        prompt_terms = set(_tokenize_meaningful(prompt))
+
+        # Compute weighted overlap score
+        overlap_score = 0.0
+        matching_terms = []
+        for term in prompt_terms & positive_desc_terms:
+            # IDF weight: rarer terms in the eval suite matter more
+            idf = math.log(num_triggers / (term_doc_freq.get(term, 1) + 1)) + 1
+            overlap_score += idf
+            matching_terms.append(term)
+
+        # Check if prompt matches negative boundaries
+        neg_overlap = prompt_terms & negative_terms
+        if neg_overlap:
+            overlap_score *= 0.3  # Heavy penalty for matching negated terms
+
+        # Adaptive threshold based on prompt complexity
+        prompt_meaningful = len(prompt_terms)
+        threshold = 2.0 if prompt_meaningful <= 4 else 3.0
+
+        would_trigger = overlap_score >= threshold
 
         if would_trigger == expected:
             correct += 1
 
+        details_per_trigger.append({
+            "prompt": prompt[:60],
+            "expected": expected,
+            "predicted": would_trigger,
+            "score": round(overlap_score, 2),
+            "match": would_trigger == expected,
+        })
+
     score = int((correct / total) * 100) if total > 0 else 0
-    return {"score": score, "issues": [], "details": {"correct": correct, "total": total}}
+
+    # Identify failure patterns
+    issues = []
+    false_positives = sum(1 for d in details_per_trigger if d["predicted"] and not d["expected"])
+    false_negatives = sum(1 for d in details_per_trigger if not d["predicted"] and d["expected"])
+    if false_positives > 0:
+        issues.append(f"false_positives:{false_positives}")
+    if false_negatives > 0:
+        issues.append(f"false_negatives:{false_negatives}")
+
+    return {
+        "score": score,
+        "issues": issues,
+        "details": {
+            "correct": correct,
+            "total": total,
+            "false_positives": false_positives,
+            "false_negatives": false_negatives,
+            "per_trigger": details_per_trigger,
+        }
+    }
 
 
 def score_efficiency(skill_path: str) -> dict:
-    """Score token efficiency — instruction density.
-    
-    Rewards concise instructions that explain WHY, not just WHAT.
-    Penalizes hedging and repetition, not thoughtful reasoning.
+    """Score token efficiency — information density.
+
+    Measures how much useful, actionable content the skill delivers
+    relative to its total size. Penalizes bloat, rewards conciseness.
+
+    Key insight: A good efficiency metric should NOT reward adding more
+    headers or code blocks. It should reward delivering more value in
+    fewer words.
     """
     content = Path(skill_path).read_text(encoding="utf-8")
+    full_content = content
 
-    # Strip frontmatter
+    # Strip frontmatter for body analysis
     if content.startswith("---"):
         end = content.find("---", 3)
         if end > 0:
             content = content[end + 3:]
 
-    words = len(content.split())
-    headers = len(re.findall(r"^##\s", content, re.MULTILINE))
-    code_blocks = len(re.findall(r"```", content))
-    examples = len(re.findall(r"(?i)example", content))
-    # Count imperative verbs as capabilities too
-    imperatives = len(re.findall(
-        r"^(?:Read|Run|Check|Create|Add|Remove|Move|Use|Set|If|When)\b",
+    lines = content.strip().split("\n")
+    total_lines = len(lines)
+    words = content.split()
+    total_words = len(words)
+
+    if total_words == 0:
+        return {"score": 0, "issues": ["empty_skill_body"], "details": {}}
+
+    # --- Signal indicators (what makes content valuable) ---
+
+    # Actionable instructions (imperative verbs at line start)
+    actionable_lines = len(re.findall(
+        r"^(?:\d+\.\s*)?(?:Read|Run|Check|Create|Add|Remove|Move|Use|Set|"
+        r"Install|Configure|Deploy|Test|Verify|Build|Start|Stop|Open|Save|"
+        r"Copy|Delete|Write|Edit|Update|Generate|Execute|Validate|Parse|"
+        r"Extract|Transform|Import|Export|Send|Fetch|Call|Return)\b",
         content, re.MULTILINE
     ))
 
-    capabilities = max(headers + (code_blocks // 2) + examples + (imperatives // 3), 1)
-    words_per_cap = words / capabilities
+    # Real examples (input/output pairs, not just code blocks)
+    real_examples = len(re.findall(
+        r"(?i)(example\s*[0-9:#]|input.*output|e\.g\.|for instance|for example)",
+        content
+    ))
 
-    # Scoring: lower words_per_capability = better
-    if words_per_cap <= 30:
-        score = 95
-    elif words_per_cap <= 50:
-        score = 85
-    elif words_per_cap <= 80:
-        score = 75
-    elif words_per_cap <= 120:
-        score = 60
-    else:
-        score = 40
+    # WHY-based reasoning (explains rationale)
+    why_count = len(re.findall(
+        r"\b(because|since|this enables|this prevents|this means|the reason|"
+        r"this ensures|this avoids|otherwise|so that|why[:\s])\b",
+        content, re.IGNORECASE
+    ))
 
-    # Penalty for hedging (vague language wastes tokens)
+    # Verification commands (executable checks)
+    verification_cmds = len(re.findall(r"```\s*(?:bash|sh)\b", content))
+
+    # --- Noise indicators (what wastes tokens) ---
+
+    # Hedging language
     hedge_count = len(re.findall(
         r"you (might|could|should|may) (want to|consider|possibly)",
         content, re.IGNORECASE
     ))
-    score = max(0, score - (hedge_count * 3))
 
-    # Bonus for using examples instead of prose (+5)
-    if examples >= 3:
-        score = min(100, score + 5)
-
-    # Bonus for WHY-based reasoning (+5) — explains rationale, not just rules
-    why_indicators = len(re.findall(
-        r"\b(because|since|this enables|this prevents|this means|the reason)\b",
-        content, re.IGNORECASE
+    # Redundant phrases (saying the same thing multiple ways)
+    filler_phrases = len(re.findall(
+        r"(?i)(it is important to note that|as mentioned (above|earlier|before)|"
+        r"in other words|that is to say|keep in mind that|note that|"
+        r"it should be noted|please note|remember that|be aware that|"
+        r"it's worth mentioning)",
+        content
     ))
-    if why_indicators >= 3:
-        score = min(100, score + 5)
 
-    # Bonus for explicit boundaries (+3) — scope clarity saves tokens downstream
-    if re.search(r"(?i)(do not|don't) use (for|when|if)", content):
+    # Instructions Claude already knows (generic coding advice)
+    obvious_instructions = len(re.findall(
+        r"(?i)(make sure to save|don't forget to|always test your|"
+        r"be careful when|ensure you have|make sure you|"
+        r"remember to commit|use version control)",
+        content
+    ))
+
+    # Empty/near-empty lines ratio
+    empty_lines = sum(1 for line in lines if not line.strip())
+    empty_ratio = empty_lines / max(total_lines, 1)
+
+    # --- Compute score ---
+
+    # Base score: information density (signal words / total words)
+    signal_count = (
+        actionable_lines * 3 +  # High value: direct instructions
+        real_examples * 5 +      # High value: concrete examples
+        why_count * 2 +           # Medium value: reasoning
+        verification_cmds * 2     # Medium value: verifiable steps
+    )
+    noise_count = (
+        hedge_count * 3 +
+        filler_phrases * 2 +
+        obvious_instructions * 2
+    )
+
+    # Density = signal per 100 words, penalized by noise
+    density = ((signal_count - noise_count) / max(total_words, 1)) * 100
+
+    # Map density to score
+    if density >= 8:
+        score = 95
+    elif density >= 5:
+        score = 85
+    elif density >= 3:
+        score = 75
+    elif density >= 1.5:
+        score = 65
+    elif density >= 0.5:
+        score = 55
+    else:
+        score = 40
+
+    # Penalty for excessive length without proportional signal
+    if total_words > 2000 and density < 3:
+        score = max(20, score - 15)
+
+    # Penalty for too much whitespace (padding)
+    if empty_ratio > 0.3:
+        score = max(20, score - 5)
+
+    # Bonus for explicit scope boundaries (+3)
+    if re.search(r"(?i)(do not|don't) use (for|when|if)", full_content):
         score = min(100, score + 3)
 
+    # Bonus for conciseness: under 300 lines with good signal (+5)
+    if total_lines <= 300 and density >= 3:
+        score = min(100, score + 5)
+
+    issues = []
+    if hedge_count > 2:
+        issues.append(f"excessive_hedging:{hedge_count}")
+    if filler_phrases > 2:
+        issues.append(f"filler_phrases:{filler_phrases}")
+    if obvious_instructions > 1:
+        issues.append(f"obvious_instructions:{obvious_instructions}")
+    if total_words > 2000:
+        issues.append(f"verbose:{total_words}_words")
+
     return {
-        "score": score,
-        "issues": [],
+        "score": min(100, max(0, score)),
+        "issues": issues,
         "details": {
-            "total_words": words,
-            "capabilities": capabilities,
-            "words_per_capability": round(words_per_cap, 1),
-            "hedge_count": hedge_count
+            "total_words": total_words,
+            "total_lines": total_lines,
+            "signal_count": signal_count,
+            "noise_count": noise_count,
+            "density": round(density, 2),
+            "actionable_lines": actionable_lines,
+            "real_examples": real_examples,
+            "why_count": why_count,
+            "hedge_count": hedge_count,
+            "filler_phrases": filler_phrases,
         }
     }
 
 
-def compute_composite(scores: dict) -> float:
-    """Compute weighted composite score."""
+def score_composability(skill_path: str) -> dict:
+    """Score composability — how well this skill plays with others.
+
+    Static analysis checks (no runtime needed):
+    - Clear scope boundaries (20 pts)
+    - No global state assumptions (20 pts)
+    - Input/output contract clarity (20 pts)
+    - Explicit handoff points (20 pts)
+    - No conflicting tool assumptions (20 pts)
+    """
+    try:
+        content = Path(skill_path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {"score": 0, "issues": ["file_not_found"], "details": {}}
+
+    score = 0
+    issues = []
+
+    # 1. Clear scope boundaries (20 pts)
+    has_positive_scope = bool(re.search(
+        r"(?i)(use this skill when|use when|trigger when|activate for)",
+        content
+    ))
+    has_negative_scope = bool(re.search(
+        r"(?i)(do not use|don't use|NOT for|not use for|out of scope)",
+        content
+    ))
+    if has_positive_scope and has_negative_scope:
+        score += 20
+    elif has_positive_scope or has_negative_scope:
+        score += 10
+        issues.append("partial_scope_boundaries")
+    else:
+        issues.append("no_scope_boundaries")
+
+    # 2. No global state assumptions (20 pts)
+    global_state_patterns = re.findall(
+        r"(?i)(must be installed globally|global config|~\/\.|modify system|"
+        r"system-wide|/etc/|export\s+\w+=)",
+        content
+    )
+    if not global_state_patterns:
+        score += 20
+    elif len(global_state_patterns) <= 2:
+        score += 10
+        issues.append(f"some_global_state_assumptions:{len(global_state_patterns)}")
+    else:
+        issues.append(f"heavy_global_state_assumptions:{len(global_state_patterns)}")
+
+    # 3. Input/output contract clarity (20 pts)
+    has_input_spec = bool(re.search(
+        r"(?i)(input:|takes.*as input|expects|requires.*file|requires.*path|target.*skill)",
+        content
+    ))
+    has_output_spec = bool(re.search(
+        r"(?i)(output:|produces|generates|creates|saves.*to|writes.*to|returns)",
+        content
+    ))
+    if has_input_spec and has_output_spec:
+        score += 20
+    elif has_input_spec or has_output_spec:
+        score += 10
+        issues.append("partial_io_contract")
+    else:
+        issues.append("no_io_contract")
+
+    # 4. Explicit handoff points (20 pts)
+    has_handoff = bool(re.search(
+        r"(?i)(then use|hand off to|pass to|chain with|followed by|"
+        r"complementary|works with|after.*use|before.*use|"
+        r"skill-creator|next step)",
+        content
+    ))
+    has_when_not = bool(re.search(
+        r"(?i)(if.*instead use|for.*use.*instead|suggest using)",
+        content
+    ))
+    if has_handoff and has_when_not:
+        score += 20
+    elif has_handoff or has_when_not:
+        score += 12
+    else:
+        issues.append("no_handoff_points")
+
+    # 5. No conflicting tool assumptions (20 pts)
+    # Check for hard-coded tool requirements without alternatives
+    hard_requirements = re.findall(
+        r"(?i)(requires?\s+(?:npm|pip|brew|apt|docker|node|python)\b)",
+        content
+    )
+    has_alternatives = bool(re.search(
+        r"(?i)(alternatively|or use|if.*not available|fallback)",
+        content
+    ))
+    if not hard_requirements or has_alternatives:
+        score += 20
+    elif len(hard_requirements) <= 2:
+        score += 10
+        issues.append("hard_tool_requirements_without_fallback")
+    else:
+        issues.append("many_hard_tool_requirements")
+
+    return {
+        "score": score,
+        "issues": issues,
+        "details": {
+            "has_positive_scope": has_positive_scope,
+            "has_negative_scope": has_negative_scope,
+            "has_input_spec": has_input_spec,
+            "has_output_spec": has_output_spec,
+            "has_handoff": has_handoff,
+            "global_state_patterns": len(global_state_patterns) if global_state_patterns else 0,
+        }
+    }
+
+
+def compute_composite(scores: dict) -> dict:
+    """Compute weighted composite score with confidence indicator.
+
+    Returns both the score and metadata about how many dimensions
+    were actually measured, so users know how trustworthy the number is.
+    """
     weights = {
         "structure": 0.15,
         "triggers": 0.25,
@@ -247,14 +579,47 @@ def compute_composite(scores: dict) -> float:
 
     total = 0.0
     weight_sum = 0.0
+    measured = []
+    unmeasured = []
 
     for dim, weight in weights.items():
         s = scores.get(dim, {}).get("score", -1)
-        if s >= 0:  # Only count dimensions we could measure
+        if s >= 0:
             total += s * weight
             weight_sum += weight
+            measured.append(dim)
+        else:
+            unmeasured.append(dim)
 
-    return round(total / weight_sum * 1.0, 1) if weight_sum > 0 else 0.0
+    composite = round(total / weight_sum, 1) if weight_sum > 0 else 0.0
+
+    # Confidence: what fraction of total weight is actually measured
+    confidence = round(weight_sum, 2)
+    measured_count = len(measured)
+    total_count = len(weights)
+
+    warnings = []
+    if measured_count <= 2:
+        warnings.append(
+            f"Only {measured_count}/{total_count} dimensions measured "
+            f"(weight coverage: {confidence:.0%}). Score is unreliable — "
+            f"unmeasured: {', '.join(unmeasured)}"
+        )
+    elif measured_count <= 4:
+        warnings.append(
+            f"{measured_count}/{total_count} dimensions measured "
+            f"(weight coverage: {confidence:.0%}). "
+            f"Unmeasured: {', '.join(unmeasured)}"
+        )
+
+    return {
+        "score": composite,
+        "measured_dimensions": measured_count,
+        "total_dimensions": total_count,
+        "weight_coverage": confidence,
+        "unmeasured": unmeasured,
+        "warnings": warnings,
+    }
 
 
 def main():
@@ -272,17 +637,24 @@ def main():
         "structure": score_structure(args.skill_path),
         "triggers": score_triggers(args.skill_path, eval_suite),
         "efficiency": score_efficiency(args.skill_path),
-        # These require runtime eval (placeholder scores)
+        "composability": score_composability(args.skill_path),
+        # These require runtime eval (still placeholder)
         "quality": {"score": -1, "issues": ["requires_runtime_eval"], "details": {}},
         "edges": {"score": -1, "issues": ["requires_runtime_eval"], "details": {}},
-        "composability": {"score": -1, "issues": ["requires_runtime_eval"], "details": {}},
     }
 
-    composite = compute_composite(scores)
+    composite_result = compute_composite(scores)
 
     result = {
         "skill_path": args.skill_path,
-        "composite_score": composite,
+        "composite_score": composite_result["score"],
+        "confidence": {
+            "measured": composite_result["measured_dimensions"],
+            "total": composite_result["total_dimensions"],
+            "weight_coverage": composite_result["weight_coverage"],
+            "unmeasured": composite_result["unmeasured"],
+        },
+        "warnings": composite_result["warnings"],
         "dimensions": {k: v["score"] for k, v in scores.items()},
         "issues": {k: v["issues"] for k, v in scores.items() if v["issues"]},
         "details": {k: v["details"] for k, v in scores.items() if v["details"]},
@@ -291,20 +663,34 @@ def main():
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print(f"\n{'='*50}")
-        print(f"  SkillForge Quality Score: {composite}/100")
-        print(f"{'='*50}")
+        print(f"\n{'='*60}")
+        print(f"  SkillForge Quality Score: {composite_result['score']}/100")
+
+        # Show confidence warning
+        mc = composite_result['measured_dimensions']
+        tc = composite_result['total_dimensions']
+        wc = composite_result['weight_coverage']
+        if mc < tc:
+            print(f"  [{mc}/{tc} dimensions measured, {wc:.0%} weight coverage]")
+
+        print(f"{'='*60}")
         for dim, data in scores.items():
             s = data["score"]
-            indicator = "✓" if s >= 70 else "△" if s >= 50 else "✗" if s >= 0 else "—"
+            indicator = "\u2713" if s >= 70 else "\u25b3" if s >= 50 else "\u2717" if s >= 0 else "\u2014"
             score_str = f"{s}" if s >= 0 else "n/a"
             print(f"  {indicator} {dim:15s} {score_str:>5s}")
-        print(f"{'='*50}")
-        all_issues = [i for v in scores.values() for i in v["issues"]]
+        print(f"{'='*60}")
+
+        # Show warnings
+        for warning in composite_result.get("warnings", []):
+            print(f"\n  \u26a0  {warning}")
+
+        all_issues = [i for v in scores.values() for i in v["issues"]
+                      if i != "requires_runtime_eval"]
         if all_issues:
             print(f"\n  Issues found:")
             for issue in all_issues:
-                print(f"    • {issue}")
+                print(f"    \u2022 {issue}")
         print()
 
 

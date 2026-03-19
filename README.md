@@ -1,6 +1,6 @@
 # SkillForge 🔨
 
-> **Autonomous skill improvement engine** — the autoresearch loop applied to Claude Code skills.
+> **Agent-assisted skill improvement engine** — the autoresearch loop applied to Claude Code skills.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Claude Code Skill](https://img.shields.io/badge/Claude_Code-Skill-blue?logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code/skills)
@@ -18,7 +18,7 @@ You have a Claude Code skill. It kind of works. But:
 - It's bloated with instructions Claude already knows
 - You don't know what "good" looks like, let alone how to measure it
 
-**SkillForge fixes this.** Set a goal, start the loop, walk away.
+**SkillForge fixes this.** Set a goal, start the loop, and let the agent grind through iterations overnight while you review results.
 
 ## How It Works
 
@@ -48,14 +48,16 @@ Every improvement stacks. Every failure auto-reverts. Progress is tracked.
 
 ## Quality Dimensions
 
-| Dimension | Weight | What It Measures |
-|-----------|--------|-----------------|
-| **Structure** | 15% | Frontmatter, progressive disclosure, organization |
-| **Trigger accuracy** | 25% | Activates for right prompts, silent for wrong ones |
-| **Output quality** | 25% | Following the skill produces correct results |
-| **Edge coverage** | 15% | Handles unusual inputs gracefully |
-| **Token efficiency** | 10% | Minimal instructions, maximum effect |
-| **Composability** | 10% | Works well with other skills |
+| Dimension | Weight | What It Measures | Automated? |
+|-----------|--------|-----------------|------------|
+| **Structure** | 15% | Frontmatter, progressive disclosure, organization | Yes |
+| **Trigger accuracy** | 25% | Activates for right prompts, silent for wrong ones | Yes (with eval suite) |
+| **Output quality** | 25% | Following the skill produces correct results | No (needs runtime eval) |
+| **Edge coverage** | 15% | Handles unusual inputs gracefully | No (needs runtime eval) |
+| **Token efficiency** | 10% | Information density, signal-to-noise ratio | Yes |
+| **Composability** | 10% | Scope boundaries, handoff points, no conflicts | Yes (static analysis) |
+
+> **Transparency note:** Structure, Trigger accuracy (with eval suite), Efficiency, and Composability are measured automatically. Output quality and Edge coverage require human evaluation via the eval loop. The composite score shows how many dimensions were actually measured and warns when coverage is low.
 
 ## Quick Start
 
@@ -182,7 +184,6 @@ Existing autoresearch skills improve **code, content, or configurations**. Skill
 
 - **[Andrej Karpathy](https://github.com/karpathy)** — [autoresearch](https://github.com/karpathy/autoresearch): the original 630-line autonomous ML experiment loop
 - **[Udit Goenka](https://github.com/uditgoenka)** — [autoresearch](https://github.com/uditgoenka/autoresearch): generalized autoresearch for Claude Code
-- **[Ole Lehmann](https://github.com/olelehmann100kMRR)** — [autoresearch-skill](https://github.com/olelehmann100kMRR/autoresearch-skill): minimal autoresearch skill
 - **[Anthropic](https://anthropic.com)** — [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills system
 
 ## Contributing
