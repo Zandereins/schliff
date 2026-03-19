@@ -798,9 +798,18 @@ def score_edges(skill_path: str, eval_suite: Optional[dict]) -> dict:
         issues.append("no_edge_cases")
 
     # 2. Covers multiple categories (30 pts)
-    known_categories = {
-        "minimal_input", "invalid_path", "scale_extreme",
-        "malformed_input", "missing_deps", "unicode"
+    # Use prefix matching to handle category name variations
+    # e.g., "malformed_skill" matches "malformed", "unicode_path" matches "unicode"
+    category_prefixes = {
+        "minimal": "minimal_input",
+        "invalid": "invalid_path",
+        "scale": "scale_extreme",
+        "malformed": "malformed_input",
+        "missing": "missing_deps",
+        "unicode": "unicode",
+        "empty": "minimal_input",
+        "huge": "scale_extreme",
+        "dangerous": "missing_deps",
     }
     found_categories = set()
     for ec in edge_cases:
@@ -808,7 +817,13 @@ def score_edges(skill_path: str, eval_suite: Optional[dict]) -> dict:
         if cat:
             found_categories.add(cat)
 
-    covered_known = found_categories & known_categories
+    # Map found categories to known categories via prefix matching
+    covered_known = set()
+    for found_cat in found_categories:
+        for prefix, known_cat in category_prefixes.items():
+            if found_cat.startswith(prefix):
+                covered_known.add(known_cat)
+                break
     if len(covered_known) >= 4:
         score += 30
     elif len(covered_known) >= 3:
