@@ -93,32 +93,48 @@ edge_score = (graceful_handling_count / total_edge_cases) × 100
 
 ## 5. Token Efficiency (weight: 0.10)
 
-Measures instruction density — maximum capability per token consumed.
+Measures information density — how much actionable signal the skill delivers
+relative to its total size.
 
-**Red flags:**
+**How `score-skill.py` measures this (automated):**
+
+The scorer computes a signal-to-noise density ratio:
+- **Signal:** actionable instructions (imperative verbs), real examples,
+  WHY-based reasoning, verification commands
+- **Noise:** hedging language, filler phrases ("it should be noted that"),
+  instructions Claude already knows ("always test your code")
+- **Density** = (signal - noise) / total words * 100
+
+This approach rewards **fewer words with more punch** rather than the old
+formula which rewarded adding headers and code blocks.
+
+**Red flags (noise indicators):**
 - Repeated instructions (same thing said 3 different ways)
 - Verbose preambles before actionable content
-- Long explanations where a short example would suffice
-- Unnecessary hedging
-- Instructions that Claude already knows
+- Filler phrases: "it is important to note that", "as mentioned above"
+- Hedging: "you might want to consider possibly"
+- Instructions Claude already knows: "make sure to save your file"
 
-**Green flags:**
+**Green flags (signal indicators):**
 - Concise imperative instructions
-- Examples that replace explanations
-- Progressive disclosure (details in references, not SKILL.md)
+- Real input/output examples
 - WHY-based reasoning (explains rationale, not just rules)
+- Executable verification commands
+- Explicit scope boundaries
 
 ## 6. Composability (weight: 0.10)
 
 Measures how well the skill plays with others.
 
-| Check | Points |
-|-------|--------|
-| No global state pollution | 20 |
-| Clear input/output contract | 20 |
-| No conflicting tool assumptions | 20 |
-| Explicit handoff points | 20 |
-| No overlapping scope | 20 |
+**How `score-skill.py` measures this (automated, static analysis):**
+
+| Check | Points | What the scorer looks for |
+|-------|--------|--------------------------|
+| Clear scope boundaries | 20 | Both "use when" AND "do not use for" present |
+| No global state assumptions | 20 | No hard-coded global paths, system-wide config |
+| Clear input/output contract | 20 | Specifies what input is expected and what output is produced |
+| Explicit handoff points | 20 | References to other skills, "then use X", "suggest using Y" |
+| No conflicting tool assumptions | 20 | No hard tool requirements without fallbacks |
 
 ## Composite Score Calculation
 
@@ -133,9 +149,17 @@ total = (
 )
 ```
 
-**Quality tiers:**
+Dimensions that return `-1` (unmeasured) are excluded and the remaining
+weights are renormalized. The scorer reports **weight coverage** — the
+fraction of total weight actually measured — and warns when coverage is
+below 50%.
+
+**Quality tiers (with sufficient coverage):**
 - 90+ Excellent — production-ready, community-shareable
 - 80-89 Good — reliable for personal/team use
 - 70-79 Adequate — works but has clear gaps
 - 60-69 Needs work — functional but unreliable
 - <60 Poor — significant issues, needs major revision
+
+**Currently automated:** Structure, Triggers (with eval suite), Efficiency,
+Composability. **Requires eval loop:** Output Quality, Edge Coverage.
