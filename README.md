@@ -182,7 +182,6 @@ Existing autoresearch skills improve **code, content, or configurations**. Skill
 
 - **[Andrej Karpathy](https://github.com/karpathy)** — [autoresearch](https://github.com/karpathy/autoresearch): the original 630-line autonomous ML experiment loop
 - **[Udit Goenka](https://github.com/uditgoenka)** — [autoresearch](https://github.com/uditgoenka/autoresearch): generalized autoresearch for Claude Code
-- **[Ole Lehmann](https://github.com/olelehmann100kMRR)** — [autoresearch-skill](https://github.com/olelehmann100kMRR/autoresearch-skill): minimal autoresearch skill
 - **[Anthropic](https://anthropic.com)** — [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills system
 
 ## Contributing
