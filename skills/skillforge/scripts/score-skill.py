@@ -330,7 +330,7 @@ def score_triggers(skill_path: str, eval_suite: Optional[dict]) -> dict:
             prompt
         )
         if creation_patterns:
-            overlap_score *= 0.3
+            overlap_score *= 0.1  # Strong penalty: creation is anti-signal for improvement
 
         # Apply domain signal multiplier (skill context vs generic code)
         domain_mult = _has_skill_domain_signal(prompt)
