@@ -28,7 +28,6 @@ Goal: Make the skill trigger correctly for deployment scenarios
 ```
 
 SkillForge will auto-select metrics, generate evals, and run 30 iterations.
-Or customize with explicit metric + time budget.
 
 ## Core Loop (NEVER Pauses)
 
@@ -81,7 +80,7 @@ Verify: python3 scripts/score-skill.py SKILL.md --json
 Constraint: efficiency >= 80, composability >= 90
 ```
 
-Use constraints when optimizing one dimension risks degrading others.
+Set constraints when optimizing one dimension risks degrading others.
 
 ## Quality Dimensions (Defaults, Customizable)
 
@@ -105,6 +104,7 @@ Metric: "Time to first correct output (ms)"
 Verify: time bash scripts/run-eval.sh | grep "passed"
 ```
 
+Validate custom metrics by running them once before entering the loop.
 See `references/metrics-catalog.md#custom` for setup and examples.
 
 ## Subcommands
@@ -157,8 +157,8 @@ SkillForge handles skills that span multiple files (SKILL.md + references/):
 3. When SKILL.md exceeds 400 lines, extract the largest section to `references/`.
 4. Verify all cross-file references resolve after each change.
 
-For agent improvement (not just skills): treat the agent's system prompt as SKILL.md,
-and the agent's tool definitions as reference files. Run the same loop.
+For agent improvement (not just skills): treat the agent's system prompt as SKILL.md
+and tool definitions as reference files. Execute the same loop on agent configs.
 
 ## Discovery Mode (Auto-Gap Analysis)
 
@@ -170,6 +170,7 @@ Run `/skillforge:analyze` without a GOAL. SkillForge will:
 5. Suggest GOAL + METRIC + VERIFY automatically. User confirms or overrides.
 
 Use discovery mode when the user says "my skill needs work" without specifying what.
+Run all scorers, cluster failures, propose targeted GOAL + METRIC automatically.
 
 ## Parallel Experimentation (Try 3, Keep Best)
 
@@ -180,8 +181,7 @@ For iterations where multiple plausible changes exist:
 4. Fall back to sequential mode if git worktree is unavailable.
 
 Use parallel mode when stuck (5+ sequential discards) or when the gap-to-target
-is large (>15 points). This is 3x faster than sequential experimentation because
-each iteration explores more of the search space.
+is large (>15 points). Explores 3x more search space per iteration.
 
 ## Noisy Metric Handling
 
@@ -191,6 +191,27 @@ When metrics fluctuate (±5% across runs), use multi-run averaging:
 3. Detect noise floor automatically from the first 3 baseline runs.
 
 Use this when the VERIFY command involves LLM output or timing-dependent checks.
+
+## Cost Tracking + ROI
+
+Track improvement efficiency to stop when returns diminish:
+1. Count iterations and estimate tokens per experiment (~2k-5k per iteration).
+2. Compute ROI: `delta_metric / iterations_spent` after each keep.
+3. Stop when ROI drops below threshold (e.g., last 5 iterations < 0.5 points gained).
+4. Log `tokens_estimated` to `history/results.jsonl` for cross-session ROI comparison.
+
+Use ROI tracking to prevent wasteful grinding when the skill has plateaued.
+
+## Self-Evolving Eval Suites
+
+After every 10 iterations, analyze eval suite effectiveness:
+1. Classify tests as "mastered" (always pass for 10+ iterations), "blocked" (always fail), or "flaky" (inconsistent).
+2. Reduce weight of mastered tests — they no longer discriminate quality changes.
+3. Generate new test cases targeting uncovered gaps found during discovery mode.
+4. Log eval mutations to `history/` separately from skill changes.
+
+Run eval evolution BETWEEN sessions, not during the loop, because this preserves
+Rule 7 (never modify VERIFY during loop) while improving test coverage.
 
 ## Improvement Strategies (Dynamic)
 
@@ -207,34 +228,19 @@ this order and pick the first with a gap > 10 points from target:
 
 See `references/metrics-catalog.md` for patterns and anti-patterns per dimension.
 
-## Example: Real Improvement Session
+## Example Session
 
 ```
-Goal: Make "audit" trigger work for all audit-related requests
-Metric: Binary eval pass rate (run eval suite, count passing tests)
+Goal: Trigger accuracy from 60% to 90%
 Verify: bash scripts/run-eval.sh | grep "PASS" | wc -l
-Time budget: 1 hour
-Iterations: 20
 
-Baseline (exp #0): 60% (12/20 tests pass)
-
-Exp 1: Add synonyms to description
-  Change: "audit" → "audit, review, assess, inspect, evaluate"
-  Result: 65% (13/20)
-  Keep: ✓
-
-Exp 2: Add negative trigger examples
-  Change: Add examples of when NOT to trigger
-  Result: 70% (14/20)
-  Keep: ✓
-
-Exp 3: Add edge case for partial audit
-  Change: Handle "just check the trigger accuracy" (partial audit)
-  Result: 75% (15/20)
-  Keep: ✓
-
-[Continue until goal met or iterations exhausted]
+Exp 1: Add synonyms to description → 65% → Keep
+Exp 2: Add negative trigger examples → 70% → Keep
+Exp 3: Compress verbose setup section → 68% → Discard (revert)
+Exp 4: Add edge case for partial audit → 75% → Keep
 ```
+
+Check `history/results.jsonl` between sessions to extract which strategy types succeed.
 
 ## Skill-Creator Handoff
 
@@ -256,7 +262,7 @@ to SkillForge for iteration.
 
 ## Files
 
-Run `ls -R` in the skill directory. Key files:
+Run `ls -R` in the skill directory. Run `python3 scripts/score-skill.py SKILL.md --json` for current scores. Key files:
 - `scripts/score-skill.py` — Run to compute all 6 dimension scores
 - `scripts/analyze-skill.sh` — Run for structural lint (100-point check)
 - `scripts/run-eval.sh` — Run eval suite with assertion validation
