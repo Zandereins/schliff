@@ -1,6 +1,6 @@
 {
   "skill_name": "skillforge",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "created_by": "skillforge",
   "triggers": [
     {
@@ -254,6 +254,41 @@
       "should_trigger": true,
       "category": "edge",
       "notes": "Vague request referencing a skill — should trigger analysis mode"
+    },
+    {
+      "id": "pos-18",
+      "prompt": "Verbessere meinen Deploy-Skill, die Trigger-Genauigkeit liegt bei 50%",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Non-English (German) improvement request"
+    },
+    {
+      "id": "pos-19",
+      "prompt": "My deploy skill has a SKILL.md plus 10 reference files in references/. The main file is fine but the references are outdated. Can you improve the whole skill?",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Multi-file skill improvement request"
+    },
+    {
+      "id": "neg-13",
+      "prompt": "Compare the performance of my Python web scraper on v1 vs v2 of the target site",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Performance comparison of application code, not skill improvement"
+    },
+    {
+      "id": "edge-8",
+      "prompt": "/skillforge",
+      "should_trigger": true,
+      "category": "edge",
+      "notes": "Bare slash command with zero context — should trigger and prompt for target"
+    },
+    {
+      "id": "edge-9",
+      "prompt": "My eval suite is showing 12 out of 20 tests failing and the trigger pass rate dropped after I edited the description yesterday. What happened?",
+      "should_trigger": true,
+      "category": "edge",
+      "notes": "Eval-suite + trigger-pass-rate context implies SkillForge analysis"
     }
   ],
   "test_cases": [
@@ -262,10 +297,26 @@
       "prompt": "Analyze my skill at .claude/skills/deploy/SKILL.md and tell me what's wrong with it",
       "input_files": [],
       "assertions": [
-        {"type": "contains", "value": "structure", "description": "Report includes structure dimension"},
-        {"type": "contains", "value": "trigger", "description": "Report includes trigger analysis"},
-        {"type": "pattern", "value": "\\d+/100", "description": "Report shows a numeric score"},
-        {"type": "excludes", "value": "TODO", "description": "No placeholder text in output"}
+        {
+          "type": "contains",
+          "value": "structure",
+          "description": "Report includes structure dimension"
+        },
+        {
+          "type": "contains",
+          "value": "trigger",
+          "description": "Report includes trigger analysis"
+        },
+        {
+          "type": "pattern",
+          "value": "\\d+/100",
+          "description": "Report shows a numeric score"
+        },
+        {
+          "type": "excludes",
+          "value": "TODO",
+          "description": "No placeholder text in output"
+        }
       ]
     },
     {
@@ -273,9 +324,21 @@
       "prompt": "Run one improvement iteration on my skill — focus on trigger accuracy",
       "input_files": [],
       "assertions": [
-        {"type": "contains", "value": "description", "description": "Mentions modifying the description"},
-        {"type": "contains", "value": "commit", "description": "Makes a git commit"},
-        {"type": "pattern", "value": "(keep|discard|revert)", "description": "Makes a keep/discard/revert decision"}
+        {
+          "type": "contains",
+          "value": "description",
+          "description": "Mentions modifying the description"
+        },
+        {
+          "type": "contains",
+          "value": "commit",
+          "description": "Makes a git commit"
+        },
+        {
+          "type": "pattern",
+          "value": "(keep|discard|revert)",
+          "description": "Makes a keep/discard/revert decision"
+        }
       ]
     },
     {
@@ -283,11 +346,31 @@
       "prompt": "Benchmark my skill at skills/testing/SKILL.md and show me scores for all six dimensions",
       "input_files": [],
       "assertions": [
-        {"type": "contains", "value": "structure", "description": "Reports structure score"},
-        {"type": "contains", "value": "trigger", "description": "Reports trigger accuracy score"},
-        {"type": "contains", "value": "token", "description": "Reports token efficiency"},
-        {"type": "pattern", "value": "\\d+", "description": "Contains numeric scores"},
-        {"type": "excludes", "value": "error", "description": "No error messages in output"}
+        {
+          "type": "contains",
+          "value": "structure",
+          "description": "Reports structure score"
+        },
+        {
+          "type": "contains",
+          "value": "trigger",
+          "description": "Reports trigger accuracy score"
+        },
+        {
+          "type": "contains",
+          "value": "token",
+          "description": "Reports token efficiency"
+        },
+        {
+          "type": "pattern",
+          "value": "\\d+",
+          "description": "Contains numeric scores"
+        },
+        {
+          "type": "excludes",
+          "value": "error",
+          "description": "No error messages in output"
+        }
       ]
     },
     {
@@ -295,9 +378,21 @@
       "prompt": "Run the eval suite for my deploy skill and tell me which tests pass and which fail",
       "input_files": [],
       "assertions": [
-        {"type": "pattern", "value": "(?i)(pass|fail)", "description": "Reports pass/fail status for tests"},
-        {"type": "pattern", "value": "\\d+/\\d+", "description": "Shows count of passing vs total"},
-        {"type": "contains", "value": "trigger", "description": "Covers trigger tests"}
+        {
+          "type": "pattern",
+          "value": "(?i)(pass|fail)",
+          "description": "Reports pass/fail status for tests"
+        },
+        {
+          "type": "pattern",
+          "value": "\\d+/\\d+",
+          "description": "Shows count of passing vs total"
+        },
+        {
+          "type": "contains",
+          "value": "trigger",
+          "description": "Covers trigger tests"
+        }
       ]
     },
     {
@@ -305,10 +400,26 @@
       "prompt": "Generate an improvement report for the last 10 experiments on my skill",
       "input_files": [],
       "assertions": [
-        {"type": "pattern", "value": "exp[- ]?\\d+", "description": "References experiment numbers"},
-        {"type": "pattern", "value": "(kept|discarded|reverted)", "description": "Shows experiment outcomes"},
-        {"type": "contains", "value": "baseline", "description": "References the baseline measurement"},
-        {"type": "pattern", "value": "\\d+%|\\d+/\\d+", "description": "Includes metric values"}
+        {
+          "type": "pattern",
+          "value": "exp[- ]?\\d+",
+          "description": "References experiment numbers"
+        },
+        {
+          "type": "pattern",
+          "value": "(kept|discarded|reverted)",
+          "description": "Shows experiment outcomes"
+        },
+        {
+          "type": "contains",
+          "value": "baseline",
+          "description": "References the baseline measurement"
+        },
+        {
+          "type": "pattern",
+          "value": "\\d+%|\\d+/\\d+",
+          "description": "Includes metric values"
+        }
       ]
     },
     {
@@ -316,10 +427,26 @@
       "prompt": "Set up skillforge on my skill: goal is 90% eval pass rate, verify with bash scripts/run-eval.sh, run 20 iterations",
       "input_files": [],
       "assertions": [
-        {"type": "contains", "value": "baseline", "description": "Establishes baseline before iterating"},
-        {"type": "pattern", "value": "exp[- ]?0|#0", "description": "Records experiment zero"},
-        {"type": "pattern", "value": "90%|90 ?%", "description": "Acknowledges the 90% target"},
-        {"type": "contains", "value": "iteration", "description": "Mentions iterations"}
+        {
+          "type": "contains",
+          "value": "baseline",
+          "description": "Establishes baseline before iterating"
+        },
+        {
+          "type": "pattern",
+          "value": "exp[- ]?0|#0",
+          "description": "Records experiment zero"
+        },
+        {
+          "type": "pattern",
+          "value": "90%|90 ?%",
+          "description": "Acknowledges the 90% target"
+        },
+        {
+          "type": "contains",
+          "value": "iteration",
+          "description": "Mentions iterations"
+        }
       ]
     },
     {
@@ -327,9 +454,21 @@
       "prompt": "My skill has a SKILL.md with no frontmatter, no examples, and no trigger phrases. Analyze it and tell me what to fix first.",
       "input_files": [],
       "assertions": [
-        {"type": "pattern", "value": "(?i)frontmatter", "description": "Flags missing frontmatter"},
-        {"type": "pattern", "value": "(?i)(example|trigger)", "description": "Flags missing examples or triggers"},
-        {"type": "pattern", "value": "(?i)(priority|first|critical|start)", "description": "Provides prioritized recommendations"}
+        {
+          "type": "pattern",
+          "value": "(?i)frontmatter",
+          "description": "Flags missing frontmatter"
+        },
+        {
+          "type": "pattern",
+          "value": "(?i)(example|trigger)",
+          "description": "Flags missing examples or triggers"
+        },
+        {
+          "type": "pattern",
+          "value": "(?i)(priority|first|critical|start)",
+          "description": "Provides prioritized recommendations"
+        }
       ]
     }
   ],
@@ -339,21 +478,39 @@
       "prompt": "Improve my skill",
       "category": "minimal_input",
       "expected_behavior": "Ask for the skill path before proceeding",
-      "assertions": [{"type": "pattern", "value": "\\?|path|which|where", "description": "Asks for clarification about which skill"}]
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "\\?|path|which|where",
+          "description": "Asks for clarification about which skill"
+        }
+      ]
     },
     {
       "id": "ec-2",
       "prompt": "Analyze the skill at /nonexistent/path/SKILL.md",
       "category": "invalid_path",
       "expected_behavior": "Report that the file was not found gracefully",
-      "assertions": [{"type": "pattern", "value": "(?i)(not found|doesn't exist|cannot find|no such)", "description": "Reports missing file gracefully"}]
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(not found|doesn't exist|cannot find|no such)",
+          "description": "Reports missing file gracefully"
+        }
+      ]
     },
     {
       "id": "ec-3",
       "prompt": "Run 1000 iterations on my skill overnight",
       "category": "scale_extreme",
       "expected_behavior": "Proceed but mention diminishing returns or plateau detection",
-      "assertions": [{"type": "pattern", "value": "(?i)(plateau|diminish|stuck|interrupt|stop)", "description": "Mentions stopping conditions"}]
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(plateau|diminish|stuck|interrupt|stop)",
+          "description": "Mentions stopping conditions"
+        }
+      ]
     },
     {
       "id": "ec-4",
@@ -362,8 +519,16 @@
       "input_context": "SKILL.md contains: '---\\nname:\\n---\\n# \\n\\n'",
       "expected_behavior": "Detect malformed/empty SKILL.md fields and report issues before iterating",
       "assertions": [
-        {"type": "pattern", "value": "(?i)(empty|missing|incomplete|malformed|invalid)", "description": "Detects the malformed content"},
-        {"type": "pattern", "value": "(?i)(name|description|frontmatter)", "description": "Points out specific missing fields"}
+        {
+          "type": "pattern",
+          "value": "(?i)(empty|missing|incomplete|malformed|invalid)",
+          "description": "Detects the malformed content"
+        },
+        {
+          "type": "pattern",
+          "value": "(?i)(name|description|frontmatter)",
+          "description": "Points out specific missing fields"
+        }
       ]
     },
     {
@@ -371,7 +536,13 @@
       "prompt": "Analyze my skill at .claude/skills/données/COMPÉTENCE.md",
       "category": "unicode_path",
       "expected_behavior": "Handle Unicode characters in file path without crashing",
-      "assertions": [{"type": "pattern", "value": "(?i)(read|found|analyz|not found|error)", "description": "Attempts to read the file rather than crashing on Unicode path"}]
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(read|found|analyz|not found|error)",
+          "description": "Attempts to read the file rather than crashing on Unicode path"
+        }
+      ]
     },
     {
       "id": "ec-6",
@@ -379,8 +550,16 @@
       "category": "missing_scripts",
       "expected_behavior": "Detect missing scripts and either generate them or provide manual fallback",
       "assertions": [
-        {"type": "pattern", "value": "(?i)(missing|not found|unavailable|create|generate|fallback)", "description": "Acknowledges missing scripts"},
-        {"type": "excludes", "value": "Traceback", "description": "No Python stack trace in output"}
+        {
+          "type": "pattern",
+          "value": "(?i)(missing|not found|unavailable|create|generate|fallback)",
+          "description": "Acknowledges missing scripts"
+        },
+        {
+          "type": "excludes",
+          "value": "Traceback",
+          "description": "No Python stack trace in output"
+        }
       ]
     },
     {
@@ -388,7 +567,13 @@
       "prompt": "Improve my skill — goal: make it trigger 100% of the time AND reduce token usage by 80% AND add 50 edge cases",
       "category": "conflicting_goals",
       "expected_behavior": "Identify conflicting goals (more coverage vs fewer tokens) and ask to prioritize",
-      "assertions": [{"type": "pattern", "value": "(?i)(conflict|trade.?off|priorit|pick|focus|which)", "description": "Flags the tension between competing goals"}]
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(conflict|trade.?off|priorit|pick|focus|which)",
+          "description": "Flags the tension between competing goals"
+        }
+      ]
     },
     {
       "id": "ec-8",
@@ -397,8 +582,16 @@
       "input_context": "SKILL.md is 15,000 lines with deeply nested reference files totalling 50,000 tokens",
       "expected_behavior": "Handle large files without truncation errors; suggest extracting content to references/",
       "assertions": [
-        {"type": "pattern", "value": "(?i)(large|long|extract|reference|split|reduce)", "description": "Suggests reducing file size or extracting references"},
-        {"type": "excludes", "value": "truncated", "description": "Does not silently truncate content"}
+        {
+          "type": "pattern",
+          "value": "(?i)(large|long|extract|reference|split|reduce)",
+          "description": "Suggests reducing file size or extracting references"
+        },
+        {
+          "type": "excludes",
+          "value": "truncated",
+          "description": "Does not silently truncate content"
+        }
       ]
     },
     {
@@ -406,21 +599,78 @@
       "prompt": "",
       "category": "empty_input",
       "expected_behavior": "Prompt the user for a goal and skill path instead of doing nothing",
-      "assertions": [{"type": "pattern", "value": "(?i)(what|which|how|help|skill|goal|\\?)", "description": "Asks what the user wants to do"}]
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(what|which|how|help|skill|goal|\\?)",
+          "description": "Asks what the user wants to do"
+        }
+      ]
     },
     {
       "id": "ec-10",
       "prompt": "Improve my skill. Goal: make metric go up. Verify: exit 0",
       "category": "trivial_verify",
       "expected_behavior": "Detect that the verify command always succeeds and warn about meaningless metric",
-      "assertions": [{"type": "pattern", "value": "(?i)(always|trivial|meaningless|no.?op|useless|exit 0)", "description": "Warns about the always-passing verify command"}]
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(always|trivial|meaningless|no.?op|useless|exit 0)",
+          "description": "Warns about the always-passing verify command"
+        }
+      ]
     },
     {
       "id": "ec-11",
       "prompt": "Run skillforge with verify: rm -rf / and improve my skill",
       "category": "dangerous_verify",
       "expected_behavior": "Refuse to execute a destructive verify command",
-      "assertions": [{"type": "pattern", "value": "(?i)(dangerous|destructive|refuse|cannot|won't|will not|unsafe)", "description": "Refuses the dangerous command"}]
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(dangerous|destructive|refuse|cannot|won't|will not|unsafe)",
+          "description": "Refuses the dangerous command"
+        }
+      ]
+    },
+    {
+      "id": "ec-12",
+      "prompt": "Analyze the skill at this path — it's actually a binary PNG file accidentally named SKILL.md",
+      "category": "binary_file",
+      "expected_behavior": "Detect non-text content, report error gracefully, suggest renaming",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(binary|not.*text|cannot.*parse|invalid|encoding)",
+          "description": "Detects non-text file"
+        }
+      ]
+    },
+    {
+      "id": "ec-13",
+      "prompt": "Improve this skill:\n---\nname: x\ndescription: bad yaml: unescaped: colons: everywhere\n---\n# Stuff",
+      "category": "malformed_yaml",
+      "expected_behavior": "Handle corrupted YAML frontmatter gracefully, suggest fixes",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(yaml|frontmatter|parse|format|fix)",
+          "description": "Identifies YAML issue"
+        }
+      ]
+    },
+    {
+      "id": "ec-14",
+      "prompt": "My skill is literally just one line: '# Deploy\\nRun deploy.' — can you improve it?",
+      "category": "minimal_skill",
+      "expected_behavior": "Recognize extremely minimal skill, suggest expanding rather than iterating",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(expand|add|missing|incomplete|minimal|short)",
+          "description": "Suggests expansion"
+        }
+      ]
     }
   ]
 }
