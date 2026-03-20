@@ -935,11 +935,115 @@ def compute_composite(scores: dict) -> dict:
     }
 
 
+def score_diff(skill_path: str, diff_ref: str = "HEAD~1") -> dict:
+    """Analyze git diff to explain WHY a score changed.
+
+    Classifies added/removed lines using signal/noise patterns from
+    score_efficiency() to determine net quality impact.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "diff", diff_ref, "--", skill_path],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return {"available": False, "reason": "no diff or not in git repo"}
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return {"available": False, "reason": "git not available"}
+
+    diff_text = result.stdout
+    added_lines = [line[1:] for line in diff_text.split("\n") if line.startswith("+") and not line.startswith("+++")]
+    removed_lines = [line[1:] for line in diff_text.split("\n") if line.startswith("-") and not line.startswith("---")]
+
+    # Signal patterns (from score_efficiency)
+    signal_pattern = re.compile(
+        r"^(?:\d+\.\s*)?(?:Read|Run|Check|Create|Add|Remove|Move|Use|Set|"
+        r"Install|Configure|Deploy|Test|Verify|Build|Start|Stop|Open|Save|"
+        r"Copy|Delete|Write|Edit|Update|Generate|Execute|Validate|Parse|"
+        r"Extract|Transform|Import|Export|Send|Fetch|Call|Return)\b",
+        re.IGNORECASE
+    )
+    example_pattern = re.compile(
+        r"(?i)(example\s*[0-9:#]|input.*output|e\.g\.|for instance|for example)"
+    )
+    noise_pattern = re.compile(
+        r"(?i)(you (might|could|should|may) (want to|consider|possibly)|"
+        r"it is important to note that|as mentioned (above|earlier|before)|"
+        r"in other words|keep in mind that|note that|please note|"
+        r"make sure to save|don't forget to|always test your)"
+    )
+
+    def classify_lines(lines: list[str]) -> dict:
+        signals = sum(1 for l in lines if signal_pattern.search(l) or example_pattern.search(l))
+        noise = sum(1 for l in lines if noise_pattern.search(l))
+        neutral = len(lines) - signals - noise
+        return {"signal": signals, "noise": noise, "neutral": neutral, "total": len(lines)}
+
+    added = classify_lines(added_lines)
+    removed = classify_lines(removed_lines)
+
+    net_signal = added["signal"] - removed["signal"]
+    net_noise = added["noise"] - removed["noise"]
+
+    return {
+        "available": True,
+        "diff_ref": diff_ref,
+        "added": added,
+        "removed": removed,
+        "net_change": {
+            "signal": net_signal,
+            "noise": net_noise,
+            "lines": added["total"] - removed["total"],
+        },
+    }
+
+
+def explain_score_change(old_scores: dict, new_scores: dict, diff_analysis: dict) -> list:
+    """Generate per-dimension explanations for score changes.
+
+    Returns a list of explanation dicts with dimension, delta, and reason.
+    """
+    explanations = []
+    all_dims = set(list(old_scores.keys()) + list(new_scores.keys()))
+
+    for dim in sorted(all_dims):
+        old_val = old_scores.get(dim, 0)
+        new_val = new_scores.get(dim, 0)
+        delta = new_val - old_val
+
+        if abs(delta) < 0.5:
+            continue
+
+        reason = f"{dim}: {old_val} -> {new_val} ({delta:+.1f})"
+
+        # Add context from diff if available
+        if diff_analysis.get("available"):
+            net = diff_analysis.get("net_change", {})
+            if dim == "efficiency" and net.get("noise", 0) < 0:
+                reason += " (noise removed)"
+            elif dim == "efficiency" and net.get("signal", 0) > 0:
+                reason += " (signal added)"
+            elif dim == "structure" and net.get("lines", 0) < 0:
+                reason += " (file shortened)"
+
+        explanations.append({
+            "dimension": dim,
+            "old": old_val,
+            "new": new_val,
+            "delta": round(delta, 1),
+            "explanation": reason,
+        })
+
+    return explanations
+
+
 def main():
     parser = argparse.ArgumentParser(description="SkillForge Quality Scorer")
     parser.add_argument("skill_path", help="Path to SKILL.md")
     parser.add_argument("--eval-suite", help="Path to eval suite JSON", default=None)
     parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--diff", action="store_true", help="Include diff analysis")
+    parser.add_argument("--diff-ref", default="HEAD~1", help="Git ref to diff against (default: HEAD~1)")
     args = parser.parse_args()
 
     eval_suite = None
@@ -977,6 +1081,11 @@ def main():
         "issues": {k: v["issues"] for k, v in scores.items() if v["issues"]},
         "details": {k: v["details"] for k, v in scores.items() if v["details"]},
     }
+
+    # Diff analysis (opt-in)
+    if args.diff:
+        diff_analysis = score_diff(args.skill_path, args.diff_ref)
+        result["diff_analysis"] = diff_analysis
 
     if args.json:
         print(json.dumps(result, indent=2))
