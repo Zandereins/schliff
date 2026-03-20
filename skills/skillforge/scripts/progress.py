@@ -237,6 +237,91 @@ class ProgressAnalyzer:
         else:
             return f"{seconds / 3600:.1f}h"
 
+    # --- Strategy types for meta-learning ---
+    STRATEGY_TYPES = [
+        "trigger_expansion",
+        "example_addition",
+        "noise_reduction",
+        "edge_coverage",
+        "structural_fix",
+        "progressive_disclosure",
+        "composability_fix",
+        "recovery_combo",
+    ]
+
+    # Keywords used to infer strategy type from experiment descriptions
+    _STRATEGY_KEYWORDS = {
+        "trigger_expansion": ["synonym", "trigger", "description", "boundary", "negative boundary"],
+        "example_addition": ["example", "input/output", "before/after", "sample"],
+        "noise_reduction": ["compress", "trim", "remove", "verbose", "noise", "filler", "concise", "lean"],
+        "edge_coverage": ["edge", "malformed", "corner", "error", "fallback", "unicode"],
+        "structural_fix": ["frontmatter", "header", "section", "structure", "format", "lint"],
+        "progressive_disclosure": ["reference", "extract", "progressive", "disclosure", "split"],
+        "composability_fix": ["scope", "handoff", "composab", "conflict", "boundary"],
+        "recovery_combo": ["recovery", "combo", "revert", "fix", "workaround"],
+    }
+
+    def _infer_strategy(self, description: str) -> Optional[str]:
+        """Infer strategy type from experiment description using keywords."""
+        desc_lower = description.lower()
+        best_match = None
+        best_count = 0
+        for strategy, keywords in self._STRATEGY_KEYWORDS.items():
+            count = sum(1 for kw in keywords if kw in desc_lower)
+            if count > best_count:
+                best_count = count
+                best_match = strategy
+        return best_match if best_count > 0 else None
+
+    def compute_strategy_stats(self) -> Dict[str, Dict[str, Any]]:
+        """Compute effectiveness stats per strategy type.
+
+        Groups experiments by strategy_type (explicit field or inferred from
+        description), then computes keep_rate and avg_delta per strategy.
+        """
+        strategy_data: Dict[str, List[Dict[str, Any]]] = {}
+
+        for exp in self.experiments:
+            if exp.get("status") in ("baseline",):
+                continue
+
+            # Explicit strategy_type takes precedence
+            strategy = exp.get("strategy_type")
+            if not strategy:
+                strategy = self._infer_strategy(exp.get("description", ""))
+            if not strategy:
+                strategy = "unknown"
+
+            if strategy not in strategy_data:
+                strategy_data[strategy] = []
+            strategy_data[strategy].append(exp)
+
+        stats = {}
+        for strategy, exps in strategy_data.items():
+            kept = [e for e in exps if e.get("status") == "keep"]
+            keep_rate = len(kept) / len(exps) if exps else 0
+            deltas = [e.get("delta", 0) for e in kept]
+            avg_delta = sum(deltas) / len(deltas) if deltas else 0
+
+            stats[strategy] = {
+                "total": len(exps),
+                "kept": len(kept),
+                "keep_rate": round(keep_rate, 2),
+                "avg_delta": round(avg_delta, 2),
+                "effectiveness": round(keep_rate * avg_delta, 2),
+            }
+
+        return stats
+
+    def get_recommended_strategy_order(self) -> List[str]:
+        """Return strategies sorted by effectiveness (keep_rate * avg_delta)."""
+        stats = self.compute_strategy_stats()
+        return sorted(
+            stats.keys(),
+            key=lambda s: stats[s]["effectiveness"],
+            reverse=True,
+        )
+
     def generate_summary(
         self,
         goal: Optional[float] = None,
@@ -293,6 +378,14 @@ class ProgressAnalyzer:
                 "target": goal,
                 "current": current_best.get("composite", 0),
                 "estimated_iterations": est,
+            }
+
+        # Strategy meta-learning (opt-in via --strategies)
+        strategy_stats = self.compute_strategy_stats()
+        if strategy_stats:
+            summary["strategies"] = {
+                "stats": strategy_stats,
+                "recommended_order": self.get_recommended_strategy_order(),
             }
 
         return summary
@@ -398,6 +491,21 @@ class ProgressAnalyzer:
                 )
                 lines.append("")
 
+        # Strategy effectiveness
+        if "strategies" in summary and summary["strategies"]["stats"]:
+            lines.append("Strategy Effectiveness:")
+            lines.append("-" * 50)
+            for strategy in summary["strategies"]["recommended_order"]:
+                s = summary["strategies"]["stats"][strategy]
+                lines.append(
+                    f"  {strategy:25s} "
+                    f"keep={s['keep_rate']:.0%} "
+                    f"avg_delta={s['avg_delta']:+.1f} "
+                    f"eff={s['effectiveness']:.2f} "
+                    f"({s['kept']}/{s['total']})"
+                )
+            lines.append("")
+
         if include_chart and "latest_kept" in summary and summary["latest_kept"]:
             chart = self._generate_chart()
             if chart:
@@ -479,6 +587,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--goal", type=float, help="Target composite score for estimation"
+    )
+    parser.add_argument(
+        "--strategies", action="store_true",
+        help="Include strategy meta-learning analysis"
     )
 
     args = parser.parse_args()
