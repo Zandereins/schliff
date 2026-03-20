@@ -192,6 +192,17 @@ When metrics fluctuate (±5%), use multi-run averaging:
 2. Keep only if improvement > 2 * noise floor.
 3. Detect noise floor from the first 3 baseline runs.
 
+## Interaction Effect Detection
+
+Individual keeps can interact badly. Guard against composite degradation:
+1. Every 5 iterations, compare composite against the score from 5 iterations ago.
+2. If composite dropped > 2 points over the window despite individual keeps passing,
+   review ALL kept changes in the window for pairwise contradictions.
+3. Revert to the best-in-window checkpoint. Re-apply only non-conflicting keeps.
+
+Use this to catch cases where adding edge case A (+0.5) and edge case B (+0.3)
+creates contradictory instructions that degrade the composite by -3 over 10 iterations.
+
 ## Cost Tracking + ROI
 
 Track improvement efficiency to stop when returns diminish:
