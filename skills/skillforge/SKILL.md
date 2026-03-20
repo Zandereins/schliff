@@ -19,7 +19,7 @@ description: >
 Constraint + clear metric + autonomous iteration = compounding gains. Each kept
 improvement builds on the last — gradient descent for skill quality.
 
-## Quick Start
+## Quick Start (Only 2 Inputs Required)
 
 ```
 /skillforge
@@ -27,7 +27,7 @@ Target: path/to/SKILL.md
 Goal: Make the skill trigger correctly for deployment scenarios
 ```
 
-SkillForge will auto-select metrics, generate evals, and run 30 iterations.
+Defaults: Metric=composite_score, Verify=score-skill.py, Iterations=30.
 
 ## Core Loop (NEVER Pauses)
 
@@ -80,7 +80,7 @@ Verify: python3 scripts/score-skill.py SKILL.md --json
 Constraint: efficiency >= 80, composability >= 90
 ```
 
-Set constraints when optimizing one dimension risks degrading others.
+Use constraints to prevent dimension degradation during optimization.
 
 ## Quality Dimensions (Defaults, Customizable)
 
@@ -93,6 +93,7 @@ Set constraints when optimizing one dimension risks degrading others.
 | **Token efficiency** | Instruction density (words per feature) | `scripts/score-skill.py` | ≤ target |
 | **Composability** | Cross-skill conflict tests | Run with other skills | 0 conflicts |
 
+Validate scores against real behavior: run the skill on test prompts and check output.
 See `references/metrics-catalog.md` for detailed rubrics and custom metric setup.
 
 ## Custom Metrics
@@ -138,6 +139,8 @@ Each iteration follows `references/improvement-protocol.md`. Immutable rules:
 6. When stuck (5+ discards): re-read files, review history, try the opposite. This avoids local optima.
 7. Never modify VERIFY during loop. The metric is fixed; the skill is the variable.
 8. Log everything to `history/` — diffs, metric values, keep/discard status.
+9. **Plateau guard:** Every 5 iterations, compare composite against 5 iterations ago.
+   If delta < 1.0 over the window, switch strategy or suggest stopping.
 
 ## Cross-Session Learning
 
@@ -170,7 +173,6 @@ Run `/skillforge:analyze` without a GOAL. SkillForge will:
 5. Suggest GOAL + METRIC + VERIFY automatically. User confirms or overrides.
 
 Use discovery mode when the user says "my skill needs work" without specifying what.
-Run all scorers, cluster failures, propose targeted GOAL + METRIC automatically.
 
 ## Parallel Experimentation (Try 3, Keep Best)
 
@@ -185,12 +187,21 @@ is large (>15 points). Explores 3x more search space per iteration.
 
 ## Noisy Metric Handling
 
-When metrics fluctuate (±5% across runs), use multi-run averaging:
+When metrics fluctuate (±5%), use multi-run averaging:
 1. Run VERIFY 3 times per iteration. Use the median score.
-2. Apply a significance threshold: keep only if improvement > 2 * noise floor.
-3. Detect noise floor automatically from the first 3 baseline runs.
+2. Keep only if improvement > 2 * noise floor.
+3. Detect noise floor from the first 3 baseline runs.
 
-Use this when the VERIFY command involves LLM output or timing-dependent checks.
+## Interaction Effect Detection
+
+Individual keeps can interact badly. Guard against composite degradation:
+1. Every 5 iterations, compare composite against the score from 5 iterations ago.
+2. If composite dropped > 2 points over the window despite individual keeps passing,
+   review ALL kept changes in the window for pairwise contradictions.
+3. Revert to the best-in-window checkpoint. Re-apply only non-conflicting keeps.
+
+Use this to catch cases where adding edge case A (+0.5) and edge case B (+0.3)
+creates contradictory instructions that degrade the composite by -3 over 10 iterations.
 
 ## Cost Tracking + ROI
 
@@ -200,7 +211,7 @@ Track improvement efficiency to stop when returns diminish:
 3. Stop when ROI drops below threshold (e.g., last 5 iterations < 0.5 points gained).
 4. Log `tokens_estimated` to `history/results.jsonl` for cross-session ROI comparison.
 
-Use ROI tracking to prevent wasteful grinding when the skill has plateaued.
+Stop grinding when ROI drops below threshold to prevent wasted iterations.
 
 ## Self-Evolving Eval Suites
 
@@ -240,20 +251,15 @@ Exp 3: Compress verbose setup section → 68% → Discard (revert)
 Exp 4: Add edge case for partial audit → 75% → Keep
 ```
 
-Check `history/results.jsonl` between sessions to extract which strategy types succeed.
+Parse `history/results.jsonl` between sessions to extract which strategy types succeed.
+Compare keep rates per strategy to prioritize high-ROI changes in the next session.
 
 ## Skill Genealogy + Handoff
 
-Track skill lineage across tools and sessions:
-1. `/skill-creator` → v1 draft with initial tests and human review.
-2. `/skillforge` → autonomous grinding, 30+ iterations, production quality.
-3. `/skillforge:report` → review changes, approve, merge.
-4. If new capabilities needed → back to `/skill-creator`.
-5. Each session adds a generation entry to `history/results.jsonl`.
-6. Roll back to any ancestor version: `git log --oneline history/` shows the full lineage.
+Track lineage: `/skill-creator` → v1 → `/skillforge` → autonomous grinding → merge.
+Roll back to any version: `git log --oneline history/` shows the full lineage.
 
-SkillForge never creates skills from scratch. If the user wants a new skill,
-instead use `skill-creator`. If the skill crashes, suggest using
+Create new skills with `skill-creator`. For crashing skills, suggest using
 `systematic-debugging` first, then return to SkillForge for iteration.
 
 ## Files
