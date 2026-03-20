@@ -15,11 +15,26 @@ if not found.
 import argparse
 import json
 import re
+import signal
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+
+def _regex_search_safe(pattern: str, text: str, timeout: int = 2) -> bool:
+    """Regex search with timeout to prevent ReDoS."""
+    def _handler(signum, frame):
+        raise TimeoutError("Regex timed out")
+
+    old_handler = signal.signal(signal.SIGALRM, _handler)
+    signal.alarm(timeout)
+    try:
+        return bool(re.search(pattern, text, re.IGNORECASE))
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 
 def check_claude_cli() -> bool:
@@ -91,14 +106,14 @@ def check_assertion(response: str, assertion: dict) -> dict:
 
     elif a_type in ("response_matches", "pattern"):
         try:
-            passed = bool(re.search(a_value, response, re.IGNORECASE))
-        except re.error:
+            passed = _regex_search_safe(a_value, response)
+        except (re.error, TimeoutError) as e:
             return {
                 "type": a_type,
                 "value": a_value,
                 "description": description,
                 "passed": False,
-                "error": f"invalid regex: {a_value}",
+                "error": f"regex error: {e}",
             }
 
     elif a_type in ("response_excludes", "excludes"):

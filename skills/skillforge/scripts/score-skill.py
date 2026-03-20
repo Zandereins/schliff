@@ -21,6 +21,19 @@ from collections import Counter
 from typing import Optional
 from pathlib import Path
 
+# Maximum skill file size (1 MB) to prevent DoS via large inputs
+MAX_SKILL_SIZE = 1_000_000
+
+
+def _read_skill_safe(skill_path: str) -> str:
+    """Read a skill file with size limit enforcement."""
+    p = Path(skill_path)
+    if not p.exists():
+        raise FileNotFoundError(f"Skill file not found: {skill_path}")
+    if p.stat().st_size > MAX_SKILL_SIZE:
+        raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
+    return p.read_text(encoding="utf-8", errors="replace")
+
 
 # --- Stopwords for trigger scoring (truly generic function words only) ---
 # IMPORTANT: Do NOT include domain-relevant terms here. Words like "skill",
@@ -67,8 +80,8 @@ def _score_structure_inline(skill_path: str) -> dict:
     issues = []
 
     try:
-        content = Path(skill_path).read_text(encoding="utf-8", errors="replace")
-    except FileNotFoundError:
+        content = _read_skill_safe(skill_path)
+    except (FileNotFoundError, ValueError):
         return {"score": 0, "issues": ["file_not_found"], "details": {}}
 
     lines = content.split("\n")
@@ -141,7 +154,7 @@ def _score_structure_inline(skill_path: str) -> dict:
         score += 5
         issues.append(f"missing_refs: {missing}")
 
-    return {"score": min(score, 100), "issues": issues, "details": {"line_count": len(lines)}}
+    return {"score": max(0, min(100, score)), "issues": issues, "details": {"line_count": len(lines)}}
 
 
 def _extract_description(content: str) -> str:
@@ -266,7 +279,10 @@ def score_triggers(skill_path: str, eval_suite: Optional[dict]) -> dict:
     if not eval_suite or "triggers" not in eval_suite:
         return {"score": -1, "issues": ["no_trigger_eval_suite"], "details": {}}
 
-    content = Path(skill_path).read_text(encoding="utf-8", errors="replace")
+    try:
+        content = _read_skill_safe(skill_path)
+    except (FileNotFoundError, ValueError):
+        return {"score": 0, "issues": ["file_not_found"], "details": {}}
     description = _extract_description(content)
 
     if not description:
@@ -398,8 +414,8 @@ def score_efficiency(skill_path: str) -> dict:
     fewer words.
     """
     try:
-        content = Path(skill_path).read_text(encoding="utf-8", errors="replace")
-    except FileNotFoundError:
+        content = _read_skill_safe(skill_path)
+    except (FileNotFoundError, ValueError):
         return {"score": 0, "issues": ["file_not_found"], "details": {}}
 
     full_content = content
@@ -561,8 +577,8 @@ def score_composability(skill_path: str) -> dict:
     - No conflicting tool assumptions (20 pts)
     """
     try:
-        content = Path(skill_path).read_text(encoding="utf-8", errors="replace")
-    except FileNotFoundError:
+        content = _read_skill_safe(skill_path)
+    except (FileNotFoundError, ValueError):
         return {"score": 0, "issues": ["file_not_found"], "details": {}}
 
     score = 0
@@ -958,8 +974,8 @@ def score_clarity(skill_path: str) -> dict:
     - Instruction completeness (25 pts): every "Run X" has a concrete command
     """
     try:
-        content = Path(skill_path).read_text(encoding="utf-8", errors="replace")
-    except FileNotFoundError:
+        content = _read_skill_safe(skill_path)
+    except (FileNotFoundError, ValueError):
         return {"score": 0, "issues": ["file_not_found"], "details": {}}
 
     # Strip frontmatter
@@ -1234,6 +1250,13 @@ def main():
     if args.diff:
         diff_analysis = score_diff(args.skill_path, args.diff_ref)
         result["diff_analysis"] = diff_analysis
+        # Wire explain_score_change into diff output
+        # Use current scores as "new" and zeros as "old" placeholder
+        # (real old scores would come from previous run's JSON)
+        current_scores = {k: v["score"] for k, v in scores.items() if v["score"] >= 0}
+        explanations = explain_score_change({}, current_scores, diff_analysis)
+        if explanations:
+            result["score_explanations"] = explanations
 
     if args.json:
         print(json.dumps(result, indent=2))

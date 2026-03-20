@@ -176,7 +176,7 @@ Run `/skillforge:analyze` without a GOAL. SkillForge will:
 
 Use discovery mode when the user says "my skill needs work" without specifying what.
 
-## Parallel Experimentation (Try 3, Keep Best)
+## Parallel Experimentation (Try 3, Keep Best) — Planned
 
 For iterations where multiple plausible changes exist:
 1. Create 3 candidate changes on separate git branches using `git worktree`.
@@ -199,19 +199,19 @@ to best-in-window checkpoint and re-apply only non-conflicting keeps.
 ## Cost Tracking + ROI
 
 Track improvement efficiency to stop when returns diminish:
-1. Count iterations and estimate tokens per experiment (~2k-5k per iteration).
+1. `run-eval.sh --log` records `duration_ms`, `tokens_estimated`, `delta`, and `status` per run.
 2. Compute ROI: `delta_metric / iterations_spent` after each keep.
 3. Stop when ROI drops below threshold (e.g., last 5 iterations < 0.5 points gained).
-4. Log `tokens_estimated` to `history/results.jsonl` for cross-session ROI comparison.
+4. Use `progress.py --json` to compare cross-session ROI from logged data.
 
 Stop grinding when ROI drops below threshold to prevent wasted iterations.
 
 ## Self-Evolving Eval Suites
 
 After every 10 iterations, analyze eval suite effectiveness:
-1. Classify tests as "mastered" (always pass for 10+ iterations), "blocked" (always fail), or "flaky" (inconsistent).
+1. Classify tests as "mastered", "blocked", or "flaky" via `classify_eval_health()`.
 2. Reduce weight of mastered tests — they no longer discriminate quality changes.
-3. Generate new test cases targeting uncovered gaps found during discovery mode.
+3. Auto-generation of new test cases: classification implemented, auto-generation planned.
 4. Log eval mutations to `history/` separately from skill changes.
 
 Run eval evolution BETWEEN sessions, not during the loop, because this preserves

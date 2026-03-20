@@ -14,6 +14,9 @@
 
 set -euo pipefail
 
+# --- Cost tracking: capture start time ---
+START_SECONDS=$SECONDS
+
 # --- Default config ---
 TIMEOUT=300
 RESULTS_LOG=""
@@ -102,7 +105,7 @@ if [[ ! -f "$EVAL_SUITE" ]]; then
 fi
 
 # --- Extract skill name from SKILL.md ---
-SKILL_NAME=$(grep "^name:" "$SKILL_MD" | head -1 | cut -d: -f2- | xargs || echo "unknown")
+SKILL_NAME=$(grep "^name:" "$SKILL_MD" | head -1 | sed 's/^name:[[:space:]]*//' | sed 's/[[:space:]]*$//' || echo "unknown")
 SKILL_DIR=$(dirname "$SKILL_MD")
 
 # --- Generate experiment ID (sequential counter) ---
@@ -299,18 +302,38 @@ RESULT_JSON=$(jq -n \
 if [[ -n "$RESULTS_LOG" ]]; then
     mkdir -p "$(dirname "$RESULTS_LOG")"
 
+    # Cost tracking: compute real duration, tokens, delta, status
+    COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    DURATION_MS=$(( (SECONDS - START_SECONDS) * 1000 ))
+    WORD_COUNT=$(wc -w < "$SKILL_MD" | tr -d ' ')
+    TOKENS_EST=$((WORD_COUNT * 13 / 10))
+
+    # Compute delta and status from previous entry
+    LOG_STATUS="baseline"
+    LOG_DELTA=0
+    if [[ -f "$RESULTS_LOG" ]] && [[ -s "$RESULTS_LOG" ]]; then
+        PREV_COMPOSITE=$(tail -1 "$RESULTS_LOG" | jq -r '.composite // 0' 2>/dev/null || echo "0")
+        LOG_DELTA=$(python3 -c "print(round($COMPOSITE_SCORE - $PREV_COMPOSITE, 1))" 2>/dev/null || echo "0")
+        if python3 -c "exit(0 if $COMPOSITE_SCORE > $PREV_COMPOSITE else 1)" 2>/dev/null; then
+            LOG_STATUS="keep"
+        else
+            LOG_STATUS="discard"
+        fi
+    fi
+
     # JSONL format compatible with progress.py ProgressAnalyzer
     jq -n -c \
         --argjson exp "$EXPERIMENT_ID" \
         --arg timestamp "$TIMESTAMP" \
-        --arg commit "$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')" \
+        --arg commit "$COMMIT_HASH" \
         --argjson scores "$DIMENSION_SCORES" \
         --arg pass_rate "${ASSERTIONS_PASSED}/${ASSERTIONS_TOTAL}" \
         --argjson composite "$COMPOSITE_SCORE" \
-        --argjson delta 0 \
-        --arg status "pending" \
+        --argjson delta "$LOG_DELTA" \
+        --arg status "$LOG_STATUS" \
         --arg description "" \
-        --argjson duration_ms 0 \
+        --argjson duration_ms "$DURATION_MS" \
+        --argjson tokens_estimated "$TOKENS_EST" \
         '{
             "exp": $exp,
             "timestamp": $timestamp,
@@ -322,7 +345,8 @@ if [[ -n "$RESULTS_LOG" ]]; then
             "status": $status,
             "strategy_type": null,
             "description": $description,
-            "duration_ms": $duration_ms
+            "duration_ms": $duration_ms,
+            "tokens_estimated": $tokens_estimated
         }' >> "$RESULTS_LOG"
 fi
 
