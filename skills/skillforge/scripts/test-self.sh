@@ -70,7 +70,7 @@ WARNINGS=$(echo "$SELF_SCORE" | python3 -c "import sys,json; w=json.load(sys.std
 section "Self-Eval: Run eval suite against own SKILL.md"
 ##############################################################################
 
-EVAL_RESULT=$(bash "$SCRIPT_DIR/run-eval.sh" "$SKILL_DIR/SKILL.md" "$SKILL_DIR/eval-suite.json" 2>/dev/null || true)
+EVAL_RESULT=$(bash "$SCRIPT_DIR/run-eval.sh" "$SKILL_DIR/SKILL.md" "$SKILL_DIR/eval-suite.json" --no-runtime-auto 2>/dev/null || true)
 
 # Should produce valid JSON
 echo "$EVAL_RESULT" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null && \
@@ -78,7 +78,7 @@ echo "$EVAL_RESULT" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/
 
 # Pass rate should be 100%
 PASS_PCT=$(echo "$EVAL_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['pass_rate']['percentage'])" 2>/dev/null)
-[[ "$PASS_PCT" == "100" ]] && pass "100% static assertion pass rate" || fail "Pass rate $PASS_PCT% (expected 100%)"
+[[ "$PASS_PCT" == "100" ]] && pass "Pass rate 100% (static assertions)" || fail "Pass rate ${PASS_PCT}% (expected 100%)"
 
 # Composite from eval should match standalone scorer
 EVAL_COMP=$(echo "$EVAL_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])" 2>/dev/null)
@@ -97,7 +97,7 @@ echo '{"exp":0,"timestamp":"2026-01-01T00:00:00Z","commit":"base","scores":{"str
 
 # Run actual eval and log it
 bash "$SCRIPT_DIR/run-eval.sh" "$SKILL_DIR/SKILL.md" "$SKILL_DIR/eval-suite.json" \
-    --log "$PIPELINE_LOG" > /dev/null 2>/dev/null || true
+    --log "$PIPELINE_LOG" --no-runtime-auto > /dev/null 2>/dev/null || true
 
 # Progress.py should read both entries
 PROG_RESULT=$(python3 "$SCRIPT_DIR/progress.py" "$PIPELINE_LOG" --json 2>&1)
