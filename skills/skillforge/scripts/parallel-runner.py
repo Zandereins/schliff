@@ -272,7 +272,8 @@ def run_sequential_fallback(
             )
             data = json.loads(result.stdout)
             score = data.get("composite_score", 0)
-        except Exception:
+        except (subprocess.SubprocessError, json.JSONDecodeError, OSError, KeyError) as e:
+            print(f"Warning: scoring failed for strategy '{strategy}': {e}", file=sys.stderr)
             score = 0
 
         results.append({
@@ -366,7 +367,7 @@ def main():
                 print(f"  {r['strategy']}: score={r['score']}")
         sys.exit(0)
 
-    # Create parallel branches
+    # Create parallel branches — always clean up on failure
     print("Creating parallel branches...", file=sys.stderr)
     branches = create_branches(args.skill_path, strategies)
 
@@ -375,16 +376,18 @@ def main():
         print("Failed to create any branches.", file=sys.stderr)
         sys.exit(1)
 
-    # Score in parallel
-    print(f"Scoring {len(active)} branches in parallel...", file=sys.stderr)
-    branches = run_parallel(branches, skill_relative)
+    winner = None
+    try:
+        # Score in parallel
+        print(f"Scoring {len(active)} branches in parallel...", file=sys.stderr)
+        branches = run_parallel(branches, skill_relative)
 
-    # Select winner
-    winner = select_winner(branches)
-
-    # Clean up
-    keep = winner["name"] if winner else None
-    cleaned = cleanup(branches, keep_branch=keep)
+        # Select winner
+        winner = select_winner(branches)
+    finally:
+        # Always clean up worktrees, even if scoring raised an exception
+        keep = winner["name"] if winner else None
+        cleaned = cleanup(branches, keep_branch=keep)
 
     result = {
         "branches": branches,

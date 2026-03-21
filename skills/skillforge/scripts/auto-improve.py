@@ -42,23 +42,25 @@ scorer = importlib.import_module("score-skill")
 gradient_mod = importlib.import_module("text-gradient")
 
 # Optional imports
+_MISSING_MODULES: list[tuple[str, str]] = []
+
 try:
     episodic_store = importlib.import_module("episodic-store")
 except ImportError as e:
     episodic_store = None
-    print(f"Warning: episodic-store unavailable: {e}", file=sys.stderr)
+    _MISSING_MODULES.append(("episodic-store", str(e)))
 
 try:
     meta_report = importlib.import_module("meta-report")
 except ImportError as e:
     meta_report = None
-    print(f"Warning: meta-report unavailable: {e}", file=sys.stderr)
+    _MISSING_MODULES.append(("meta-report", str(e)))
 
 try:
     parallel_runner = importlib.import_module("parallel-runner")
 except ImportError as e:
     parallel_runner = None
-    print(f"Warning: parallel-runner unavailable: {e}", file=sys.stderr)
+    _MISSING_MODULES.append(("parallel-runner", str(e)))
 
 
 # --- State Management ---
@@ -82,9 +84,23 @@ def _load_state(skill_path: str) -> list[dict]:
     # Guard against unbounded state files
     try:
         if path.stat().st_size > MAX_STATE_SIZE:
-            print(f"Warning: state file exceeds {MAX_STATE_SIZE} bytes, truncating to recent entries", file=sys.stderr)
-            # Read only tail of file (last ~100 entries)
+            # Read all lines and backup removed entries before truncation
             lines = path.read_text(encoding="utf-8").splitlines()
+            removed = lines[:-100]
+            if removed:
+                backup_path = Path.home() / ".skillforge" / "state-backup.jsonl"
+                backup_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(backup_path, "a", encoding="utf-8") as bf:
+                    for rline in removed:
+                        bf.write(rline + "\n")
+                print(
+                    f"Warning: state file exceeds {MAX_STATE_SIZE} bytes, "
+                    f"truncating to recent entries. "
+                    f"Backup of {len(removed)} removed entries at {backup_path}",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"Warning: state file exceeds {MAX_STATE_SIZE} bytes, truncating to recent entries", file=sys.stderr)
             lines = lines[-100:]
         else:
             lines = path.read_text(encoding="utf-8").splitlines()
@@ -155,8 +171,10 @@ def _compute_marginal_roi(state: list[dict], window: int = 5) -> float:
 
     ROI = sum of positive deltas in window / window size.
     """
+    if len(state) < 2:
+        return 1.0  # Not enough data for meaningful ROI, neutral value
     if len(state) < window:
-        return float("inf")  # Not enough data
+        return float("inf")  # Not enough data for full window
 
     recent = state[-window:]
     total_delta = sum(e.get("delta", 0) for e in recent if e.get("status") == "keep")
@@ -390,7 +408,8 @@ def run_auto_improve(
         if delta >= 0:
             status = "keep"
             current_score = new_score
-            improvements += 1
+            if delta > 0:
+                improvements += 1
             total_delta += delta
             if verbose:
                 print(f"✓ Keep (composite: {new_score['composite']})", file=sys.stderr)
@@ -457,6 +476,10 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose progress output")
     parser.add_argument("--resume", action="store_true", help="Resume from previous state")
     args = parser.parse_args()
+
+    if _MISSING_MODULES:
+        for mod_name, mod_err in _MISSING_MODULES:
+            print(f"Warning: {mod_name} unavailable: {mod_err}", file=sys.stderr)
 
     if not Path(args.skill_path).exists():
         print(f"Error: {args.skill_path} not found", file=sys.stderr)

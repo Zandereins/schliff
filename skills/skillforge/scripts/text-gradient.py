@@ -781,9 +781,13 @@ def apply_patches(skill_path: str, patches: list[dict], dry_run: bool = False) -
                 applied += 1
             elif op == "remove_regex":
                 pattern = patch.get("pattern", "")
+                replacement = patch.get("replacement")
                 if pattern:
                     compiled = re.compile(pattern, re.IGNORECASE)
-                    lines = [l for l in lines if not compiled.search(l)]
+                    if replacement is not None:
+                        lines = [compiled.sub(replacement, l) for l in lines]
+                    else:
+                        lines = [l for l in lines if not compiled.search(l)]
                     applied += 1
                 else:
                     skipped += 1
@@ -852,6 +856,21 @@ def main():
         auto_path = skill_dir / "eval-suite.json"
         if auto_path.exists():
             eval_suite = json.loads(auto_path.read_text())
+
+    # Validate eval-suite structure before processing
+    if eval_suite is not None:
+        if not isinstance(eval_suite, dict):
+            print(
+                f"Error: eval-suite must be a JSON object, got {type(eval_suite).__name__}. Ignoring.",
+                file=sys.stderr,
+            )
+            eval_suite = None
+        elif "skill_name" not in eval_suite and "test_cases" not in eval_suite and "triggers" not in eval_suite:
+            print(
+                "Error: eval-suite is missing required keys ('skill_name', and at least one of 'test_cases' or 'triggers'). Ignoring.",
+                file=sys.stderr,
+            )
+            eval_suite = None
 
     gradients = compute_gradients(
         args.skill_path,

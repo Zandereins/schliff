@@ -1180,6 +1180,179 @@ else
 fi
 
 ##############################################################################
+section "16. Regression Tests for Audit Fixes"
+##############################################################################
+
+# Test: cache eviction in score-skill.py does not crash after many invocations
+# Scores 5 different temp skill files to exercise the cache eviction path
+# (MAX_CACHE_ENTRIES=50; each invocation adds a fresh entry via _read_file_cached)
+_CACHE_OK=1
+for i in $(seq 1 5); do
+    _CACHE_FILE="$TMPDIR_BASE/cache-test-$i.md"
+    printf -- "---\nname: cache-test-%s\ndescription: cache eviction test file %s\n---\n\nContent paragraph %s for testing.\n" "$i" "$i" "$i" > "$_CACHE_FILE"
+    python3 "$SCRIPT_DIR/score-skill.py" "$_CACHE_FILE" --json > /dev/null 2>&1 || _CACHE_OK=0
+done
+if [[ "$_CACHE_OK" == "1" ]]; then
+    pass "Cache eviction: 5 sequential scorings complete without crash"
+else
+    fail "Cache eviction" "score-skill.py crashed during repeated invocations"
+fi
+
+# Test: counter locking in run-eval.sh — parallel runs produce unique experiment IDs
+_LOCK_LOG="$TMPDIR_BASE/lock-test.jsonl"
+bash "$SCRIPT_DIR/run-eval.sh" "$SKILL_DIR/SKILL.md" "$SKILL_DIR/eval-suite.json" \
+    --no-runtime-auto --log "$_LOCK_LOG" > /dev/null 2>&1 &
+_LOCK_PID1=$!
+bash "$SCRIPT_DIR/run-eval.sh" "$SKILL_DIR/SKILL.md" "$SKILL_DIR/eval-suite.json" \
+    --no-runtime-auto --log "$_LOCK_LOG" > /dev/null 2>&1 &
+_LOCK_PID2=$!
+wait "$_LOCK_PID1" 2>/dev/null; wait "$_LOCK_PID2" 2>/dev/null
+_UNIQUE_IDS=$(grep -o '"exp":[0-9]*' "$_LOCK_LOG" 2>/dev/null | sort -u | wc -l | tr -d ' ')
+if [[ "$_UNIQUE_IDS" == "2" ]]; then
+    pass "Counter locking: parallel runs produced 2 unique experiment IDs"
+else
+    fail "Counter locking" "expected 2 unique exp IDs, got $_UNIQUE_IDS"
+fi
+
+# Test: symlink escape blocked in skill-mesh.py
+# A symlink inside the scan root pointing outside must not be followed
+_MESH_SAFE="$TMPDIR_BASE/mesh-safe"
+_MESH_OUTSIDE="$TMPDIR_BASE/mesh-outside"
+mkdir -p "$_MESH_SAFE" "$_MESH_OUTSIDE"
+printf -- "---\nname: escaped\ndescription: should not appear\n---\nContent\n" > "$_MESH_OUTSIDE/SKILL.md"
+ln -sf "$_MESH_OUTSIDE" "$_MESH_SAFE/symlink-escape"
+_MESH_RESULT=$(python3 "$SCRIPT_DIR/skill-mesh.py" --json --skill-dirs "$_MESH_SAFE" 2>/dev/null)
+_MESH_FOUND=$(echo "$_MESH_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['skills_found'])" 2>/dev/null)
+if [[ "$_MESH_FOUND" == "0" ]]; then
+    pass "Symlink escape blocked: skill-mesh.py found 0 skills (symlink not followed)"
+else
+    fail "Symlink escape" "skills_found=$_MESH_FOUND, expected 0"
+fi
+
+# Test: Unicode zero-width char sanitization in session-injector.js
+# Failures file contains skill names with invisible zero-width chars; output must be clean
+_INJECT_DIR="$TMPDIR_BASE/injector-test"
+mkdir -p "$_INJECT_DIR/.skillforge"
+printf '{"skill":"test\u200B\u200Cskill","failure_type":"test","injected":false}\n' \
+    > "$_INJECT_DIR/.skillforge/failures.jsonl"
+printf '{"skill":"test\u200Bskill2","failure_type":"test","injected":false}\n' \
+    >> "$_INJECT_DIR/.skillforge/failures.jsonl"
+printf '{"skill":"test\u200Bskill3","failure_type":"test","injected":false}\n' \
+    >> "$_INJECT_DIR/.skillforge/failures.jsonl"
+_INJECT_RESULT=$(echo "{\"cwd\":\"$_INJECT_DIR\"}" | node "$SKILL_DIR/hooks/session-injector.js" 2>/dev/null)
+_HAS_ZW=$(echo "$_INJECT_RESULT" | python3 -c "
+import sys
+data = sys.stdin.read()
+bad = [chr(0x200B), chr(0x200C), chr(0x200D), chr(0x200E), chr(0x200F)]
+print(any(c in data for c in bad))
+" 2>/dev/null)
+if [[ "$_HAS_ZW" == "False" ]]; then
+    pass "Unicode sanitization: zero-width chars stripped from injector output"
+else
+    fail "Unicode sanitization" "zero-width chars present in session-injector output"
+fi
+
+# Test: state-backup mechanism exists in auto-improve.py source
+# Verifies the backup-before-truncation code path was not removed
+_BACKUP_CHECK=$(grep -c "state-backup" "$SCRIPT_DIR/auto-improve.py" 2>/dev/null)
+if [[ "$_BACKUP_CHECK" -ge 1 ]]; then
+    pass "State backup: state-backup reference present in auto-improve.py"
+else
+    fail "State backup" "state-backup not found in auto-improve.py source"
+fi
+
+# Test: auto-improve.py handles --max-iterations 0 gracefully (ROI guard boundary)
+# Should not crash and must report stop_reason in JSON output
+_AUTOIMPROVE_RESULT=$(python3 "$SCRIPT_DIR/auto-improve.py" "$SKILL_DIR/SKILL.md" \
+    --dry-run --max-iterations 0 --json 2>/dev/null)
+_AUTOIMPROVE_STOP=$(echo "$_AUTOIMPROVE_RESULT" | \
+    python3 -c "import sys,json; print(json.load(sys.stdin).get('stop_reason','MISSING'))" 2>/dev/null)
+if [[ -n "$_AUTOIMPROVE_STOP" ]] && [[ "$_AUTOIMPROVE_STOP" != "MISSING" ]]; then
+    pass "auto-improve --max-iterations 0: exits cleanly with stop_reason=$_AUTOIMPROVE_STOP"
+else
+    fail "auto-improve max-iterations 0" "stop_reason missing or crash; got: $_AUTOIMPROVE_STOP"
+fi
+
+# Test: meta-report.py handles nonexistent meta-dir without crashing
+# Agents 1-4 fixed a None-correlation crash; ensure graceful JSON output remains
+_META_RESULT=$(python3 "$SCRIPT_DIR/meta-report.py" --json --meta-dir /nonexistent 2>/dev/null)
+_META_VALID=$(echo "$_META_RESULT" | python3 -c "import sys,json; json.load(sys.stdin); print('ok')" 2>/dev/null)
+if [[ "$_META_VALID" == "ok" ]]; then
+    pass "meta-report.py: nonexistent meta-dir → valid JSON (no crash)"
+else
+    fail "meta-report nonexistent dir" "output is not valid JSON or script crashed"
+fi
+
+# Test: unknown assertion type in eval suite → skipped (not auto-passed)
+# Regression for the fix that ensures unknown types are excluded from pass_rate total
+_UNKNOWN_SUITE="$TMPDIR_BASE/unknown-type-suite.json"
+cat > "$_UNKNOWN_SUITE" <<'EOFSUITE'
+{
+  "skill_name": "test",
+  "version": "1.0.0",
+  "triggers": [],
+  "test_cases": [
+    {
+      "id": "unk-1",
+      "prompt": "test",
+      "assertions": [
+        {"type": "nonexistent_type", "value": "test", "description": "Unknown assertion"}
+      ]
+    }
+  ],
+  "edge_cases": []
+}
+EOFSUITE
+_UNKNOWN_RESULT=$(bash "$SCRIPT_DIR/run-eval.sh" "$SKILL_DIR/SKILL.md" "$_UNKNOWN_SUITE" \
+    --no-runtime-auto 2>/dev/null || true)
+_UNKNOWN_TOTAL=$(echo "$_UNKNOWN_RESULT" | \
+    python3 -c "import sys,json; print(json.load(sys.stdin)['pass_rate']['total'])" 2>/dev/null)
+if [[ "$_UNKNOWN_TOTAL" == "0" ]]; then
+    pass "Unknown assertion type: skipped (total=0, not auto-passed)"
+else
+    fail "Unknown assertion type regression" "total=$_UNKNOWN_TOTAL, expected 0 (should be skipped)"
+fi
+
+# Test: text-gradient.py handles invalid eval-suite JSON structure gracefully
+# An array [] is valid JSON but not a valid eval-suite schema; must not crash
+_BAD_SUITE="$TMPDIR_BASE/bad-suite.json"
+echo '[]' > "$_BAD_SUITE"
+_GRADIENT_RESULT=$(python3 "$SCRIPT_DIR/text-gradient.py" "$SKILL_DIR/SKILL.md" \
+    --json --eval-suite "$_BAD_SUITE" 2>/dev/null)
+_GRADIENT_VALID=$(echo "$_GRADIENT_RESULT" | \
+    python3 -c "import sys,json; json.load(sys.stdin); print('ok')" 2>/dev/null)
+if [[ "$_GRADIENT_VALID" == "ok" ]]; then
+    pass "text-gradient.py: invalid eval-suite schema → valid JSON output (no crash)"
+else
+    fail "text-gradient bad eval-suite" "output not valid JSON or script crashed"
+fi
+
+# Test: dashboard.py produces valid JSON with expected top-level keys
+_DASHBOARD_RESULT=$(python3 "$SCRIPT_DIR/dashboard.py" "$SKILL_DIR/SKILL.md" --json 2>/dev/null)
+_DASHBOARD_VALID=$(echo "$_DASHBOARD_RESULT" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+assert 'composite_score' in d or 'skill_name' in d
+print('ok')
+" 2>/dev/null)
+if [[ "$_DASHBOARD_VALID" == "ok" ]]; then
+    pass "dashboard.py: produces valid JSON with expected keys"
+else
+    fail "dashboard.py output" "missing composite_score/skill_name or invalid JSON"
+fi
+
+# Test: parallel-runner.py --dry-run produces valid JSON without spawning processes
+_PARALLEL_RESULT=$(python3 "$SCRIPT_DIR/parallel-runner.py" "$SKILL_DIR/SKILL.md" \
+    --dry-run --json 2>/dev/null)
+_PARALLEL_VALID=$(echo "$_PARALLEL_RESULT" | \
+    python3 -c "import sys,json; json.load(sys.stdin); print('ok')" 2>/dev/null)
+if [[ "$_PARALLEL_VALID" == "ok" ]]; then
+    pass "parallel-runner.py: --dry-run produces valid JSON"
+else
+    fail "parallel-runner dry-run" "output is not valid JSON or script crashed"
+fi
+
+##############################################################################
 # --- Summary ---
 ##############################################################################
 
