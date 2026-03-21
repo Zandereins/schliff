@@ -87,17 +87,18 @@ def analyze_calibration(meta_dir: Path) -> dict:
         denom_x = math.sqrt(sum((v - dim_mean) ** 2 for v in dim_values))
         denom_y = math.sqrt(sum((v - runtime_mean) ** 2 for v in runtime_values))
 
-        if denom_x > 0 and denom_y > 0:
-            r = numerator / (denom_x * denom_y)
+        if denom_x * denom_y < 1e-10:
+            correlations[dim] = None
         else:
-            r = 0.0
-
-        correlations[dim] = round(r, 3)
+            r = numerator / (denom_x * denom_y)
+            correlations[dim] = round(r, 3)
 
     # Suggest weight adjustments based on correlation
     suggestions = []
-    for dim, r in sorted(correlations.items(), key=lambda x: abs(x[1]), reverse=True):
-        if r > 0.5:
+    for dim, r in sorted(correlations.items(), key=lambda x: abs(x[1]) if x[1] is not None else -1, reverse=True):
+        if r is None:
+            suggestions.append(f"  {dim}: r=N/A — zero variance, correlation undefined")
+        elif r > 0.5:
             suggestions.append(f"  {dim}: r={r:+.3f} — strong positive correlation, consider increasing weight")
         elif r < -0.3:
             suggestions.append(f"  {dim}: r={r:+.3f} — negative correlation, consider decreasing weight")
@@ -105,7 +106,7 @@ def analyze_calibration(meta_dir: Path) -> dict:
             suggestions.append(f"  {dim}: r={r:+.3f} — weak correlation")
 
     # Generate --weights suggestion
-    positive_dims = {d: max(0.05, abs(r)) for d, r in correlations.items() if r > 0}
+    positive_dims = {d: max(0.05, abs(r)) for d, r in correlations.items() if r is not None and r > 0}
     if positive_dims:
         total = sum(positive_dims.values())
         weights_str = ",".join(f"{d}={v/total:.2f}" for d, v in sorted(positive_dims.items()))
@@ -361,7 +362,10 @@ def compute_optimal_weights(meta_dir: Optional[Path] = None) -> dict:
     # Negative or zero correlations get minimum weight (0.05)
     raw_weights = {}
     for dim, r in correlations.items():
-        raw_weights[dim] = max(0.05, r) if r > 0 else 0.05
+        if r is None:
+            raw_weights[dim] = 0.05
+        else:
+            raw_weights[dim] = max(0.05, r) if r > 0 else 0.05
 
     # Normalize to sum to 1.0
     total = sum(raw_weights.values())

@@ -120,13 +120,15 @@ def check_assertion(response: str, assertion: dict) -> dict:
         passed = a_value.lower() not in response_lower
 
     else:
-        # Unknown assertion type — skip, mark as passed
+        # Unknown assertion type — fail-safe, do not auto-pass
+        print(f"Warning: unknown assertion type '{a_type}', marking as skipped (not passed)", file=sys.stderr)
         return {
             "type": a_type,
             "value": a_value,
             "description": description,
-            "passed": True,
+            "passed": False,
             "skipped": True,
+            "reason": f"unknown assertion type: {a_type}",
         }
 
     return {

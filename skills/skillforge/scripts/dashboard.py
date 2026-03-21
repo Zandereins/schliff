@@ -23,10 +23,19 @@ SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import importlib
-scorer = importlib.import_module("score-skill")
-gradient_engine = importlib.import_module("text-gradient")
-mesh_analyzer = importlib.import_module("skill-mesh")
-meta_reporter = importlib.import_module("meta-report")
+
+def _try_import(module_name: str):
+    """Import a hyphenated sibling module; return None on failure."""
+    try:
+        return importlib.import_module(module_name)
+    except (ImportError, ModuleNotFoundError, SyntaxError) as e:
+        print(f"Warning: module '{module_name}' unavailable — dashboard will show N/A for that section ({e})", file=sys.stderr)
+        return None
+
+scorer = _try_import("score-skill")
+gradient_engine = _try_import("text-gradient")
+mesh_analyzer = _try_import("skill-mesh")
+meta_reporter = _try_import("meta-report")
 
 
 def _load_jsonl_safe(path: Path, max_size: int = 10_000_000) -> list[dict]:
@@ -58,13 +67,14 @@ def generate_dashboard(
     skill_name = "unknown"
 
     # Extract skill name
-    try:
-        content = scorer._read_skill_safe(skill_path)
-        name_match = re.search(r"^name:\s*(.+?)$", content, re.MULTILINE)
-        if name_match:
-            skill_name = name_match.group(1).strip()
-    except (FileNotFoundError, ValueError):
-        pass
+    if scorer is not None:
+        try:
+            content = scorer._read_skill_safe(skill_path)
+            name_match = re.search(r"^name:\s*(.+?)$", content, re.MULTILINE)
+            if name_match:
+                skill_name = name_match.group(1).strip()
+        except (FileNotFoundError, ValueError):
+            pass
 
     # 1. Score (all dimensions)
     eval_suite = None
@@ -75,31 +85,46 @@ def generate_dashboard(
         except (json.JSONDecodeError, OSError) as e:
             print(f"Warning: failed to parse eval-suite.json: {e}", file=sys.stderr)
 
-    scores = {
-        "structure": scorer.score_structure(skill_path),
-        "triggers": scorer.score_triggers(skill_path, eval_suite),
-        "quality": scorer.score_quality(skill_path, eval_suite),
-        "edges": scorer.score_edges(skill_path, eval_suite),
-        "efficiency": scorer.score_efficiency(skill_path),
-        "composability": scorer.score_composability(skill_path),
-    }
-    if include_clarity:
-        scores["clarity"] = scorer.score_clarity(skill_path)
-
-    composite = scorer.compute_composite(scores)
+    _na = {"score": -1, "issues": [], "details": {}}
+    if scorer is not None:
+        scores = {
+            "structure": scorer.score_structure(skill_path),
+            "triggers": scorer.score_triggers(skill_path, eval_suite),
+            "quality": scorer.score_quality(skill_path, eval_suite),
+            "edges": scorer.score_edges(skill_path, eval_suite),
+            "efficiency": scorer.score_efficiency(skill_path),
+            "composability": scorer.score_composability(skill_path),
+        }
+        if include_clarity:
+            scores["clarity"] = scorer.score_clarity(skill_path)
+        composite = scorer.compute_composite(scores)
+    else:
+        scores = {
+            "structure": _na, "triggers": _na, "quality": _na,
+            "edges": _na, "efficiency": _na, "composability": _na,
+        }
+        if include_clarity:
+            scores["clarity"] = _na
+        composite = {"score": -1, "measured_dimensions": 0, "total_dimensions": len(scores), "weight_coverage": 0.0}
 
     # 2. Top gradients
-    gradients = gradient_engine.compute_gradients(
-        skill_path, eval_suite=eval_suite,
-        include_clarity=include_clarity, top_n=5,
-    )
+    if gradient_engine is not None:
+        gradients = gradient_engine.compute_gradients(
+            skill_path, eval_suite=eval_suite,
+            include_clarity=include_clarity, top_n=5,
+        )
+    else:
+        gradients = []
 
     # 3. Mesh issues (filtered to this skill)
-    mesh_result = mesh_analyzer.run_mesh_analysis(
-        skill_dirs=skill_dirs or [],
-        severity_filter=None,
-        incremental=True,
-    )
+    if mesh_analyzer is not None:
+        mesh_result = mesh_analyzer.run_mesh_analysis(
+            skill_dirs=skill_dirs or [],
+            severity_filter=None,
+            incremental=True,
+        )
+    else:
+        mesh_result = {"issues": []}
     mesh_issues = [
         i for i in mesh_result.get("issues", [])
         if skill_name in (i.get("skill_a", ""), i.get("skill_b", ""), i.get("skill", ""))

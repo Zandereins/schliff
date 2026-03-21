@@ -44,11 +44,12 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
         if not skill_dir_path.is_dir():
             continue
 
-        scan_root = skill_dir_path.resolve()
+        scan_root = Path(os.path.realpath(str(skill_dir_path)))
         for skill_md in skill_dir_path.rglob("SKILL.md"):
             try:
-                resolved = skill_md.resolve()
-                real_path = str(resolved)
+                # Use os.path.realpath() explicitly to resolve all symlinks
+                real_path = os.path.realpath(str(skill_md))
+                resolved = Path(real_path)
                 # Prevent symlink escape outside scan root
                 resolved.relative_to(scan_root)
             except (ValueError, OSError):
@@ -602,7 +603,7 @@ def run_mesh_analysis(
     if incremental:
         cache = _load_mesh_cache()
         any_changed, changed_indices = _needs_recompute(skills, cache)
-        if not any_changed and cache.get("_issues"):
+        if not any_changed and cache.get("_issues") is not None:
             # No skills changed — return cached result
             cached_issues = cache.get("_issues", [])
             return {

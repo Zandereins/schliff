@@ -37,6 +37,8 @@ done
 # --- Trap signal handlers ---
 cleanup() {
     local exit_code=$?
+    # Release counter lock if held
+    rmdir "${LOCK_DIR:-/nonexistent}" 2>/dev/null || true
     if [[ -n "${SCORER_PID:-}" ]] && kill -0 "$SCORER_PID" 2>/dev/null; then
         kill -9 "$SCORER_PID" 2>/dev/null || true
     fi
@@ -117,10 +119,30 @@ SKILL_MD=$(cd "$(dirname "$SKILL_MD")" && echo "$(pwd)/$(basename "$SKILL_MD")")
 SKILL_NAME=$(grep "^name:" "$SKILL_MD" | head -1 | sed 's/^name:[[:space:]]*//' | sed 's/[[:space:]]*$//' || echo "unknown")
 SKILL_DIR=$(dirname "$SKILL_MD")
 
-# --- Generate experiment ID (sequential counter) ---
+# --- Generate experiment ID (sequential counter, atomic lock) ---
 EXPERIMENT_DIR="${SKILL_DIR}/.skillforge-eval"
 mkdir -p "$EXPERIMENT_DIR"
 COUNTER_FILE="$EXPERIMENT_DIR/counter"
+LOCK_DIR="$EXPERIMENT_DIR/.counter.lock"
+
+# Acquire lock using mkdir (atomic on all POSIX systems including macOS)
+_counter_retries=0
+_total_retries=0
+while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    _counter_retries=$((_counter_retries + 1))
+    _total_retries=$((_total_retries + 1))
+    if [[ $_total_retries -gt 300 ]]; then
+        echo "Error: could not acquire counter lock after 30s, proceeding without lock" >&2
+        break
+    fi
+    if [[ $_counter_retries -gt 50 ]]; then
+        echo "Warning: counter lock acquisition timed out, removing stale lock" >&2
+        rmdir "$LOCK_DIR" 2>/dev/null || rm -rf "$LOCK_DIR"
+        _counter_retries=0
+    fi
+    sleep 0.1
+done
+
 if [[ -f "$COUNTER_FILE" ]]; then
     RAW_COUNTER=$(cat "$COUNTER_FILE" 2>/dev/null || echo "0")
     if [[ "$RAW_COUNTER" =~ ^[0-9]+$ ]]; then
@@ -133,6 +155,9 @@ else
     EXPERIMENT_ID=1
 fi
 echo "$EXPERIMENT_ID" > "$COUNTER_FILE"
+
+# Release lock immediately after write
+rmdir "$LOCK_DIR" 2>/dev/null || true
 
 # --- Run Python scorer (6 dimensions) ---
 DIMENSION_SCORES="{}"
@@ -296,8 +321,22 @@ fi
 # --- Check previous pass rate (for exit code determination) ---
 PREVIOUS_PASS_RATE=0
 if [[ -n "$RESULTS_LOG" ]] && [[ -f "$RESULTS_LOG" ]]; then
-    PREVIOUS_PASS_RATE=$(tail -1 "$RESULTS_LOG" | \
-        jq -r '.pass_rate // 0' 2>/dev/null || echo "0")
+    # pass_rate stored as "N/M" (v5) or integer (v4 legacy) — handle both
+    _prev_pr_raw=$(tail -1 "$RESULTS_LOG" | jq -r '.pass_rate // "0/1"' 2>/dev/null || echo "0/1")
+    if [[ "$_prev_pr_raw" == */* ]]; then
+        _prev_passed="${_prev_pr_raw%%/*}"
+        _prev_total="${_prev_pr_raw##*/}"
+        if [[ "$_prev_total" =~ ^[0-9]+$ ]] && [[ "$_prev_total" -gt 0 ]] && [[ "$_prev_passed" =~ ^[0-9]+$ ]]; then
+            PREVIOUS_PASS_RATE=$((_prev_passed * 100 / _prev_total))
+        else
+            PREVIOUS_PASS_RATE=0
+        fi
+    elif [[ "$_prev_pr_raw" =~ ^[0-9]+$ ]]; then
+        # Legacy integer percentage from v4
+        PREVIOUS_PASS_RATE="$_prev_pr_raw"
+    else
+        PREVIOUS_PASS_RATE=0
+    fi
 fi
 
 # --- Build JSON output ---

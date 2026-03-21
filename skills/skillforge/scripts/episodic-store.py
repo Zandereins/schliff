@@ -19,6 +19,7 @@ Usage:
 import argparse
 import json
 import math
+import os
 import re
 import sys
 from collections import Counter, defaultdict
@@ -32,8 +33,8 @@ MAX_EPISODES = 10_000
 CONSOLIDATION_BATCH = 1000
 MAX_FILE_SIZE = 10_000_000  # 10 MB
 
-# Module-level TF-IDF cache with mtime-based invalidation
-_tfidf_cache: dict[str, Any] = {"mtime": 0.0, "index": None, "episodes": None}
+# Module-level TF-IDF cache with mtime+size-based invalidation
+_tfidf_cache: dict[str, Any] = {"mtime": 0.0, "filesize": 0, "index": None, "episodes": None}
 
 
 # --- Tokenizer (reuses scorer patterns) ---
@@ -112,9 +113,10 @@ class TFIDFIndex:
             dot = sum(query_vector[t] * doc_vec[t] for t in common)
             norm_q = math.sqrt(sum(v ** 2 for v in query_vector.values()))
             norm_d = math.sqrt(sum(v ** 2 for v in doc_vec.values()))
-            if norm_q > 0 and norm_d > 0:
-                sim = dot / (norm_q * norm_d)
-                results.append((i, sim))
+            if norm_q < 1e-10 or norm_d < 1e-10:
+                continue
+            sim = dot / (norm_q * norm_d)
+            results.append((i, sim))
 
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:top_k]
@@ -223,13 +225,19 @@ def recall(query: str, top_k: int = 5) -> list[dict]:
         if "text" not in ep:
             ep["text"] = _episode_text(ep)
 
-    # Use cached TF-IDF index if file hasn't changed
+    # Use cached TF-IDF index if file hasn't changed (mtime + size)
     current_mtime = EPISODES_PATH.stat().st_mtime if EPISODES_PATH.exists() else 0.0
-    if _tfidf_cache["mtime"] == current_mtime and _tfidf_cache["index"] is not None:
+    current_filesize = os.path.getsize(EPISODES_PATH) if EPISODES_PATH.exists() else 0
+    if (
+        _tfidf_cache["mtime"] == current_mtime
+        and _tfidf_cache["filesize"] == current_filesize
+        and _tfidf_cache["index"] is not None
+    ):
         index = _tfidf_cache["index"]
     else:
         index = TFIDFIndex(episodes)
         _tfidf_cache["mtime"] = current_mtime
+        _tfidf_cache["filesize"] = current_filesize
         _tfidf_cache["index"] = index
         _tfidf_cache["episodes"] = episodes
 
@@ -330,7 +338,9 @@ def _enforce_size_cap() -> None:
             "context": f"Consolidated from {len(eps)} episodes",
             "timestamp": eps[-1].get("timestamp", ""),
             "text": _episode_text({"domain": domain, "strategy": strategy,
-                                    "outcome": outcome, "learning": best_learning}),
+                                    "outcome": outcome, "learning": best_learning,
+                                    "skill": f"consolidated-{domain}",
+                                    "context": f"Consolidated {len(eps)} episodes"}),
         })
 
     # Atomic rewrite: write to temp file then rename (crash-safe on POSIX)

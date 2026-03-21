@@ -18,6 +18,19 @@
 set -euo pipefail
 
 SKILL_PATH="${1:?Usage: analyze-skill.sh /path/to/SKILL.md}"
+
+# --- Path validation: reject traversal and resolve to real path ---
+if [[ "$SKILL_PATH" =~ (^|/)\.\.(/|$) ]]; then
+  printf '{"error":"path contains .. — traversal rejected","path":"%s","score":0}\n' "$SKILL_PATH"
+  exit 1
+fi
+if command -v realpath &>/dev/null; then
+  REAL_PATH="$(realpath "$SKILL_PATH" 2>/dev/null)" || REAL_PATH="$SKILL_PATH"
+else
+  REAL_PATH="$SKILL_PATH"
+fi
+SKILL_PATH="$REAL_PATH"
+
 SKILL_DIR="$(dirname "$SKILL_PATH")"
 SCORE=0
 MAX=100
@@ -25,7 +38,7 @@ ISSUES=()
 
 # --- Check 1: File exists ---
 if [[ ! -f "$SKILL_PATH" ]]; then
-  printf '{"error":"SKILL.md not found","score":0}\n'
+  printf '{"error":"SKILL.md not found","path":"%s","score":0}\n' "$SKILL_PATH"
   exit 1
 fi
 
@@ -152,7 +165,12 @@ done < <(echo "$CONTENT" | grep -oE '(references|scripts|templates)/[a-zA-Z0-9_.
 if [[ $MISSING_REFS -eq 0 ]]; then
   SCORE=$((SCORE + 10))
 else
-  ISSUES+=("missing_referenced_files:${MISSING_REF_LIST[*]}")
+  # Join missing refs with comma to avoid word-splitting issues in the issues array
+  MISSING_REF_JOINED=""
+  for _ref in "${MISSING_REF_LIST[@]+"${MISSING_REF_LIST[@]}"}"; do
+    MISSING_REF_JOINED="${MISSING_REF_JOINED:+${MISSING_REF_JOINED},}${_ref}"
+  done
+  ISSUES+=("missing_referenced_files:${MISSING_REF_JOINED}")
   SCORE=$((SCORE + 5))
 fi
 
