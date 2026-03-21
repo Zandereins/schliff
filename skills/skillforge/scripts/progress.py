@@ -630,8 +630,7 @@ class ProgressAnalyzer:
         result += f"\n{min_score:.0f}" + " " * (width - 10) + f"{max_score:.0f}"
         return result
 
-
-def emit_strategy_meta(self, skill_name: str = "unknown", domain: str = "unknown",
+    def emit_strategy_meta(self, skill_name: str = "unknown", domain: str = "unknown",
                            experiments: Optional[List[Dict[str, Any]]] = None) -> int:
         """Emit strategy data to ~/.skillforge/meta/strategy-log.jsonl.
 
@@ -644,7 +643,7 @@ def emit_strategy_meta(self, skill_name: str = "unknown", domain: str = "unknown
         exps = experiments if experiments is not None else self.experiments
         count = 0
 
-        with open(meta_path, "a") as f:
+        with open(meta_path, "a", encoding="utf-8") as f:
             for exp in exps:
                 if exp.get("status") in ("baseline",):
                     continue

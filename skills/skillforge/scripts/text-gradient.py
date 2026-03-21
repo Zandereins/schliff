@@ -13,8 +13,6 @@ Output: Ranked list of improvements sorted by predicted_delta / effort.
 
 import argparse
 import json
-import math
-import os
 import re
 import sys
 from pathlib import Path
@@ -596,11 +594,16 @@ def compute_gradients(
     if include_clarity:
         gradients.extend(_compute_clarity_gradients(skill_path))
 
-    # Compute priority: predicted_delta / effort
+    # Normalize delta to float and compute priority
     for g in gradients:
-        delta = _parse_delta(g["delta"])
+        raw_delta = g["delta"]
+        parsed = _parse_delta(raw_delta)
+        # Keep original string as display hint, normalize delta to float
+        if isinstance(raw_delta, str):
+            g["delta_display"] = raw_delta
+        g["delta"] = parsed
         effort = g.get("effort", EFFORT_MODERATE)
-        g["priority"] = round(delta / effort, 2)
+        g["priority"] = round(parsed / effort, 2)
 
     # Sort by priority descending
     gradients.sort(key=lambda g: g["priority"], reverse=True)
@@ -623,7 +626,7 @@ def format_gradients(gradients: list[dict]) -> str:
     lines.append("")
 
     for i, g in enumerate(gradients, 1):
-        delta_str = g["delta"] if isinstance(g["delta"], str) else f"+{g['delta']:.1f}"
+        delta_str = g.get("delta_display", f"+{g['delta']:.1f}")
         conf = g.get("confidence", "medium")
         effort_labels = {1: "simple", 2: "moderate", 3: "complex", 4: "major"}
         effort_str = effort_labels.get(g.get("effort", 2), "moderate")
