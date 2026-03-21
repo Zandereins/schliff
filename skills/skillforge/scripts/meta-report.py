@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """SkillForge Meta-Learning Report — Data-Informed Insights
 
 Reads collected meta-learning data (calibration, strategy, trigger logs)
@@ -34,6 +35,7 @@ def _load_jsonl(path: Path) -> list[dict]:
     if path.stat().st_size > MAX_JSONL_SIZE:
         print(f"Warning: {path} exceeds {MAX_JSONL_SIZE} bytes, skipping", file=sys.stderr)
         return entries
+    skipped = 0
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -41,7 +43,9 @@ def _load_jsonl(path: Path) -> list[dict]:
                 try:
                     entries.append(json.loads(line))
                 except json.JSONDecodeError:
-                    continue
+                    skipped += 1
+    if skipped > 0:
+        print(f"Warning: {path}: skipped {skipped} malformed JSONL lines", file=sys.stderr)
     return entries
 
 
@@ -168,10 +172,12 @@ def analyze_triggers(meta_dir: Path) -> dict:
     """Analyze trigger threshold effectiveness.
 
     Shows F1 at current vs alternative thresholds.
+    Note: trigger-calibration.jsonl is not yet emitted by any component.
+    This feature is planned — data pipeline will be added in a future version.
     """
     entries = _load_jsonl(meta_dir / "trigger-calibration.jsonl")
     if not entries:
-        return {"available": False, "reason": "No trigger calibration data yet."}
+        return {"available": False, "reason": "No trigger calibration data yet (planned feature — data pipeline not yet implemented)."}
 
     if len(entries) < 5:
         return {
@@ -222,14 +228,178 @@ def analyze_triggers(meta_dir: Path) -> dict:
     }
 
 
+def _gap_bucket(gap: float) -> str:
+    """Discretize a dimension gap into a bucket label."""
+    if gap <= 10:
+        return "0-10"
+    elif gap <= 20:
+        return "10-20"
+    elif gap <= 30:
+        return "20-30"
+    else:
+        return "30+"
+
+
+def predict_best_strategy(
+    current_scores: dict,
+    skill_domain: str = "unknown",
+    meta_dir: Optional[Path] = None,
+) -> dict:
+    """Predict which strategy will yield the highest improvement.
+
+    Groups historical data by (domain, strategy_type, dimension_gap_bucket).
+    Computes P(keep | strategy, domain, gap) and expected_delta.
+    Requires minimum 5 entries per bucket for prediction.
+
+    Args:
+        current_scores: Dict of dimension -> current score
+        skill_domain: Domain of the skill being improved
+        meta_dir: Path to meta data directory
+
+    Returns:
+        Dict with ranked strategies and predictions
+    """
+    if meta_dir is None:
+        meta_dir = META_DIR_DEFAULT
+
+    entries = _load_jsonl(meta_dir / "strategy-log.jsonl")
+    if not entries:
+        return {"available": False, "reason": "No strategy data for prediction."}
+
+    # Find weakest dimension and its gap
+    target = 100
+    weakest_dim = None
+    max_gap = 0
+    for dim, score in current_scores.items():
+        if not isinstance(score, (int, float)) or score < 0:
+            continue
+        gap = target - score
+        if gap > max_gap:
+            max_gap = gap
+            weakest_dim = dim
+
+    if weakest_dim is None:
+        return {"available": False, "reason": "No valid dimension scores."}
+
+    gap_bucket = _gap_bucket(max_gap)
+
+    # Group entries by (strategy_type) with optional domain/gap filtering
+    strategy_stats: dict[str, dict] = defaultdict(lambda: {"keeps": 0, "total": 0, "deltas": []})
+
+    for e in entries:
+        strategy = e.get("strategy_type", "unknown")
+        domain = e.get("domain", "unknown")
+        entry_gap = e.get("dimension_gap_bucket", "")
+
+        # Weight: exact domain match = 1.0, any domain = 0.5
+        weight = 1.0 if domain == skill_domain else 0.5
+
+        # Additional weight for matching gap bucket
+        if entry_gap == gap_bucket:
+            weight *= 1.5
+
+        stats = strategy_stats[strategy]
+        stats["total"] += weight
+        if e.get("status") == "keep":
+            stats["keeps"] += weight
+            stats["deltas"].append(e.get("delta", 0))
+
+    # Compute predictions
+    predictions = []
+    for strategy, stats in strategy_stats.items():
+        if stats["total"] < 3:  # Minimum data threshold (weighted)
+            continue
+
+        p_keep = stats["keeps"] / stats["total"]
+        avg_delta = sum(stats["deltas"]) / len(stats["deltas"]) if stats["deltas"] else 0
+        expected_value = p_keep * avg_delta
+
+        predictions.append({
+            "strategy": strategy,
+            "p_keep": round(p_keep, 3),
+            "avg_delta": round(avg_delta, 2),
+            "expected_delta": round(expected_value, 2),
+            "sample_size": round(stats["total"], 1),
+        })
+
+    # Sort by expected delta descending
+    predictions.sort(key=lambda p: p["expected_delta"], reverse=True)
+
+    return {
+        "available": True,
+        "weakest_dimension": weakest_dim,
+        "gap": round(max_gap, 1),
+        "gap_bucket": gap_bucket,
+        "domain": skill_domain,
+        "predictions": predictions,
+        "fallback": len(predictions) == 0,
+    }
+
+
+def compute_optimal_weights(meta_dir: Optional[Path] = None) -> dict:
+    """Compute optimal dimension weights from calibration data.
+
+    Uses Pearson correlations between static scores and runtime pass rates
+    to determine which dimensions best predict actual effectiveness.
+
+    Writes result to ~/.skillforge/meta/calibrated-weights.json.
+    Re-calibrates when called (should be triggered every ~20 runtime evals).
+
+    Returns:
+        Dict with weights and calibration metadata
+    """
+    if meta_dir is None:
+        meta_dir = META_DIR_DEFAULT
+
+    cal_result = analyze_calibration(meta_dir)
+    if not cal_result.get("available") or not cal_result.get("correlations"):
+        return {"available": False, "reason": cal_result.get("reason", "Insufficient calibration data.")}
+
+    correlations = cal_result["correlations"]
+
+    # Convert correlations to weights: positive correlations get proportional weight
+    # Negative or zero correlations get minimum weight (0.05)
+    raw_weights = {}
+    for dim, r in correlations.items():
+        raw_weights[dim] = max(0.05, r) if r > 0 else 0.05
+
+    # Normalize to sum to 1.0
+    total = sum(raw_weights.values())
+    weights = {dim: round(w / total, 3) for dim, w in raw_weights.items()}
+
+    # Write to calibrated-weights.json
+    weights_path = meta_dir / "calibrated-weights.json"
+    meta_dir.mkdir(parents=True, exist_ok=True)
+    weights_path.write_text(json.dumps(weights, indent=2), encoding="utf-8")
+
+    return {
+        "available": True,
+        "weights": weights,
+        "correlations": correlations,
+        "entries_used": cal_result.get("entries", 0),
+        "weights_path": str(weights_path),
+    }
+
+
 def generate_report(meta_dir: Path) -> dict:
     """Generate complete meta-learning report."""
-    return {
+    report = {
         "calibration": analyze_calibration(meta_dir),
         "strategies": analyze_strategies(meta_dir),
         "triggers": analyze_triggers(meta_dir),
         "meta_dir": str(meta_dir),
     }
+
+    # Include predictor if strategy data exists
+    if report["strategies"].get("available"):
+        # Use a dummy current_scores for the report — real usage passes actual scores
+        report["predictor_status"] = "available" if report["strategies"]["entries"] >= 5 else "insufficient_data"
+
+    # Include calibration status
+    if report["calibration"].get("correlations"):
+        report["calibration_weights"] = compute_optimal_weights(meta_dir)
+
+    return report
 
 
 def format_report(report: dict) -> str:

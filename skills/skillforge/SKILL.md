@@ -119,11 +119,15 @@ See `references/metrics-catalog.md#custom` for setup and examples.
 | Command | Purpose |
 |---------|---------|
 | `/skillforge` | Autonomous loop with GOAL + METRIC |
+| `/skillforge:auto` | Self-driving auto-improve: apply deterministic patches in a loop |
 | `/skillforge:analyze` | Skill analysis, gaps, anti-patterns, baseline |
 | `/skillforge:bench` | Single evaluation run, current score |
 | `/skillforge:eval` | Run eval suite, show results |
 | `/skillforge:report` | Generate improvement summary + diffs |
 | `/skillforge:mesh` | Scan all skills for trigger overlap, broken handoffs, scope collisions |
+| `/skillforge:mesh-evolve` | Mesh + generate fix actions (negative boundaries, stubs) |
+| `/skillforge:predict` | Predict best strategy before trying (from cross-session data) |
+| `/skillforge:recall` | Recall relevant past episodes from episodic memory |
 | `/skillforge:triage` | Cluster logged failures, auto-generate fixes |
 | `/skillforge:log-failure` | Manually log a skill failure for later triage |
 
@@ -265,14 +269,17 @@ Create new skills with `skill-creator`. For crashing skills, suggest using
 ## Files
 
 Run `ls -R` in the skill directory. Run `python3 scripts/score-skill.py SKILL.md --json` for current scores. Key files:
-- `scripts/score-skill.py` — Compute dimension scores (`--diff`, `--clarity`, `--weights`)
-- `scripts/text-gradient.py` — Invert scorer issues into prioritized fix list (`--json`, `--top N`)
-- `scripts/skill-mesh.py` — Multi-skill conflict detection (`--skill-dirs`, `--severity`)
-- `scripts/meta-report.py` — Data-informed strategy and correlation insights
+- `scripts/score-skill.py` — Compute dimension scores incl. runtime (`--diff`, `--clarity`, `--weights`)
+- `scripts/text-gradient.py` — Invert scorer issues into fix list (`--json`, `--top N`, `--apply`, `--dry-run`)
+- `scripts/auto-improve.py` — Self-driving autonomous loop (`--max-iterations N`, `--dry-run`, `--resume`)
+- `scripts/skill-mesh.py` — Multi-skill conflict detection + evolution actions (`--incremental`)
+- `scripts/meta-report.py` — Strategy predictor + auto-calibration + correlation insights
+- `scripts/episodic-store.py` — Cross-session learning memory (`--store`, `--recall`, `--synthesize`)
+- `scripts/parallel-runner.py` — Worktree-based parallel experimentation (`--strategies`, `--auto`)
 - `scripts/runtime-evaluator.py` — Invoke Claude with test prompts, check real output
 - `scripts/analyze-skill.sh` — Legacy standalone structural linter (score-skill.py has this built-in)
 - `scripts/run-eval.sh` — Run eval suite (auto-enables `--runtime` if claude CLI is available)
-- `scripts/progress.py` — Convergence charts + strategy analysis (`--strategies`, `--emit-meta`)
+- `scripts/progress.py` — Convergence charts + strategy analysis + episode emit (`--emit-meta`)
 - `hooks/session-injector.js` — SessionStart hook: surfaces untriaged failures
 - `references/improvement-protocol.md` — Full 9-phase autonomous loop spec
 - `references/metrics-catalog.md` — Scoring rubrics + custom metric setup
