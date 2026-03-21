@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """SkillForge Skill Mesh — Multi-Skill Conflict Detection
 
 Scans all installed skills, detects trigger overlap, broken handoffs,

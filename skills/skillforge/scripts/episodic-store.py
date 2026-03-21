@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """SkillForge Episodic Memory — Cross-Session Learning Store
 
 Lightweight semantic search over past skill improvements.
