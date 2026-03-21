@@ -605,8 +605,8 @@ def compute_gradients(
         effort = g.get("effort", EFFORT_MODERATE)
         g["priority"] = round(parsed / effort, 2)
 
-    # Sort by priority descending
-    gradients.sort(key=lambda g: g["priority"], reverse=True)
+    # Sort by priority descending, with stable secondary sort by dimension+issue
+    gradients.sort(key=lambda g: (-g["priority"], g["dimension"], g["issue"]))
 
     if top_n:
         gradients = gradients[:top_n]
@@ -643,6 +643,194 @@ def format_gradients(gradients: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def generate_patches(skill_path: str, gradients: list[dict]) -> list[dict]:
+    """Generate concrete patches for deterministic gradients.
+
+    Only high-confidence, simple-effort gradients get patches.
+    Returns a list of patch dicts with op, line, and content fields.
+    """
+    try:
+        content = scorer._read_skill_safe(skill_path)
+    except (FileNotFoundError, ValueError):
+        return []
+
+    lines = content.split("\n")
+    patches = []
+
+    # Extract skill name from frontmatter if present
+    name_match = re.search(r"^name:\s*(.+?)$", content, re.MULTILINE)
+    skill_name = name_match.group(1).strip() if name_match else Path(skill_path).parent.name
+
+    for g in gradients:
+        if g.get("confidence") != "high" or g.get("effort", 2) > EFFORT_SIMPLE:
+            continue
+
+        patch = None
+
+        if g["issue"] == "no_frontmatter":
+            patch = {
+                "op": "insert_before",
+                "line": 1,
+                "content": f"---\nname: {skill_name}\ndescription: >-\n  TODO: describe what this skill does and when to use it\n---\n",
+            }
+        elif g["issue"] == "missing_name" and lines and lines[0].strip() == "---":
+            # Find end of frontmatter to insert name
+            for i, line in enumerate(lines[1:], 1):
+                if line.strip() == "---":
+                    patch = {
+                        "op": "insert_before",
+                        "line": i + 1,
+                        "content": f"name: {skill_name}\n",
+                    }
+                    break
+        elif g["issue"] == "missing_description" and lines and lines[0].strip() == "---":
+            for i, line in enumerate(lines[1:], 1):
+                if line.strip() == "---":
+                    patch = {
+                        "op": "insert_before",
+                        "line": i + 1,
+                        "content": "description: >-\n  TODO: describe what this skill does and when to use it\n",
+                    }
+                    break
+        elif g["issue"].startswith("has_todo"):
+            # Find and list TODO/FIXME lines for removal
+            todo_lines = []
+            for i, line in enumerate(lines):
+                if re.search(r"(?i)(TODO|FIXME|HACK|XXX|placeholder)", line):
+                    todo_lines.append(i + 1)
+            if todo_lines:
+                patch = {
+                    "op": "remove_lines",
+                    "lines": todo_lines,
+                    "content": "",
+                }
+        elif g["issue"] == "no_scope_boundaries":
+            # Insert scope section before the last line
+            patch = {
+                "op": "append",
+                "line": len(lines),
+                "content": "\n## When to Use\n\nUse this skill when:\n- TODO: describe positive triggers\n\nDo NOT use for:\n- TODO: describe negative boundaries\n",
+            }
+        elif g["issue"] == "no_handoff_points":
+            patch = {
+                "op": "append",
+                "line": len(lines),
+                "content": "\n## Related Skills\n\nThen use:\n- TODO: describe handoff points\n\nIf instead:\n- TODO: describe when to suggest other skills\n",
+            }
+
+        if patch:
+            patch["gradient_id"] = f"{g['dimension']}:{g['issue']}"
+            patch["dimension"] = g["dimension"]
+            patch["issue"] = g["issue"]
+            patch["delta"] = g["delta"]
+            patches.append(patch)
+
+    return patches
+
+
+def apply_patches(skill_path: str, patches: list[dict], dry_run: bool = False) -> dict:
+    """Apply deterministic patches to a skill file.
+
+    Applies patches in reverse line order to keep line numbers stable.
+    Validates YAML frontmatter after all patches are applied.
+
+    Returns:
+        ApplyResult dict with: applied, skipped, errors, new_content
+    """
+    try:
+        content = scorer._read_skill_safe(skill_path)
+    except (FileNotFoundError, ValueError) as e:
+        return {"applied": 0, "skipped": 0, "errors": [str(e)], "new_content": None}
+
+    lines = content.split("\n")
+    applied = 0
+    skipped = 0
+    errors = []
+
+    # Sort patches by line number descending (reverse order for stable application)
+    line_patches = []
+    other_patches = []
+    for p in patches:
+        if "line" in p:
+            line_patches.append(p)
+        elif "lines" in p:
+            line_patches.append(p)
+        else:
+            other_patches.append(p)
+
+    line_patches.sort(key=lambda p: p.get("line", p.get("lines", [0])[0] if p.get("lines") else 0), reverse=True)
+
+    for patch in line_patches + other_patches:
+        op = patch.get("op", "")
+        try:
+            if op == "insert_before":
+                line_idx = patch["line"] - 1
+                new_lines = patch["content"].rstrip("\n").split("\n")
+                lines[line_idx:line_idx] = new_lines
+                applied += 1
+            elif op == "append":
+                new_lines = patch["content"].rstrip("\n").split("\n")
+                lines.extend(new_lines)
+                applied += 1
+            elif op == "remove_lines":
+                # Remove lines in reverse order to keep indices stable
+                for ln in sorted(patch["lines"], reverse=True):
+                    idx = ln - 1
+                    if 0 <= idx < len(lines):
+                        lines.pop(idx)
+                applied += 1
+            elif op == "remove_regex":
+                pattern = patch.get("pattern", "")
+                if pattern:
+                    compiled = re.compile(pattern, re.IGNORECASE)
+                    lines = [l for l in lines if not compiled.search(l)]
+                    applied += 1
+                else:
+                    skipped += 1
+            elif op == "replace_line":
+                line_idx = patch["line"] - 1
+                if 0 <= line_idx < len(lines):
+                    lines[line_idx] = patch["content"]
+                    applied += 1
+                else:
+                    errors.append(f"replace_line: line {patch['line']} out of range")
+                    skipped += 1
+            elif op == "append_section":
+                new_lines = patch["content"].rstrip("\n").split("\n")
+                lines.extend([""] + new_lines)
+                applied += 1
+            else:
+                skipped += 1
+        except (KeyError, IndexError) as e:
+            errors.append(f"{op}: {e}")
+            skipped += 1
+
+    new_content = "\n".join(lines)
+
+    # Validate YAML frontmatter integrity
+    if new_content.startswith("---"):
+        end_idx = new_content.find("---", 3)
+        if end_idx < 0:
+            errors.append("YAML frontmatter broken after patching (no closing ---)")
+        else:
+            fm = new_content[3:end_idx].strip()
+            if not re.search(r"^name:\s*\S", fm, re.MULTILINE):
+                errors.append("YAML frontmatter missing 'name' field after patching")
+
+    if not dry_run and applied > 0 and not errors:
+        Path(skill_path).write_text(new_content, encoding="utf-8")
+        # Invalidate scorer cache for this file
+        cache_key = str(Path(skill_path).resolve())
+        scorer._file_cache.pop(cache_key, None)
+
+    return {
+        "applied": applied,
+        "skipped": skipped,
+        "errors": errors,
+        "new_content": new_content if dry_run else None,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="SkillForge Text Gradients")
     parser.add_argument("skill_path", help="Path to SKILL.md")
@@ -650,6 +838,9 @@ def main():
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--top", type=int, default=None, help="Show only top N gradients")
     parser.add_argument("--clarity", action="store_true", help="Include clarity dimension")
+    parser.add_argument("--patch", action="store_true", help="Generate concrete patches for deterministic fixes")
+    parser.add_argument("--apply", action="store_true", help="Apply deterministic patches directly to file")
+    parser.add_argument("--dry-run", action="store_true", help="Show what --apply would do without writing")
     args = parser.parse_args()
 
     eval_suite = None
@@ -669,7 +860,46 @@ def main():
         top_n=args.top,
     )
 
-    if args.json:
+    if args.apply or (args.patch and args.dry_run):
+        patches = generate_patches(args.skill_path, gradients)
+        if not patches:
+            if args.json:
+                print(json.dumps({"applied": 0, "skipped": 0, "errors": [], "message": "no patches available"}, indent=2))
+            else:
+                print("No deterministic patches available — all gradients require manual intervention.")
+        else:
+            result = apply_patches(args.skill_path, patches, dry_run=args.dry_run or not args.apply)
+            if args.json:
+                # Don't include full new_content in JSON output
+                output = {k: v for k, v in result.items() if k != "new_content"}
+                output["patches_attempted"] = len(patches)
+                print(json.dumps(output, indent=2))
+            else:
+                mode = "DRY RUN" if args.dry_run else "APPLIED"
+                print(f"[{mode}] {result['applied']} patches applied, {result['skipped']} skipped")
+                if result["errors"]:
+                    for err in result["errors"]:
+                        print(f"  ERROR: {err}")
+                for p in patches:
+                    status = "✓" if result["applied"] > 0 else "⊘"
+                    print(f"  {status} [{p['dimension']}] {p['issue']} → {p['op']}")
+    elif args.patch:
+        patches = generate_patches(args.skill_path, gradients)
+        if args.json:
+            print(json.dumps({"patches": patches, "count": len(patches)}, indent=2))
+        else:
+            if not patches:
+                print("No deterministic patches available — all gradients require manual intervention.")
+            else:
+                print(f"Generated {len(patches)} concrete patches:")
+                for p in patches:
+                    print(f"  [{p['dimension']}] {p['issue']} → {p['op']} at line {p.get('line', '?')}")
+                    if p.get("content"):
+                        for cl in p["content"].split("\n")[:3]:
+                            print(f"    | {cl}")
+                        if len(p["content"].split("\n")) > 3:
+                            print(f"    | ... ({len(p['content'].split(chr(10)))} lines)")
+    elif args.json:
         print(json.dumps({"gradients": gradients, "count": len(gradients)}, indent=2))
     else:
         print(format_gradients(gradients))

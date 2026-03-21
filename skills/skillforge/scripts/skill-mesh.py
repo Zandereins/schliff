@@ -46,9 +46,10 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
         scan_root = skill_dir_path.resolve()
         for skill_md in skill_dir_path.rglob("SKILL.md"):
             try:
-                real_path = str(skill_md.resolve())
+                resolved = skill_md.resolve()
+                real_path = str(resolved)
                 # Prevent symlink escape outside scan root
-                skill_md.resolve().relative_to(scan_root)
+                resolved.relative_to(scan_root)
             except (ValueError, OSError):
                 continue
             if real_path in seen_paths:
@@ -384,6 +385,144 @@ def detect_scope_collisions(skills: list[dict]) -> list[dict]:
     return collisions
 
 
+# --- Mesh Evolution Actions ---
+
+def generate_mesh_actions(issues: list[dict], skills: list[dict]) -> list[dict]:
+    """Generate concrete fix actions for mesh issues.
+
+    For each issue type, generates a specific remediation action:
+    - trigger_overlap (critical): Negative-boundary additions for both skills
+    - scope_collision: Domain-ownership proposal + scope-narrowing patches
+    - broken_handoff: Missing-skill stub or reference fix
+
+    Returns list of MeshAction dicts with: type, target_path, instruction, patch, confidence.
+    """
+    actions = []
+    skill_by_name = {s["name"]: s for s in skills}
+
+    for issue in issues:
+        itype = issue.get("type", "")
+        severity = issue.get("severity", "info")
+
+        if itype == "trigger_overlap" and severity == "critical":
+            # Generate negative boundary additions for both skills
+            skill_a = issue.get("skill_a", "")
+            skill_b = issue.get("skill_b", "")
+            common = issue.get("common_terms", [])
+
+            if skill_a and skill_b:
+                # For skill A: add "Do NOT use for [skill_b's domain]"
+                actions.append({
+                    "type": "add_negative_boundary",
+                    "target_path": issue.get("skill_a_path", ""),
+                    "instruction": f"Add negative boundary: 'Do NOT use for {skill_b} scenarios' "
+                                   f"to disambiguate from {skill_b}",
+                    "patch": {
+                        "op": "append_section",
+                        "content": f"\nDo NOT use for:\n- Tasks that belong to `{skill_b}` "
+                                   f"(disambiguate: {', '.join(common[:5])})\n",
+                    },
+                    "confidence": 0.8 if severity == "critical" else 0.5,
+                    "issue_ref": f"trigger_overlap:{skill_a}:{skill_b}",
+                })
+                # Mirror for skill B
+                actions.append({
+                    "type": "add_negative_boundary",
+                    "target_path": issue.get("skill_b_path", ""),
+                    "instruction": f"Add negative boundary: 'Do NOT use for {skill_a} scenarios' "
+                                   f"to disambiguate from {skill_a}",
+                    "patch": {
+                        "op": "append_section",
+                        "content": f"\nDo NOT use for:\n- Tasks that belong to `{skill_a}` "
+                                   f"(disambiguate: {', '.join(common[:5])})\n",
+                    },
+                    "confidence": 0.8 if severity == "critical" else 0.5,
+                    "issue_ref": f"trigger_overlap:{skill_b}:{skill_a}",
+                })
+
+        elif itype == "scope_collision":
+            skill_a = issue.get("skill_a", "")
+            skill_b = issue.get("skill_b", "")
+            domain = issue.get("shared_domain", "")
+
+            actions.append({
+                "type": "scope_narrowing",
+                "target_path": issue.get("skill_a_path", ""),
+                "instruction": f"Narrow scope: {skill_a} should own '{domain}' for its specific use case. "
+                               f"Add 'Scope: {domain} specifically for [specific aspect]' to description.",
+                "patch": None,  # Requires human judgment
+                "confidence": 0.5,
+                "issue_ref": f"scope_collision:{skill_a}:{skill_b}",
+            })
+
+        elif itype == "broken_handoff":
+            ref = issue.get("referenced", "")
+            suggestion = issue.get("suggestion")
+
+            if suggestion:
+                # Fix reference to point to correct skill
+                actions.append({
+                    "type": "fix_reference",
+                    "target_path": issue.get("skill_path", ""),
+                    "instruction": f"Replace reference to '{ref}' with '{suggestion}'",
+                    "patch": {
+                        "op": "remove_regex",
+                        "pattern": re.escape(ref),
+                        "replacement": suggestion,
+                    },
+                    "confidence": 0.7,
+                    "issue_ref": f"broken_handoff:{ref}",
+                })
+            else:
+                # Suggest creating a stub
+                actions.append({
+                    "type": "create_stub",
+                    "target_path": f"<new>/{ref}/SKILL.md",
+                    "instruction": f"Create missing skill '{ref}' referenced by {issue.get('skill', '?')}",
+                    "patch": None,
+                    "confidence": 0.3,
+                    "issue_ref": f"broken_handoff:{ref}",
+                })
+
+    return actions
+
+
+# --- Incremental Cache ---
+
+_MESH_CACHE_PATH = Path.home() / ".skillforge" / "meta" / "mesh-cache.json"
+
+
+def _load_mesh_cache() -> dict:
+    """Load mesh analysis cache (content_hash -> analysis results)."""
+    if not _MESH_CACHE_PATH.exists():
+        return {}
+    try:
+        return json.loads(_MESH_CACHE_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_mesh_cache(cache: dict) -> None:
+    """Save mesh analysis cache."""
+    _MESH_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _MESH_CACHE_PATH.write_text(json.dumps(cache), encoding="utf-8")
+
+
+def _needs_recompute(skills: list[dict], cache: dict) -> tuple[bool, list[int]]:
+    """Check which skill pairs need recomputation based on content hashes.
+
+    Returns (any_changed, list_of_changed_skill_indices).
+    """
+    changed = []
+    for i, skill in enumerate(skills):
+        cache_key = skill.get("path", "")
+        cached_hash = cache.get(cache_key, {}).get("content_hash", "")
+        if cached_hash != skill.get("content_hash", ""):
+            changed.append(i)
+
+    return len(changed) > 0, changed
+
+
 # --- Mesh Health Score ---
 
 def compute_mesh_health(issues: list[dict]) -> dict:
@@ -418,24 +557,6 @@ def compute_mesh_health(issues: list[dict]) -> dict:
     }
 
 
-# --- Cache for Incremental Mode ---
-
-def _load_cache(cache_path: Path) -> dict:
-    """Load incremental cache."""
-    if cache_path.exists():
-        try:
-            return json.loads(cache_path.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {}
-
-
-def _save_cache(cache_path: Path, cache: dict):
-    """Save incremental cache."""
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(json.dumps(cache, indent=2))
-
-
 # --- Main ---
 
 def run_mesh_analysis(
@@ -464,11 +585,31 @@ def run_mesh_analysis(
             "summary": "No skills found in scanned directories.",
         }
 
+    # Incremental mode: only recompute pairs involving changed skills
+    cache = {}
+    if incremental:
+        cache = _load_mesh_cache()
+        any_changed, changed_indices = _needs_recompute(skills, cache)
+        if not any_changed and cache.get("_issues"):
+            # No skills changed — return cached result
+            cached_issues = cache.get("_issues", [])
+            return {
+                "skills_found": len(skills),
+                "skill_names": [s["name"] for s in skills],
+                "issues": cached_issues,
+                "health": compute_mesh_health(cached_issues),
+                "incremental": True,
+                "cache_hit": True,
+            }
+
     # Run all detectors
     issues = []
     issues.extend(detect_trigger_overlaps(skills))
     issues.extend(detect_broken_handoffs(skills))
     issues.extend(detect_scope_collisions(skills))
+
+    # Generate evolution actions for issues
+    actions = generate_mesh_actions(issues, skills)
 
     # Filter by severity
     severity_order = {"info": 0, "warning": 1, "critical": 2}
@@ -481,12 +622,29 @@ def run_mesh_analysis(
 
     health = compute_mesh_health(issues)
 
-    return {
+    # Update cache
+    if incremental:
+        for skill in skills:
+            cache[skill.get("path", "")] = {"content_hash": skill.get("content_hash", "")}
+        cache["_issues"] = issues
+        _save_mesh_cache(cache)
+
+    result = {
         "skills_found": len(skills),
         "skill_names": [s["name"] for s in skills],
         "issues": issues,
         "health": health,
     }
+
+    if actions:
+        result["actions"] = actions
+        result["actions_count"] = len(actions)
+
+    if incremental:
+        result["incremental"] = True
+        result["cache_hit"] = False
+
+    return result
 
 
 def format_mesh_report(result: dict) -> str:
