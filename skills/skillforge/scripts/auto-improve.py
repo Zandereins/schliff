@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """SkillForge Auto-Improve — Autonomous Self-Driving Loop
 
 Drives the entire improvement loop without a Claude session:
