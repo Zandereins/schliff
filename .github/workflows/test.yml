@@ -22,7 +22,7 @@ jobs:
 
       - name: Run integration tests
         working-directory: skills/skillforge
-        run: bash scripts/test-integration.sh
+        run: bash scripts/test-integration.sh --no-runtime-auto
 
       - name: Run self-tests
         working-directory: skills/skillforge
@@ -38,4 +38,4 @@ jobs:
 
       - name: Run eval suite
         working-directory: skills/skillforge
-        run: bash scripts/run-eval.sh SKILL.md eval-suite.json 2>/dev/null || true
+        run: bash scripts/run-eval.sh SKILL.md eval-suite.json --no-runtime-auto 2>/dev/null || true

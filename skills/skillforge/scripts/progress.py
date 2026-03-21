@@ -630,11 +630,48 @@ class ProgressAnalyzer:
         result += f"\n{min_score:.0f}" + " " * (width - 10) + f"{max_score:.0f}"
         return result
 
+    @staticmethod
+    def _gap_bucket(gap: float) -> str:
+        """Discretize a dimension gap into a bucket label."""
+        if gap <= 10:
+            return "0-10"
+        elif gap <= 20:
+            return "10-20"
+        elif gap <= 30:
+            return "20-30"
+        else:
+            return "30+"
+
+    def compute_dimension_gaps(self, experiments: Optional[List[Dict[str, Any]]] = None,
+                                target: float = 100.0) -> Dict[str, Dict[str, Any]]:
+        """Compute gap-to-target per dimension from latest kept experiment.
+
+        Returns dict of dimension -> {score, gap, bucket}.
+        """
+        exps = experiments if experiments is not None else self.experiments
+        latest = self.get_latest_kept(exps)
+        if not latest:
+            return {}
+
+        scores = latest.get("scores", {})
+        gaps = {}
+        for dim, score in scores.items():
+            if not isinstance(score, (int, float)) or score < 0:
+                continue
+            gap = target - score
+            gaps[dim] = {
+                "score": score,
+                "gap": round(gap, 1),
+                "bucket": self._gap_bucket(gap),
+            }
+        return gaps
+
     def emit_strategy_meta(self, skill_name: str = "unknown", domain: str = "unknown",
                            experiments: Optional[List[Dict[str, Any]]] = None) -> int:
         """Emit strategy data to ~/.skillforge/meta/strategy-log.jsonl.
 
-        Returns number of entries emitted.
+        Returns number of entries emitted. Includes dimension_gap_bucket for
+        the strategy predictor.
         """
         meta_dir = Path.home() / ".skillforge" / "meta"
         meta_dir.mkdir(parents=True, exist_ok=True)
@@ -642,6 +679,14 @@ class ProgressAnalyzer:
 
         exps = experiments if experiments is not None else self.experiments
         count = 0
+
+        # Compute current gaps for bucket annotation
+        gaps = self.compute_dimension_gaps(exps)
+        # Find weakest dimension gap bucket
+        weakest_bucket = "30+"
+        if gaps:
+            weakest = max(gaps.items(), key=lambda x: x[1]["gap"])
+            weakest_bucket = weakest[1]["bucket"]
 
         with open(meta_path, "a", encoding="utf-8") as f:
             for exp in exps:
@@ -661,6 +706,7 @@ class ProgressAnalyzer:
                     "status": exp.get("status", "unknown"),
                     "delta": exp.get("delta", 0),
                     "dimension_deltas": {},
+                    "dimension_gap_bucket": weakest_bucket,
                     "context": exp.get("description", ""),
                     "timestamp": exp.get("timestamp", ""),
                 }
@@ -673,6 +719,60 @@ class ProgressAnalyzer:
 
                 f.write(json.dumps(entry) + "\n")
                 count += 1
+
+        return count
+
+    def emit_episodes(self, skill_name: str = "unknown", domain: str = "unknown",
+                      experiments: Optional[List[Dict[str, Any]]] = None) -> int:
+        """Emit learning episodes to episodic store after keep/discard decisions.
+
+        Returns number of episodes emitted.
+        """
+        try:
+            # Import episodic store (sibling module)
+            import importlib.util
+            store_path = Path(__file__).parent / "episodic-store.py"
+            if not store_path.exists():
+                return 0
+            spec = importlib.util.spec_from_file_location("episodic_store", str(store_path))
+            store_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(store_mod)
+        except Exception:
+            return 0
+
+        exps = experiments if experiments is not None else self.experiments
+        count = 0
+
+        for exp in exps:
+            status = exp.get("status", "")
+            if status not in ("keep", "discard"):
+                continue
+
+            strategy = exp.get("strategy_type")
+            if not strategy:
+                strategy = self._infer_strategy(exp.get("description", ""))
+            if not strategy:
+                strategy = "unknown"
+
+            delta = exp.get("delta", 0)
+            description = exp.get("description", "")
+
+            # Generate learning from outcome
+            if status == "keep":
+                learning = f"Strategy '{strategy}' worked: {description} (delta: {delta:+.1f})"
+            else:
+                learning = f"Strategy '{strategy}' failed: {description} (delta: {delta:+.1f})"
+
+            store_mod.store_episode(
+                skill=skill_name,
+                strategy=strategy,
+                outcome=status,
+                delta=delta,
+                learning=learning,
+                domain=domain,
+                context=description,
+            )
+            count += 1
 
         return count
 

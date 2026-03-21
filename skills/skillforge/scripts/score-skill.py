@@ -24,15 +24,23 @@ from pathlib import Path
 # Maximum skill file size (1 MB) to prevent DoS via large inputs
 MAX_SKILL_SIZE = 1_000_000
 
+# Module-level file cache to avoid redundant reads within a single invocation
+_file_cache: dict[str, str] = {}
+
 
 def _read_skill_safe(skill_path: str) -> str:
-    """Read a skill file with size limit enforcement."""
-    p = Path(skill_path)
+    """Read a skill file with size limit enforcement and caching."""
+    p = Path(skill_path).resolve()
+    key = str(p)
+    if key in _file_cache:
+        return _file_cache[key]
     if not p.exists():
         raise FileNotFoundError(f"Skill file not found: {skill_path}")
     if p.stat().st_size > MAX_SKILL_SIZE:
         raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
-    return p.read_text(encoding="utf-8", errors="replace")
+    content = p.read_text(encoding="utf-8", errors="replace")
+    _file_cache[key] = content
+    return content
 
 
 # --- Stopwords for trigger scoring (truly generic function words only) ---
@@ -311,11 +319,6 @@ def score_triggers(skill_path: str, eval_suite: Optional[dict]) -> dict:
     positive_desc_terms = desc_term_set - negative_terms
 
     # Build IDF-like weights: terms that appear in fewer triggers are more discriminative
-    all_trigger_terms = []
-    for trigger in eval_suite["triggers"]:
-        prompt = trigger.get("prompt", "")
-        all_trigger_terms.extend(_tokenize_meaningful(prompt))
-
     term_doc_freq = Counter()
     for trigger in eval_suite["triggers"]:
         prompt_terms = set(_tokenize_meaningful(trigger.get("prompt", "")))
@@ -901,6 +904,128 @@ def score_edges(skill_path: str, eval_suite: Optional[dict]) -> dict:
     }
 
 
+def score_runtime(skill_path: str, eval_suite: Optional[dict] = None,
+                   enabled: bool = False) -> dict:
+    """Score runtime effectiveness by invoking Claude with test prompts.
+
+    Opt-in dimension — returns -1 (skip) unless explicitly enabled.
+    Requires `claude` CLI to be available. Returns score -1 if unavailable
+    (graceful degradation — dimension is skipped in composite).
+
+    Runs up to 3 test cases from eval suite, checks response_* assertions.
+
+    Args:
+        enabled: Must be True to actually run (default: False → returns -1)
+    """
+    if not enabled:
+        return {"score": -1, "issues": ["runtime_not_enabled"], "details": {}}
+
+    # Check claude CLI availability
+    try:
+        result = subprocess.run(
+            ["claude", "--version"],
+            capture_output=True, text=True, timeout=5, errors="replace"
+        )
+        if result.returncode != 0:
+            return {"score": -1, "issues": ["claude_cli_unavailable"], "details": {}}
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return {"score": -1, "issues": ["claude_cli_unavailable"], "details": {}}
+
+    if not eval_suite or "test_cases" not in eval_suite:
+        return {"score": -1, "issues": ["no_eval_suite_for_runtime"], "details": {}}
+
+    # Find test cases with response_* assertions
+    runtime_cases = []
+    for tc in eval_suite["test_cases"]:
+        assertions = tc.get("assertions", [])
+        runtime_asserts = [a for a in assertions if a.get("type", "").startswith("response_")]
+        if runtime_asserts:
+            runtime_cases.append({"tc": tc, "assertions": runtime_asserts})
+
+    if not runtime_cases:
+        return {"score": -1, "issues": ["no_runtime_assertions"], "details": {}}
+
+    # Run up to 3 cases to limit cost
+    runtime_cases = runtime_cases[:3]
+
+    try:
+        content = _read_skill_safe(skill_path)
+    except (FileNotFoundError, ValueError):
+        return {"score": 0, "issues": ["file_not_found"], "details": {}}
+
+    passed = 0
+    total = 0
+    per_case = []
+
+    for rc in runtime_cases:
+        tc = rc["tc"]
+        prompt = tc.get("prompt", "")
+        if not prompt:
+            continue
+
+        # Invoke claude with the skill as system context
+        try:
+            result = subprocess.run(
+                ["claude", "-p", prompt, "--no-input"],
+                capture_output=True, text=True, timeout=60, errors="replace",
+                env={**os.environ, "CLAUDE_SKILL_CONTEXT": content}
+            )
+            response = result.stdout.strip()
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            per_case.append({"id": tc.get("id", "?"), "status": "timeout"})
+            total += len(rc["assertions"])
+            continue
+
+        # Check assertions
+        for assertion in rc["assertions"]:
+            total += 1
+            atype = assertion.get("type", "")
+            value = assertion.get("value", "")
+            case_passed = False
+
+            if atype == "response_contains":
+                case_passed = value.lower() in response.lower()
+            elif atype == "response_matches":
+                case_passed = bool(re.search(value, response, re.IGNORECASE))
+            elif atype == "response_excludes":
+                case_passed = value.lower() not in response.lower()
+
+            if case_passed:
+                passed += 1
+
+        per_case.append({
+            "id": tc.get("id", "?"),
+            "status": "ok",
+            "response_length": len(response),
+        })
+
+    score = int((passed / total) * 100) if total > 0 else 0
+    return {
+        "score": score,
+        "issues": [] if score >= 70 else [f"runtime_pass_rate_low:{passed}/{total}"],
+        "details": {
+            "passed": passed,
+            "total": total,
+            "cases_run": len(per_case),
+            "per_case": per_case,
+        }
+    }
+
+
+def _load_calibrated_weights() -> Optional[dict]:
+    """Load auto-calibrated weights from ~/.skillforge/meta/calibrated-weights.json."""
+    weights_path = Path.home() / ".skillforge" / "meta" / "calibrated-weights.json"
+    if not weights_path.exists():
+        return None
+    try:
+        data = json.loads(weights_path.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and all(isinstance(v, (int, float)) for v in data.values()):
+            return data
+    except (json.JSONDecodeError, OSError):
+        pass
+    return None
+
+
 def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> dict:
     """Compute weighted composite score with confidence indicator.
 
@@ -915,25 +1040,33 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> di
     """
     weights = {
         "structure": 0.15,
-        "triggers": 0.25,
-        "quality": 0.25,
+        "triggers": 0.20,
+        "quality": 0.20,
         "edges": 0.15,
         "efficiency": 0.10,
-        "composability": 0.10,
+        "composability": 0.05,
+        "runtime": 0.15,
     }
 
-    # Apply custom weights if provided
+    # Apply custom weights if provided (highest priority)
     if custom_weights:
         # Normalize custom weights to sum to 1.0
         total_w = sum(custom_weights.values())
         if total_w > 0:
             weights = {k: v / total_w for k, v in custom_weights.items()}
+    else:
+        # Try auto-calibrated weights (second priority)
+        calibrated = _load_calibrated_weights()
+        if calibrated:
+            total_w = sum(calibrated.values())
+            if total_w > 0:
+                weights = {k: v / total_w for k, v in calibrated.items()}
 
-    # If clarity is present, add it with weight 0.05 redistributed from others
+    # If clarity is present, add it with weight 0.05 redistributed proportionally
     if "clarity" in scores:
         clarity_weight = 0.05
-        redistribution = clarity_weight / len(weights)
-        weights = {k: v - redistribution for k, v in weights.items()}
+        scale = (1.0 - clarity_weight) / sum(weights.values())
+        weights = {k: v * scale for k, v in weights.items()}
         weights["clarity"] = clarity_weight
 
     total = 0.0
@@ -1065,6 +1198,9 @@ def score_clarity(skill_path: str) -> dict:
     for i, line in enumerate(lines):
         matches = vague_pattern.findall(line)
         for match in matches:
+            # Skip if backtick-quoted reference is on the same line (e.g., "the file `output.json`")
+            if re.search(r"`[^`]+`", line):
+                continue
             # Check preceding 3 lines for a specific file/path reference
             context = "\n".join(lines[max(0, i - 3):i])
             # If no specific path, filename, or backtick-quoted reference nearby, it's vague
@@ -1245,6 +1381,8 @@ def main():
     parser.add_argument("--diff", action="store_true", help="Include diff analysis")
     parser.add_argument("--diff-ref", default="HEAD~1", help="Git ref to diff against (default: HEAD~1)")
     parser.add_argument("--clarity", action="store_true", help="Include clarity dimension (zero weight by default)")
+    parser.add_argument("--runtime", action="store_true",
+                        help="Enable runtime scoring dimension (invokes claude CLI)")
     parser.add_argument("--weights", default=None,
                         help="Custom dimension weights as key=value pairs, e.g. "
                              "'structure=0.3,triggers=0.4,efficiency=0.3'. "
@@ -1268,6 +1406,7 @@ def main():
         "edges": score_edges(args.skill_path, eval_suite),
         "efficiency": score_efficiency(args.skill_path),
         "composability": score_composability(args.skill_path),
+        "runtime": score_runtime(args.skill_path, eval_suite, enabled=args.runtime),
     }
 
     # Clarity dimension (opt-in, zero default weight)
@@ -1282,7 +1421,11 @@ def main():
             pair = pair.strip()
             if "=" in pair:
                 k, v = pair.split("=", 1)
-                custom_weights[k.strip()] = float(v.strip())
+                try:
+                    custom_weights[k.strip()] = float(v.strip())
+                except ValueError:
+                    print(f"Error: invalid weight value for '{k.strip()}': '{v.strip()}' — expected a number", file=sys.stderr)
+                    sys.exit(1)
 
     composite_result = compute_composite(scores, custom_weights)
 
@@ -1339,8 +1482,7 @@ def main():
         for warning in composite_result.get("warnings", []):
             print(f"\n  \u26a0  {warning}")
 
-        all_issues = [i for v in scores.values() for i in v["issues"]
-                      if i != "requires_runtime_eval"]
+        all_issues = [i for v in scores.values() for i in v["issues"]]
         if all_issues:
             print(f"\n  Issues found:")
             for issue in all_issues:

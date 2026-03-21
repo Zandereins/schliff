@@ -339,13 +339,13 @@ else
     fail "Roundtrip" "expected 2 experiments, got $RT_TOTAL"
 fi
 
-# Test: scorer JSON → run-eval.sh dimension extraction
+# Test: scorer JSON → run-eval.sh dimension extraction (6 core + runtime)
 SCORER_JSON=$(python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR/SKILL.md" --json 2>&1)
 DIMS_COUNT=$(echo "$SCORER_JSON" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['dimensions']))" 2>/dev/null)
-if [[ "$DIMS_COUNT" == "6" ]]; then
-    pass "Scorer → 6 dimensions extracted"
+if [[ "$DIMS_COUNT" == "7" ]]; then
+    pass "Scorer → 7 dimensions extracted (6 core + runtime)"
 else
-    fail "Scorer dimensions" "expected 6, got $DIMS_COUNT"
+    fail "Scorer dimensions" "expected 7, got $DIMS_COUNT"
 fi
 
 ##############################################################################
@@ -872,11 +872,11 @@ cat > "$UNKNOWN_EVAL" <<'UEOF'
 }
 UEOF
 UNKNOWN_RESULT=$(bash "$SCRIPT_DIR/run-eval.sh" "$SKILL_DIR/SKILL.md" "$UNKNOWN_EVAL" --no-runtime-auto 2>/dev/null || true)
-UNKNOWN_PASSED=$(echo "$UNKNOWN_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['pass_rate']['passed'])" 2>/dev/null)
-if [[ "$UNKNOWN_PASSED" == "1" ]]; then
-    pass "Unknown assertion type → passed (skipped)"
+UNKNOWN_TOTAL=$(echo "$UNKNOWN_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['pass_rate']['total'])" 2>/dev/null)
+if [[ "$UNKNOWN_TOTAL" == "0" ]]; then
+    pass "Unknown assertion type → skipped (not counted)"
 else
-    fail "Unknown assertion type" "passed=$UNKNOWN_PASSED, expected 1"
+    fail "Unknown assertion type" "total=$UNKNOWN_TOTAL, expected 0 (skip)"
 fi
 
 # Test: case-insensitive contains
