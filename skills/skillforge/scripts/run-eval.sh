@@ -339,20 +339,23 @@ if [[ $RUNTIME_EVAL -eq 1 ]] && [[ "$RUNTIME_RESULTS" != "{}" ]]; then
 fi
 
 # --- Log assertion failures to .skillforge/failures.jsonl ---
-FAILURES_DIR=".skillforge"
+FAILURES_DIR="${SKILL_DIR}/.skillforge"
 FAILURES_FILE="$FAILURES_DIR/failures.jsonl"
 if [[ "$BINARY_RESULTS" != "[]" ]]; then
     FAILED_ASSERTIONS=$(echo "$BINARY_RESULTS" | jq -c '[.[] | select(.passed == false)]')
     FAILED_COUNT=$(echo "$FAILED_ASSERTIONS" | jq 'length')
     if [[ $FAILED_COUNT -gt 0 ]]; then
         mkdir -p "$FAILURES_DIR"
-        echo "$FAILED_ASSERTIONS" | jq -c ".[] | {
-            timestamp: \"$TIMESTAMP\",
-            skill: \"$SKILL_NAME\",
-            failure_type: \"assertion_failed\",
-            assertion_id: (.test_case + \":\" + .type + \":\" + (.description // \"\")),
-            confidence: 0.9
-        }" >> "$FAILURES_FILE"
+        echo "$FAILED_ASSERTIONS" | jq -c \
+            --arg ts "$TIMESTAMP" \
+            --arg skill "$SKILL_NAME" \
+            '.[] | {
+                timestamp: $ts,
+                skill: $skill,
+                failure_type: "assertion_failed",
+                assertion_id: (.test_case + ":" + .type + ":" + (.description // "")),
+                confidence: 0.9
+            }' >> "$FAILURES_FILE"
 
         # Rotate if > 1MB
         if [[ -f "$FAILURES_FILE" ]] && [[ $(wc -c < "$FAILURES_FILE" | tr -d ' ') -gt 1000000 ]]; then

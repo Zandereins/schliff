@@ -43,8 +43,14 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
         if not skill_dir_path.is_dir():
             continue
 
+        scan_root = skill_dir_path.resolve()
         for skill_md in skill_dir_path.rglob("SKILL.md"):
-            real_path = str(skill_md.resolve())
+            try:
+                real_path = str(skill_md.resolve())
+                # Prevent symlink escape outside scan root
+                skill_md.resolve().relative_to(scan_root)
+            except (ValueError, OSError):
+                continue
             if real_path in seen_paths:
                 continue
             seen_paths.add(real_path)
@@ -392,7 +398,8 @@ def compute_mesh_health(issues: list[dict]) -> dict:
     score = 100
 
     critical_conflicts = sum(1 for i in issues if i["type"] == "trigger_overlap" and i["severity"] == "critical")
-    warnings = sum(1 for i in issues if i["severity"] == "warning")
+    # Exclude broken_handoffs from generic warning count to avoid double-counting
+    warnings = sum(1 for i in issues if i["severity"] == "warning" and i["type"] != "broken_handoff")
     broken_handoffs = sum(1 for i in issues if i["type"] == "broken_handoff")
     critical_collisions = sum(1 for i in issues if i["type"] == "scope_collision" and i["severity"] == "critical")
 
@@ -403,11 +410,11 @@ def compute_mesh_health(issues: list[dict]) -> dict:
 
     return {
         "score": max(0, score),
+        "total_issues": len(issues),
         "critical_conflicts": critical_conflicts,
         "warnings": warnings,
         "broken_handoffs": broken_handoffs,
         "critical_collisions": critical_collisions,
-        "total_issues": len(issues),
     }
 
 
@@ -545,7 +552,7 @@ def main():
     parser = argparse.ArgumentParser(description="SkillForge Skill Mesh Analyzer")
     parser.add_argument("--skill-dirs", nargs="+", default=[], help="Directories to scan for SKILL.md files")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
-    parser.add_argument("--incremental", action="store_true", help="Use cached tokens (recompute only changed skills)")
+    parser.add_argument("--incremental", action="store_true", help="(Planned) Use cached tokens — not yet implemented")
     parser.add_argument("--severity", choices=["info", "warning", "critical"], default=None,
                         help="Minimum severity to report")
     args = parser.parse_args()

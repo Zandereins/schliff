@@ -14,7 +14,6 @@ Default meta dir: ~/.skillforge/meta/
 import argparse
 import json
 import math
-import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -24,12 +23,18 @@ from typing import Any, Optional
 META_DIR_DEFAULT = Path.home() / ".skillforge" / "meta"
 
 
+MAX_JSONL_SIZE = 10_000_000  # 10 MB
+
+
 def _load_jsonl(path: Path) -> list[dict]:
     """Load all entries from a JSONL file."""
     entries = []
     if not path.exists():
         return entries
-    with open(path, "r") as f:
+    if path.stat().st_size > MAX_JSONL_SIZE:
+        print(f"Warning: {path} exceeds {MAX_JSONL_SIZE} bytes, skipping", file=sys.stderr)
+        return entries
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
