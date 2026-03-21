@@ -24,6 +24,9 @@ from pathlib import Path
 # Maximum skill file size (1 MB) to prevent DoS via large inputs
 MAX_SKILL_SIZE = 1_000_000
 
+# Maximum entries in the file cache to prevent unbounded memory growth
+MAX_CACHE_ENTRIES = 50
+
 # Module-level file cache to avoid redundant reads within a single invocation
 _file_cache: dict[str, str] = {}
 
@@ -39,6 +42,8 @@ def _read_skill_safe(skill_path: str) -> str:
     if p.stat().st_size > MAX_SKILL_SIZE:
         raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
     content = p.read_text(encoding="utf-8", errors="replace")
+    if len(_file_cache) >= MAX_CACHE_ENTRIES:
+        _file_cache.pop(next(iter(_file_cache)))
     _file_cache[key] = content
     return content
 
