@@ -1180,7 +1180,10 @@ def score_runtime(skill_path: str, eval_suite: Optional[dict] = None,
             if atype == "response_contains":
                 case_passed = value.lower() in response.lower()
             elif atype == "response_matches":
-                case_passed = bool(re.search(value, response, re.IGNORECASE))
+                try:
+                    case_passed = bool(re.search(value, response, re.IGNORECASE))
+                except re.error:
+                    case_passed = False
             elif atype == "response_excludes":
                 case_passed = value.lower() not in response.lower()
 
@@ -1467,6 +1470,10 @@ def score_diff(skill_path: str, diff_ref: str = "HEAD~1") -> dict:
     Classifies added/removed lines using signal/noise patterns from
     score_efficiency() to determine net quality impact.
     """
+    import re as _re
+    if not _re.match(r'^[a-zA-Z0-9_.~^@/\-]+$', diff_ref):
+        print(f"Invalid diff reference: {diff_ref}", file=sys.stderr)
+        sys.exit(1)
     try:
         result = subprocess.run(
             ["git", "diff", diff_ref, "--", skill_path],
@@ -1565,13 +1572,13 @@ def main():
 
     eval_suite = None
     if args.eval_suite and Path(args.eval_suite).exists():
-        eval_suite = json.loads(Path(args.eval_suite).read_text())
+        eval_suite = json.loads(Path(args.eval_suite).read_text(encoding="utf-8"))
     else:
         # Auto-discover eval-suite.json as sibling of SKILL.md
         skill_dir = Path(args.skill_path).parent
         auto_path = skill_dir / "eval-suite.json"
         if auto_path.exists():
-            eval_suite = json.loads(auto_path.read_text())
+            eval_suite = json.loads(auto_path.read_text(encoding="utf-8"))
 
     scores = {
         "structure": score_structure(args.skill_path),

@@ -3,6 +3,22 @@
 All notable changes to SkillForge are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [5.1.1] - 2026-03-22
+
+### Fixed
+- Atomic file writes in text-gradient.py (prevents skill corruption on crash)
+- `re.error` guard on all user-controlled regex patterns
+- Path traversal validation before skill file writes
+- `from __future__` placement after docstrings in 3 files
+- Unguarded `terminal_art.progress_bar` import with fallback stub
+- Broken all-errors guard using zip identity check
+- Missing `encoding="utf-8"` on eval-suite JSON reads (4 call sites)
+- Unvalidated `diff_ref` parameter in git subprocess calls
+- Severity filter bypass on mesh cache hit
+- `terminal_art` import before `sys.path` setup in dashboard
+- Non-deterministic `hash()` replaced with `hashlib.sha256` in LSH banding
+- `progress.py` loaded once instead of 3 times in report generator
+
 ## [5.1.0] - 2026-03-22
 
 ### Added

@@ -216,6 +216,10 @@ Weights auto-calibrate from runtime data when available. Override with `--weight
 
 ## v5.1 Features (Latest)
 
+**Atomic Writes** — `.tmp` + `rename()` pattern prevents skill file corruption on crash.
+
+**Deterministic LSH** — `hashlib.sha256` replaces `hash()` for reproducible mesh results across runs.
+
 **Honest Scoring** — "Structural Score" everywhere instead of misleading "Quality Score". Transparent about what the number means.
 
 **Stemming Tokenizer** — Suffix-stripping replaces fixed synonym tables. Better keyword matching with zero maintenance.
@@ -274,11 +278,12 @@ SkillForge scores itself. Dogfooding, not marketing.
 | Self-tests | **12/12 passing** |
 | Total tests | **99/99 passing** |
 | Journey | v1.0 (62.5) → v5.1 (99.9) across 5 major versions |
+| Code review | **3 CRITICAL + 9 HIGH fixed** in v5.1.1 |
 
 > The 99.9 score means "near-perfect structure" — not "perfect skill". Runtime
 > validation (`--runtime`) tests actual Claude behavior and is the true quality gate.
 
-27 security fixes applied from a 15-agent deep audit. It practices what it preaches.
+27 security fixes + 12 code review fixes from multi-agent audits. It practices what it preaches.
 
 ---
 
@@ -317,6 +322,9 @@ skills/skillforge/
     └── eval-suite-template.json
 ```
 
+All file writes use atomic tmp+rename. All regex on user data is guarded against `re.error`.
+All JSON reads specify `encoding="utf-8"` explicitly.
+
 ---
 
 ## Ecosystem
@@ -343,7 +351,7 @@ MIT — do whatever you want.
 Score your skill and add this badge to your README:
 
 ```markdown
-[![SkillForge: 98.9 [S]](https://img.shields.io/badge/SkillForge-99.9%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
+[![SkillForge: 99.9 [S]](https://img.shields.io/badge/SkillForge-99.9%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
 ```
 
 [![SkillForge: 99.9 [S]](https://img.shields.io/badge/SkillForge-99.9%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)

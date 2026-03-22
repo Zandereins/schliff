@@ -41,6 +41,10 @@ def _colored_bar(score: int, bar_w: int = 10) -> str:
     else:
         return f"\x1b[31m{bar}\x1b[0m"  # red
 
+# Import sibling modules via underscore aliases (clean Python imports)
+SCRIPT_DIR = Path(__file__).parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
 # Import terminal_art for grade system
 try:
     from terminal_art import score_to_grade, grade_colored
@@ -51,10 +55,6 @@ except ImportError:
         return "F"
     def grade_colored(g: str) -> str:
         return f"[{g}]"
-
-# Import sibling modules via underscore aliases (clean Python imports)
-SCRIPT_DIR = Path(__file__).parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
 
 def _try_import(module_name: str):
