@@ -32,63 +32,13 @@ from typing import Any, Optional
 
 
 SCRIPT_DIR = Path(__file__).parent
-
-# --- Security: Command validation for autonomous execution ---
-_COMMAND_BLOCKLIST_PATTERNS = [
-    r'\brm\s+(-[a-zA-Z]*[rRf])', r'\bcurl\b', r'\bwget\b', r'\bnc\b', r'\bncat\b',
-    r'\bchmod\b', r'\bchown\b', r'\bdd\b', r'\bmkfs\b', r'\bsudo\b',
-    r'`[^`]+`',  # backtick execution
-    r'\|\s*(ba)?sh\b', r'\|\s*zsh\b',  # pipe to shell
-    r'>\s*/dev/', r'>\s*/etc/', r'>\s*/tmp/',  # write to system dirs
-    r'\beval\b', r'\bexec\b',
-]
-_COMMAND_BLOCKLIST_RE = [re.compile(p) for p in _COMMAND_BLOCKLIST_PATTERNS]
-
-_COMMAND_ALLOWLIST_PREFIXES = (
-    'python3 ', 'python ', 'bash scripts/', 'node ', 'grep ', 'wc ', 'jq ',
-    'cat ', 'head ', 'tail ', 'sort ', 'uniq ', 'diff ', 'git ',
-    'bash scripts/', 'sh scripts/',
-)
-
-
-def validate_command_safety(cmd: str) -> tuple[bool, str]:
-    """Validate a command is safe to run in autonomous mode.
-
-    Returns (is_safe, reason).
-    """
-    cmd_stripped = cmd.strip()
-    if not cmd_stripped:
-        return False, "empty command"
-
-    # Check allowlist FIRST (prevents false positives like "run-eval.sh" matching \beval\b)
-    for prefix in _COMMAND_ALLOWLIST_PREFIXES:
-        if cmd_stripped.startswith(prefix):
-            return True, "allowed prefix"
-
-    # Check blocklist
-    for pattern in _COMMAND_BLOCKLIST_RE:
-        if pattern.search(cmd_stripped):
-            return False, f"blocked pattern: {pattern.pattern}"
-
-    return False, "command does not match any allowed prefix"
-
-
-def _sparkline(values: list[float]) -> str:
-    """Render a sparkline from a list of values using Unicode block characters."""
-    if not values:
-        return ""
-    blocks = " \u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588"
-    lo, hi = min(values), max(values)
-    spread = hi - lo if hi > lo else 1
-    return "".join(blocks[min(8, int((v - lo) / spread * 8))] for v in values)
-
+sys.path.insert(0, str(SCRIPT_DIR))
+from shared import validate_command_safety
 
 # Import terminal_art for grade system
-from terminal_art import score_to_grade, grade_colored, progress_bar
+from terminal_art import score_to_grade, grade_colored, progress_bar, sparkline
 
 # --- Imports from sibling modules ---
-
-sys.path.insert(0, str(SCRIPT_DIR))
 
 # Use underscore aliases for clean imports (wrapper modules for hyphenated originals)
 import score_skill as scorer
@@ -611,7 +561,7 @@ def run_auto_improve(
 
     # Sparkline of score progression
     score_history = [e.get("composite", 0) for e in state if e.get("status") in ("keep", "baseline")]
-    sparkline = _sparkline(score_history) if len(score_history) >= 2 else ""
+    sparkline_str = sparkline(score_history) if len(score_history) >= 2 else ""
 
     summary = {
         "skill_path": skill_path,
@@ -624,7 +574,7 @@ def run_auto_improve(
         "stop_reason": reason if should_stop else "max_iterations" if iteration >= start_iteration + max_iterations else "no_patches",
         "dry_run": dry_run,
         "elapsed_seconds": round(elapsed, 1),
-        "sparkline": sparkline,
+        "sparkline": sparkline_str,
     }
 
     return summary

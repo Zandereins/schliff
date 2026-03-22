@@ -47,6 +47,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 # Import terminal_art for grade system
 from terminal_art import score_to_grade, grade_colored
+from shared import load_jsonl_safe, read_skill_safe
 
 
 def _try_import(module_name: str):
@@ -65,23 +66,6 @@ meta_reporter = _try_import("meta_report")
 achievements_mod = _try_import("achievements")
 
 
-def _load_jsonl_safe(path: Path, max_size: int = 10_000_000) -> list[dict]:
-    """Load JSONL with size guard."""
-    if not path.exists():
-        return []
-    if path.stat().st_size > max_size:
-        return []
-    entries = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-    return entries
-
 
 def generate_dashboard(
     skill_path: str,
@@ -96,7 +80,7 @@ def generate_dashboard(
     # Extract skill name
     if scorer is not None:
         try:
-            content = scorer._read_skill_safe(skill_path)
+            content = read_skill_safe(skill_path)
             name_match = re.search(r"^name:\s*(.+?)$", content, re.MULTILINE)
             if name_match:
                 skill_name = name_match.group(1).strip()
@@ -159,12 +143,12 @@ def generate_dashboard(
 
     # 4. Untriaged failures
     failures_path = skill_dir / ".skillforge" / "failures.jsonl"
-    failures = _load_jsonl_safe(failures_path, max_size=1_000_000)
+    failures = load_jsonl_safe(failures_path, max_size=1_000_000)
     untriaged = [f for f in failures if not f.get("injected")]
 
     # 5. Strategy history from meta
     meta_dir = Path.home() / ".skillforge" / "meta"
-    strategy_entries = _load_jsonl_safe(meta_dir / "strategy-log.jsonl")
+    strategy_entries = load_jsonl_safe(meta_dir / "strategy-log.jsonl")
     skill_strategies = [e for e in strategy_entries if e.get("skill") == skill_name]
 
     # Compute strategy stats
@@ -211,7 +195,7 @@ def generate_dashboard(
     # 6. Achievements
     if achievements_mod is not None:
         state_path = skill_dir / ".skillforge" / "auto-improve-state.jsonl"
-        state_entries = _load_jsonl_safe(state_path)
+        state_entries = load_jsonl_safe(state_path)
         current_score = {
             "composite": composite["score"],
             "dimensions": {k: v["score"] for k, v in scores.items()},

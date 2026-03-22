@@ -138,15 +138,17 @@ def regex_search_safe(pattern: str, text: str, timeout: int = 2) -> bool:
 def load_jsonl_safe(path: str | Path, max_size: int = 10_000_000) -> list[dict]:
     """Safely load a JSONL file with size limit and malformed-line tolerance.
 
+    Reads first, then checks size (avoids TOCTOU race condition).
     Returns a list of parsed JSON objects. Skips malformed lines silently.
     """
     p = Path(path)
     if not p.exists():
         return []
     try:
-        if p.stat().st_size > max_size:
+        raw = p.read_text(encoding="utf-8")
+        if len(raw) > max_size:
             return []
-        lines = p.read_text(encoding="utf-8").splitlines()
+        lines = raw.splitlines()
     except OSError:
         return []
 
@@ -160,3 +162,43 @@ def load_jsonl_safe(path: str | Path, max_size: int = 10_000_000) -> list[dict]:
         except (json.JSONDecodeError, ValueError):
             continue
     return results
+
+
+# --- Security: Command validation for autonomous execution ---
+_COMMAND_BLOCKLIST_PATTERNS = [
+    r'\brm\s+(-[a-zA-Z]*[rRf])', r'\bcurl\b', r'\bwget\b', r'\bnc\b', r'\bncat\b',
+    r'\bchmod\b', r'\bchown\b', r'\bdd\b', r'\bmkfs\b', r'\bsudo\b',
+    r'`[^`]+`',  # backtick execution
+    r'\|\s*(ba)?sh\b', r'\|\s*zsh\b',  # pipe to shell
+    r'>\s*/dev/', r'>\s*/etc/', r'>\s*/tmp/',  # write to system dirs
+    r'\beval\b', r'\bexec\b',
+]
+_COMMAND_BLOCKLIST_RE = [re.compile(p) for p in _COMMAND_BLOCKLIST_PATTERNS]
+
+_COMMAND_ALLOWLIST_PREFIXES = (
+    'python3 ', 'python ', 'bash scripts/', 'node ', 'grep ', 'wc ', 'jq ',
+    'cat ', 'head ', 'tail ', 'sort ', 'uniq ', 'diff ', 'git ',
+    'sh scripts/',
+)
+
+
+def validate_command_safety(cmd: str) -> tuple[bool, str]:
+    """Validate a command is safe to run in autonomous mode.
+
+    Returns (is_safe, reason). Checks allowlist first, then blocklist.
+    """
+    cmd_stripped = cmd.strip()
+    if not cmd_stripped:
+        return False, "empty command"
+
+    # Check allowlist FIRST (prevents false positives like "run-eval.sh" matching \beval\b)
+    for prefix in _COMMAND_ALLOWLIST_PREFIXES:
+        if cmd_stripped.startswith(prefix):
+            return True, "allowed prefix"
+
+    # Check blocklist
+    for pattern in _COMMAND_BLOCKLIST_RE:
+        if pattern.search(cmd_stripped):
+            return False, f"blocked pattern: {pattern.pattern}"
+
+    return False, "command does not match any allowed prefix"

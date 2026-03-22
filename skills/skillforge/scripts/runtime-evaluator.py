@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
-from shared import regex_search_safe
+from shared import regex_search_safe, validate_regex_complexity
 
 
 def check_claude_cli() -> bool:
@@ -93,6 +93,16 @@ def check_assertion(response: str, assertion: dict) -> dict:
         passed = a_value.lower() in response_lower
 
     elif a_type in ("response_matches", "pattern"):
+        # Validate regex complexity before execution
+        safe, reason = validate_regex_complexity(a_value)
+        if not safe:
+            return {
+                "type": a_type,
+                "value": a_value,
+                "description": description,
+                "passed": False,
+                "error": f"regex rejected: {reason}",
+            }
         try:
             passed = regex_search_safe(a_value, response)
         except (re.error, TimeoutError) as e:
