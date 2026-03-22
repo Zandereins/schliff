@@ -2,7 +2,7 @@
 
 Stop manually auditing your Claude Code skills.
 
-> You wrote a skill. It worked. Three weeks later, triggers misfire, edge cases slip through, instructions contradict themselves. SkillForge fixes all of it autonomously — deterministic patches, mechanical scoring, zero hallucinations.
+> You wrote a skill. It worked. Three weeks later, triggers misfire, edge cases slip through, instructions contradict themselves. SkillForge fixes all of it autonomously — deterministic patches, mechanical scoring, zero hallucinations on the rule-based fixes.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests: 99/99](https://img.shields.io/badge/Tests-99%2F99_passing-brightgreen)](skills/skillforge/scripts/test-integration.sh)
@@ -37,14 +37,16 @@ Unlike code linters, SkillForge improves skills via multi-dimensional eval suite
 
 ## Try It
 
+> **Note:** SkillForge commands (`/skillforge:*`) run inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code), not in a regular terminal.
+
 ```bash
-# 1. Install
+# 1. Install (in your regular terminal)
 git clone https://github.com/Zandereins/skillforge.git && bash skillforge/install.sh
 
-# 2. Score the included demo skill (starts at 56.9 [D])
+# 2. Score the included demo skill (in Claude Code)
 /skillforge:init demo/bad-skill/SKILL.md
 
-# 3. Watch it improve autonomously
+# 3. Watch it improve autonomously (in Claude Code)
 /skillforge:auto
 ```
 
