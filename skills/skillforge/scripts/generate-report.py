@@ -41,6 +41,26 @@ except Exception:
 
 
 # ---------------------------------------------------------------------------
+# Cached progress module loader (avoids redundant spec_from_file_location)
+# ---------------------------------------------------------------------------
+
+_progress_mod_cache: Optional[Any] = None
+
+
+def _get_progress_module():
+    """Load progress.py once and cache the module object."""
+    global _progress_mod_cache
+    if _progress_mod_cache is not None:
+        return _progress_mod_cache
+    spec_path = SCRIPT_DIR / "progress.py"
+    spec = importlib.util.spec_from_file_location("progress", str(spec_path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    _progress_mod_cache = mod
+    return mod
+
+
+# ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
@@ -75,11 +95,8 @@ def load_current_score(skill_path: str) -> dict[str, Any]:
 
 def load_progress(results_path: str) -> dict[str, Any]:
     """Load ProgressAnalyzer summary from the JSONL results file."""
-    spec_path = SCRIPT_DIR / "progress.py"
     try:
-        spec = importlib.util.spec_from_file_location("progress", str(spec_path))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        mod = _get_progress_module()
     except Exception as exc:
         return {"error": f"failed to import progress module: {exc}"}
 
@@ -299,10 +316,7 @@ def format_report(skill_name: str, progress: dict[str, Any], current: dict[str, 
 
     # Re-load raw experiments for the top improvements section
     try:
-        spec_path = SCRIPT_DIR / "progress.py"
-        spec = importlib.util.spec_from_file_location("progress_raw", str(spec_path))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        mod = _get_progress_module()
         _raw_path = progress.get("_results_path")
         if _raw_path:
             analyzer = mod.ProgressAnalyzer(_raw_path)
@@ -428,10 +442,7 @@ def build_json_output(
     kept_exps: list[dict[str, Any]] = []
     top_improvements: list[dict[str, Any]] = []
     try:
-        spec_path = SCRIPT_DIR / "progress.py"
-        spec = importlib.util.spec_from_file_location("progress_json", str(spec_path))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        mod = _get_progress_module()
         _raw_path = progress.get("_results_path")
         if _raw_path:
             analyzer = mod.ProgressAnalyzer(_raw_path)

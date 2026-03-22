@@ -878,7 +878,11 @@ def apply_patches(skill_path: str, patches: list[dict], dry_run: bool = False) -
                 pattern = patch.get("pattern", "")
                 replacement = patch.get("replacement")
                 if pattern:
-                    compiled = re.compile(pattern, re.IGNORECASE)
+                    try:
+                        compiled = re.compile(pattern, re.IGNORECASE)
+                    except re.error:
+                        skipped += 1
+                        continue
                     if replacement is not None:
                         lines = [compiled.sub(replacement, l) for l in lines]
                     else:
@@ -917,7 +921,12 @@ def apply_patches(skill_path: str, patches: list[dict], dry_run: bool = False) -
                 errors.append("YAML frontmatter missing 'name' field after patching")
 
     if not dry_run and applied > 0 and not errors:
-        Path(skill_path).write_text(new_content, encoding="utf-8")
+        resolved = Path(skill_path).resolve()
+        if not resolved.is_file():
+            return {"applied": 0, "errors": ["skill path is not a file"]}
+        tmp_path = Path(skill_path).with_suffix(".skill.tmp")
+        tmp_path.write_text(new_content, encoding="utf-8")
+        tmp_path.replace(Path(skill_path))
         # Invalidate scorer cache for this file
         cache_key = str(Path(skill_path).resolve())
         scorer.invalidate_cache(skill_path)

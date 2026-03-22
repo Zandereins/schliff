@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from __future__ import annotations
 """SkillForge Auto-Improve — Autonomous Self-Driving Loop
 
 Drives the entire improvement loop without a Claude session:
@@ -17,6 +16,7 @@ Stopping (EMA-based plateau detection):
   - all dims >= 90 → stop
   - EMA ROI < 0.1 for 5 consecutive entries → stop
 """
+from __future__ import annotations
 
 import argparse
 import copy
@@ -46,7 +46,7 @@ def _sparkline(values: list[float]) -> str:
 
 # Import terminal_art for grade system
 try:
-    from terminal_art import score_to_grade, grade_colored
+    from terminal_art import score_to_grade, grade_colored, progress_bar
 except ImportError:
     def score_to_grade(s: float) -> str:
         for t, g in [(95,"S"),(85,"A"),(75,"B"),(65,"C"),(50,"D")]:
@@ -54,6 +54,9 @@ except ImportError:
         return "F"
     def grade_colored(g: str) -> str:
         return f"[{g}]"
+    def progress_bar(score, width=20):
+        filled = int(score / 100 * width)
+        return "\u2588" * filled + "\u2591" * (width - filled)
 
 # --- Imports from sibling modules ---
 
@@ -188,7 +191,7 @@ def _load_eval_suite(skill_path: str) -> Optional[dict]:
     auto_path = skill_dir / "eval-suite.json"
     if auto_path.exists():
         try:
-            return json.loads(auto_path.read_text())
+            return json.loads(auto_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             pass
     return None
@@ -514,9 +517,7 @@ def run_auto_improve(
                     print(f"✗ Discard (best delta: {best_delta:+.1f})", file=sys.stderr)
 
         # Handle case where all patches errored
-        if patch_errors and not best_result and all(
-            p[0] == c for p, c in zip(patch_errors, candidates_to_try)
-        ):
+        if patch_errors and not best_result and len(patch_errors) == len(candidates_to_try):
             entry = {
                 "iteration": iteration,
                 "status": "error",
@@ -629,7 +630,6 @@ def main():
         print(f"\n  SkillForge Auto-Improve Complete")
         print(f"  {'─' * 50}")
         sc = summary['final_composite']
-        from terminal_art import progress_bar
         bar = progress_bar(sc, 20)
         grade = score_to_grade(sc)
         grade_str = grade_colored(grade)

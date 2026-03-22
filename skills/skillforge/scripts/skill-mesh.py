@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from __future__ import annotations
 """SkillForge Skill Mesh — Multi-Skill Conflict Detection
 
 Scans all installed skills, detects trigger overlap, broken handoffs,
@@ -10,6 +9,7 @@ Usage:
 
 Default scan dirs: ~/.claude/skills/, .claude/skills/
 """
+from __future__ import annotations
 
 import argparse
 import hashlib
@@ -182,7 +182,7 @@ def _lsh_candidates(signatures: list[list[int]], bands: int = 16) -> set[tuple[i
         start = band_idx * rows_per_band
         end = start + rows_per_band
         for skill_idx, sig in enumerate(signatures):
-            band_hash = hash(tuple(sig[start:end]))
+            band_hash = hashlib.sha256(str(tuple(sig[start:end])).encode()).hexdigest()
             if band_hash in buckets:
                 for other_idx in buckets[band_hash]:
                     pair = (min(skill_idx, other_idx), max(skill_idx, other_idx))
@@ -701,6 +701,9 @@ def run_mesh_analysis(
         if not any_changed and cache.get("_issues") is not None:
             # No skills changed — return cached result
             cached_issues = cache.get("_issues", [])
+            severity_order = {"info": 0, "warning": 1, "critical": 2}
+            if severity_filter and severity_filter in severity_order:
+                cached_issues = [i for i in cached_issues if severity_order.get(i.get("severity", "info"), 0) >= severity_order[severity_filter]]
             return {
                 "skills_found": len(skills),
                 "skill_names": [s["name"] for s in skills],
