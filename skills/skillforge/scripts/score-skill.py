@@ -26,6 +26,11 @@ from collections import Counter
 from typing import Optional
 from pathlib import Path
 
+# Ensure scripts directory is on path for shared module imports
+sys.path.insert(0, str(Path(__file__).parent))
+from shared import regex_search_safe as _regex_search_safe, read_skill_safe, extract_description, VALID_DIMENSIONS, MAX_SKILL_SIZE, invalidate_cache as _shared_invalidate_cache
+from nlp import STOPWORDS, stem as _stem, tokenize_meaningful as _tokenize_meaningful, SYNONYM_TABLE, _SYNONYM_GROUPS, RE_WORD_TOKEN as _RE_WORD_TOKEN
+
 # --- Pre-compiled regex patterns (Change 3) ---
 # Used in score_structure()
 _RE_FRONTMATTER_NAME = re.compile(r"^name:\s*\S+", re.MULTILINE)
@@ -130,13 +135,8 @@ _RE_NEGATION_BOUNDARIES = re.compile(
     r"(?:do not|don't|NOT|never)\s+(?:use\s+)?(?:for|when|if|with)?\s*(.+?)(?:\.|,|$)",
     re.IGNORECASE,
 )
-_RE_WORD_TOKEN = re.compile(r"\b[a-z]{4,}\b")
-
-# Used in _extract_description()
-_RE_DESC_BLOCK = re.compile(
-    r"^description:\s*[>|]-?\s*\n((?:[ \t]+.+\n)*)", re.MULTILINE
-)
-_RE_DESC_INLINE = re.compile(r'^description:\s*"?(.+?)"?\s*$', re.MULTILINE)
+# _RE_WORD_TOKEN now imported from nlp.py
+# _RE_DESC_BLOCK, _RE_DESC_INLINE, _extract_description now in shared.py
 
 # Used in score_diff()
 _RE_DIFF_SIGNAL = re.compile(
@@ -166,54 +166,20 @@ _RE_IMPERATIVE_INSTRUCTION = re.compile(
 )
 _RE_CODE_BLOCK_REGION = re.compile(r"```[\s\S]*?```")
 
-# Maximum skill file size (1 MB) to prevent DoS via large inputs
-MAX_SKILL_SIZE = 1_000_000
-
-# Maximum entries in the file cache to prevent unbounded memory growth
-MAX_CACHE_ENTRIES = 500
-
-# Module-level file cache to avoid redundant reads within a single invocation
-_file_cache: dict[str, str] = {}
+# MAX_SKILL_SIZE, read_skill_safe, invalidate_cache now imported from shared.py
+# Keep local aliases for backward compatibility with external callers
+_read_skill_safe = read_skill_safe
 
 
 def invalidate_cache(skill_path: str) -> None:
     """Invalidate the file cache for a given skill path.
 
-    Public API — callers should use this instead of accessing _file_cache directly.
+    Public API — delegates to shared.invalidate_cache (single cache).
     """
-    key = str(Path(skill_path).resolve())
-    _file_cache.pop(key, None)
+    _shared_invalidate_cache(skill_path)
 
 
-def _read_skill_safe(skill_path: str) -> str:
-    """Read a skill file with size limit enforcement and caching."""
-    p = Path(skill_path).resolve()
-    key = str(p)
-    if key in _file_cache:
-        return _file_cache[key]
-    if not p.exists():
-        raise FileNotFoundError(f"Skill file not found: {skill_path}")
-    if p.stat().st_size > MAX_SKILL_SIZE:
-        raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
-    content = p.read_text(encoding="utf-8", errors="replace")
-    if len(_file_cache) >= MAX_CACHE_ENTRIES:
-        _file_cache.pop(next(iter(_file_cache)))
-    _file_cache[key] = content
-    return content
-
-
-# --- Stopwords for trigger scoring (truly generic function words only) ---
-# IMPORTANT: Do NOT include domain-relevant terms here. Words like "skill",
-# "code", "create" are meaningful in skill-improvement contexts.
-STOPWORDS = {
-    "this", "that", "with", "from", "have", "will", "been", "were", "they",
-    "their", "them", "what", "when", "where", "which", "about", "into",
-    "your", "some", "than", "then", "also", "just", "more", "very", "here",
-    "there", "each", "like", "help", "want", "need", "using", "used",
-    "uses", "does", "doing", "done", "should", "could", "would", "please",
-    "really", "actually", "currently", "basically", "think", "know",
-    "sure", "well", "okay", "look", "show", "tell",
-}
+# NLP utilities and shared constants now imported at top of file
 
 
 def score_structure(skill_path: str) -> dict:
@@ -324,141 +290,45 @@ def _score_structure_inline(skill_path: str) -> dict:
     return {"score": max(0, min(100, score)), "issues": issues, "details": {"line_count": len(lines)}}
 
 
-def _extract_description(content: str) -> str:
-    """Extract the description field from YAML frontmatter.
-
-    Handles all common YAML formats:
-      description: inline text
-      description: >
-        block text
-      description: |
-        block text
-    """
-    # Try block scalar first (> or |)
-    match = _RE_DESC_BLOCK.search(content)
-    if match:
-        return match.group(1).strip()
-
-    # Try inline
-    match = _RE_DESC_INLINE.search(content)
-    if match:
-        return match.group(1).strip()
-
-    return ""
+# _extract_description = extract_description (imported from shared.py at top)
+_extract_description = extract_description
 
 
-# --- Lightweight suffix-stripping stemmer (Change 1) ---
-def _stem(word: str) -> str:
-    """Lightweight suffix-stripping stemmer for English skill terms."""
-    # Order matters: longest suffixes first
-    for suffix, min_len in [
-        ("ation", 6), ("ment", 5), ("ness", 5), ("tion", 5),
-        ("sion", 5), ("able", 5), ("ible", 5), ("ying", 4),
-        ("ling", 4), ("ting", 4), ("ning", 4), ("ring", 4),
-        ("ing", 4), ("ied", 4), ("ies", 4), ("ous", 4),
-        ("ive", 4), ("ize", 4), ("ise", 4), ("ate", 4),
-        ("ful", 4), ("ely", 4), ("ally", 5), ("ly", 4),
-        ("ed", 4), ("er", 4), ("es", 4), ("al", 4),
-        ("s", 4),
-    ]:
-        if len(word) >= min_len and word.endswith(suffix):
-            stem = word[:-len(suffix)]
-            if len(stem) >= 3:  # Keep meaningful stems
-                return stem
-    return word
+# _stem, _tokenize_meaningful, SYNONYM_TABLE, _SYNONYM_GROUPS now imported from nlp.py
 
 
-# --- Synonym expansion for trigger matching ---
-# Non-morphological synonym groups (supplements stemmer for semantic matches)
-_SYNONYM_GROUPS = {
-    "improve": ["enhance", "optimize", "refine", "polish", "boost", "upgrade", "tune", "tweak"],
-    "trigger": ["activate", "fire", "match", "invoke", "detect"],
-    "audit": ["assess", "inspect", "review", "evaluate", "examine", "check"],
-    "eval": ["test", "validate", "verify"],
-    "iterate": ["grind", "loop", "repeat"],
-    "efficiency": ["verbose", "bloated", "concise", "lean", "trim", "compact"],
-}
-
-# Build bidirectional table: synonym→canonical AND canonical→all-synonyms
-SYNONYM_TABLE = {}
-for canonical, synonyms in _SYNONYM_GROUPS.items():
-    for syn in synonyms:
-        SYNONYM_TABLE[syn] = canonical
-    SYNONYM_TABLE[canonical] = canonical
-
-
-def _tokenize_meaningful(text: str, expand_reverse: bool = False) -> list[str]:
-    """Extract meaningful words (4+ chars, not stopwords), with stemming + synonym expansion.
-
-    Applies suffix-stripping stemmer to each word and adds the stem as an extra
-    token (if different from the word itself). Synonym table supplements for
-    non-morphological synonyms (e.g., "audit" → "assess").
-
-    expand_reverse=True: also expand canonical→all-synonyms (use for descriptions only).
-    expand_reverse=False: only expand synonym→canonical (use for prompts).
-    """
-    words = _RE_WORD_TOKEN.findall(text.lower())
-    result = []
-    seen = set()
-    for w in words:
-        if w in STOPWORDS:
-            continue
-        if w not in seen:
-            result.append(w)
-            seen.add(w)
-        # Add stem as extra token (catches morphological variants)
-        stemmed = _stem(w)
-        if stemmed != w and stemmed not in seen:
-            result.append(stemmed)
-            seen.add(stemmed)
-        # Forward: synonym → canonical (always)
-        canonical = SYNONYM_TABLE.get(w)
-        if canonical and canonical not in seen:
-            result.append(canonical)
-            seen.add(canonical)
-        # Reverse: canonical → all synonyms (only for descriptions)
-        if expand_reverse and w in _SYNONYM_GROUPS:
-            for syn in _SYNONYM_GROUPS[w]:
-                if syn not in seen:
-                    result.append(syn)
-                    seen.add(syn)
-    return result
+# Pre-compiled domain signal patterns (avoids ~300 re.search compilations per scoring run)
+_RE_STRONG_DOMAIN_SIGNAL = re.compile(
+    r"skill\.md|skill\s*forge|my\s+skill|this\s+skill|the\s+skill|"
+    r"skill\s+(?:trigger|description|improvement|quality|needs|work)|"
+    r"improve\s+(?:my|this|the)\s+skill|"
+    r"(?:trigger|eval)\s+(?:accuracy|suite|test)|"
+    r"skill\s+(?:and|but|needs|is|has)",
+    re.IGNORECASE,
+)
+_RE_ANTI_DOMAIN_SIGNAL = re.compile(
+    r"python\s+function|rest\s+api|docker|"
+    r"security\s+vulnerab|\.py\b|\.ts\b|\.js\b|"
+    r"open\s+source\s+project|readme|prompt\s+template",
+    re.IGNORECASE,
+)
 
 
 def _has_skill_domain_signal(prompt: str) -> float:
     """Check if prompt is about skills (not generic code/config).
 
-    Returns a multiplier: 1.5 for strong signal, 1.0 for neutral, 0.5 for anti-signal.
+    Returns a multiplier: 1.8 for strong signal, 1.0 for neutral, 0.4 for anti-signal.
     """
     prompt_lower = prompt.lower()
 
-    # Strong positive signals: explicitly about skill files or skill improvement
-    strong_signals = [
-        r"skill\.md", r"skill\s*forge",
-        r"my\s+skill", r"this\s+skill", r"the\s+skill",
-        r"skill\s+(?:trigger|description|improvement|quality|needs|work)",
-        r"improve\s+(?:my|this|the)\s+skill",
-        r"(?:trigger|eval)\s+(?:accuracy|suite|test)",
-        r"skill\s+(?:and|but|needs|is|has)",
-    ]
-    for pat in strong_signals:
-        if re.search(pat, prompt_lower):
-            return 1.8
+    if _RE_STRONG_DOMAIN_SIGNAL.search(prompt_lower):
+        return 1.8
 
-    # Weak positive: mentions "skill" at all
     if "skill" in prompt_lower:
         return 1.2
 
-    # Anti-signals: clearly about code, not skills
-    anti_signals = [
-        r"python\s+function", r"rest\s+api", r"docker",
-        r"security\s+vulnerab", r"\.py\b", r"\.ts\b", r"\.js\b",
-        r"open\s+source\s+project", r"readme",
-        r"prompt\s+template",
-    ]
-    for pat in anti_signals:
-        if re.search(pat, prompt_lower):
-            return 0.4
+    if _RE_ANTI_DOMAIN_SIGNAL.search(prompt_lower):
+        return 0.4
 
     return 1.0
 
@@ -1181,7 +1051,7 @@ def score_runtime(skill_path: str, eval_suite: Optional[dict] = None,
                 case_passed = value.lower() in response.lower()
             elif atype == "response_matches":
                 try:
-                    case_passed = bool(re.search(value, response, re.IGNORECASE))
+                    case_passed = _regex_search_safe(value, response)
                 except re.error:
                     case_passed = False
             elif atype == "response_excludes":
@@ -1470,8 +1340,10 @@ def score_diff(skill_path: str, diff_ref: str = "HEAD~1") -> dict:
     Classifies added/removed lines using signal/noise patterns from
     score_efficiency() to determine net quality impact.
     """
-    import re as _re
-    if not _re.match(r'^[a-zA-Z0-9_.~^@/\-]+$', diff_ref):
+    if diff_ref.startswith("-"):
+        print(f"Invalid diff reference (must not start with '-'): {diff_ref}", file=sys.stderr)
+        sys.exit(1)
+    if not re.match(r'^[a-zA-Z0-9_.~^@/\-]+$', diff_ref):
         print(f"Invalid diff reference: {diff_ref}", file=sys.stderr)
         sys.exit(1)
     try:
@@ -1572,13 +1444,20 @@ def main():
 
     eval_suite = None
     if args.eval_suite and Path(args.eval_suite).exists():
-        eval_suite = json.loads(Path(args.eval_suite).read_text(encoding="utf-8"))
+        try:
+            eval_suite = json.loads(Path(args.eval_suite).read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            print(f"Error: malformed eval-suite JSON '{args.eval_suite}': {e}", file=sys.stderr)
+            sys.exit(1)
     else:
         # Auto-discover eval-suite.json as sibling of SKILL.md
         skill_dir = Path(args.skill_path).parent
         auto_path = skill_dir / "eval-suite.json"
         if auto_path.exists():
-            eval_suite = json.loads(auto_path.read_text(encoding="utf-8"))
+            try:
+                eval_suite = json.loads(auto_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
 
     scores = {
         "structure": score_structure(args.skill_path),
@@ -1602,10 +1481,14 @@ def main():
             pair = pair.strip()
             if "=" in pair:
                 k, v = pair.split("=", 1)
+                dim_name = k.strip()
+                if dim_name not in VALID_DIMENSIONS:
+                    print(f"Error: unknown dimension '{dim_name}' — valid: {', '.join(sorted(VALID_DIMENSIONS))}", file=sys.stderr)
+                    sys.exit(1)
                 try:
-                    custom_weights[k.strip()] = float(v.strip())
+                    custom_weights[dim_name] = float(v.strip())
                 except ValueError:
-                    print(f"Error: invalid weight value for '{k.strip()}': '{v.strip()}' — expected a number", file=sys.stderr)
+                    print(f"Error: invalid weight value for '{dim_name}': '{v.strip()}' — expected a number", file=sys.stderr)
                     sys.exit(1)
 
     composite_result = compute_composite(scores, custom_weights)

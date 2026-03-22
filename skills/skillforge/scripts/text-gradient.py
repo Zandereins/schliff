@@ -23,6 +23,8 @@ SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import score_skill as scorer
+from shared import read_skill_safe, extract_description
+from nlp import tokenize_meaningful
 
 
 # --- Effort classification ---
@@ -168,16 +170,16 @@ def _compute_trigger_gradients(skill_path: str, eval_suite: Optional[dict]) -> l
     if false_negs:
         # Extract keywords from false negative prompts that aren't in the description
         try:
-            content = scorer._read_skill_safe(skill_path)
-            description = scorer._extract_description(content)
-            desc_terms = set(scorer._tokenize_meaningful(description.lower(), expand_reverse=True))
+            content = read_skill_safe(skill_path)
+            description = extract_description(content)
+            desc_terms = set(tokenize_meaningful(description.lower(), expand_reverse=True))
         except (FileNotFoundError, ValueError):
             desc_terms = set()
 
         missing_terms = set()
         for fn in false_negs:
             prompt = fn.get("prompt", "")
-            prompt_terms = set(scorer._tokenize_meaningful(prompt))
+            prompt_terms = set(tokenize_meaningful(prompt))
             missing = prompt_terms - desc_terms
             missing_terms.update(missing)
 
@@ -657,7 +659,7 @@ def generate_patches(skill_path: str, gradients: list[dict]) -> list[dict]:
     Returns a list of patch dicts with op, line, and content fields.
     """
     try:
-        content = scorer._read_skill_safe(skill_path)
+        content = read_skill_safe(skill_path)
     except (FileNotFoundError, ValueError):
         return []
 
@@ -676,7 +678,7 @@ def generate_patches(skill_path: str, gradients: list[dict]) -> list[dict]:
             body_text = content[fm_end + 3:].strip()
 
     # Extract meaningful terms from body for auto-generated descriptions
-    body_terms = scorer._tokenize_meaningful(body_text.lower())[:5] if body_text else []
+    body_terms = tokenize_meaningful(body_text.lower())[:5] if body_text else []
 
     # Extract first header text
     first_header_match = re.search(r"^##?\s+(.+)$", body_text, re.MULTILINE)
@@ -710,7 +712,7 @@ def generate_patches(skill_path: str, gradients: list[dict]) -> list[dict]:
         return f"TODO: describe what {skill_name} does and when to use it"
 
     # Extract existing description and "when" clauses for scope patches
-    existing_desc = scorer._extract_description(content)
+    existing_desc = extract_description(content)
     when_clauses = re.findall(r"(?i)(?:when|if)\s+(?:you|the|a)\s+(.+?)(?:\.|$)", body_text)
     when_clauses = [c.strip() for c in when_clauses[:3] if len(c.strip()) > 10]
 
@@ -764,7 +766,7 @@ def generate_patches(skill_path: str, gradients: list[dict]) -> list[dict]:
             if when_clauses:
                 positive_items = "\n".join(f"- {c}" for c in when_clauses)
             elif existing_desc:
-                desc_terms = scorer._tokenize_meaningful(existing_desc.lower())[:4]
+                desc_terms = tokenize_meaningful(existing_desc.lower())[:4]
                 positive_items = "\n".join(f"- Working with {t}" for t in desc_terms) if desc_terms else f"- TODO: describe when to use {skill_name} vs alternatives"
             else:
                 positive_items = f"- TODO: describe when to use {skill_name} vs alternatives"
@@ -833,7 +835,7 @@ def apply_patches(skill_path: str, patches: list[dict], dry_run: bool = False) -
         ApplyResult dict with: applied, skipped, errors, new_content
     """
     try:
-        content = scorer._read_skill_safe(skill_path)
+        content = read_skill_safe(skill_path)
     except (FileNotFoundError, ValueError) as e:
         return {"applied": 0, "skipped": 0, "errors": [str(e)], "new_content": None}
 
