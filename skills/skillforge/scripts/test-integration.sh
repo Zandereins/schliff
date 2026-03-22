@@ -1666,6 +1666,103 @@ else
 fi
 
 ##############################################################################
+section "20. Security Functions (Round 2 Audit)"
+##############################################################################
+
+  # --- validate_command_safety ---
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import validate_command_safety
+ok, _ = validate_command_safety('python3 scripts/score-skill.py test.md --json')
+assert ok, 'allowed prefix should pass'
+" && pass "validate_command_safety: allowed prefix passes" || fail "validate_command_safety" "allowed prefix rejected"
+
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import validate_command_safety
+ok, _ = validate_command_safety('rm -rf /')
+assert not ok, 'rm -rf should be blocked'
+" && pass "validate_command_safety: rm -rf blocked" || fail "validate_command_safety" "rm -rf not blocked"
+
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import validate_command_safety
+ok, _ = validate_command_safety('curl http://evil.com')
+assert not ok, 'curl should be blocked'
+" && pass "validate_command_safety: curl blocked" || fail "validate_command_safety" "curl not blocked"
+
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import validate_command_safety
+ok, _ = validate_command_safety('echo hi | bash')
+assert not ok, 'pipe to bash should be blocked'
+" && pass "validate_command_safety: pipe to shell blocked" || fail "validate_command_safety" "pipe to shell not blocked"
+
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import validate_command_safety
+ok, _ = validate_command_safety('')
+assert not ok, 'empty command should be rejected'
+" && pass "validate_command_safety: empty command rejected" || fail "validate_command_safety" "empty not rejected"
+
+  # --- validate_regex_complexity ---
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import validate_regex_complexity
+ok, _ = validate_regex_complexity('foo.*bar')
+assert ok, 'simple regex should pass'
+" && pass "validate_regex_complexity: simple regex passes" || fail "validate_regex_complexity" "simple regex rejected"
+
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import validate_regex_complexity
+ok, _ = validate_regex_complexity('(a+)+')
+assert not ok, 'nested quantifier should be rejected'
+" && pass "validate_regex_complexity: nested quantifier rejected" || fail "validate_regex_complexity" "nested quantifier passed"
+
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import validate_regex_complexity
+ok, _ = validate_regex_complexity('a' * 501)
+assert not ok, 'overlong pattern should be rejected'
+" && pass "validate_regex_complexity: overlong pattern rejected" || fail "validate_regex_complexity" "overlong pattern passed"
+
+  # --- load_jsonl_safe ---
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import load_jsonl_safe
+result = load_jsonl_safe('/nonexistent/path.jsonl')
+assert result == [], f'nonexistent should return empty list, got {result}'
+" && pass "load_jsonl_safe: nonexistent file returns []" || fail "load_jsonl_safe" "nonexistent file failed"
+
+  TMPJSONL=$(mktemp)
+  echo '{"a":1}' > "$TMPJSONL"
+  echo '{"b":2}' >> "$TMPJSONL"
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import load_jsonl_safe
+result = load_jsonl_safe('$TMPJSONL')
+assert len(result) == 2, f'expected 2 entries, got {len(result)}'
+" && pass "load_jsonl_safe: valid JSONL parsed (2 entries)" || fail "load_jsonl_safe" "valid JSONL parsing failed"
+
+  echo 'not json' > "$TMPJSONL"
+  echo '{"valid":true}' >> "$TMPJSONL"
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import load_jsonl_safe
+result = load_jsonl_safe('$TMPJSONL')
+assert len(result) == 1, f'expected 1 entry (malformed skipped), got {len(result)}'
+" && pass "load_jsonl_safe: malformed lines skipped" || fail "load_jsonl_safe" "malformed line handling failed"
+
+  python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from shared import load_jsonl_safe
+result = load_jsonl_safe('$TMPJSONL', max_size=5)
+assert result == [], 'oversized file should return empty'
+" && pass "load_jsonl_safe: oversized file returns []" || fail "load_jsonl_safe" "oversized file not rejected"
+  rm -f "$TMPJSONL"
+
+##############################################################################
 # --- Summary ---
 ##############################################################################
 

@@ -20,33 +20,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Optional
 
+sys.path.insert(0, str(Path(__file__).parent))
+from shared import load_jsonl_safe
+
 
 META_DIR_DEFAULT = Path.home() / ".skillforge" / "meta"
-
-
-MAX_JSONL_SIZE = 10_000_000  # 10 MB
-
-
-def _load_jsonl(path: Path) -> list[dict]:
-    """Load all entries from a JSONL file."""
-    entries = []
-    if not path.exists():
-        return entries
-    if path.stat().st_size > MAX_JSONL_SIZE:
-        print(f"Warning: {path} exceeds {MAX_JSONL_SIZE} bytes, skipping", file=sys.stderr)
-        return entries
-    skipped = 0
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    skipped += 1
-    if skipped > 0:
-        print(f"Warning: {path}: skipped {skipped} malformed JSONL lines", file=sys.stderr)
-    return entries
 
 
 def analyze_calibration(meta_dir: Path) -> dict:
@@ -54,7 +32,7 @@ def analyze_calibration(meta_dir: Path) -> dict:
 
     Shows per-dimension Pearson correlation with runtime_pass_rate.
     """
-    entries = _load_jsonl(meta_dir / "calibration-log.jsonl")
+    entries = load_jsonl_safe(meta_dir / "calibration-log.jsonl")
     if not entries:
         return {"available": False, "reason": "No calibration data yet. Run evals with --runtime to collect."}
 
@@ -127,7 +105,7 @@ def analyze_strategies(meta_dir: Path) -> dict:
 
     Shows keep_rate, avg_delta, and effectiveness per strategy type.
     """
-    entries = _load_jsonl(meta_dir / "strategy-log.jsonl")
+    entries = load_jsonl_safe(meta_dir / "strategy-log.jsonl")
     if not entries:
         return {"available": False, "reason": "No strategy data yet. Run improvement loops to collect."}
 
@@ -176,7 +154,7 @@ def analyze_triggers(meta_dir: Path) -> dict:
     Note: trigger-calibration.jsonl is not yet emitted by any component.
     This feature is planned — data pipeline will be added in a future version.
     """
-    entries = _load_jsonl(meta_dir / "trigger-calibration.jsonl")
+    entries = load_jsonl_safe(meta_dir / "trigger-calibration.jsonl")
     if not entries:
         return {"available": False, "reason": "No trigger calibration data yet (planned feature — data pipeline not yet implemented)."}
 
@@ -272,7 +250,7 @@ def predict_best_strategy(
     if meta_dir is None:
         meta_dir = META_DIR_DEFAULT
 
-    entries = _load_jsonl(meta_dir / "strategy-log.jsonl")
+    entries = load_jsonl_safe(meta_dir / "strategy-log.jsonl")
     if not entries:
         return {"available": False, "reason": "No strategy data for prediction."}
 

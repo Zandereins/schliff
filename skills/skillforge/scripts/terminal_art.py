@@ -5,7 +5,7 @@ Centralized render functions for grades, heatmaps, banners, and score cards.
 Imported by dashboard.py, generate-report.py, auto-improve.py, init-skill.py,
 and achievements.py.
 
-Pattern: ANSI only when _is_color_tty(), NO_COLOR respected, returns str.
+Pattern: ANSI only when is_color_tty(), NO_COLOR respected, returns str.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import sys
 # Color detection
 # ---------------------------------------------------------------------------
 
-def _is_color_tty() -> bool:
+def is_color_tty() -> bool:
     """Check if stdout supports ANSI colors."""
     return hasattr(sys.stdout, "isatty") and sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 
@@ -52,7 +52,7 @@ def score_to_grade(score: float) -> str:
 
 def grade_colored(grade: str) -> str:
     """Return grade string with ANSI color if TTY supports it."""
-    if not _is_color_tty():
+    if not is_color_tty():
         return f"[{grade}]"
     color = _GRADE_COLORS.get(grade, "")
     return f"{color}[{grade}]{RESET}"
@@ -66,7 +66,7 @@ def colored_bar(score: float, bar_w: int = 10) -> str:
     """Render a gauge bar, optionally colored by score threshold."""
     filled = min(bar_w, int(round(score / 100 * bar_w)))
     bar = "\u2588" * filled + "\u2591" * (bar_w - filled)
-    if not _is_color_tty():
+    if not is_color_tty():
         return bar
     if score >= 80:
         return f"\x1b[32m{bar}{RESET}"  # green

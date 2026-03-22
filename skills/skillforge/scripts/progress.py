@@ -21,6 +21,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 import math
 
+sys.path.insert(0, str(Path(__file__).parent))
+from shared import load_jsonl_safe
+
 
 class ProgressAnalyzer:
     """Analyzes experiment progression from JSONL results."""
@@ -41,15 +44,7 @@ class ProgressAnalyzer:
         if not self.results_path.exists():
             raise FileNotFoundError(f"Results file not found: {self.results_path}")
 
-        with open(self.results_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        self.experiments.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        print(f"Warning: Invalid JSON on line: {line[:50]}...", file=sys.stderr)
-                        continue
+        self.experiments = load_jsonl_safe(self.results_path)
 
         if not self.experiments:
             raise ValueError(f"No valid experiments found in: {self.results_path}")
