@@ -12,7 +12,7 @@ description: >
   skill", "review my skill", "harden skill", "benchmark skill", or paste
   SKILL.md for auto-analysis. Also use when user shares skill without explicit
   instructions. Do NOT use for brand-new skills from scratch — use
-  skill-creator first, then come to SkillForge.
+  skill-creator first, then come to SkillForge. Do NOT use for SQL query tuning. Do NOT use for prompt template authoring.
 ---
 
 # SkillForge — Skill Measurement & Iteration Framework

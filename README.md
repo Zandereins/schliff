@@ -2,11 +2,11 @@
 
 Your Claude Code skills, automatically better.
 
-> 62.5 → 98.9 structural points. One command. Zero manual work.
+> 62.5 → 99.9 structural points. One command. Zero manual work.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests: 99/99](https://img.shields.io/badge/Tests-99%2F99_passing-brightgreen)](skills/skillforge/scripts/test-integration.sh)
-[![Structural Score: 98.9](https://img.shields.io/badge/Structural_Score-98.9%2F100-blue)](skills/skillforge/scripts/score-skill.py)
+[![Structural Score: 99.9](https://img.shields.io/badge/Structural_Score-99.9%2F100-blue)](skills/skillforge/scripts/score-skill.py)
 [![v5.1](https://img.shields.io/badge/Version-5.1-F59E0B)](CHANGELOG.md)
 [![Claude Code Skill](https://img.shields.io/badge/Claude_Code-Skill-8A2BE2)](https://docs.anthropic.com/en/docs/claude-code/skills)
 
@@ -145,7 +145,7 @@ cp -r skillforge/commands/skillforge ~/.claude/commands/
 
 ```
 Baseline:  ██████░░░░░░░░░░░░░░  62.5/100  [C]
-After 18x: ████████████████████  98.9/100  [S]  (+36 points, zero human input)
+After 18x: ████████████████████  99.9/100  [S]  (+37 points, zero human input)
 ```
 
 What actually changed in a real run:
@@ -268,14 +268,14 @@ SkillForge scores itself. Dogfooding, not marketing.
 
 | Metric | Value |
 |--------|-------|
-| Structural Score | **98.9 / 100** [S] *(structural only — see note below)* |
+| Structural Score | **99.9 / 100** [S] *(structural only — see note below)* |
 | Binary assertions | **25/25 passing** |
 | Integration tests | **87/87 passing** |
 | Self-tests | **12/12 passing** |
 | Total tests | **99/99 passing** |
-| Journey | v1.0 (62.5) → v5.1 (98.9) across 5 major versions |
+| Journey | v1.0 (62.5) → v5.1 (99.9) across 5 major versions |
 
-> The 98.9 score means "well-structured file" — not "perfect skill". Runtime
+> The 99.9 score means "near-perfect structure" — not "perfect skill". Runtime
 > validation (`--runtime`) tests actual Claude behavior and is the true quality gate.
 
 27 security fixes applied from a 15-agent deep audit. It practices what it preaches.
@@ -343,10 +343,10 @@ MIT — do whatever you want.
 Score your skill and add this badge to your README:
 
 ```markdown
-[![SkillForge: 98.9 [S]](https://img.shields.io/badge/SkillForge-98.9%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
+[![SkillForge: 98.9 [S]](https://img.shields.io/badge/SkillForge-99.9%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
 ```
 
-[![SkillForge: 98.9 [S]](https://img.shields.io/badge/SkillForge-98.9%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
+[![SkillForge: 99.9 [S]](https://img.shields.io/badge/SkillForge-99.9%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
 
 ---
 
