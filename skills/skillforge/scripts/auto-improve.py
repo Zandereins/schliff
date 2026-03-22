@@ -26,7 +26,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -350,7 +350,7 @@ def run_auto_improve(
             "composite": baseline["composite"],
             "dimensions": baseline["dimensions"],
             "delta": 0,
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "patch_applied": None,
         }
         if not dry_run:
@@ -526,7 +526,7 @@ def run_auto_improve(
                 "delta": 0,
                 "patch_applied": f"{top_patch['dimension']}:{top_patch['issue']}",
                 "errors": patch_errors[0][1],
-                "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
             if not dry_run:
                 _append_state(skill_path, entry)
@@ -550,7 +550,7 @@ def run_auto_improve(
             "dimensions": new_score["dimensions"] if status == "keep" else current_score["dimensions"],
             "delta": delta,
             "patch_applied": f"{top_patch['dimension']}:{top_patch['issue']}",
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         if not dry_run:
             _append_state(skill_path, entry)

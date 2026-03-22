@@ -20,12 +20,13 @@ import argparse
 import json
 import math
 import os
-import re
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+from nlp import tokenize_meaningful
 
 
 EPISODES_PATH = Path.home() / ".skillforge" / "meta" / "episodes.jsonl"
@@ -35,25 +36,6 @@ MAX_FILE_SIZE = 10_000_000  # 10 MB
 
 # Module-level TF-IDF cache with mtime+size-based invalidation
 _tfidf_cache: dict[str, Any] = {"mtime": 0.0, "filesize": 0, "index": None, "episodes": None}
-
-
-# --- Tokenizer (reuses scorer patterns) ---
-
-STOPWORDS = {
-    "this", "that", "with", "from", "have", "will", "been", "were", "they",
-    "their", "them", "what", "when", "where", "which", "about", "into",
-    "your", "some", "than", "then", "also", "just", "more", "very", "here",
-    "there", "each", "like", "help", "want", "need", "using", "used",
-    "uses", "does", "doing", "done", "should", "could", "would", "please",
-    "really", "actually", "currently", "basically", "think", "know",
-    "sure", "well", "okay", "look", "show", "tell",
-}
-
-
-def _tokenize(text: str) -> list[str]:
-    """Extract meaningful words (4+ chars, not stopwords)."""
-    words = re.findall(r"\b[a-z]{4,}\b", text.lower())
-    return [w for w in words if w not in STOPWORDS]
 
 
 # --- TF-IDF Engine ---
@@ -73,13 +55,13 @@ class TFIDFIndex:
 
         # Build document frequency
         for doc in documents:
-            tokens = set(_tokenize(doc.get("text", "")))
+            tokens = set(tokenize_meaningful(doc.get("text", "")))
             for token in tokens:
                 self.doc_freq[token] += 1
 
         # Build TF-IDF vectors
         for doc in documents:
-            tokens = _tokenize(doc.get("text", ""))
+            tokens = tokenize_meaningful(doc.get("text", ""))
             tf: Counter = Counter(tokens)
             vector = {}
             for term, count in tf.items():
@@ -93,7 +75,7 @@ class TFIDFIndex:
 
         Returns list of (doc_index, similarity_score) tuples, sorted by score.
         """
-        query_tokens = _tokenize(query)
+        query_tokens = tokenize_meaningful(query)
         if not query_tokens:
             return []
 
@@ -145,10 +127,29 @@ def _load_episodes() -> list[dict]:
 
 
 def _save_episode(episode: dict) -> None:
-    """Append a single episode to the store."""
+    """Append a single episode to the store with file locking (POSIX only)."""
     EPISODES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        import fcntl
+        _has_flock = True
+    except ImportError:
+        _has_flock = False
+
     with open(EPISODES_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(episode) + "\n")
+        if _has_flock:
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            except OSError as e:
+                print(f"Warning: file locking unavailable ({e}), writing without lock", file=sys.stderr)
+                _has_flock = False
+        try:
+            f.write(json.dumps(episode) + "\n")
+        finally:
+            if _has_flock:
+                try:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
 
 
 def _episode_text(ep: dict) -> str:
@@ -195,7 +196,7 @@ def store_episode(
         "delta": round(delta, 2),
         "learning": learning,
         "context": context,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     episode["text"] = _episode_text(episode)
     _save_episode(episode)
@@ -356,8 +357,17 @@ def _enforce_size_cap() -> None:
 
 
 def get_stats() -> dict:
-    """Get episode store statistics."""
-    episodes = _load_episodes()
+    """Get episode store statistics (uses cached episodes when available)."""
+    # Reuse cached episodes from recall() if still valid
+    if _tfidf_cache["episodes"] and EPISODES_PATH.exists():
+        current_mtime = EPISODES_PATH.stat().st_mtime
+        current_filesize = os.path.getsize(EPISODES_PATH)
+        if _tfidf_cache["mtime"] == current_mtime and _tfidf_cache["filesize"] == current_filesize:
+            episodes = _tfidf_cache["episodes"]
+        else:
+            episodes = _load_episodes()
+    else:
+        episodes = _load_episodes()
     if not episodes:
         return {"total": 0, "domains": {}, "strategies": {}, "outcomes": {}}
 

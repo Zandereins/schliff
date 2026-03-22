@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""SkillForge — Shared Utilities
+
+Centralized constants, file I/O, and common helpers.
+Single source of truth — imported by all scoring and analysis modules.
+"""
+from __future__ import annotations
+
+import json
+import re
+import signal
+import sys
+from pathlib import Path
+from typing import Optional
+
+# Maximum skill file size (1 MB) to prevent DoS via large inputs
+MAX_SKILL_SIZE = 1_000_000
+
+# Maximum entries in the file cache to prevent unbounded memory growth
+MAX_CACHE_ENTRIES = 500
+
+# Module-level file cache to avoid redundant reads within a single invocation
+_file_cache: dict[str, str] = {}
+
+# Known scoring dimensions for validation
+VALID_DIMENSIONS = {
+    "structure", "triggers", "quality", "edges",
+    "efficiency", "composability", "clarity", "runtime",
+}
+
+# --- Regex for description extraction ---
+_RE_DESC_BLOCK = re.compile(
+    r"^description:\s*[>|]-?\s*\n((?:[ \t]+.+\n)*)", re.MULTILINE
+)
+_RE_DESC_INLINE = re.compile(r'^description:\s*"?(.+?)"?\s*$', re.MULTILINE)
+
+
+def invalidate_cache(skill_path: str) -> None:
+    """Invalidate the file cache for a given skill path."""
+    key = str(Path(skill_path).resolve())
+    _file_cache.pop(key, None)
+
+
+def read_skill_safe(skill_path: str) -> str:
+    """Read a skill file with size limit enforcement and caching.
+
+    Reads first, then checks size (avoids TOCTOU race condition).
+    """
+    p = Path(skill_path).resolve()
+    key = str(p)
+    if key in _file_cache:
+        return _file_cache[key]
+    if not p.exists():
+        raise FileNotFoundError(f"Skill file not found: {skill_path}")
+    content = p.read_text(encoding="utf-8", errors="replace")
+    if len(content) > MAX_SKILL_SIZE:
+        raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
+    if len(_file_cache) >= MAX_CACHE_ENTRIES:
+        _file_cache.pop(next(iter(_file_cache)))
+    _file_cache[key] = content
+    return content
+
+
+def extract_description(content: str) -> str:
+    """Extract the description field from YAML frontmatter.
+
+    Handles inline, block scalar (> and |) formats.
+    """
+    match = _RE_DESC_BLOCK.search(content)
+    if match:
+        return match.group(1).strip()
+    match = _RE_DESC_INLINE.search(content)
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
+def load_eval_suite(skill_path: str) -> Optional[dict]:
+    """Auto-discover and load eval-suite.json from skill directory."""
+    skill_dir = Path(skill_path).parent
+    auto_path = skill_dir / "eval-suite.json"
+    if auto_path.exists():
+        try:
+            return json.loads(auto_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
+    return None
+
+
+def regex_search_safe(pattern: str, text: str, timeout: int = 2) -> bool:
+    """Regex search with timeout to prevent ReDoS from user-supplied patterns.
+
+    Uses SIGALRM on POSIX; falls back to unprotected search on Windows.
+    """
+    if not hasattr(signal, "SIGALRM"):
+        # Windows fallback: no timeout protection available
+        try:
+            return bool(re.search(pattern, text, re.IGNORECASE))
+        except re.error:
+            return False
+
+    def _handler(signum, frame):
+        raise TimeoutError("Regex timed out")
+
+    old_handler = signal.signal(signal.SIGALRM, _handler)
+    signal.alarm(timeout)
+    try:
+        return bool(re.search(pattern, text, re.IGNORECASE))
+    except TimeoutError:
+        print(f"Warning: regex timed out after {timeout}s on pattern '{pattern[:60]}'", file=sys.stderr)
+        return False
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)

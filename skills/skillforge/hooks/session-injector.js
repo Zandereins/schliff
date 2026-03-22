@@ -94,8 +94,13 @@ function main() {
   let input = "";
   process.stdin.setEncoding("utf8");
 
+  const MAX_STDIN_SIZE = 1_000_000; // 1 MB
   process.stdin.on("data", (chunk) => {
     input += chunk;
+    if (input.length > MAX_STDIN_SIZE) {
+      process.stdout.write("{}");
+      process.exit(0);
+    }
   });
 
   process.stdin.on("end", () => {

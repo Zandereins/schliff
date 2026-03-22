@@ -28,31 +28,39 @@ from typing import Optional
 
 SCRIPT_DIR = Path(__file__).parent
 
+# Module-level cache for git availability checks (avoids ~300ms of redundant subprocess calls)
+_git_cache: dict[str, bool] = {}
+
 
 def _git_available() -> bool:
-    """Check if git is available and we're in a repo."""
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
-            capture_output=True, text=True, timeout=5
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    """Check if git is available and we're in a repo (cached)."""
+    if "git" not in _git_cache:
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                capture_output=True, text=True, timeout=5
+            )
+            _git_cache["git"] = result.returncode == 0
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            _git_cache["git"] = False
+    return _git_cache["git"]
 
 
 def _worktree_available() -> bool:
-    """Check if git worktree is available."""
-    if not _git_available():
-        return False
-    try:
-        result = subprocess.run(
-            ["git", "worktree", "list"],
-            capture_output=True, text=True, timeout=5
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    """Check if git worktree is available (cached)."""
+    if "worktree" not in _git_cache:
+        if not _git_available():
+            _git_cache["worktree"] = False
+        else:
+            try:
+                result = subprocess.run(
+                    ["git", "worktree", "list"],
+                    capture_output=True, text=True, timeout=5
+                )
+                _git_cache["worktree"] = result.returncode == 0
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                _git_cache["worktree"] = False
+    return _git_cache["worktree"]
 
 
 def create_branches(
@@ -259,12 +267,44 @@ def run_sequential_fallback(
 ) -> dict:
     """Sequential fallback when git worktree is unavailable.
 
-    Applies each strategy one at a time, scores, reverts if worse.
+    Scores baseline, then applies each strategy via text-gradient, scores after,
+    reverts if worse. Returns results for each strategy attempted.
     """
+    import shutil
     results = []
+    skill_path_obj = Path(skill_path)
+    backup_path = skill_path_obj.with_suffix(".md.bak")
+
+    # Score baseline once
+    baseline_score = 0
+    try:
+        result = subprocess.run(
+            ["python3", str(SCRIPT_DIR / "score-skill.py"), skill_path, "--json"],
+            capture_output=True, text=True, timeout=60,
+        )
+        data = json.loads(result.stdout)
+        baseline_score = data.get("composite_score", 0)
+    except (subprocess.SubprocessError, json.JSONDecodeError, OSError, KeyError) as e:
+        print(f"Warning: baseline scoring failed: {e}", file=sys.stderr)
 
     for strategy in strategies[:3]:
-        # Score current state
+        # Backup current state
+        shutil.copy2(str(skill_path_obj), str(backup_path))
+
+        # Apply strategy via text-gradient
+        try:
+            apply_result = subprocess.run(
+                ["python3", str(SCRIPT_DIR / "text-gradient.py"), skill_path,
+                 "--apply-top", "--strategy", strategy],
+                capture_output=True, text=True, timeout=60,
+            )
+        except (subprocess.SubprocessError, OSError):
+            # Strategy application failed — restore and skip
+            shutil.copy2(str(backup_path), str(skill_path_obj))
+            results.append({"strategy": strategy, "score": baseline_score, "mode": "sequential_failed"})
+            continue
+
+        # Score after strategy
         try:
             result = subprocess.run(
                 ["python3", str(SCRIPT_DIR / "score-skill.py"), skill_path, "--json"],
@@ -273,18 +313,27 @@ def run_sequential_fallback(
             data = json.loads(result.stdout)
             score = data.get("composite_score", 0)
         except (subprocess.SubprocessError, json.JSONDecodeError, OSError, KeyError) as e:
-            print(f"Warning: scoring failed for strategy '{strategy}': {e}", file=sys.stderr)
-            score = 0
+            print(f"Warning: scoring failed after applying {strategy}: {e}", file=sys.stderr)
+            score = -1
+
+        # Revert — caller decides which strategy to keep
+        shutil.copy2(str(backup_path), str(skill_path_obj))
 
         results.append({
             "strategy": strategy,
             "score": score,
-            "mode": "sequential_baseline",
+            "baseline": baseline_score,
+            "delta": round(score - baseline_score, 1),
+            "mode": "sequential",
         })
+
+    # Cleanup backup
+    backup_path.unlink(missing_ok=True)
 
     return {
         "mode": "sequential",
         "reason": "git worktree unavailable",
+        "baseline": baseline_score,
         "results": results,
     }
 

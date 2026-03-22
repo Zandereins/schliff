@@ -28,6 +28,8 @@ SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import score_skill as scorer
+from nlp import tokenize_meaningful
+from shared import extract_description
 
 
 # --- Skill Discovery ---
@@ -40,13 +42,24 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
     skills = []
     seen_paths = set()
 
+    MAX_SCAN_FILES = 1000
+    file_count = 0
+    scan_limit_reached = False
+
     for skill_dir in skill_dirs:
+        if scan_limit_reached:
+            break
         skill_dir_path = Path(skill_dir).expanduser()
         if not skill_dir_path.is_dir():
             continue
 
         scan_root = Path(os.path.realpath(str(skill_dir_path)))
         for skill_md in skill_dir_path.rglob("SKILL.md"):
+            file_count += 1
+            if file_count > MAX_SCAN_FILES:
+                print(f"Warning: scan limit reached ({MAX_SCAN_FILES} files), stopping discovery", file=sys.stderr)
+                scan_limit_reached = True
+                break
             try:
                 # Use os.path.realpath() explicitly to resolve all symlinks
                 real_path = os.path.realpath(str(skill_md))
@@ -74,8 +87,8 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
             if name_match:
                 name = name_match.group(1).strip().strip('"').strip("'")
 
-            description = scorer._extract_description(content)
-            tokens = scorer._tokenize_meaningful(
+            description = extract_description(content)
+            tokens = tokenize_meaningful(
                 description.lower(), expand_reverse=True
             ) if description else []
 
@@ -148,8 +161,12 @@ def _cosine_similarity(v1: dict, v2: dict) -> float:
 
 
 def _stable_token_hash(token: str) -> int:
-    """Deterministic hash for a token string (independent of PYTHONHASHSEED)."""
-    return int(hashlib.md5(token.encode("utf-8")).hexdigest()[:8], 16)
+    """Deterministic hash for a token string (independent of PYTHONHASHSEED).
+
+    Uses zlib.crc32 instead of hashlib.md5 for ~5-10x better performance.
+    """
+    import zlib
+    return zlib.crc32(token.encode("utf-8")) & 0x7FFFFFFF
 
 
 def _minhash_signature(tokens: set, num_hashes: int = 128, seed: int = 42) -> list[int]:
@@ -182,7 +199,7 @@ def _lsh_candidates(signatures: list[list[int]], bands: int = 16) -> set[tuple[i
         start = band_idx * rows_per_band
         end = start + rows_per_band
         for skill_idx, sig in enumerate(signatures):
-            band_hash = hashlib.sha256(str(tuple(sig[start:end])).encode()).hexdigest()
+            band_hash = hash(tuple(sig[start:end]))
             if band_hash in buckets:
                 for other_idx in buckets[band_hash]:
                     pair = (min(skill_idx, other_idx), max(skill_idx, other_idx))
@@ -239,7 +256,7 @@ def detect_trigger_overlaps(skills: list[dict]) -> list[dict]:
     vectors, _ = _compute_tfidf_vectors(skills)
 
     # Fallback: brute-force for small skill sets (LSH overhead not worth it)
-    if len(skills) < 50:
+    if len(skills) < 200:
         return _detect_overlaps_bruteforce(skills, vectors)
 
     # MinHash + LSH path for large skill sets
@@ -430,7 +447,7 @@ def _classify_domain(skill: dict) -> dict[str, float]:
     Returns dict of domain -> relevance score.
     """
     text = (skill.get("description", "") + " " + skill.get("name", "")).lower()
-    tokens = set(scorer._tokenize_meaningful(text, expand_reverse=True))
+    tokens = set(tokenize_meaningful(text, expand_reverse=True))
 
     domains = {}
     for domain, keywords in _DOMAIN_KEYWORDS.items():
