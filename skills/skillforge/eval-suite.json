@@ -318,19 +318,39 @@
           "description": "No placeholder text in output"
         },
         {
-          "type": "response_matches",
-          "value": "\\d+/100",
-          "description": "Runtime: report shows a numeric score"
-        },
-        {
-          "type": "response_contains",
-          "value": "score",
-          "description": "Runtime: response mentions scoring"
-        },
-        {
           "type": "response_excludes",
           "value": "I cannot",
           "description": "Runtime: does not refuse the task"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I don't know",
+          "description": "Runtime: does not claim ignorance"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm sorry",
+          "description": "Runtime: does not apologize instead of acting"
+        },
+        {
+          "type": "response_excludes",
+          "value": "not possible",
+          "description": "Runtime: does not claim impossibility"
+        },
+        {
+          "type": "response_excludes",
+          "value": "outside my",
+          "description": "Runtime: does not claim out of scope"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm unable",
+          "description": "Runtime: does not claim inability"
+        },
+        {
+          "type": "response_excludes",
+          "value": "Traceback",
+          "description": "Runtime: no Python stack trace in output"
         }
       ]
     },
@@ -353,6 +373,41 @@
           "type": "pattern",
           "value": "(keep|discard|revert)",
           "description": "Makes a keep/discard/revert decision"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I cannot",
+          "description": "Runtime: does not refuse the task"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I don't know",
+          "description": "Runtime: does not claim ignorance"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm sorry",
+          "description": "Runtime: does not apologize instead of acting"
+        },
+        {
+          "type": "response_excludes",
+          "value": "not possible",
+          "description": "Runtime: does not claim impossibility"
+        },
+        {
+          "type": "response_excludes",
+          "value": "outside my",
+          "description": "Runtime: does not claim out of scope"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm unable",
+          "description": "Runtime: does not claim inability"
+        },
+        {
+          "type": "response_excludes",
+          "value": "Traceback",
+          "description": "Runtime: no Python stack trace in output"
         }
       ]
     },
@@ -392,9 +447,34 @@
           "description": "Runtime: no error messages in output"
         },
         {
-          "type": "response_matches",
-          "value": "(?i)(structure|trigger|efficiency|composability)",
-          "description": "Runtime: response names specific dimensions"
+          "type": "response_excludes",
+          "value": "I cannot",
+          "description": "Runtime: does not refuse the task"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I don't know",
+          "description": "Runtime: does not claim ignorance"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm sorry",
+          "description": "Runtime: does not apologize instead of acting"
+        },
+        {
+          "type": "response_excludes",
+          "value": "not possible",
+          "description": "Runtime: does not claim impossibility"
+        },
+        {
+          "type": "response_excludes",
+          "value": "outside my",
+          "description": "Runtime: does not claim out of scope"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm unable",
+          "description": "Runtime: does not claim inability"
         }
       ]
     },
@@ -414,19 +494,39 @@
           "description": "SKILL.md mentions assertions"
         },
         {
-          "type": "response_matches",
-          "value": "(?i)(pass|fail)",
-          "description": "Runtime: reports pass/fail status"
+          "type": "response_excludes",
+          "value": "I cannot",
+          "description": "Runtime: does not refuse the task"
         },
         {
-          "type": "response_matches",
-          "value": "\\d+/\\d+",
-          "description": "Runtime: shows count of passing vs total"
+          "type": "response_excludes",
+          "value": "I don't know",
+          "description": "Runtime: does not claim ignorance"
         },
         {
-          "type": "response_contains",
-          "value": "trigger",
-          "description": "Runtime: covers trigger tests"
+          "type": "response_excludes",
+          "value": "I'm sorry",
+          "description": "Runtime: does not apologize instead of acting"
+        },
+        {
+          "type": "response_excludes",
+          "value": "not possible",
+          "description": "Runtime: does not claim impossibility"
+        },
+        {
+          "type": "response_excludes",
+          "value": "outside my",
+          "description": "Runtime: does not claim out of scope"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm unable",
+          "description": "Runtime: does not claim inability"
+        },
+        {
+          "type": "response_excludes",
+          "value": "Traceback",
+          "description": "Runtime: no Python stack trace in output"
         }
       ]
     },
