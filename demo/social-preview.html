@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=640">
+<title>SkillForge Social Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1280px;
+    height: 640px;
+    overflow: hidden;
+    background: #0d1117;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    color: #e6edf3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card {
+    width: 1280px;
+    height: 640px;
+    background: #0d1117;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    padding: 60px 80px;
+  }
+
+  /* Subtle grid pattern */
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(99, 102, 106, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99, 102, 106, 0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* Top-left glow */
+  .glow-tl {
+    position: absolute;
+    top: -120px;
+    left: -120px;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Bottom-right glow */
+  .glow-br {
+    position: absolute;
+    bottom: -100px;
+    right: -100px;
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.07) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    width: 100%;
+  }
+
+  /* Icon + Title row */
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .icon {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #38bdf8, #a855f7);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    flex-shrink: 0;
+    box-shadow: 0 0 30px rgba(56, 189, 248, 0.2), 0 0 60px rgba(168, 85, 247, 0.1);
+  }
+
+  .title {
+    font-size: 72px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, #e6edf3 30%, #38bdf8 70%, #a855f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+  }
+
+  .subtitle {
+    font-size: 22px;
+    color: #8b949e;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    margin-top: -8px;
+  }
+
+  /* Score progression */
+  .score-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    width: 700px;
+    margin-top: 4px;
+  }
+
+  .score-numbers {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 36px;
+    font-weight: 700;
+  }
+
+  .score-old {
+    color: #6e7681;
+  }
+
+  .score-arrow {
+    color: #484f58;
+    font-size: 28px;
+  }
+
+  .score-new {
+    background: linear-gradient(90deg, #38bdf8, #34d399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .score-label {
+    font-size: 13px;
+    color: #484f58;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 600;
+  }
+
+  /* Progress bar */
+  .progress-track {
+    width: 100%;
+    height: 10px;
+    background: #161b22;
+    border-radius: 5px;
+    overflow: hidden;
+    border: 1px solid #21262d;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 99.9%;
+    background: linear-gradient(90deg, #6e7681 0%, #38bdf8 40%, #34d399 75%, #a855f7 100%);
+    border-radius: 5px;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+  }
+
+  /* Stats row */
+  .stats {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    margin-top: 4px;
+  }
+
+  .stat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    color: #8b949e;
+    font-weight: 500;
+  }
+
+  .stat-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-blue { background: #38bdf8; box-shadow: 0 0 6px rgba(56, 189, 248, 0.4); }
+  .dot-green { background: #34d399; box-shadow: 0 0 6px rgba(52, 211, 153, 0.4); }
+  .dot-purple { background: #a855f7; box-shadow: 0 0 6px rgba(168, 85, 247, 0.4); }
+
+  .stat-sep {
+    color: #21262d;
+    font-size: 18px;
+  }
+
+  /* Version badge */
+  .version {
+    position: absolute;
+    top: 32px;
+    right: 40px;
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    padding: 6px 14px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    z-index: 1;
+  }
+
+  /* Bottom border accent */
+  .bottom-accent {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #38bdf8, #a855f7, #34d399);
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="glow-tl"></div>
+    <div class="glow-br"></div>
+
+    <span class="version">v5.1</span>
+
+    <div class="content">
+      <div class="title-row">
+        <div class="icon">S</div>
+        <h1 class="title">SkillForge</h1>
+      </div>
+
+      <p class="subtitle">Autonomous Skill Improvement for Claude Code</p>
+
+      <div class="score-section">
+        <span class="score-label">Structural Score</span>
+        <div class="score-numbers">
+          <span class="score-old">62.5</span>
+          <span class="score-arrow">&rarr;</span>
+          <span class="score-new">99.9</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill"></div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <span class="stat"><span class="stat-dot dot-blue"></span>7 Dimensions</span>
+        <span class="stat-sep">|</span>
+        <span class="stat"><span class="stat-dot dot-green"></span>99 Tests</span>
+        <span class="stat-sep">|</span>
+        <span class="stat"><span class="stat-dot dot-purple"></span>Zero Human Input</span>
+      </div>
+    </div>
+
+    <div class="bottom-accent"></div>
+  </div>
+</body>
+</html>
