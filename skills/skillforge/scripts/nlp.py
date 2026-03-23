@@ -38,7 +38,7 @@ def stem(word: str) -> str:
     ]:
         if len(word) >= min_len and word.endswith(suffix):
             result = word[:-len(suffix)]
-            if len(result) >= 3:
+            if len(result) >= 4:
                 return result
     return word
 

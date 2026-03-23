@@ -11,10 +11,11 @@ Usage:
     python3 auto-improve.py SKILL.md [--max-iterations N] [--dry-run] [--json]
     python3 auto-improve.py SKILL.md --resume  # Resume from JSONL state file
 
-Stopping (EMA-based plateau detection):
+Stopping conditions:
   - composite >= 98 → stop
   - all dims >= 90 → stop
-  - EMA ROI < 0.1 for 5 consecutive entries → stop
+  - 3 consecutive patch errors → stop (unpatchable skill)
+  - EMA ROI < 0.1 for 5 consecutive keep/discard steps → stop
 """
 from __future__ import annotations
 
