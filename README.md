@@ -7,7 +7,7 @@ Stop manually auditing your Claude Code skills.
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/skillforge-tests.json)](skills/skillforge/scripts/test-integration.sh)
 [![Structural Score](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/skillforge-score.json)](skills/skillforge/scripts/score-skill.py)
-[![v5.1.1](https://img.shields.io/badge/Version-5.1.1-F59E0B)](CHANGELOG.md)
+[![v5.2.0](https://img.shields.io/badge/Version-5.2.0-F59E0B)](CHANGELOG.md)
 [![Claude Code Skill](https://img.shields.io/badge/Claude_Code-Skill-8A2BE2)](https://docs.anthropic.com/en/docs/claude-code/skills)
 
 ---
@@ -138,7 +138,7 @@ Already have skills? Run `/skillforge:doctor` to see health grades for all your 
 
 **Deterministic** — 60-70% of fixes are rule-based: frontmatter insertion, noise removal, TODO cleanup. No LLM needed. Same input, same output.
 
-**Empirical** — 6 scoring dimensions (structure, triggers, quality, edges, efficiency, composability) + optional runtime validation against actual Claude behavior.
+**Empirical** — 7 scoring dimensions (structure, triggers, quality, edges, efficiency, composability, clarity) + optional runtime validation against actual Claude behavior.
 
 **Learns** — Episodic memory remembers which strategies worked across sessions. Predicts success before trying. Your 50th skill improves faster than your 1st.
 
@@ -146,7 +146,7 @@ Already have skills? Run `/skillforge:doctor` to see health grades for all your 
 
 ---
 
-## What's New in v5.1
+## What's New in v5.2
 
 | Feature | Description |
 |---------|-------------|
@@ -161,6 +161,13 @@ Already have skills? Run `/skillforge:doctor` to see health grades for all your 
 | Coherence Check | Instruction-assertion alignment as quality bonus |
 | 40+ Pre-compiled Regex | Performance optimization across the scorer |
 | Public Cache API | `invalidate_cache()` replaces direct `_file_cache.pop()` |
+| Continuous Density | Smooth sqrt curve replaces 10-point step functions |
+| E Grade | New grade between D and F for skills scoring 35-49 |
+| Verb+Object Contradictions | Clarity detects "Always run X" vs "Never run X" |
+| IDF Floor | Small eval suites (< 5 triggers) score correctly |
+| Thread-safe Regex | SIGALRM replaced with threading-only timeout |
+| 119 Unit Tests | +148% test coverage from 48 to 119 |
+| 40 Security Fixes | Shell injection, prompt injection, ReDoS, supply chain |
 
 ---
 
@@ -205,10 +212,11 @@ Two modes, one decision:
 | Eval Coverage | 20% | Assertion breadth and eval suite coverage |
 | Edge Coverage | 15% | Edge case definitions in eval suite |
 | Token Efficiency | 10% | Information density, signal-to-noise ratio |
-| Composability | 5% | Scope boundaries, handoff declarations |
-| Runtime *(opt-in)* | 15% | Actual Claude behavior against assertions |
+| Composability | 10% | Scope boundaries, handoff declarations |
+| Clarity | 5% | Contradiction detection, vague references, ambiguity |
+| Runtime *(opt-in)* | 10% | Actual Claude behavior against assertions |
 
-Grades: **S** (>=95), **A** (>=85), **B** (>=75), **C** (>=65), **D** (>=50), **F** (<50).
+Grades: **S** (>=95), **A** (>=85), **B** (>=75), **C** (>=65), **D** (>=50), **E** (>=35), **F** (<35).
 
 Full scoring methodology: [docs/SCORING.md](docs/SCORING.md)
 
@@ -220,11 +228,11 @@ SkillForge scores itself. Dogfooding, not marketing.
 
 | Metric | Value |
 |--------|-------|
-| Structural Score | **99.9 / 100** [S] |
-| Tests | **99/99 passing** (87 integration + 12 self) |
-| Code review | **3 CRITICAL + 9 HIGH fixed** in v5.1.1 |
-| Security | 27 + 12 fixes from multi-agent audits |
-| Journey | v1.0 (62.5) → v5.1.1 (99.9) across 5 major versions |
+| Structural Score | **97.2 / 100** [S] |
+| Tests | **119 passing** (unit + integration + proof) |
+| Security audit | **40 fixes** across 6 review rounds |
+| Scoring engine | **7 dimensions**, continuous density, verb+object contradiction detection |
+| Journey | v1.0 (62.5) → v5.2.0 (97.2) across 6 major versions |
 
 ---
 
@@ -238,6 +246,22 @@ skill-creator → v1 SKILL.md → /skillforge:auto → autonomous grinding → s
 
 - **[skill-creator](https://github.com/anthropics/courses/tree/master/claude-code/09-skill-creator)** — generate the first draft
 - **[autoresearch](https://github.com/uditgoenka/autoresearch)** — generalized autonomous research for Claude Code
+
+---
+
+## Autoresearch for Claude Code
+
+Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) (50K+ stars) — SkillForge applies the same autonomous improvement loop to Claude Code skills:
+
+| | Karpathy's autoresearch | SkillForge |
+|---|---|---|
+| **Target** | ML training scripts | Claude Code SKILL.md files |
+| **Metric** | 1 (val_bpb) | 7 dimensions |
+| **Patches** | 100% LLM | 60-70% deterministic |
+| **Memory** | None | Cross-session episodic store |
+| **Fleet** | 1 file | 50+ skills (Doctor + Mesh) |
+
+Both run overnight. Both stop when ROI plateaus. Both improve unattended.
 
 ---
 
