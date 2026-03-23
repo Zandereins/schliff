@@ -20,7 +20,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Optional
 
-sys.path.insert(0, str(Path(__file__).parent))
 from shared import load_jsonl_safe
 
 

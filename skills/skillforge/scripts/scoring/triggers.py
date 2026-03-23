@@ -7,12 +7,8 @@ Uses TF-IDF-inspired scoring instead of naive word overlap:
 4. Requires higher threshold for positive triggers
 """
 import math
-import sys
 from collections import Counter
 from typing import Optional
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared import read_skill_safe, extract_description
 from nlp import tokenize_meaningful as _tokenize_meaningful

@@ -369,7 +369,6 @@ def main():
     # Auto mode: use meta-report predictor
     if args.auto:
         try:
-            sys.path.insert(0, str(SCRIPT_DIR))
             import meta_report as meta
             prediction = meta.predict_best_strategy({}, meta_dir=meta.META_DIR_DEFAULT)
             if prediction.get("available") and prediction.get("predictions"):

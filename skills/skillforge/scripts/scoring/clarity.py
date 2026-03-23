@@ -8,11 +8,6 @@ Sub-checks (100 pts total):
 - Ambiguous pronoun detection (20 pts): sentences starting with It/This/That
 - Instruction completeness (25 pts): every "Run X" has a concrete command
 """
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from shared import read_skill_safe
 from scoring.patterns import (
     _RE_ALWAYS_PATTERNS, _RE_NEVER_PATTERNS, _RE_VAGUE_REF,

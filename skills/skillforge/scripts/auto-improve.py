@@ -32,7 +32,6 @@ from typing import Any, Optional
 
 
 SCRIPT_DIR = Path(__file__).parent
-sys.path.insert(0, str(SCRIPT_DIR))
 from shared import validate_command_safety
 
 # Import terminal_art for grade system

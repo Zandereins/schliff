@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 SCRIPT_DIR = Path(__file__).parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
 ACHIEVEMENTS_PATH = Path.home() / ".skillforge" / "meta" / "achievements.json"
 

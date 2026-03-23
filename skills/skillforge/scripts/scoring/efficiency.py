@@ -3,11 +3,6 @@
 Measures how much useful, actionable content the skill delivers
 relative to its total size. Penalizes bloat, rewards conciseness.
 """
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from shared import read_skill_safe
 from scoring.patterns import (
     _RE_ACTIONABLE_LINES, _RE_REAL_EXAMPLES, _RE_WHY_COUNT,

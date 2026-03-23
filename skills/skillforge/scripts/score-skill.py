@@ -20,8 +20,6 @@ import json
 import sys
 from pathlib import Path
 
-# Ensure scripts directory is on path for shared module imports
-sys.path.insert(0, str(Path(__file__).parent))
 from shared import read_skill_safe, extract_description, VALID_DIMENSIONS, invalidate_cache as _shared_invalidate_cache
 from scoring import (
     score_structure, score_triggers, score_efficiency,

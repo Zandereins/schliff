@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 SCRIPT_DIR = Path(__file__).parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
 # Import terminal_art for grade system and heatmap
 from terminal_art import score_to_grade, render_heatmap

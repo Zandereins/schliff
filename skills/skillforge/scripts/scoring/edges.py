@@ -9,11 +9,7 @@ Scoring (100 pts total):
 - All edge cases have expected_behavior: 20 pts
 - All edge cases have assertions: 20 pts
 """
-import sys
 from typing import Optional
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def score_edges(skill_path: str, eval_suite: Optional[dict]) -> dict:

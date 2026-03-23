@@ -114,11 +114,27 @@ def regex_search_safe(pattern: str, text: str, timeout: int = 2) -> bool:
     Uses SIGALRM on POSIX; falls back to unprotected search on Windows.
     """
     if not hasattr(signal, "SIGALRM"):
-        # Windows fallback: no timeout protection available
-        try:
-            return bool(re.search(pattern, text, re.IGNORECASE))
-        except re.error:
+        # Windows/non-POSIX fallback: use threading for timeout
+        import threading
+        result = [False]
+        error = [None]
+
+        def _search():
+            try:
+                result[0] = bool(re.search(pattern, text, re.IGNORECASE))
+            except re.error as e:
+                error[0] = e
+
+        t = threading.Thread(target=_search, daemon=True)
+        t.start()
+        t.join(timeout=timeout)
+
+        if t.is_alive():
+            print(f"Warning: regex timed out after {timeout}s on pattern '{pattern[:60]}'", file=sys.stderr)
             return False
+        if error[0]:
+            return False
+        return result[0]
 
     def _handler(signum, frame):
         raise TimeoutError("Regex timed out")
