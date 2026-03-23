@@ -3,10 +3,7 @@
 Checks frontmatter, length, examples, headers, progressive disclosure,
 imperative voice, referenced files, and dead content.
 """
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared import read_skill_safe
 from scoring.patterns import (

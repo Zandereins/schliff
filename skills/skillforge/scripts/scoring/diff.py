@@ -8,8 +8,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from scoring.patterns import _RE_DIFF_SIGNAL, _RE_DIFF_EXAMPLE, _RE_DIFF_NOISE
 
 

@@ -28,7 +28,6 @@ from pathlib import Path
 MAX_SKILL_SIZE = 1_000_000
 
 SCRIPT_DIR = Path(__file__).parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
 # Import terminal_art for grade system and score cards
 from terminal_art import score_to_grade, grade_colored, colored_bar, is_color_tty

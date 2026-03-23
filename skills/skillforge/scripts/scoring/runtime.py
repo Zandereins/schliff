@@ -8,11 +8,7 @@ Runs up to 3 test cases from eval suite, checks response_* assertions.
 """
 import re
 import subprocess
-import sys
 from typing import Optional
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared import regex_search_safe as _regex_search_safe, read_skill_safe
 

@@ -20,7 +20,6 @@ from typing import Any, Optional
 
 # Import scorer functions directly — no reimplementation
 SCRIPT_DIR = Path(__file__).parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
 import score_skill as scorer
 from shared import read_skill_safe, extract_description

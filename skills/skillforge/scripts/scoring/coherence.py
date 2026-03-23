@@ -4,11 +4,7 @@ Cross-references imperative instructions in the skill body against
 assertion values in the eval suite's test_cases. Returns a bonus score
 (0-10) based on how many instruction topics are covered by assertions.
 """
-import sys
 from typing import Optional
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared import read_skill_safe
 from nlp import STOPWORDS, stem as _stem, RE_WORD_TOKEN as _RE_WORD_TOKEN

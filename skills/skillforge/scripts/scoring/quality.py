@@ -9,11 +9,7 @@ Scoring (100 pts total):
 - Test cases cover different skill features (analyze, improve, report): 25 pts
 - All assertions have descriptions: 20 pts
 """
-import sys
 from typing import Optional
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scoring.coherence import score_coherence
 

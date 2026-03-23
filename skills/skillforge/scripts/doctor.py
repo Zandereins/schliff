@@ -18,7 +18,6 @@ import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
 import score_skill as scorer
 import skill_mesh

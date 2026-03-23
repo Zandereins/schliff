@@ -7,11 +7,6 @@ Static analysis checks (no runtime needed):
 - Explicit handoff points (20 pts)
 - No conflicting tool assumptions (20 pts)
 """
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from shared import read_skill_safe
 from scoring.patterns import (
     _RE_POSITIVE_SCOPE, _RE_NEGATIVE_SCOPE, _RE_GLOBAL_STATE,

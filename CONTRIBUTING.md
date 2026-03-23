@@ -1,85 +1,116 @@
 # Contributing to SkillForge
 
-Thanks for your interest in improving SkillForge.
+Thanks for your interest in improving SkillForge! This guide covers everything you need to get started.
 
-## Getting Started
+## Quick Setup
 
 ```bash
+# Clone and install in dev mode (symlink)
 git clone https://github.com/Zandereins/skillforge.git
-cd skillforge/skills/skillforge
+cd skillforge
+bash install.sh --link
 
 # Run the test suite
-bash scripts/test-integration.sh
-bash scripts/test-self.sh
-
-# Score the skill
-python3 scripts/score-skill.py SKILL.md --json
+make test-all
 ```
 
-## How to Contribute
+## Prerequisites
 
-### Report Issues
+- Python 3.9+
+- Bash 4.0+
+- Git 2.0+
+- jq 1.6+
 
-Open an issue if you find a bug, have a feature request, or want to share
-results from using SkillForge on your own skills.
+## Project Structure
 
-### Submit Improvements
+```
+skills/skillforge/
+├── scripts/
+│   ├── scoring/          # Scoring package (1 module per dimension)
+│   │   ├── __init__.py   # Public API — import from here
+│   │   ├── patterns.py   # Shared regex patterns
+│   │   ├── structure.py  # Structure scoring
+│   │   ├── triggers.py   # Trigger accuracy scoring
+│   │   └── ...           # One file per dimension
+│   ├── shared.py         # Core utilities (caching, file I/O, security)
+│   ├── nlp.py            # NLP utilities (tokenization, stemming)
+│   ├── terminal_art.py   # Terminal rendering (grades, bars, heatmaps)
+│   └── ...               # Application scripts
+├── commands/skillforge/  # Claude Code command definitions
+├── references/           # Deep documentation
+├── templates/            # Eval suite templates
+└── tests/proof/          # Proof tests
+```
 
-1. Fork the repo
-2. Create a branch: `git checkout -b feature/your-feature`
-3. Make changes
-4. Run the full test suite:
-   ```bash
-   cd skills/skillforge
-   bash scripts/test-integration.sh   # Must pass all tests
-   bash scripts/test-self.sh          # Must pass all tests
-   python3 scripts/score-skill.py SKILL.md --json  # Composite must be >= 90
+## Running Tests
+
+```bash
+make test          # 99+ integration tests
+make test-self     # 12 self-tests (SkillForge scores itself)
+make test-proof    # 6 proof tests (demonstrates real improvement)
+make test-all      # All of the above
+make score         # Score SkillForge's own SKILL.md
+```
+
+All tests must pass before submitting a PR.
+
+## Adding a New Scoring Dimension
+
+1. Create `scripts/scoring/your_dimension.py`:
+   ```python
+   """scoring/your_dimension.py — Your Dimension scoring."""
+   from shared import read_skill_safe
+   from scoring.patterns import _RE_YOUR_PATTERNS  # if needed
+
+   def score_your_dimension(skill_path: str, eval_suite=None) -> dict:
+       """Score your dimension.
+
+       Returns dict with 'score' (0-100), 'issues' (list), 'details' (dict).
+       """
+       content = read_skill_safe(skill_path)
+       # ... scoring logic ...
+       return {"score": score, "issues": issues, "details": details}
    ```
-5. Open a PR with a clear description
 
-### PR Checklist
+2. Register in `scripts/scoring/__init__.py`:
+   ```python
+   from scoring.your_dimension import score_your_dimension
+   ```
 
-- [ ] All integration tests pass (`bash scripts/test-integration.sh`)
-- [ ] All self-tests pass (`bash scripts/test-self.sh`)
-- [ ] Composite score >= 90 (`python3 scripts/score-skill.py SKILL.md --json`)
-- [ ] SKILL.md stays under 500 lines
-- [ ] All referenced files exist
-- [ ] New tests added for new functionality
-- [ ] CHANGELOG.md updated
+3. Add weight in `scripts/scoring/composite.py` (DEFAULT_WEIGHTS dict)
 
-## High-Impact Areas
-
-- **New assertion types** — regex, semantic, file-diff for eval suites
-- **Scoring improvements** — better heuristics in `score-skill.py`
-- **Domain-specific rubrics** — API skills, doc skills, deploy skills
-- **Real-world benchmarks** — share before/after data from SkillForge runs
-- **New subcommands** — e.g., `/skillforge:diff` to compare two skill versions
-
-## Adding a New Metric
-
-1. Add a `score_<metric>()` function to `scripts/score-skill.py`
-2. Return `{"score": 0-100, "issues": [...], "details": {...}}`
-3. Add the metric to `compute_composite()` weights
 4. Add tests in `scripts/test-integration.sh`
-5. Document in `references/metrics-catalog.md`
+
+5. Run `make test-all` to verify
 
 ## Code Style
 
-- **Bash scripts**: `set -euo pipefail`, JSON output to stdout, errors to stderr
-- **Python**: Type hints, docstrings, argparse for CLI, `max(0, min(100, score))` for capping
-- **Markdown**: ATX headers (`##`), fenced code blocks, imperative voice
+- **Python 3.9+** — Use type hints, f-strings, pathlib
+- **Line length:** 120 chars (configured in pyproject.toml)
+- **Linter:** `make lint` (uses ruff)
+- **Docstrings:** Required for all public functions
+- **Error handling:** Always explicit — no silent failures
+- **File I/O:** Use `shared.read_skill_safe()` for skill files (enforces size limits)
+- **Regex:** Use `shared.validate_regex_complexity()` before executing user-supplied patterns
 
-## Skill Quality Standards
+## Naming Conventions
 
-When modifying the SkillForge skill itself:
+- **Underscore names** (`text_gradient.py`) = importable Python modules
+- **Hyphenated names** (`text-gradient.py`) = thin CLI wrappers (5-8 lines, delegate to underscore module)
+- **scoring/** modules = one file per scoring dimension
 
-- SKILL.md stays under 500 lines
-- All referenced files exist
-- Scripts are executable and produce valid output
-- Examples use realistic, non-trivial scenarios
-- Imperative voice throughout
+## Security
 
-## License
+- Use `shared.validate_command_safety()` before executing any user-supplied commands
+- Use `shared.validate_regex_complexity()` before any user-supplied regex
+- Use `shared.read_skill_safe()` for all file reads (enforces 1MB size limit)
+- Never execute commands from eval-suite content without validation
 
-By contributing, you agree that your contributions will be licensed under
-the MIT License.
+## PR Checklist
+
+- [ ] All tests pass (`make test-all`)
+- [ ] Score is >= 90 (`make score`)
+- [ ] New functions have docstrings and type hints
+- [ ] Security functions used where applicable
+- [ ] No hardcoded file paths
+- [ ] CHANGELOG.md updated (if user-facing change)

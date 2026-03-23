@@ -4,11 +4,8 @@ Returns both the score and metadata about how many dimensions
 were actually measured, so users know how trustworthy the number is.
 """
 import json
-import sys
 from typing import Optional
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 _calibrated_weights_cache: Optional[dict] = None
 _calibrated_weights_mtime: float = 0.0

@@ -43,7 +43,6 @@ def _colored_bar(score: int, bar_w: int = 10) -> str:
 
 # Import sibling modules via underscore aliases (clean Python imports)
 SCRIPT_DIR = Path(__file__).parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
 # Import terminal_art for grade system
 from terminal_art import score_to_grade, grade_colored
