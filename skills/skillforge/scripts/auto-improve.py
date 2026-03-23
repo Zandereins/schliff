@@ -23,7 +23,6 @@ import copy
 import json
 import os
 import re
-import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -32,7 +31,6 @@ from typing import Any, Optional
 
 
 SCRIPT_DIR = Path(__file__).parent
-from shared import validate_command_safety
 
 # Import terminal_art for grade system
 from terminal_art import score_to_grade, grade_colored, progress_bar, sparkline
