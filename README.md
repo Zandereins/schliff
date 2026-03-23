@@ -48,12 +48,6 @@ git clone https://github.com/Zandereins/schliff.git && bash schliff/install.sh
 
 Already have skills? Run `/schliff:doctor` to see health grades for all your installed skills at once.
 
-**Add this badge to your README after scoring:**
-
-```markdown
-[![Schliff: 97 [S]](https://img.shields.io/badge/Schliff-97%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
-```
-
 ---
 
 ## This Is For You If
@@ -240,11 +234,11 @@ Schliff scores itself. Dogfooding, not marketing.
 
 | Metric | Value |
 |--------|-------|
-| Structural Score | **97.1 / 100** [S] |
+| Structural Score | **95.1 / 100** [S] |
 | Tests | **120 passing** (unit + integration + proof) |
 | Security audit | **40 fixes** across 6 review rounds |
 | Scoring engine | **7 dimensions**, continuous density, context-aware contradiction detection |
-| Journey | v1.0 (62.5) → v6.0.0 (97.1) across 7 major versions |
+| Journey | v1.0 (62.5) → v6.0.0 (95.1) across 7 major versions |
 
 ---
 
@@ -258,6 +252,18 @@ skill-creator → v1 SKILL.md → /schliff:auto → autonomous grinding → ship
 
 - **[skill-creator](https://github.com/anthropics/courses/tree/master/claude-code/09-skill-creator)** — generate the first draft
 - **[autoresearch](https://github.com/uditgoenka/autoresearch)** — generalized autonomous research for Claude Code
+
+---
+
+## Badge
+
+Score your skill and add this to your README:
+
+```markdown
+[![Schliff: 95 [S]](https://img.shields.io/badge/Schliff-95%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
+```
+
+[![Schliff: 95 [S]](https://img.shields.io/badge/Schliff-95%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
 
 ---
 
