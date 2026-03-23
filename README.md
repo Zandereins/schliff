@@ -5,8 +5,8 @@ Stop manually auditing your Claude Code skills.
 > You wrote a skill. It worked. Three weeks later, triggers misfire, edge cases slip through, instructions contradict themselves. SkillForge fixes all of it autonomously — deterministic patches, mechanical scoring, zero hallucinations on the rule-based fixes.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests: 99/99](https://img.shields.io/badge/Tests-99%2F99_passing-brightgreen)](skills/skillforge/scripts/test-integration.sh)
-[![Structural Score: 99.9](https://img.shields.io/badge/Structural_Score-99.9%2F100-blue)](skills/skillforge/scripts/score-skill.py)
+[![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/skillforge-tests.json)](skills/skillforge/scripts/test-integration.sh)
+[![Structural Score](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/skillforge-score.json)](skills/skillforge/scripts/score-skill.py)
 [![v5.1.1](https://img.shields.io/badge/Version-5.1.1-F59E0B)](CHANGELOG.md)
 [![Claude Code Skill](https://img.shields.io/badge/Claude_Code-Skill-8A2BE2)](https://docs.anthropic.com/en/docs/claude-code/skills)
 

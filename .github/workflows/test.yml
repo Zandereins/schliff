@@ -69,9 +69,9 @@ jobs:
   # Badge generation using dynamic badges
   # Setup steps:
   #   1. Create a public GitHub Gist (https://gist.github.com) — content doesn't matter
-  #   2. Copy the Gist ID from the URL (e.g., https://gist.github.com/user/<GIST_ID>)
+  #   2. Copy the Gist ID from the URL (e.g., https://gist.github.com/user/130bb61237b5b9b1536718e6a2296d4a)
   #   3. Create a repository secret named GIST_TOKEN with a PAT that has gist scope
-  #   4. Replace <GIST_ID> below with your actual Gist ID
+  #   4. Replace 130bb61237b5b9b1536718e6a2296d4a below with your actual Gist ID
   badges:
     needs: test
     runs-on: ubuntu-latest
@@ -81,7 +81,7 @@ jobs:
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           auth: ${{ secrets.GIST_TOKEN }}
-          gistID: <GIST_ID>
+          gistID: 130bb61237b5b9b1536718e6a2296d4a
           filename: skillforge-tests.json
           label: tests
           message: "${{ needs.test.outputs.test_passed }}/${{ needs.test.outputs.test_total }} passed"
@@ -91,7 +91,7 @@ jobs:
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           auth: ${{ secrets.GIST_TOKEN }}
-          gistID: <GIST_ID>
+          gistID: 130bb61237b5b9b1536718e6a2296d4a
           filename: skillforge-score.json
           label: composite score
           message: "${{ needs.test.outputs.composite_score }}"
