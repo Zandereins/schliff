@@ -1,16 +1,16 @@
-# SkillForge Scoring System
+# Schliff Scoring System
 
-How SkillForge measures skill quality — and what the numbers actually mean.
+How Schliff measures skill quality — and what the numbers actually mean.
 
 ---
 
 ## Two-Tier Model: Structural vs Runtime
 
-SkillForge scoring operates on two tiers:
+Schliff scoring operates on two tiers:
 
 **Structural (default)** — Static analysis of the skill file and eval suite. Measures file organization, keyword coverage, assertion breadth, and information density. Runs instantly, requires no LLM invocation. This is a **lint score**, not a quality score. A skill with 99/100 structure can still fail at runtime.
 
-**Runtime (opt-in)** — Invokes Claude with test prompts from the eval suite and checks `response_*` assertions against actual output. This is the true quality gate. Enable with `--runtime` or run `/skillforge:eval` with runtime assertions. Requires `claude` CLI.
+**Runtime (opt-in)** — Invokes Claude with test prompts from the eval suite and checks `response_*` assertions against actual output. This is the true quality gate. Enable with `--runtime` or run `/schliff:eval` with runtime assertions. Requires `claude` CLI.
 
 When runtime data is available, the composite score blends both tiers. When it is not, the score is purely structural and labeled as such.
 
@@ -88,13 +88,13 @@ runtime:        0.15  (15%)  — only counted when enabled
 
 ## Auto-Calibration from Runtime Data
 
-When runtime evaluation data exists, SkillForge can auto-calibrate weights based on which dimensions correlate most with runtime success.
+When runtime evaluation data exists, Schliff can auto-calibrate weights based on which dimensions correlate most with runtime success.
 
-Calibrated weights are stored at `~/.skillforge/meta/calibrated-weights.json`. The loader validates that all values are numeric before applying them. Calibrated weights take second priority — they are used when no custom weights are provided via `--weights`.
+Calibrated weights are stored at `~/.schliff/meta/calibrated-weights.json`. The loader validates that all values are numeric before applying them. Calibrated weights take second priority — they are used when no custom weights are provided via `--weights`.
 
 Priority order:
 1. `--weights` CLI flag (highest)
-2. `~/.skillforge/meta/calibrated-weights.json` (auto-calibrated)
+2. `~/.schliff/meta/calibrated-weights.json` (auto-calibrated)
 3. Built-in defaults (lowest)
 
 ---

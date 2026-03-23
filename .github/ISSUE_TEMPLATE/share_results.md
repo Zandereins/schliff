@@ -1,6 +1,6 @@
 ---
 name: Share Your Results
-about: Show your before/after SkillForge improvement
+about: Show your before/after Schliff improvement
 labels: community
 ---
 
@@ -17,4 +17,4 @@ labels: community
 <!-- Which dimensions improved most? -->
 
 ## Iterations
-<!-- How many iterations did SkillForge run? -->
+<!-- How many iterations did Schliff run? -->

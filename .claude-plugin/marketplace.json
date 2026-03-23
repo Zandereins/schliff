@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "name": "SkillForge",
-  "slug": "skillforge",
+  "name": "Schliff",
+  "slug": "schliff",
   "tagline": "Improve your Claude Code skills automatically — measurable quality, overnight iteration",
   "description": "Takes any Claude Code skill as input and iteratively improves it with measurable metrics across 6 dimensions: structure, trigger accuracy, output quality, edge-case coverage, token efficiency, and composability. The agent-assisted loop makes one atomic change per iteration, keeps improvements, auto-reverts regressions, and logs everything. Based on Karpathy's autoresearch loop pattern. Requires: python3, bash, git.",
   "categories": ["productivity", "developer-tools"],
@@ -9,7 +9,7 @@
     "name": "Zandereins",
     "github": "https://github.com/Zandereins"
   },
-  "repository": "https://github.com/Zandereins/skillforge",
+  "repository": "https://github.com/Zandereins/schliff",
   "license": "MIT",
   "keywords": [
     "autoresearch", "skill-improvement", "autonomous-agent",

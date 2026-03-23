@@ -26,7 +26,7 @@ jobs:
 
       - name: Run integration tests
         id: integration
-        working-directory: skills/skillforge
+        working-directory: skills/schliff
         run: |
           OUTPUT=$(bash scripts/test-integration.sh --no-runtime-auto 2>&1) || true
           echo "$OUTPUT"
@@ -38,12 +38,12 @@ jobs:
           if [ "$FAILED" -gt 0 ]; then exit 1; fi
 
       - name: Run self-tests
-        working-directory: skills/skillforge
+        working-directory: skills/schliff
         run: bash scripts/test-self.sh
 
       - name: Run scorer
         id: scorer
-        working-directory: skills/skillforge
+        working-directory: skills/schliff
         run: |
           RESULT=$(python3 scripts/score-skill.py SKILL.md --json 2>/dev/null)
           COMPOSITE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])")
@@ -52,18 +52,18 @@ jobs:
           python3 -c "import sys; assert float(sys.argv[1]) >= 90, f'Score {sys.argv[1]} below threshold'" "$COMPOSITE"
 
       - name: Run eval suite
-        working-directory: skills/skillforge
+        working-directory: skills/schliff
         run: bash scripts/run-eval.sh SKILL.md eval-suite.json --no-runtime-auto 2>/dev/null
 
       - name: Install pytest
         run: pip install pytest
 
       - name: Run unit tests
-        working-directory: skills/skillforge
+        working-directory: skills/schliff
         run: python3 -m pytest tests/unit/ -v
 
       - name: Run proof test
-        working-directory: skills/skillforge
+        working-directory: skills/schliff
         run: bash tests/proof/test-proof.sh
 
   # Badge generation using dynamic badges
@@ -82,7 +82,7 @@ jobs:
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: 130bb61237b5b9b1536718e6a2296d4a
-          filename: skillforge-tests.json
+          filename: schliff-tests.json
           label: tests
           message: "${{ needs.test.outputs.test_passed }}/${{ needs.test.outputs.test_total }} passed"
           color: ${{ needs.test.outputs.test_passed == needs.test.outputs.test_total && 'brightgreen' || 'red' }}
@@ -92,8 +92,8 @@ jobs:
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: 130bb61237b5b9b1536718e6a2296d4a
-          filename: skillforge-score.json
-          label: SkillForge
+          filename: schliff-score.json
+          label: Schliff
           message: "${{ needs.test.outputs.composite_score }}/100 [S]"
           color: >-
             ${{

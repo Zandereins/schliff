@@ -1,4 +1,4 @@
-# SkillForge Deep Analysis Report
+# Schliff Deep Analysis Report
 
 **Datum:** 19. März 2026
 **Analysemethode:** 4 parallele Subagents (Architektur, Code-Qualität, Metriken, UX/Produkt)
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-SkillForge ist ein ambitioniertes Meta-Skill-Projekt mit einer überzeugenden Vision: Das Autoresearch-Pattern von Karpathy auf die Verbesserung von Claude Code Skills anwenden. Die Architektur ist durchdacht, die Dokumentation professionell und das Plugin-Format korrekt.
+Schliff ist ein ambitioniertes Meta-Skill-Projekt mit einer überzeugenden Vision: Das Autoresearch-Pattern von Karpathy auf die Verbesserung von Claude Code Skills anwenden. Die Architektur ist durchdacht, die Dokumentation professionell und das Plugin-Format korrekt.
 
 **Aber:** Die Analyse durch 4 spezialisierte Subagents deckt fundamentale Schwächen auf, die den Kern-Claim "autonomous improvement" untergraben. Die wichtigsten Erkenntnisse:
 
@@ -144,7 +144,7 @@ words_per_capability = total_words / capabilities
 
 ### Das Autonomie-Paradox
 
-SkillForge verspricht: "Set a goal, start the loop, walk away."
+Schliff verspricht: "Set a goal, start the loop, walk away."
 
 **Realität:**
 - 3 von 6 Dimensionen unmessbar → Loop optimiert nur halbe Wahrheit
@@ -173,7 +173,7 @@ def run_iteration(skill_path, change):
     try:
         apply_change(skill_path, change)
         validate_yaml(skill_path)
-        git_commit(f"skillforge: {change}")
+        git_commit(f"schliff: {change}")
         score = run_eval(skill_path)
         if score <= best_score:
             git_revert(backup)
@@ -186,7 +186,7 @@ def run_iteration(skill_path, change):
 
 ### Fehlende Integration mit skill-creator
 
-**Claim:** "skill-creator builds v1, SkillForge grinds to production."
+**Claim:** "skill-creator builds v1, Schliff grinds to production."
 **Realität:** Kein shared Data-Format, kein Handoff-Protokoll, keine gemeinsamen Eval-Schemata.
 
 **Vorschlag:** `HANDOFF.md` erstellen mit:
@@ -203,10 +203,10 @@ def run_iteration(skill_path, change):
 
 | Command | Zweck | Impact |
 |---------|-------|--------|
-| `/skillforge:init` | Eval-Suite bootstrappen + erster Baseline | **HOCH** — größte Hürde für neue User |
-| `/skillforge:status` | Echtzeit-Fortschritt während Loop | **HOCH** — "Walk away" braucht Sichtbarkeit |
-| `/skillforge:undo N` | Letzte N Iterationen rückgängig | **MITTEL** — Sicherheitsnetz |
-| `/skillforge:compare` | Visual Diff Baseline vs. Current | **MITTEL** — Ergebnis greifbar machen |
+| `/schliff:init` | Eval-Suite bootstrappen + erster Baseline | **HOCH** — größte Hürde für neue User |
+| `/schliff:status` | Echtzeit-Fortschritt während Loop | **HOCH** — "Walk away" braucht Sichtbarkeit |
+| `/schliff:undo N` | Letzte N Iterationen rückgängig | **MITTEL** — Sicherheitsnetz |
+| `/schliff:compare` | Visual Diff Baseline vs. Current | **MITTEL** — Ergebnis greifbar machen |
 
 ### Marketplace-Readiness: ~40%
 
@@ -243,7 +243,7 @@ def run_iteration(skill_path, change):
 
 | # | Verbesserung | Impact | Effort | Details |
 |---|-------------|--------|--------|---------|
-| 6 | **`/skillforge:init` Command** | Hoch | Mittel | Eval-Suite-Generator mit interaktiven Prompts |
+| 6 | **`/schliff:init` Command** | Hoch | Mittel | Eval-Suite-Generator mit interaktiven Prompts |
 | 7 | **Composability statisch implementieren** | Mittel | Mittel | Scope-Boundaries, Dependencies, Global-State checks |
 | 8 | **Atomic Transaction Wrapper** | Hoch | Mittel | try/except um jede Loop-Iteration |
 | 9 | **Tests hinzufügen** | Mittel | Mittel | 5-10 Fixture-Skills + pytest/bats |
@@ -255,7 +255,7 @@ def run_iteration(skill_path, change):
 |---|-------------|--------|--------|---------|
 | 11 | **Reales Before/After-Beispiel** | Hoch | Niedrig | Ein Skill durch 20 Iterationen, Ergebnisse zeigen |
 | 12 | **Progress Dashboard** | Mittel | Mittel | HTML-Viewer für Score-Trends |
-| 13 | **CI/CD-Integration** | Hoch | Mittel | GitHub Action die SkillForge bei Skill-Änderungen ausführt |
+| 13 | **CI/CD-Integration** | Hoch | Mittel | GitHub Action die Schliff bei Skill-Änderungen ausführt |
 | 14 | **Skill-Creator Handoff-Protokoll** | Mittel | Niedrig | HANDOFF.md mit shared Schemas |
 | 15 | **Marketplace-Overhaul** | Mittel | Niedrig | Neue Tagline, Screenshots, Kategorien |
 
@@ -267,7 +267,7 @@ def run_iteration(skill_path, change):
 | 17 | **Community Benchmark Database** | Hoch | Hoch | Anonyme Leaderboard, Vergleich mit anderen |
 | 18 | **Multi-Skill Optimization** | Mittel | Hoch | Suite von Skills gemeinsam optimieren |
 | 19 | **Smart Suggestions Engine** | Mittel | Mittel | "Dein Trigger fehlt deployment-Synonyme" |
-| 20 | **Konfigurierbare Gewichte** | Niedrig | Niedrig | `.claude/skillforge-config.json` |
+| 20 | **Konfigurierbare Gewichte** | Niedrig | Niedrig | `.claude/schliff-config.json` |
 
 ---
 
@@ -287,11 +287,11 @@ Diese Verbesserungen kosten jeweils <30 Minuten und haben sofortigen Impact:
 
 ## Fazit
 
-SkillForge hat das richtige Konzept am richtigen Punkt: Die Idee, Karpathys Autoresearch auf Skill-Improvement anzuwenden, ist brillant. Das Problem ist nicht die Vision — es ist die Execution der Scoring-Engine.
+Schliff hat das richtige Konzept am richtigen Punkt: Die Idee, Karpathys Autoresearch auf Skill-Improvement anzuwenden, ist brillant. Das Problem ist nicht die Vision — es ist die Execution der Scoring-Engine.
 
 **Der kritischste Pfad:**
 Trigger-Scoring fixen → Efficiency-Metrik fixen → Placeholder-Dimensionen implementieren → Dann ist der autonome Loop tatsächlich autonomous.
 
-Ohne diese Fixes optimiert der Loop im Wesentlichen nur Trigger-Descriptions und Header-Anzahl — was ironischerweise genau die Anti-Patterns erzeugt, die SkillForge selbst in `skill-patterns.md` beschreibt ("The Kitchen Sink", "The Chatty Instructor").
+Ohne diese Fixes optimiert der Loop im Wesentlichen nur Trigger-Descriptions und Header-Anzahl — was ironischerweise genau die Anti-Patterns erzeugt, die Schliff selbst in `skill-patterns.md` beschreibt ("The Kitchen Sink", "The Chatty Instructor").
 
 Die gute Nachricht: Die Architektur ist sauber genug, dass alle Fixes inkrementell machbar sind. Kein Rewrite nötig — nur gezielte Verbesserungen an den richtigen Stellen.

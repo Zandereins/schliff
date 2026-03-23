@@ -1,4 +1,4 @@
-# SkillForge — Abschließender Analysebericht nach 2 Verbesserungsrunden
+# Schliff — Abschließender Analysebericht nach 2 Verbesserungsrunden
 
 **Datum:** 19. März 2026
 **Analysephase:** Finale Selbstanalyse nach Round 1 + Round 2 Improvements
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-SkillForge hat sich über zwei Verbesserungszyklen **signifikant weiterentwickelt**, ist aber noch nicht vollständig produktionsreif. Der wichtigste Fortschritt: **Die Scoring-Engine wurde von einer naiven Word-Overlap-Implementierung zu einem TF-IDF-basierten System mit Negationshandling und Stopword-Filterung überarbeitet.** Das System kann jetzt tatsächlich zwischen validen und invaliden Triggers unterscheiden.
+Schliff hat sich über zwei Verbesserungszyklen **signifikant weiterentwickelt**, ist aber noch nicht vollständig produktionsreif. Der wichtigste Fortschritt: **Die Scoring-Engine wurde von einer naiven Word-Overlap-Implementierung zu einem TF-IDF-basierten System mit Negationshandling und Stopword-Filterung überarbeitet.** Das System kann jetzt tatsächlich zwischen validen und invaliden Triggers unterscheiden.
 
 ### Aktuelle Scores (Finale Messung)
 - **Composite Score:** 82.9 / 100
@@ -70,7 +70,7 @@ SkillForge hat sich über zwei Verbesserungszyklen **signifikant weiterentwickel
 **Aktuelles Verhalten:**
 ```
 Test 1: "I want to create a brand new skill from scratch"
-  Expected: False (skill-creator's job, nicht skillforge)
+  Expected: False (skill-creator's job, nicht schliff)
   Result: Predicted False ✓
   Reasoning: 'skill' + 'from scratch' → High signal aber triggert nicht wegen
             no overlap mit "improvement", "iterate", "optimize"
@@ -105,7 +105,7 @@ Alte Metrik: words_per_capability = total_words / num_headers
 - Bonus für explizite Scope-Boundaries, Strafe für Verbosity über 2000 Worte
 
 **Resultat:**
-- SkillForge SKILL.md: 1292 Words, Density 3.17 → Score 83
+- Schliff SKILL.md: 1292 Words, Density 3.17 → Score 83
 - System belohnt jetzt konkrete Inhalte, nicht Padding
 - Bonus (+5): Unter 300 Lines mit gutem Signal
 
@@ -125,7 +125,7 @@ Alte Metrik: words_per_capability = total_words / num_headers
 - **Explicit handoff points** (20): "then use X skill", "suggest using Y"
 - **No hard tool conflicts** (20): Tool-Requirements mit Fallbacks
 
-**SkillForge Score:** 92 / 100
+**Schliff Score:** 92 / 100
 - ✓ Clear scope boundaries (beide positive + negative vorhanden)
 - ✓ No global state assumptions
 - ✓ Clear I/O contracts (takes skill path, produces improvements)
@@ -211,13 +211,13 @@ Alte Metrik: words_per_capability = total_words / num_headers
 
 ### Commands (User Interface)
 
-10. **`commands/skillforge/init.md`**
+10. **`commands/schliff/init.md`**
     - Initialization Protocol
     - Auto-generate Eval Suite
     - Baseline Benchmark
     - Setup Completion Checklist
 
-11. **`commands/skillforge/eval.md`**
+11. **`commands/schliff/eval.md`**
     - Comprehensive Evaluation Interface
     - 6-Dimension + Binary Assertions
     - JSON Output Format
@@ -241,7 +241,7 @@ Alte Metrik: words_per_capability = total_words / num_headers
 
 ### A. Output Quality (Dimension: Quality) = -1
 
-**Problem:** Können nicht automatisch testen, ob SkillForge's *outputs* (die verbesserten Skills) tatsächlich besser sind.
+**Problem:** Können nicht automatisch testen, ob Schliff's *outputs* (die verbesserten Skills) tatsächlich besser sind.
 
 **Warum schwierig:**
 - Quality ist subjektiv: "Ist diese Beschreibung besser triggert?" → Benötigt manuellen A/B-Test
@@ -255,7 +255,7 @@ Alte Metrik: words_per_capability = total_words / num_headers
 
 ### B. Edge Case Coverage (Dimension: Edges) = -1
 
-**Problem:** Können nicht automatisch testen, wie gut SkillForge mit Malformed Input, Missing Context, etc. umgeht.
+**Problem:** Können nicht automatisch testen, wie gut Schliff mit Malformed Input, Missing Context, etc. umgeht.
 
 **Warum schwierig:**
 - Edge Cases sind oft Domain-spezifisch (z.B. "What if SKILL.md is 5000 lines?")
@@ -273,7 +273,7 @@ Alte Metrik: words_per_capability = total_words / num_headers
 
 1. **False Positive:** "I want to create a brand new skill from scratch"
    - Beschreibung enthält "skill" → Matches
-   - Aber: Sollte nicht triggern (skill-creator's job, nicht skillforge)
+   - Aber: Sollte nicht triggern (skill-creator's job, nicht schliff)
    - Fix: Müsste "create from scratch" als Negation erkennen
 
 2. **False Negative:** "This SKILL.md seems off, formatting weird, instructions contradicting"
@@ -363,7 +363,7 @@ Das System ist **funktional und produktionsreif für die Basis-Nutzung**, aber n
 
 ## Fazit
 
-SkillForge hat sich von einem konzeptionell interessanten aber technisch fragilen Projekt zu einem **funktional soliden System** entwickelt. Die kritischen Bugs (JSON-Injection, Bloat-Belohnung, naive Trigger-Scoring) sind gelöst. Die Scoring-Engine ist intelligent und defensiv.
+Schliff hat sich von einem konzeptionell interessanten aber technisch fragilen Projekt zu einem **funktional soliden System** entwickelt. Die kritischen Bugs (JSON-Injection, Bloat-Belohnung, naive Trigger-Scoring) sind gelöst. Die Scoring-Engine ist intelligent und defensiv.
 
 Für ein vollständiges "Autonomes Skill-Improvement-System" benötigen Sie noch:
 1. Runtime Eval Suite für Quality + Edges

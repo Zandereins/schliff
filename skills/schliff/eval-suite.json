@@ -1,0 +1,832 @@
+{
+  "skill_name": "schliff",
+  "version": "5.1.0",
+  "created_by": "schliff",
+  "triggers": [
+    {
+      "id": "pos-1",
+      "prompt": "I have a deploy skill in .claude/skills/deploy/ and it barely ever triggers when I say 'push to staging'. Can you improve it?",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Direct skill improvement request with specific trigger problem"
+    },
+    {
+      "id": "pos-2",
+      "prompt": "grind my code-review skill to production quality, run like 30 iterations overnight",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Casual 'grind' phrasing with iteration count"
+    },
+    {
+      "id": "pos-3",
+      "prompt": "Can you optimize the trigger accuracy of my deploy skill? It's only hitting about 60% right now.",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Explicit metric (trigger accuracy) with current baseline"
+    },
+    {
+      "id": "pos-4",
+      "prompt": "make this skill better — it works but the outputs are way too verbose and it wastes tokens",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Exact trigger phrase from SKILL.md description, token efficiency focus"
+    },
+    {
+      "id": "pos-5",
+      "prompt": "iterate on this skill until the edge coverage is above 90%",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Goal-oriented iteration with explicit metric target"
+    },
+    {
+      "id": "pos-6",
+      "prompt": "benchmark my skill at skills/commit-msg/SKILL.md — I want to see current scores across all dimensions",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Benchmark subcommand request with path"
+    },
+    {
+      "id": "pos-7",
+      "prompt": "audit the skill I just wrote, check for anti-patterns and missing sections",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Audit keyword with structural analysis request"
+    },
+    {
+      "id": "pos-8",
+      "prompt": "harden my testing skill against malformed inputs and weird edge cases",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Harden keyword targeting edge coverage"
+    },
+    {
+      "id": "pos-9",
+      "prompt": "I finished a first draft with skill-creator. Now I want schliff to take over and grind it for a couple hours.",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Explicit handoff from skill-creator to schliff"
+    },
+    {
+      "id": "pos-10",
+      "prompt": "here's my SKILL.md — can you tell me what's wrong with it and how to fix it?\n\n---\nname: my-deploy\ndescription: deploys stuff\n---\n# Deploy\nJust deploy.",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "User pastes SKILL.md content directly for analysis"
+    },
+    {
+      "id": "pos-11",
+      "prompt": "review my skill and show me a report of gaps + suggestions, don't change anything yet",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Analysis-only request, maps to /schliff:analyze"
+    },
+    {
+      "id": "pos-12",
+      "prompt": "run the eval suite for my skill and show me which tests fail",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Maps to /schliff:eval subcommand"
+    },
+    {
+      "id": "pos-13",
+      "prompt": "my skill at .claude/skills/lint/SKILL.md has conflicting instructions — the description says one thing but the examples do another. fix it.",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Consistency/quality problem in existing skill"
+    },
+    {
+      "id": "pos-14",
+      "prompt": "improv my skill pls, its not working good for edge cases",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Typos and casual language — should still trigger"
+    },
+    {
+      "id": "pos-15",
+      "prompt": "I want to improve the composability of my database skill — it conflicts with the migration skill when both are active",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Composability dimension with cross-skill conflict"
+    },
+    {
+      "id": "pos-16",
+      "prompt": "The skill I made yesterday scores 45/100. I need it at 80+ before shipping. Run autonomous improvement.",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Numeric goal with autonomous loop request"
+    },
+    {
+      "id": "pos-17",
+      "prompt": "generate a schliff report for the last improvement session on my deploy skill",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Maps to /schliff:report subcommand"
+    },
+    {
+      "id": "neg-1",
+      "prompt": "I want to create a brand new skill from scratch that helps me write commit messages. I have some ideas but no code yet.",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Creating new skills = skill-creator's job, not schliff"
+    },
+    {
+      "id": "neg-2",
+      "prompt": "Can you review this Python function and suggest performance improvements? It's in src/utils/parser.py",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Code review, not skill improvement — similar vocabulary but wrong domain"
+    },
+    {
+      "id": "neg-3",
+      "prompt": "Help me set up pre-commit hooks for my repository with eslint and prettier",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Developer tooling setup, not skill improvement"
+    },
+    {
+      "id": "neg-4",
+      "prompt": "Write unit tests for my authentication module in tests/auth.test.ts",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Writing application tests, not skill eval tests"
+    },
+    {
+      "id": "neg-5",
+      "prompt": "Debug why my API endpoint returns 500 when I send a POST request with an empty body",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Application debugging, not skill debugging"
+    },
+    {
+      "id": "neg-6",
+      "prompt": "deploy my app to vercel and set up the environment variables",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Deployment task, not skill improvement — 'deploy' is a red herring"
+    },
+    {
+      "id": "neg-7",
+      "prompt": "refactor this class to use dependency injection instead of singletons",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Code refactoring, not skill refactoring"
+    },
+    {
+      "id": "neg-8",
+      "prompt": "I need a new Claude skill that handles database migrations. Design the SKILL.md for me.",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Designing a new skill from scratch — skill-creator territory"
+    },
+    {
+      "id": "neg-9",
+      "prompt": "optimize my Dockerfile to reduce image size, it's currently 2.3GB",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "'Optimize' keyword but targets infrastructure, not a skill"
+    },
+    {
+      "id": "neg-10",
+      "prompt": "improve the performance of my SQL query, it's taking 12 seconds on the users table",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "'Improve' keyword but targets SQL performance, not a skill"
+    },
+    {
+      "id": "neg-11",
+      "prompt": "benchmark my REST API with wrk and show me the throughput numbers",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "'Benchmark' keyword but targets an API, not a skill"
+    },
+    {
+      "id": "neg-12",
+      "prompt": "Can you help me write a README for my open source project?",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Documentation writing, nothing to do with skills"
+    },
+    {
+      "id": "edge-1",
+      "prompt": "This SKILL.md seems off, the formatting is weird and I think some of the instructions are contradicting each other",
+      "should_trigger": true,
+      "category": "edge",
+      "notes": "References SKILL.md + describes quality issues — should analyze"
+    },
+    {
+      "id": "edge-2",
+      "prompt": "I want to benchmark how well my deploy script performs compared to the old version",
+      "should_trigger": false,
+      "category": "edge",
+      "notes": "Benchmarking a script (not a skill) — keyword overlap"
+    },
+    {
+      "id": "edge-3",
+      "prompt": "can you make my workflow better? I have a skill but also some bash scripts that are slow",
+      "should_trigger": true,
+      "category": "edge",
+      "notes": "Ambiguous — mentions skill AND scripts, but skill improvement is primary"
+    },
+    {
+      "id": "edge-4",
+      "prompt": "audit this code for security vulnerabilities and check if there are any injection risks",
+      "should_trigger": false,
+      "category": "edge",
+      "notes": "'Audit' keyword but targets code security, not skill quality"
+    },
+    {
+      "id": "edge-5",
+      "prompt": "I pasted my skill description into a markdown file, can you improve the writing quality?",
+      "should_trigger": true,
+      "category": "edge",
+      "notes": "Improving skill description content — borderline with copyediting but skill-relevant"
+    },
+    {
+      "id": "edge-6",
+      "prompt": "iterate on my prompt template until it generates better summaries",
+      "should_trigger": false,
+      "category": "edge",
+      "notes": "'Iterate' + 'prompt template' — prompt engineering, not Claude skill improvement"
+    },
+    {
+      "id": "edge-7",
+      "prompt": "my skill needs work but I'm not sure what exactly is wrong. just look at it.",
+      "should_trigger": true,
+      "category": "edge",
+      "notes": "Vague request referencing a skill — should trigger analysis mode"
+    },
+    {
+      "id": "pos-18",
+      "prompt": "Verbessere meinen Deploy-Skill, die Trigger-Genauigkeit liegt bei 50%",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Non-English (German) improvement request"
+    },
+    {
+      "id": "pos-19",
+      "prompt": "My deploy skill has a SKILL.md plus 10 reference files in references/. The main file is fine but the references are outdated. Can you improve the whole skill?",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "Multi-file skill improvement request"
+    },
+    {
+      "id": "neg-13",
+      "prompt": "Compare the performance of my Python web scraper on v1 vs v2 of the target site",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "Performance comparison of application code, not skill improvement"
+    },
+    {
+      "id": "edge-8",
+      "prompt": "/schliff",
+      "should_trigger": true,
+      "category": "edge",
+      "notes": "Bare slash command with zero context — should trigger and prompt for target"
+    },
+    {
+      "id": "edge-9",
+      "prompt": "My eval suite is showing 12 out of 20 tests failing and the trigger pass rate dropped after I edited the description yesterday. What happened?",
+      "should_trigger": true,
+      "category": "edge",
+      "notes": "Eval-suite + trigger-pass-rate context implies Schliff analysis"
+    },
+    {
+      "id": "pos-mesh",
+      "prompt": "check if my skills are conflicting with each other",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "mesh/conflict detection request"
+    },
+    {
+      "id": "pos-triage",
+      "prompt": "cluster my logged failures and generate fixes for the top issues",
+      "should_trigger": true,
+      "category": "positive",
+      "notes": "failure triage request"
+    },
+    {
+      "id": "neg-mesh-false",
+      "prompt": "optimize my database queries for better performance",
+      "should_trigger": false,
+      "category": "negative",
+      "notes": "performance optimization, not skill mesh analysis"
+    }
+  ],
+  "test_cases": [
+    {
+      "id": "tc-1",
+      "prompt": "Analyze my skill at .claude/skills/deploy/SKILL.md and tell me what's wrong with it",
+      "input_files": [],
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "structure",
+          "description": "Report includes structure dimension"
+        },
+        {
+          "type": "contains",
+          "value": "trigger",
+          "description": "Report includes trigger analysis"
+        },
+        {
+          "type": "contains",
+          "value": "score-skill.py",
+          "description": "SKILL.md references the scoring script"
+        },
+        {
+          "type": "excludes",
+          "value": "TODO",
+          "description": "No placeholder text in output"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I cannot",
+          "description": "Runtime: does not refuse the task"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I don't know",
+          "description": "Runtime: does not claim ignorance"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm sorry",
+          "description": "Runtime: does not apologize instead of acting"
+        },
+        {
+          "type": "response_excludes",
+          "value": "not possible",
+          "description": "Runtime: does not claim impossibility"
+        },
+        {
+          "type": "response_excludes",
+          "value": "outside my",
+          "description": "Runtime: does not claim out of scope"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm unable",
+          "description": "Runtime: does not claim inability"
+        },
+        {
+          "type": "response_excludes",
+          "value": "Traceback",
+          "description": "Runtime: no Python stack trace in output"
+        }
+      ]
+    },
+    {
+      "id": "tc-2",
+      "prompt": "Run one improvement iteration on my skill — focus on trigger accuracy",
+      "input_files": [],
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "description",
+          "description": "Mentions modifying the description"
+        },
+        {
+          "type": "contains",
+          "value": "commit",
+          "description": "Makes a git commit"
+        },
+        {
+          "type": "pattern",
+          "value": "(keep|discard|revert)",
+          "description": "Makes a keep/discard/revert decision"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I cannot",
+          "description": "Runtime: does not refuse the task"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I don't know",
+          "description": "Runtime: does not claim ignorance"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm sorry",
+          "description": "Runtime: does not apologize instead of acting"
+        },
+        {
+          "type": "response_excludes",
+          "value": "not possible",
+          "description": "Runtime: does not claim impossibility"
+        },
+        {
+          "type": "response_excludes",
+          "value": "outside my",
+          "description": "Runtime: does not claim out of scope"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm unable",
+          "description": "Runtime: does not claim inability"
+        },
+        {
+          "type": "response_excludes",
+          "value": "Traceback",
+          "description": "Runtime: no Python stack trace in output"
+        }
+      ]
+    },
+    {
+      "id": "tc-3",
+      "prompt": "Benchmark my skill at skills/testing/SKILL.md and show me scores for all six dimensions",
+      "input_files": [],
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "structure",
+          "description": "Reports structure score"
+        },
+        {
+          "type": "contains",
+          "value": "trigger",
+          "description": "Reports trigger accuracy score"
+        },
+        {
+          "type": "contains",
+          "value": "token",
+          "description": "Reports token efficiency"
+        },
+        {
+          "type": "pattern",
+          "value": "\\d+",
+          "description": "Contains numeric scores"
+        },
+        {
+          "type": "contains",
+          "value": "composability",
+          "description": "SKILL.md covers composability dimension"
+        },
+        {
+          "type": "response_excludes",
+          "value": "error",
+          "description": "Runtime: no error messages in output"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I cannot",
+          "description": "Runtime: does not refuse the task"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I don't know",
+          "description": "Runtime: does not claim ignorance"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm sorry",
+          "description": "Runtime: does not apologize instead of acting"
+        },
+        {
+          "type": "response_excludes",
+          "value": "not possible",
+          "description": "Runtime: does not claim impossibility"
+        },
+        {
+          "type": "response_excludes",
+          "value": "outside my",
+          "description": "Runtime: does not claim out of scope"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm unable",
+          "description": "Runtime: does not claim inability"
+        }
+      ]
+    },
+    {
+      "id": "tc-4",
+      "prompt": "Run the eval suite for my deploy skill and tell me which tests pass and which fail",
+      "input_files": [],
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "run-eval.sh",
+          "description": "SKILL.md references the eval runner"
+        },
+        {
+          "type": "contains",
+          "value": "assertion",
+          "description": "SKILL.md mentions assertions"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I cannot",
+          "description": "Runtime: does not refuse the task"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I don't know",
+          "description": "Runtime: does not claim ignorance"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm sorry",
+          "description": "Runtime: does not apologize instead of acting"
+        },
+        {
+          "type": "response_excludes",
+          "value": "not possible",
+          "description": "Runtime: does not claim impossibility"
+        },
+        {
+          "type": "response_excludes",
+          "value": "outside my",
+          "description": "Runtime: does not claim out of scope"
+        },
+        {
+          "type": "response_excludes",
+          "value": "I'm unable",
+          "description": "Runtime: does not claim inability"
+        },
+        {
+          "type": "response_excludes",
+          "value": "Traceback",
+          "description": "Runtime: no Python stack trace in output"
+        }
+      ]
+    },
+    {
+      "id": "tc-5",
+      "prompt": "Generate an improvement report for the last 10 experiments on my skill",
+      "input_files": [],
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "exp[- ]?\\d+",
+          "description": "References experiment numbers"
+        },
+        {
+          "type": "pattern",
+          "value": "(kept|discarded|reverted)",
+          "description": "Shows experiment outcomes"
+        },
+        {
+          "type": "contains",
+          "value": "baseline",
+          "description": "References the baseline measurement"
+        },
+        {
+          "type": "pattern",
+          "value": "\\d+%|\\d+/\\d+",
+          "description": "Includes metric values"
+        }
+      ]
+    },
+    {
+      "id": "tc-6",
+      "prompt": "Set up schliff on my skill: goal is 90% eval pass rate, verify with bash scripts/run-eval.sh, run 20 iterations",
+      "input_files": [],
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "baseline",
+          "description": "Establishes baseline before iterating"
+        },
+        {
+          "type": "pattern",
+          "value": "exp[- ]?0|#0",
+          "description": "Records experiment zero"
+        },
+        {
+          "type": "pattern",
+          "value": "90%|90 ?%",
+          "description": "Acknowledges the 90% target"
+        },
+        {
+          "type": "contains",
+          "value": "iteration",
+          "description": "Mentions iterations"
+        }
+      ]
+    },
+    {
+      "id": "tc-7",
+      "prompt": "My skill has a SKILL.md with no frontmatter, no examples, and no trigger phrases. Analyze it and tell me what to fix first.",
+      "input_files": [],
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)frontmatter",
+          "description": "Flags missing frontmatter"
+        },
+        {
+          "type": "pattern",
+          "value": "(?i)(example|trigger)",
+          "description": "Flags missing examples or triggers"
+        },
+        {
+          "type": "pattern",
+          "value": "(?i)(priority|first|critical|start)",
+          "description": "Provides prioritized recommendations"
+        }
+      ]
+    }
+  ],
+  "edge_cases": [
+    {
+      "id": "ec-1",
+      "prompt": "Improve my skill",
+      "category": "minimal_input",
+      "expected_behavior": "Ask for the skill path before proceeding",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "\\?|path|which|where",
+          "description": "Asks for clarification about which skill"
+        }
+      ]
+    },
+    {
+      "id": "ec-2",
+      "prompt": "Analyze the skill at /nonexistent/path/SKILL.md",
+      "category": "invalid_path",
+      "expected_behavior": "Report that the file was not found gracefully",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(not found|doesn't exist|cannot find|no such)",
+          "description": "Reports missing file gracefully"
+        }
+      ]
+    },
+    {
+      "id": "ec-3",
+      "prompt": "Run 1000 iterations on my skill overnight",
+      "category": "scale_extreme",
+      "expected_behavior": "Proceed but mention diminishing returns or plateau detection",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(plateau|diminish|stuck|interrupt|stop)",
+          "description": "Mentions stopping conditions"
+        }
+      ]
+    },
+    {
+      "id": "ec-4",
+      "prompt": "Improve my skill at .claude/skills/broken/SKILL.md",
+      "category": "malformed_skill",
+      "input_context": "SKILL.md contains: '---\\nname:\\n---\\n# \\n\\n'",
+      "expected_behavior": "Detect malformed/empty SKILL.md fields and report issues before iterating",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(empty|missing|incomplete|malformed|invalid)",
+          "description": "Detects the malformed content"
+        },
+        {
+          "type": "pattern",
+          "value": "(?i)(name|description|frontmatter)",
+          "description": "Points out specific missing fields"
+        }
+      ]
+    },
+    {
+      "id": "ec-5",
+      "prompt": "Analyze my skill at .claude/skills/données/COMPÉTENCE.md",
+      "category": "unicode_path",
+      "expected_behavior": "Handle Unicode characters in file path without crashing",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(read|found|analyz|not found|error)",
+          "description": "Attempts to read the file rather than crashing on Unicode path"
+        }
+      ]
+    },
+    {
+      "id": "ec-6",
+      "prompt": "Run schliff on my skill but the scripts/ directory is missing — there's no analyze-skill.sh or score-skill.py",
+      "category": "missing_scripts",
+      "expected_behavior": "Detect missing scripts and either generate them or provide manual fallback",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(missing|not found|unavailable|create|generate|fallback)",
+          "description": "Acknowledges missing scripts"
+        },
+        {
+          "type": "excludes",
+          "value": "Traceback",
+          "description": "No Python stack trace in output"
+        }
+      ]
+    },
+    {
+      "id": "ec-7",
+      "prompt": "Improve my skill — goal: make it trigger 100% of the time AND reduce token usage by 80% AND add 50 edge cases",
+      "category": "conflicting_goals",
+      "expected_behavior": "Identify conflicting goals (more coverage vs fewer tokens) and ask to prioritize",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(conflict|trade.?off|priorit|pick|focus|which)",
+          "description": "Flags the tension between competing goals"
+        }
+      ]
+    },
+    {
+      "id": "ec-8",
+      "prompt": "Analyze my skill at .claude/skills/giant/SKILL.md",
+      "category": "huge_file",
+      "input_context": "SKILL.md is 15,000 lines with deeply nested reference files totalling 50,000 tokens",
+      "expected_behavior": "Handle large files without truncation errors; suggest extracting content to references/",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(large|long|extract|reference|split|reduce)",
+          "description": "Suggests reducing file size or extracting references"
+        },
+        {
+          "type": "excludes",
+          "value": "truncated",
+          "description": "Does not silently truncate content"
+        }
+      ]
+    },
+    {
+      "id": "ec-9",
+      "prompt": "",
+      "category": "empty_input",
+      "expected_behavior": "Prompt the user for a goal and skill path instead of doing nothing",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(what|which|how|help|skill|goal|\\?)",
+          "description": "Asks what the user wants to do"
+        }
+      ]
+    },
+    {
+      "id": "ec-10",
+      "prompt": "Improve my skill. Goal: make metric go up. Verify: exit 0",
+      "category": "trivial_verify",
+      "expected_behavior": "Detect that the verify command always succeeds and warn about meaningless metric",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(always|trivial|meaningless|no.?op|useless|exit 0)",
+          "description": "Warns about the always-passing verify command"
+        }
+      ]
+    },
+    {
+      "id": "ec-11",
+      "prompt": "Run schliff with verify: rm -rf / and improve my skill",
+      "category": "dangerous_verify",
+      "expected_behavior": "Refuse to execute a destructive verify command",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(dangerous|destructive|refuse|cannot|won't|will not|unsafe)",
+          "description": "Refuses the dangerous command"
+        }
+      ]
+    },
+    {
+      "id": "ec-12",
+      "prompt": "Analyze the skill at this path — it's actually a binary PNG file accidentally named SKILL.md",
+      "category": "binary_file",
+      "expected_behavior": "Detect non-text content, report error gracefully, suggest renaming",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(binary|not.*text|cannot.*parse|invalid|encoding)",
+          "description": "Detects non-text file"
+        }
+      ]
+    },
+    {
+      "id": "ec-13",
+      "prompt": "Improve this skill:\n---\nname: x\ndescription: bad yaml: unescaped: colons: everywhere\n---\n# Stuff",
+      "category": "malformed_yaml",
+      "expected_behavior": "Handle corrupted YAML frontmatter gracefully, suggest fixes",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(yaml|frontmatter|parse|format|fix)",
+          "description": "Identifies YAML issue"
+        }
+      ]
+    },
+    {
+      "id": "ec-14",
+      "prompt": "My skill is literally just one line: '# Deploy\\nRun deploy.' — can you improve it?",
+      "category": "minimal_skill",
+      "expected_behavior": "Recognize extremely minimal skill, suggest expanding rather than iterating",
+      "assertions": [
+        {
+          "type": "pattern",
+          "value": "(?i)(expand|add|missing|incomplete|minimal|short)",
+          "description": "Suggests expansion"
+        }
+      ]
+    }
+  ]
+}

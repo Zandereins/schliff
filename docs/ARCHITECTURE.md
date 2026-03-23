@@ -1,4 +1,4 @@
-# SkillForge Architecture
+# Schliff Architecture
 
 System design, file tree, data flow, and implementation details.
 
@@ -7,7 +7,7 @@ System design, file tree, data flow, and implementation details.
 ## File Tree
 
 ```
-skills/skillforge/
+skills/schliff/
 ├── SKILL.md                    # Skill definition (what Claude reads)
 ├── eval-suite.json             # 25+ triggers, assertions, edge cases
 ├── scripts/
@@ -54,7 +54,7 @@ Features:
 - TF-IDF-inspired trigger scoring with domain signal detection
 - File cache with size limits (`MAX_CACHE_ENTRIES = 500`, `MAX_SKILL_SIZE = 1 MB`)
 - Public cache API (`invalidate_cache()`) for external callers
-- Auto-calibrated weights from `~/.skillforge/meta/calibrated-weights.json`
+- Auto-calibrated weights from `~/.schliff/meta/calibrated-weights.json`
 - Custom weight override via `--weights`
 
 ### auto-improve.py — The Loop
@@ -117,7 +117,7 @@ Binary assertion runner. Executes eval suite test cases and edge cases, checking
 
 ### runtime-evaluator.py — Live Testing
 
-Invokes Claude CLI with test prompts and checks responses against `response_*` assertions. Used by the `--runtime` flag and `/skillforge:eval`.
+Invokes Claude CLI with test prompts and checks responses against `response_*` assertions. Used by the `--runtime` flag and `/schliff:eval`.
 
 ---
 
@@ -181,12 +181,12 @@ Cross-session learning:
 
 ## Hook System: session-injector.js
 
-The session injector is a Claude Code hook that runs at session start (`type: "init"`). It reads from `<cwd>/.skillforge/failures.jsonl` and injects a failure summary as `additionalContext` when 3 or more untriaged failures exist.
+The session injector is a Claude Code hook that runs at session start (`type: "init"`). It reads from `<cwd>/.schliff/failures.jsonl` and injects a failure summary as `additionalContext` when 3 or more untriaged failures exist.
 
 Behavior:
 1. Reads stdin JSON: `{"session_id": "...", "cwd": "...", "type": "init"}`
 2. Resolves `cwd` to an absolute path, validates it is an existing directory
-3. Reads `<cwd>/.skillforge/failures.jsonl` (JSONL format, max 1 MB)
+3. Reads `<cwd>/.schliff/failures.jsonl` (JSONL format, max 1 MB)
 4. Filters for untriaged entries (entries without `injected: true`)
 5. If >= 3 untriaged failures: clusters by `skill:failure_type`, builds summary, outputs `{"additionalContext": "..."}`
 6. Marks processed entries as `injected: true` using atomic write (tmp + rename)
@@ -204,7 +204,7 @@ Security measures:
 
 ### Atomic Writes
 
-All file writes across SkillForge use the `.tmp` + `rename()` pattern. Content is written to a temporary file first, then atomically renamed to the target path. This prevents skill file corruption if the process crashes mid-write.
+All file writes across Schliff use the `.tmp` + `rename()` pattern. Content is written to a temporary file first, then atomically renamed to the target path. This prevents skill file corruption if the process crashes mid-write.
 
 This applies to:
 - SKILL.md patches during auto-improve
