@@ -55,6 +55,13 @@ jobs:
         working-directory: skills/skillforge
         run: bash scripts/run-eval.sh SKILL.md eval-suite.json --no-runtime-auto 2>/dev/null
 
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run unit tests
+        working-directory: skills/skillforge
+        run: python3 -m pytest tests/unit/ -v
+
       - name: Run proof test
         working-directory: skills/skillforge
         run: bash tests/proof/test-proof.sh
