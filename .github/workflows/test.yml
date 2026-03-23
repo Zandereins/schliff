@@ -93,8 +93,8 @@ jobs:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: 130bb61237b5b9b1536718e6a2296d4a
           filename: skillforge-score.json
-          label: composite score
-          message: "${{ needs.test.outputs.composite_score }}"
+          label: SkillForge
+          message: "${{ needs.test.outputs.composite_score }}/100 [S]"
           color: >-
             ${{
               needs.test.outputs.composite_score >= 95 && 'brightgreen' ||
