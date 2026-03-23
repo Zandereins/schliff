@@ -248,18 +248,18 @@ if jq -e '.test_cases' "$EVAL_SUITE" > /dev/null 2>&1; then
                 pattern)
                     # Validate regex complexity before execution (ReDoS prevention)
                     if ! python3 -c "
-import sys; sys.path.insert(0,'$(dirname "$0")')
+import sys; sys.path.insert(0,'$SCRIPT_DIR')
 from shared import validate_regex_complexity
 ok, reason = validate_regex_complexity(sys.argv[1])
 if not ok: sys.exit(1)
 " "$assertion_value" 2>/dev/null; then
                         echo "  Warning: skipping unsafe regex in $tc_id" >&2
-                        _ASSERTION_RESULT="false"
-                        _ASSERTION_ERROR="regex complexity rejected"
-                    fi
-                    # Timeout guard against ReDoS from eval-suite patterns
-                    if echo "$SKILL_CONTENT" | $_GREP_TIMEOUT grep -qiE -- "$assertion_value" 2>/dev/null; then
-                        assertion_passed="true"
+                        assertion_passed="false"
+                    else
+                        # Regex passed complexity check — execute with timeout guard
+                        if echo "$SKILL_CONTENT" | $_GREP_TIMEOUT grep -qiE -- "$assertion_value" 2>/dev/null; then
+                            assertion_passed="true"
+                        fi
                     fi
                     ;;
                 *)
