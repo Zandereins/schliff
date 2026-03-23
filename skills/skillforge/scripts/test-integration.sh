@@ -573,59 +573,56 @@ section "10. _extract_description() (score-skill.py)"
 
 EXTRACT_TESTS=$(PYTHONPATH="$SCRIPT_DIR:${PYTHONPATH:-}" python3 -c "
 import sys
-from importlib.util import spec_from_file_location, module_from_spec
-spec = spec_from_file_location('score_skill', sys.argv[1])
-mod = module_from_spec(spec)
-spec.loader.exec_module(mod)
+from shared import extract_description
 
 passed = 0
 failed = 0
 errors = []
 
 # Test 1: inline description
-r = mod._extract_description('---\nname: test\ndescription: inline text here\n---\n')
+r = extract_description('---\nname: test\ndescription: inline text here\n---\n')
 if r == 'inline text here':
     passed += 1
 else:
     failed += 1; errors.append(f'inline: {repr(r)}')
 
 # Test 2: block scalar >
-r = mod._extract_description('---\nname: test\ndescription: >\n  block text\n  continues\n---\n')
+r = extract_description('---\nname: test\ndescription: >\n  block text\n  continues\n---\n')
 if 'block text' in r:
     passed += 1
 else:
     failed += 1; errors.append(f'block >: {repr(r)}')
 
 # Test 3: block scalar |
-r = mod._extract_description('---\nname: test\ndescription: |\n  literal text\n  here\n---\n')
+r = extract_description('---\nname: test\ndescription: |\n  literal text\n  here\n---\n')
 if 'literal text' in r:
     passed += 1
 else:
     failed += 1; errors.append(f'block |: {repr(r)}')
 
 # Test 4: empty description
-r = mod._extract_description('---\nname: test\n---\n')
+r = extract_description('---\nname: test\n---\n')
 if r == '':
     passed += 1
 else:
     failed += 1; errors.append(f'empty: {repr(r)}')
 
 # Test 5: missing description field
-r = mod._extract_description('---\nname: test\nversion: 1\n---\n')
+r = extract_description('---\nname: test\nversion: 1\n---\n')
 if r == '':
     passed += 1
 else:
     failed += 1; errors.append(f'missing: {repr(r)}')
 
 # Test 6: >- variant
-r = mod._extract_description('---\nname: test\ndescription: >-\n  folded strip\n  text\n---\n')
+r = extract_description('---\nname: test\ndescription: >-\n  folded strip\n  text\n---\n')
 if 'folded strip' in r:
     passed += 1
 else:
     failed += 1; errors.append(f'>-: {repr(r)}')
 
 # Test 7: quoted description
-r = mod._extract_description('---\nname: test\ndescription: \"quoted text\"\n---\n')
+r = extract_description('---\nname: test\ndescription: \"quoted text\"\n---\n')
 if r == 'quoted text':
     passed += 1
 else:
@@ -635,7 +632,7 @@ print(f'{passed},{failed}')
 if errors:
     for e in errors:
         print(f'  ERR: {e}', file=sys.stderr)
-" "$SCRIPT_DIR/score-skill.py" 2>&1)
+" 2>&1)
 EXTRACT_PASSED=$(echo "$EXTRACT_TESTS" | head -1 | cut -d, -f1)
 EXTRACT_FAILED=$(echo "$EXTRACT_TESTS" | head -1 | cut -d, -f2)
 if [[ "$EXTRACT_FAILED" == "0" ]]; then
@@ -1509,7 +1506,7 @@ failed = 0
 errors = []
 
 # Grade thresholds
-for score, expected in [(100,'S'),(95,'S'),(94.9,'A'),(85,'A'),(84,'B'),(75,'B'),(74,'C'),(65,'C'),(64,'D'),(50,'D'),(49,'F'),(0,'F')]:
+for score, expected in [(100,'S'),(95,'S'),(94.9,'A'),(85,'A'),(84,'B'),(75,'B'),(74,'C'),(65,'C'),(64,'D'),(50,'D'),(49,'D'),(35,'E'),(34,'F'),(0,'F')]:
     g = score_to_grade(score)
     if g == expected:
         passed += 1

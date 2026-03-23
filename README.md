@@ -270,10 +270,10 @@ Both run overnight. Both stop when ROI plateaus. Both improve unattended.
 Score your skill and add this badge to your README:
 
 ```markdown
-[![SkillForge: 99.9 [S]](https://img.shields.io/badge/SkillForge-99.9%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
+[![SkillForge: 97.2 [S]](https://img.shields.io/badge/SkillForge-97.2%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
 ```
 
-[![SkillForge: 99.9 [S]](https://img.shields.io/badge/SkillForge-99.9%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
+[![SkillForge: 97.2 [S]](https://img.shields.io/badge/SkillForge-97.2%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
 
 ---
 
