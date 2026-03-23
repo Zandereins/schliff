@@ -1,9 +1,9 @@
-# SkillForge
+# Schliff
 
-The autoresearch pattern for Claude Code skills — score, patch, ship.
+The finishing cut for Claude Code skills.
 
 <p align="center">
-  <img src="demo/skillforge-demo.gif" alt="SkillForge improving a skill from 56.9 to 99.9" width="720">
+  <img src="demo/schliff-demo.gif" alt="Schliff improving a skill from 56.9 to 99.9" width="720">
 </p>
 
 ```
@@ -17,51 +17,51 @@ What changed:
   Composability     40 → 100     Added scope boundaries + handoff declarations
 ```
 
-> You wrote a skill. It worked. Three weeks later, triggers misfire, edge cases slip through, instructions contradict themselves. SkillForge fixes all of it autonomously — deterministic patches, mechanical scoring, zero hallucinations.
+> You wrote a skill. It worked. Three weeks later, triggers misfire, edge cases slip through, instructions contradict themselves. Schliff fixes all of it autonomously — deterministic patches, mechanical scoring, zero hallucinations.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/skillforge-tests.json)](skills/skillforge/scripts/test-integration.sh)
-[![Structural Score](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/skillforge-score.json)](skills/skillforge/scripts/score-skill.py)
-[![v5.3.0](https://img.shields.io/badge/Version-5.3.0-F59E0B)](CHANGELOG.md)
+[![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json)](skills/schliff/scripts/test-integration.sh)
+[![Structural Score](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json)](skills/schliff/scripts/score-skill.py)
+[![v6.0.0](https://img.shields.io/badge/Version-6.0.0-F59E0B)](CHANGELOG.md)
 [![Claude Code Skill](https://img.shields.io/badge/Claude_Code-Skill-8A2BE2)](https://docs.anthropic.com/en/docs/claude-code/skills)
 
 ---
 
 ## Try It
 
-> **Note:** SkillForge commands (`/skillforge:*`) run inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code), not in a regular terminal.
+> **Note:** Schliff commands (`/schliff:*`) run inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code), not in a regular terminal.
 
 ```bash
 # 1. Install (in your regular terminal)
-git clone https://github.com/Zandereins/skillforge.git && bash skillforge/install.sh
+git clone https://github.com/Zandereins/schliff.git && bash schliff/install.sh
 
 # 2. Score the included demo skill (in Claude Code)
-/skillforge:init demo/bad-skill/SKILL.md
+/schliff:init demo/bad-skill/SKILL.md
 
 # 3. Watch it improve autonomously (in Claude Code)
-/skillforge:auto
+/schliff:auto
 ```
 
-**What you'll see:** The score climbs from 56 [D] through [C], [B], [A] to [S] as SkillForge applies patches, checks each delta, and reverts anything that regresses. When ROI drops below threshold, it stops.
+**What you'll see:** The score climbs from 56 [D] through [C], [B], [A] to [S] as Schliff applies patches, checks each delta, and reverts anything that regresses. When ROI drops below threshold, it stops.
 
 **Prerequisites:** Python 3.9+, Bash, Git, jq — the installer checks all of these.
 
-Already have skills? Run `/skillforge:doctor` to see health grades for all your installed skills at once.
+Already have skills? Run `/schliff:doctor` to see health grades for all your installed skills at once.
 
 **Add this badge to your README after scoring:**
 
 ```markdown
-[![SkillForge: 97 [S]](https://img.shields.io/badge/SkillForge-97%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/skillforge)
+[![Schliff: 97 [S]](https://img.shields.io/badge/Schliff-97%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
 ```
 
 ---
 
 ## This Is For You If
 
-- **Skill Creator** — Run `/skillforge:init` on your v1 skill to get a baseline + eval suite
-- **Skill Maintainer** — Run `/skillforge:auto` to grind any skill from [C] to [S] overnight
-- **Fleet Manager (10+ skills)** — Run `/skillforge:doctor` to scan everything, detect conflicts
-- **Quality Gate** — Run `/skillforge:eval` before shipping to validate assertions pass
+- **Skill Creator** — Run `/schliff:init` on your v1 skill to get a baseline + eval suite
+- **Skill Maintainer** — Run `/schliff:auto` to grind any skill from [C] to [S] overnight
+- **Fleet Manager (10+ skills)** — Run `/schliff:doctor` to scan everything, detect conflicts
+- **Quality Gate** — Run `/schliff:eval` before shipping to validate assertions pass
 
 ---
 
@@ -81,9 +81,9 @@ Already have skills? Run `/skillforge:doctor` to see health grades for all your 
 
 ## Autoresearch for Claude Code
 
-Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) (50K+ stars) — SkillForge applies the same autonomous improvement loop to Claude Code skills:
+Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) (50K+ stars) — Schliff applies the same autonomous improvement loop to Claude Code skills:
 
-| | Karpathy's autoresearch | SkillForge |
+| | Karpathy's autoresearch | Schliff |
 |---|---|---|
 | **Target** | ML training scripts | Claude Code SKILL.md files |
 | **Metric** | 1 (val_bpb) | 7 dimensions |
@@ -101,23 +101,23 @@ Both run overnight. Both stop when ROI plateaus. Both improve unattended.
 
 | Command | What It Does |
 |---------|--------------|
-| `/skillforge` | Full autonomous loop with GOAL + METRIC |
-| `/skillforge:doctor` | Scan ALL installed skills, show health summary |
-| `/skillforge:auto` | Self-driving auto-improve (deterministic patches, no prompts) |
-| `/skillforge:init` | Bootstrap eval suite + baseline from any SKILL.md |
-| `/skillforge:report` | Generate shareable markdown report with badge |
+| `/schliff` | Full autonomous loop with GOAL + METRIC |
+| `/schliff:doctor` | Scan ALL installed skills, show health summary |
+| `/schliff:auto` | Self-driving auto-improve (deterministic patches, no prompts) |
+| `/schliff:init` | Bootstrap eval suite + baseline from any SKILL.md |
+| `/schliff:report` | Generate shareable markdown report with badge |
 
 ### Analyze & Debug
 
 | Command | What It Does |
 |---------|--------------|
-| `/skillforge:analyze` | One-shot gap analysis with ranked recommendations |
-| `/skillforge:bench` | Establish quality baseline for a skill |
-| `/skillforge:eval` | Run eval suite assertions |
-| `/skillforge:mesh` | Detect trigger conflicts across all installed skills |
-| `/skillforge:triage` | Cluster failures, auto-generate fixes |
-| `/skillforge:log-failure` | Log a skill failure for later triage |
-| `/skillforge:update` | Update SkillForge to latest version |
+| `/schliff:analyze` | One-shot gap analysis with ranked recommendations |
+| `/schliff:bench` | Establish quality baseline for a skill |
+| `/schliff:eval` | Run eval suite assertions |
+| `/schliff:mesh` | Detect trigger conflicts across all installed skills |
+| `/schliff:triage` | Cluster failures, auto-generate fixes |
+| `/schliff:log-failure` | Log a skill failure for later triage |
+| `/schliff:update` | Update Schliff to latest version |
 
 ---
 
@@ -152,7 +152,7 @@ Full scoring methodology: [docs/SCORING.md](docs/SCORING.md)
 
 ```
 ======================================================================
-  SkillForge Health Dashboard: skillforge
+  Schliff Health Dashboard: schliff
 ======================================================================
 
   Structural Score: ████████████████████  99.9/100  [S]
@@ -180,7 +180,7 @@ Baseline: 99.9/100 (6 dims)
 --- Iteration 1 ---
 Stopping: composite >= 98 (99.9)
 
-  SkillForge Auto-Improve Complete
+  Schliff Auto-Improve Complete
   ──────────────────────────────────────────────────
   Score:  100 → 100/100  ████████████████████  (+0.0)  [S]
   Iters:  0  |  Kept: 0  |  Time: 0s
@@ -194,17 +194,17 @@ Stopping: composite >= 98 (99.9)
 
 ```
 ======================================================================
-  SkillForge Doctor — Skill Health Check
+  Schliff Doctor — Skill Health Check
 ======================================================================
 
   1 skills scanned | 1 healthy | 4 mesh issues
 
   Skill                      Score  Grade   Dims  Issues  Action
   --------------------------------------------------------------------
-  skillforge                  100    [S]    6/7       0  Healthy
+  schliff                  100    [S]    6/7       0  Healthy
 
   Mesh Health: 68/100 (4 cross-skill issues)
-  Run /skillforge:mesh for details.
+  Run /schliff:mesh for details.
 
   NOTE: Scores are STRUCTURAL — they measure file organization,
   not runtime effectiveness. Use --runtime for validated scoring.
@@ -236,7 +236,7 @@ Stopping: composite >= 98 (99.9)
 
 ## Self-Score
 
-SkillForge scores itself. Dogfooding, not marketing.
+Schliff scores itself. Dogfooding, not marketing.
 
 | Metric | Value |
 |--------|-------|
@@ -244,16 +244,16 @@ SkillForge scores itself. Dogfooding, not marketing.
 | Tests | **120 passing** (unit + integration + proof) |
 | Security audit | **40 fixes** across 6 review rounds |
 | Scoring engine | **7 dimensions**, continuous density, context-aware contradiction detection |
-| Journey | v1.0 (62.5) → v5.3.0 (97.1) across 7 major versions |
+| Journey | v1.0 (62.5) → v6.0.0 (97.1) across 7 major versions |
 
 ---
 
 ## Ecosystem
 
-`skill-creator` builds a v1 skill. SkillForge grinds it to production quality.
+`skill-creator` builds a v1 skill. Schliff grinds it to production quality.
 
 ```
-skill-creator → v1 SKILL.md → /skillforge:auto → autonomous grinding → ship
+skill-creator → v1 SKILL.md → /schliff:auto → autonomous grinding → ship
 ```
 
 - **[skill-creator](https://github.com/anthropics/courses/tree/master/claude-code/09-skill-creator)** — generate the first draft

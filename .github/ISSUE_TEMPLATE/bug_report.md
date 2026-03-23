@@ -10,8 +10,8 @@ labels: bug
 ## Reproduction
 ```bash
 # Commands to reproduce
-/skillforge:init path/to/skill
-/skillforge:auto
+/schliff:init path/to/skill
+/schliff:auto
 ```
 
 ## Expected Behavior
@@ -23,7 +23,7 @@ labels: bug
 ## Environment
 - Python version:
 - OS:
-- SkillForge version:
+- Schliff version:
 - Claude Code version:
 
 ## Eval Suite

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to SkillForge are documented here.
+All notable changes to Schliff are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [5.1.1] - 2026-03-22
@@ -55,7 +55,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **ROI Stopping** — marginal ROI < 0.2 for 3 windows → auto-stop
 - **Gap Buckets** (`progress.py`) — dimension gaps discretized for predictor input
 - **Episode Emit** (`progress.py`) — auto-emit learnings to episodic store after decisions
-- New subcommands: `/skillforge:auto`, `/skillforge:mesh-evolve`, `/skillforge:predict`, `/skillforge:recall`
+- New subcommands: `/schliff:auto`, `/schliff:mesh-evolve`, `/schliff:predict`, `/schliff:recall`
 
 ### Changed
 - Dimension weights redistributed: triggers 25%→20%, quality 25%→20%, composability 10%→5%, new runtime 15%

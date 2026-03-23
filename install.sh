@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 ##############################################################################
-# SkillForge Installer
+# Schliff Installer
 #
-# Installs SkillForge skills and commands to ~/.claude/
+# Installs Schliff skills and commands to ~/.claude/
 # Supports fresh install, update, and --link mode for developers.
 #
 # Usage:
@@ -16,10 +16,10 @@ set -euo pipefail
 
 VERSION="5.1.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILLS_SRC="$SCRIPT_DIR/skills/skillforge"
-COMMANDS_SRC="$SCRIPT_DIR/commands/skillforge"
-SKILLS_DST="$HOME/.claude/skills/skillforge"
-COMMANDS_DST="$HOME/.claude/commands/skillforge"
+SKILLS_SRC="$SCRIPT_DIR/skills/schliff"
+COMMANDS_SRC="$SCRIPT_DIR/commands/schliff"
+SKILLS_DST="$HOME/.claude/skills/schliff"
+COMMANDS_DST="$HOME/.claude/commands/schliff"
 LINK_MODE=0
 CHECK_ONLY=0
 
@@ -38,7 +38,7 @@ line() { printf "  ────────────────────�
 # --- Usage ---
 usage() {
     cat <<EOF
-SkillForge v${VERSION} Installer
+Schliff v${VERSION} Installer
 
 Usage:
   bash install.sh           Install (copy mode)
@@ -53,8 +53,8 @@ Options:
   --help    Show this help message.
 
 Paths:
-  Skills   → ~/.claude/skills/skillforge/
-  Commands → ~/.claude/commands/skillforge/
+  Skills   → ~/.claude/skills/schliff/
+  Commands → ~/.claude/commands/schliff/
 EOF
     exit 0
 }
@@ -75,7 +75,7 @@ done
 
 # --- Header ---
 echo ""
-printf "  ${BOLD}SkillForge v${VERSION} Installer${RESET}\n"
+printf "  ${BOLD}Schliff v${VERSION} Installer${RESET}\n"
 line
 echo ""
 
@@ -145,13 +145,13 @@ fi
 # --- Validate source directories ---
 if [ ! -d "$SKILLS_SRC" ]; then
     err "Skills source not found: $SKILLS_SRC"
-    err "Run this script from the SkillForge repo root."
+    err "Run this script from the Schliff repo root."
     exit 1
 fi
 
 if [ ! -d "$COMMANDS_SRC" ]; then
     err "Commands source not found: $COMMANDS_SRC"
-    err "Run this script from the SkillForge repo root."
+    err "Run this script from the Schliff repo root."
     exit 1
 fi
 
@@ -173,19 +173,19 @@ echo ""
 
 # --- Backup existing installation on update ---
 if [ "$MODE" = "update" ]; then
-    BACKUP_DIR="$HOME/.claude/skills/skillforge.bak.$(date +%Y%m%d%H%M%S)"
+    BACKUP_DIR="$HOME/.claude/skills/schliff.bak.$(date +%Y%m%d%H%M%S)"
     cp -r "$SKILLS_DST" "$BACKUP_DIR"
     ok "Backed up existing skills to $BACKUP_DIR"
 
     if [ -d "$COMMANDS_DST" ]; then
-        CMDS_BACKUP="$HOME/.claude/commands/skillforge.bak.$(date +%Y%m%d%H%M%S)"
+        CMDS_BACKUP="$HOME/.claude/commands/schliff.bak.$(date +%Y%m%d%H%M%S)"
         cp -r "$COMMANDS_DST" "$CMDS_BACKUP"
         ok "Backed up existing commands to $CMDS_BACKUP"
     fi
 
     # Clean up old backups, keep most recent 3
-    ls -dt "$HOME/.claude/skills/skillforge.bak."* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null
-    ls -dt "$HOME/.claude/commands/skillforge.bak."* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null
+    ls -dt "$HOME/.claude/skills/schliff.bak."* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null
+    ls -dt "$HOME/.claude/commands/schliff.bak."* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null
 fi
 
 # --- Install ---
@@ -222,10 +222,10 @@ fi
 # --- Done ---
 echo ""
 line
-ok "SkillForge v${VERSION} installed successfully!"
+ok "Schliff v${VERSION} installed successfully!"
 echo ""
 echo "  Quick start:"
 echo "    1. Open Claude Code"
-echo "    2. Run /skillforge:doctor to verify installation"
-echo "    3. Run /skillforge:init to improve any skill"
+echo "    2. Run /schliff:doctor to verify installation"
+echo "    3. Run /schliff:init to improve any skill"
 echo ""

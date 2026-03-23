@@ -1,4 +1,4 @@
-# SkillForge — Viral Growth: Next Steps
+# Schliff — Viral Growth: Next Steps
 
 Status: PLAN (nicht gestartet)
 Erstellt: 2026-03-22
@@ -10,19 +10,19 @@ Basiert auf: 5-Perspektiven Review (CEO, Dev Advocate, Security, Content Creator
 
 ### 1.1 Beta-Tester akquirieren
 - 5 Claude Code User finden (Discord, Reddit r/ClaudeAI, X)
-- Ihnen `/skillforge:auto` auf ihre eigenen Skills laufen lassen
+- Ihnen `/schliff:auto` auf ihre eigenen Skills laufen lassen
 - Before/After Scores + 1-Satz Quote einsammeln
 - Ergebnis: 3-5 Testimonials fuer README + Social Posts
 
 ### 1.2 Before/After Code-Diffs erstellen
 - 3 echte Skills nehmen (deploy, code-review, testing)
 - Vor/Nach-Patches als Side-by-Side zeigen
-- Was genau hat SkillForge geaendert? (Frontmatter, Trigger-Keywords, Edge Cases)
+- Was genau hat Schliff geaendert? (Frontmatter, Trigger-Keywords, Edge Cases)
 - Format: Screenshot oder Markdown-Diff
 
 ### 1.3 "Share Your Results" GitHub Discussion
 - GitHub Discussions aktivieren
-- Pinned Thread: "Show your SkillForge score"
+- Pinned Thread: "Show your Schliff score"
 - Template verlinken (schon als Issue Template da)
 
 ---
@@ -37,7 +37,7 @@ Basiert auf: 5-Perspektiven Review (CEO, Dev Advocate, Security, Content Creator
 5. CTA + Testimonial-Quote + Link
 
 ### 2.2 Show HN Post
-- Titel: "Show HN: SkillForge — Grind Claude Code Skills from [D] to [S] (Zero Human Input)"
+- Titel: "Show HN: Schliff — Grind Claude Code Skills from [D] to [S] (Zero Human Input)"
 - Timing: Dienstag 9am PT
 - Text: Problem → Loesung → Proof → Try It
 
@@ -70,16 +70,16 @@ Basiert auf: 5-Perspektiven Review (CEO, Dev Advocate, Security, Content Creator
 ## Phase 4: Platform-Features (Prio 4 — Monat 2)
 
 ### 4.1 Skill Certification Badges
-- Oeffentliches Badge-System: `[![SkillForge Certified: S](badge)]`
-- Registry-Idee: skills.skillforge.dev (spaeter)
+- Oeffentliches Badge-System: `[![Schliff Certified: S](badge)]`
+- Registry-Idee: skills.schliff.dev (spaeter)
 
 ### 4.2 Ecosystem Optimization
-- `/skillforge:ecosystem` Command
+- `/schliff:ecosystem` Command
 - Trigger-Conflict-Map visuell
 - Auto-generierte negative Boundaries
 
 ### 4.3 GitHub Action
-- `Zandereins/skillforge-action@v5`
+- `Zandereins/schliff-action@v5`
 - Nightly Cron auf .claude/skills/**/*.md
 - Auto-PR mit Report
 

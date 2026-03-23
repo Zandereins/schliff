@@ -1,13 +1,13 @@
-# Contributing to SkillForge
+# Contributing to Schliff
 
-Thanks for your interest in improving SkillForge! This guide covers everything you need to get started.
+Thanks for your interest in improving Schliff! This guide covers everything you need to get started.
 
 ## Quick Setup
 
 ```bash
 # Clone and install in dev mode (symlink)
-git clone https://github.com/Zandereins/skillforge.git
-cd skillforge
+git clone https://github.com/Zandereins/schliff.git
+cd schliff
 bash install.sh --link
 
 # Run the test suite
@@ -24,7 +24,7 @@ make test-all
 ## Project Structure
 
 ```
-skills/skillforge/
+skills/schliff/
 ├── scripts/
 │   ├── scoring/          # Scoring package (1 module per dimension)
 │   │   ├── __init__.py   # Public API — import from here
@@ -36,7 +36,7 @@ skills/skillforge/
 │   ├── nlp.py            # NLP utilities (tokenization, stemming)
 │   ├── terminal_art.py   # Terminal rendering (grades, bars, heatmaps)
 │   └── ...               # Application scripts
-├── commands/skillforge/  # Claude Code command definitions
+├── commands/schliff/  # Claude Code command definitions
 ├── references/           # Deep documentation
 ├── templates/            # Eval suite templates
 └── tests/proof/          # Proof tests
@@ -46,10 +46,10 @@ skills/skillforge/
 
 ```bash
 make test          # 99+ integration tests
-make test-self     # 12 self-tests (SkillForge scores itself)
+make test-self     # 12 self-tests (Schliff scores itself)
 make test-proof    # 6 proof tests (demonstrates real improvement)
 make test-all      # All of the above
-make score         # Score SkillForge's own SKILL.md
+make score         # Score Schliff's own SKILL.md
 ```
 
 All tests must pass before submitting a PR.

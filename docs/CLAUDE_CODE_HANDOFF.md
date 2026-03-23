@@ -1,4 +1,4 @@
-# SkillForge — Claude Code Handoff Prompt
+# Schliff — Claude Code Handoff Prompt
 
 Kopiere den folgenden Prompt in Claude Code (oder als CLAUDE.md ins Repo):
 
@@ -7,8 +7,8 @@ Kopiere den folgenden Prompt in Claude Code (oder als CLAUDE.md ins Repo):
 ## Der Prompt
 
 ```
-Du arbeitest am SkillForge Plugin — einem autonomen Skill-Improvement-System für Claude Code.
-Repo: ~/skillforge (oder der aktuelle Pfad)
+Du arbeitest am Schliff Plugin — einem autonomen Skill-Improvement-System für Claude Code.
+Repo: ~/schliff (oder der aktuelle Pfad)
 
 ### Kontext — Was bereits passiert ist
 
@@ -32,21 +32,21 @@ In Cowork wurden 2 Verbesserungsrunden mit 5+ spezialisierten Subagents durchgef
 7. improvement-protocol.md: 9-Phasen mit Stuck-Protocol, Crash Recovery
 
 **Dateien die geändert wurden (alle unstaged):**
-- skills/skillforge/SKILL.md (komplett überarbeitet, 236 Zeilen)
-- skills/skillforge/scripts/score-skill.py (komplett neu, TF-IDF + Composability)
-- skills/skillforge/scripts/analyze-skill.sh (Security-Fix + bessere Example-Detection)
-- skills/skillforge/scripts/run-eval.sh (NEU — unified eval runner)
-- skills/skillforge/scripts/progress.py (NEU — Fortschritts-Tracking + ASCII Charts)
-- skills/skillforge/references/improvement-protocol.md (9-Phasen, 768 Zeilen)
-- skills/skillforge/references/metrics-catalog.md (aktualisiert)
-- skills/skillforge/templates/eval-suite-template.json (bessere Trigger-Prompts)
-- skills/skillforge/templates/improvement-log-template.jsonl (NEU, ersetzt TSV)
-- commands/skillforge/init.md (NEU)
-- commands/skillforge/eval.md (überarbeitet)
-- commands/skillforge/bench.md (überarbeitet)
-- commands/skillforge/analyze.md (überarbeitet)
-- commands/skillforge/report.md (überarbeitet)
-- skills/skillforge/history/ (NEU, Verzeichnis erstellt)
+- skills/schliff/SKILL.md (komplett überarbeitet, 236 Zeilen)
+- skills/schliff/scripts/score-skill.py (komplett neu, TF-IDF + Composability)
+- skills/schliff/scripts/analyze-skill.sh (Security-Fix + bessere Example-Detection)
+- skills/schliff/scripts/run-eval.sh (NEU — unified eval runner)
+- skills/schliff/scripts/progress.py (NEU — Fortschritts-Tracking + ASCII Charts)
+- skills/schliff/references/improvement-protocol.md (9-Phasen, 768 Zeilen)
+- skills/schliff/references/metrics-catalog.md (aktualisiert)
+- skills/schliff/templates/eval-suite-template.json (bessere Trigger-Prompts)
+- skills/schliff/templates/improvement-log-template.jsonl (NEU, ersetzt TSV)
+- commands/schliff/init.md (NEU)
+- commands/schliff/eval.md (überarbeitet)
+- commands/schliff/bench.md (überarbeitet)
+- commands/schliff/analyze.md (überarbeitet)
+- commands/schliff/report.md (überarbeitet)
+- skills/schliff/history/ (NEU, Verzeichnis erstellt)
 - README.md (aktualisiert)
 - .claude-plugin/marketplace.json + plugin.json (aktualisiert)
 - SKILLFORGE_FINAL_REPORT.md (Analysebericht)
@@ -59,21 +59,21 @@ Starte mit einem sauberen Commit aller Änderungen, dann:
 
 **Phase 1: Commit + Push**
 - `git add` aller geänderten/neuen Dateien (NICHT die Report-MDs)
-- Commit: "feat: SkillForge v2 — TF-IDF scoring, composability analysis, 9-phase protocol"
+- Commit: "feat: Schliff v2 — TF-IDF scoring, composability analysis, 9-phase protocol"
 - Push zu GitHub
 
 **Phase 2: Selbst-Verbesserung (Ralph-Loop)**
-Führe `/skillforge:init` auf SkillForge selbst aus, dann starte den autonomen Loop:
-- Goal: "Maximize SkillForge's own composite score to 95+"
+Führe `/schliff:init` auf Schliff selbst aus, dann starte den autonomen Loop:
+- Goal: "Maximize Schliff's own composite score to 95+"
 - Metric: Composite score from `python3 scripts/score-skill.py SKILL.md --json`
-- Verify: `python3 skills/skillforge/scripts/score-skill.py skills/skillforge/SKILL.md --json | python3 -c "import sys,json;print(json.load(sys.stdin)['composite_score'])"`
+- Verify: `python3 skills/schliff/scripts/score-skill.py skills/schliff/SKILL.md --json | python3 -c "import sys,json;print(json.load(sys.stdin)['composite_score'])"`
 - Iterations: 20
 - Time budget: 30 min
 
 **Phase 3: Quality + Edges messbar machen**
 Die zwei fehlenden Dimensionen (Quality, Edges) brauchen Runtime-Eval-Suites:
-1. Generiere eine eval-suite.json für SkillForge selbst
-2. Implementiere Quality-Tests (gibt SkillForge korrekte Empfehlungen?)
+1. Generiere eine eval-suite.json für Schliff selbst
+2. Implementiere Quality-Tests (gibt Schliff korrekte Empfehlungen?)
 3. Implementiere Edge-Tests (Malformed SKILL.md, leere Dateien, Unicode-Pfade)
 4. Re-run scoring mit allen 6 Dimensionen
 
