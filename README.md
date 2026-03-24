@@ -19,6 +19,7 @@ What changed:
 
 > You wrote a skill. It worked. Three weeks later, triggers misfire, edge cases slip through, instructions contradict themselves. Schliff fixes all of it autonomously — deterministic patches, mechanical scoring, zero hallucinations.
 
+[![GitHub stars](https://img.shields.io/github/stars/Zandereins/schliff?style=flat-square)](https://github.com/Zandereins/schliff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json)](skills/schliff/scripts/test-integration.sh)
 [![Structural Score](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json)](skills/schliff/scripts/score-skill.py)
@@ -27,26 +28,41 @@ What changed:
 
 ---
 
-## Try It
+## Try It — 3 minutes, zero config
 
-> **Note:** Schliff commands (`/schliff:*`) run inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code), not in a regular terminal.
+> **Note:** Schliff commands (`/schliff:*`) run inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code), not in a regular terminal. The installer checks all prerequisites.
 
 ```bash
-# 1. Install (in your regular terminal)
+# 1. Install once (terminal, ~1 min)
 git clone https://github.com/Zandereins/schliff.git && bash schliff/install.sh
 
-# 2. Score the included demo skill (in Claude Code)
+# 2. Score the demo skill (Claude Code, ~10 sec)
 /schliff:init demo/bad-skill/SKILL.md
 
-# 3. Watch it improve autonomously (in Claude Code)
+# 3. Watch it grind to [S] (Claude Code, ~2 min)
 /schliff:auto
 ```
 
-**What you'll see:** The score climbs from 56 [D] through [C], [B], [A] to [S] as Schliff applies patches, checks each delta, and reverts anything that regresses. When ROI drops below threshold, it stops.
+**What you'll see:** 18 autonomous iterations. Each one: patch → measure → keep or revert. Score climbs from 56 [D] to 99.9 [S]. Stops when ROI plateaus. No prompts, no babysitting.
 
-**Prerequisites:** Python 3.9+, Bash, Git, jq — the installer checks all of these.
+**Prerequisites:** Python 3.9+, Bash, Git, jq
 
-Already have skills? Run `/schliff:doctor` to see health grades for all your installed skills at once.
+Already have skills? Run `/schliff:doctor` to scan all installed skills and show health grades + token costs.
+
+---
+
+## What Schliff Fixes
+
+Real improvements from the included demo skill:
+
+| Problem | What Schliff does | Result |
+|---------|-------------------|--------|
+| Triggers misfire | Keyword matching + negative boundaries | **0% → 89%** accuracy |
+| Missing structure | Added examples, edge cases, frontmatter | **75 → 100**/100 |
+| Vague instructions | Replaced hedging with concrete commands | **35 → 93**/100 |
+| No scope boundaries | Added handoff declarations + "do NOT use" | **40 → 100**/100 |
+
+Automated. No human intervention. Stops when ROI plateaus.
 
 ---
 
@@ -54,8 +70,8 @@ Already have skills? Run `/schliff:doctor` to see health grades for all your ins
 
 - **Skill Creator** — Run `/schliff:init` on your v1 skill to get a baseline + eval suite
 - **Skill Maintainer** — Run `/schliff:auto` to grind any skill from [C] to [S] overnight
-- **Fleet Manager (10+ skills)** — Run `/schliff:doctor` to scan everything, detect conflicts
-- **Quality Gate** — Run `/schliff:eval` before shipping to validate assertions pass
+- **Fleet Manager (10+ skills)** — Run `/schliff:doctor` to scan everything, detect conflicts + token costs
+- **Quality Gate** — Run `/schliff:eval` before shipping, or use the [GitHub Action](#github-action) in CI
 
 ---
 
@@ -228,17 +244,47 @@ Stopping: composite >= 98 (99.9)
 
 ---
 
-## Self-Score
+## Quality & Security
 
-Schliff scores itself. Dogfooding, not marketing.
+Schliff scores itself — 7 dimensions, same engine, no exceptions.
 
-| Metric | Value |
-|--------|-------|
-| Structural Score | **95.1 / 100** [S] |
-| Tests | **120 passing** (unit + integration + proof) |
-| Security audit | **40 fixes** across 6 review rounds |
-| Scoring engine | **7 dimensions**, continuous density, context-aware contradiction detection |
-| Journey | v1.0 (62.5) → v6.0.0 (95.1) across 7 major versions |
+| Metric | Value | What This Means |
+|--------|-------|-----------------|
+| Structural Score | **95.4 / 100** [S] | Production-ready. Catches 85% of issues without runtime. |
+| Tests | **123 passing** | Unit + integration + proof. Every scorer rule tested. |
+| Security | **40 fixes** | Shell injection, prompt injection, ReDoS, supply chain. |
+| Dimensions | **7 + runtime** | Transparent, rule-based, explainable scoring. |
+| Journey | v1.0 (62.5) → v6.0 (95.4) | 7 major versions. Continuous improvement, no regressions. |
+
+[Scoring methodology](docs/SCORING.md) | [Security details](CHANGELOG.md)
+
+---
+
+## GitHub Action
+
+Score skills in CI. Block PRs that regress. The Codecov for SKILL.md files.
+
+```yaml
+- uses: Zandereins/schliff@v6
+  with:
+    skill-path: '.claude/skills/my-skill/SKILL.md'
+    minimum-score: '75'      # blocks PR if below
+    comment-on-pr: 'true'    # posts score table on PR
+```
+
+---
+
+## CLI
+
+Score any skill without Claude Code:
+
+```bash
+pip install schliff
+
+schliff score path/to/SKILL.md          # score a skill
+schliff score path/to/SKILL.md --json   # JSON output
+schliff doctor                           # scan all installed skills
+```
 
 ---
 
@@ -271,6 +317,17 @@ Score your skill and add this to your README:
 
 Found a bug in the scorer? Add a test case to `eval-suite.json` and open an issue.
 Want to improve scoring logic? Edit `score-skill.py`, run `bash test-integration.sh`, and PR the diff.
+
+---
+
+## Next Steps
+
+1. [Try the 3-minute demo](#try-it--3-minutes-zero-config) — see a skill go from [D] to [S]
+2. Run `/schliff:doctor` on your own skills — instant health check
+3. Add the [GitHub Action](#github-action) to your CI — quality gate for every PR
+4. [Read the scoring methodology](docs/SCORING.md) — understand what each dimension measures
+
+Questions? [Open an issue](https://github.com/Zandereins/schliff/issues) — we respond fast.
 
 ---
 
