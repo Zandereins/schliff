@@ -154,6 +154,7 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
         "edges": scorer.score_edges(skill_path, eval_suite),
         "efficiency": scorer.score_efficiency(skill_path),
         "composability": scorer.score_composability(skill_path),
+        "clarity": scorer.score_clarity(skill_path),
     }
 
     # Runtime is opt-in (expensive, invokes claude CLI)
