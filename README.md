@@ -185,7 +185,7 @@ Full scoring methodology: [docs/SCORING.md](docs/SCORING.md)
 
 ```
 Scoring baseline...
-Baseline: 99.9/100 (6 dims)
+Baseline: 99.9/100 (7 dims)
 
 --- Iteration 1 ---
 Stopping: composite >= 98 (99.9)
@@ -211,7 +211,7 @@ Stopping: composite >= 98 (99.9)
 
   Skill                      Score  Grade   Dims  Issues  Action
   --------------------------------------------------------------------
-  schliff                  100    [S]    6/7       0  Healthy
+  schliff                  100    [S]    7/8       0  Healthy
 
   Mesh Health: 68/100 (4 cross-skill issues)
   Run /schliff:mesh for details.
@@ -223,21 +223,20 @@ Stopping: composite >= 98 (99.9)
 </details>
 
 <details>
-<summary><b>What's New in v5.3</b></summary>
+<summary><b>What's New in v6.0</b></summary>
 
 | Feature | Description |
 |---------|-------------|
-| Context-aware Contradictions | Clarity distinguishes "run tests" vs "run tests in production" |
-| Missing Dimension Warnings | Composite warns when eval-dependent dimensions are unmeasured |
-| Trigger Threshold Floor | Small eval suites (1-4 triggers) can't produce false positives |
-| Anti-gaming Headers | Empty sections don't count toward structure score |
-| Signal Caps | Efficiency can't be gamed with repetitive "example" markers |
-| 120 Unit Tests | +1 context-aware contradiction test |
-| Honest Scoring | "Structural Score" label everywhere — transparent about what's measured |
-| Stemming Tokenizer | Suffix-stripping replaces fixed synonym tables |
-| Beam Search | Top-3 exploration instead of greedy top-1 from iteration 4 |
-| EMA Plateau Detection | Exponential Moving Average replaces fixed-window ROI |
-| MinHash + LSH | O(n) mesh analysis instead of O(n^2) for 50+ skills |
+| Rebrand to Schliff | "The finishing cut" — German for polish/grind |
+| Clarity as Default | 7th dimension always active (contradictions, vague refs, ambiguity) |
+| Token Cost Estimation | Doctor shows per-skill token cost + fleet total |
+| GitHub Action | `Zandereins/schliff@v6` — CI quality gate with PR comments |
+| pip CLI | `schliff score SKILL.md` — works without Claude Code |
+| Actionable Doctor | Copy-paste commands with full skill paths |
+| Trigger Confidence | Small eval suites (<8 triggers) capped at score 60 |
+| Context-aware Contradictions | "run tests" vs "run tests in production" distinguished |
+| Anti-gaming | Empty headers, repetitive markers, binary composability fixed |
+| 123 Unit Tests | +3 for token estimation, context contradictions |
 | 40 Security Fixes | Shell injection, prompt injection, ReDoS, supply chain |
 
 </details>
