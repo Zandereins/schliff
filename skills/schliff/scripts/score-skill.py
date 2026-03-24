@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Schliff — Skill Structural Scorer
 
-Computes a composite structural score across 6 dimensions.
+Computes a composite structural score across 7 dimensions.
 Used during the autonomous improvement loop to decide keep/discard.
 
 IMPORTANT: This is a STRUCTURAL score — it measures file organization,
@@ -44,7 +44,7 @@ def main():
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--diff", action="store_true", help="Include diff analysis")
     parser.add_argument("--diff-ref", default="HEAD~1", help="Git ref to diff against (default: HEAD~1)")
-    parser.add_argument("--clarity", action="store_true", help="Include clarity dimension (zero weight by default)")
+    parser.add_argument("--no-clarity", action="store_true", help="Exclude clarity dimension (included by default)")
     parser.add_argument("--runtime", action="store_true",
                         help="Enable runtime scoring dimension (invokes claude CLI)")
     parser.add_argument("--weights", default=None,
@@ -80,8 +80,8 @@ def main():
         "runtime": score_runtime(args.skill_path, eval_suite, enabled=args.runtime),
     }
 
-    # Clarity dimension (opt-in, zero default weight)
-    if args.clarity:
+    # Clarity dimension (default on, opt-out with --no-clarity)
+    if not args.no_clarity:
         scores["clarity"] = score_clarity(args.skill_path)
 
     # Parse custom weights if provided

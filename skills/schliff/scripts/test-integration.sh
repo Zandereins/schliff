@@ -46,19 +46,19 @@ else
     fail "Self-score" "composite=$COMPOSITE, expected >= 75"
 fi
 
-# Test: all 6 dimensions measured
+# Test: all 7 dimensions measured (6 core + clarity, runtime opt-in)
 MEASURED=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['confidence']['measured'])" 2>/dev/null)
-if [[ "$MEASURED" == "6" ]]; then
-    pass "All 6 dimensions measured"
+if [[ "$MEASURED" == "7" ]]; then
+    pass "All 7 dimensions measured (incl. clarity)"
 else
-    fail "Dimension count" "measured=$MEASURED, expected 6"
+    fail "Dimension count" "measured=$MEASURED, expected 7"
 fi
 
-# Test: --clarity adds 7th dimension
-RESULT_CLARITY=$(python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR/SKILL.md" --json --clarity 2>&1)
+# Test: adds 7th dimension
+RESULT_CLARITY=$(python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR/SKILL.md" --json 2>&1)
 HAS_CLARITY=$(echo "$RESULT_CLARITY" | python3 -c "import sys,json; d=json.load(sys.stdin); print('clarity' in d['dimensions'])" 2>/dev/null)
 if [[ "$HAS_CLARITY" == "True" ]]; then
-    pass "--clarity adds 7th dimension"
+    pass "clarity included by default"
 else
     fail "--clarity" "clarity dimension not found"
 fi
@@ -93,7 +93,7 @@ name: empty-skill
 description: a skill with no body at all
 ---
 FMEOF
-CLARITY_EMPTY=$(python3 "$SCRIPT_DIR/score-skill.py" "$FRONTMATTER_ONLY" --json --clarity 2>&1 | \
+CLARITY_EMPTY=$(python3 "$SCRIPT_DIR/score-skill.py" "$FRONTMATTER_ONLY" --json 2>&1 | \
     python3 -c "import sys,json; print(json.load(sys.stdin)['dimensions'].get('clarity', 'missing'))" 2>/dev/null)
 if [[ "$CLARITY_EMPTY" == "0" ]]; then
     pass "Frontmatter-only → clarity score 0"
@@ -119,7 +119,7 @@ echo "deploy"
 
 Some prose after the code block.
 CEOF
-CLARITY_CODE=$(python3 "$SCRIPT_DIR/score-skill.py" "$CODE_ONLY" --json --clarity 2>&1 | \
+CLARITY_CODE=$(python3 "$SCRIPT_DIR/score-skill.py" "$CODE_ONLY" --json 2>&1 | \
     python3 -c "import sys,json; d=json.load(sys.stdin); det=d.get('details',{}).get('clarity',{}); print(det.get('always_count', 'missing'))" 2>/dev/null)
 if [[ "$CLARITY_CODE" == "0" ]]; then
     pass "Code-block always/never stripped (no false contradictions)"
@@ -339,13 +339,13 @@ else
     fail "Roundtrip" "expected 2 experiments, got $RT_TOTAL"
 fi
 
-# Test: scorer JSON → run-eval.sh dimension extraction (6 core + runtime)
+# Test: scorer JSON → run-eval.sh dimension extraction (7 core + runtime = 8)
 SCORER_JSON=$(python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR/SKILL.md" --json 2>&1)
 DIMS_COUNT=$(echo "$SCORER_JSON" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['dimensions']))" 2>/dev/null)
-if [[ "$DIMS_COUNT" == "7" ]]; then
-    pass "Scorer → 7 dimensions extracted (6 core + runtime)"
+if [[ "$DIMS_COUNT" == "8" ]]; then
+    pass "Scorer → 8 dimensions extracted (7 core + runtime)"
 else
-    fail "Scorer dimensions" "expected 7, got $DIMS_COUNT"
+    fail "Scorer dimensions" "expected 8, got $DIMS_COUNT"
 fi
 
 ##############################################################################
@@ -999,7 +999,7 @@ description: test contradictions
 Always run tests.
 Never run tests.
 CEOF
-CONTRA_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$CONTRA_FILE" --json --clarity 2>&1)
+CONTRA_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$CONTRA_FILE" --json 2>&1)
 CONTRA_SCORE=$(echo "$CONTRA_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['dimensions']['clarity'])" 2>/dev/null)
 if python3 -c "import sys; exit(0 if int(sys.argv[1]) < 100 else 1)" "$CONTRA_SCORE" 2>/dev/null; then
     pass "Contradiction detected (clarity=$CONTRA_SCORE < 100)"
@@ -1021,7 +1021,7 @@ Some unrelated paragraph here.
 
 Check the file for errors.
 VEOF
-VAGUE_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$VAGUE_FILE" --json --clarity 2>&1)
+VAGUE_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$VAGUE_FILE" --json 2>&1)
 VAGUE_REFS=$(echo "$VAGUE_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['details']['clarity']['vague_references'])" 2>/dev/null)
 if [[ "$VAGUE_REFS" -ge 1 ]]; then
     pass "Vague reference detected ($VAGUE_REFS found)"
@@ -1043,7 +1043,7 @@ It is important to check this.
 
 It does validation.
 AEOF
-AMBIG_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$AMBIG_FILE" --json --clarity 2>&1)
+AMBIG_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$AMBIG_FILE" --json 2>&1)
 AMBIG_COUNT=$(echo "$AMBIG_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['details']['clarity']['ambiguous_pronouns'])" 2>/dev/null)
 if [[ "$AMBIG_COUNT" -ge 1 ]]; then
     pass "Ambiguous pronoun detected ($AMBIG_COUNT found)"
@@ -1067,7 +1067,7 @@ Use `scripts/deploy.sh` to deploy the application.
 
 Check `output.json` for results after running the pipeline.
 CLEOF
-CLEAN_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$CLEAN_FILE" --json --clarity 2>&1)
+CLEAN_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$CLEAN_FILE" --json 2>&1)
 CLEAN_SCORE=$(echo "$CLEAN_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['dimensions']['clarity'])" 2>/dev/null)
 if python3 -c "import sys; exit(0 if int(sys.argv[1]) >= 90 else 1)" "$CLEAN_SCORE" 2>/dev/null; then
     pass "Clean file → clarity >= 90 (got $CLEAN_SCORE)"
@@ -1093,7 +1093,7 @@ echo "done"
 
 Run `python3 test.py` to verify.
 CCEOF
-CODE_CONTRA_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$CODE_CONTRA" --json --clarity 2>&1)
+CODE_CONTRA_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$CODE_CONTRA" --json 2>&1)
 CODE_CONTRA_CONTRADICTIONS=$(echo "$CODE_CONTRA_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin)['details'].get('clarity',{}); print(len(d.get('contradictions',[])))" 2>/dev/null)
 if [[ "$CODE_CONTRA_CONTRADICTIONS" == "0" ]]; then
     pass "Code blocks stripped: no false contradictions"
@@ -1114,7 +1114,7 @@ description: test same-verb contradictions
 Always run tests.
 Never run tests.
 VCEOF
-VERB_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$VERB_CONTRA" --json --clarity 2>&1)
+VERB_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$VERB_CONTRA" --json 2>&1)
 VERB_CONTRADICTIONS=$(echo "$VERB_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin)['details'].get('clarity',{}); print(len(d.get('contradictions',[])))" 2>/dev/null)
 if [[ "$VERB_CONTRADICTIONS" -ge 1 ]]; then
     pass "Same-verb contradiction detected ($VERB_CONTRADICTIONS found)"
