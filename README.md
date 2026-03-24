@@ -21,7 +21,7 @@ What changed:
 
 [![GitHub stars](https://img.shields.io/github/stars/Zandereins/schliff?style=flat-square)](https://github.com/Zandereins/schliff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json)](skills/schliff/scripts/test-integration.sh)
+[![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json)](.github/workflows/test.yml)
 [![Structural Score](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json)](skills/schliff/scripts/score-skill.py)
 [![v6.0.0](https://img.shields.io/badge/Version-6.0.0-F59E0B)](CHANGELOG.md)
 [![Claude Code Skill](https://img.shields.io/badge/Claude_Code-Skill-8A2BE2)](https://docs.anthropic.com/en/docs/claude-code/skills)
@@ -305,10 +305,10 @@ skill-creator → v1 SKILL.md → /schliff:auto → autonomous grinding → ship
 Score your skill and add this to your README:
 
 ```markdown
-[![Schliff: 95 [S]](https://img.shields.io/badge/Schliff-95%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
+[![Schliff: 90 [A]](https://img.shields.io/badge/Schliff-90%2F100_%5BA%5D-green)](https://github.com/Zandereins/schliff)
 ```
 
-[![Schliff: 95 [S]](https://img.shields.io/badge/Schliff-95%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
+[![Schliff: 90 [A]](https://img.shields.io/badge/Schliff-90%2F100_%5BA%5D-green)](https://github.com/Zandereins/schliff)
 
 ---
 
