@@ -11,3 +11,7 @@
 {"timestamp":"2026-03-24T08:27:16Z","skill":"schliff","failure_type":"assertion_failed","assertion_id":"excl-1:excludes:Excludes existing text","confidence":0.9}
 {"timestamp":"2026-03-24T08:30:05Z","skill":"schliff","failure_type":"assertion_failed","assertion_id":"regex-1:pattern:Bad regex","confidence":0.9}
 {"timestamp":"2026-03-24T08:30:06Z","skill":"schliff","failure_type":"assertion_failed","assertion_id":"excl-1:excludes:Excludes existing text","confidence":0.9}
+{"timestamp":"2026-03-24T08:43:24Z","skill":"schliff","failure_type":"assertion_failed","assertion_id":"regex-1:pattern:Bad regex","confidence":0.9}
+{"timestamp":"2026-03-24T08:43:25Z","skill":"schliff","failure_type":"assertion_failed","assertion_id":"excl-1:excludes:Excludes existing text","confidence":0.9}
+{"timestamp":"2026-03-24T08:44:29Z","skill":"schliff","failure_type":"assertion_failed","assertion_id":"regex-1:pattern:Bad regex","confidence":0.9}
+{"timestamp":"2026-03-24T08:44:30Z","skill":"schliff","failure_type":"assertion_failed","assertion_id":"excl-1:excludes:Excludes existing text","confidence":0.9}

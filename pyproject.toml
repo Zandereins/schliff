@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "schliff"
 version = "6.0.0"
@@ -10,8 +14,15 @@ authors = [
     {name = "Franz Paul"}
 ]
 
+[project.scripts]
+schliff = "skills.schliff.scripts.cli:main"
+
 [project.urls]
 Repository = "https://github.com/Zandereins/schliff"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["skills*"]
 
 [tool.ruff]
 target-version = "py39"

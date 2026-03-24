@@ -1,0 +1,93 @@
+name: 'Schliff Skill Score'
+description: 'Score Claude Code skills across 7 dimensions. The quality gate for SKILL.md files.'
+branding:
+  icon: 'award'
+  color: 'purple'
+inputs:
+  skill-path:
+    description: 'Path to SKILL.md file'
+    required: true
+  eval-suite:
+    description: 'Path to eval-suite.json (auto-discovered if not set)'
+    required: false
+  minimum-score:
+    description: 'Minimum composite score to pass (0-100). PR fails if below.'
+    required: false
+    default: '0'
+  comment-on-pr:
+    description: 'Post score as PR comment'
+    required: false
+    default: 'true'
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+
+    - name: Clone Schliff scorer
+      shell: bash
+      run: |
+        git clone --depth 1 https://github.com/Zandereins/schliff.git /tmp/schliff
+
+    - name: Run scorer
+      id: score
+      shell: bash
+      run: |
+        SKILL_FULL="${{ github.workspace }}/${{ inputs.skill-path }}"
+        EVAL_FLAG=""
+        if [ -n "${{ inputs.eval-suite }}" ]; then
+          EVAL_FLAG="--eval-suite ${{ github.workspace }}/${{ inputs.eval-suite }}"
+        fi
+        cd /tmp/schliff/skills/schliff/scripts
+        RESULT=$(python3 score-skill.py "$SKILL_FULL" $EVAL_FLAG --json 2>&1)
+        COMPOSITE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])")
+        echo "composite=$COMPOSITE" >> "$GITHUB_OUTPUT"
+        echo "result<<EOF" >> "$GITHUB_OUTPUT"
+        echo "$RESULT" >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+        echo "Score: $COMPOSITE/100"
+
+    - name: Check minimum score
+      if: inputs.minimum-score != '0'
+      shell: bash
+      run: |
+        python3 -c "
+        import sys
+        score = float('${{ steps.score.outputs.composite }}')
+        minimum = float('${{ inputs.minimum-score }}')
+        if score < minimum:
+            print(f'Score {score} is below minimum {minimum}')
+            sys.exit(1)
+        print(f'Score {score} passes minimum {minimum}')
+        "
+
+    - name: Comment on PR
+      if: inputs.comment-on-pr == 'true' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const result = JSON.parse(`${{ steps.score.outputs.result }}`);
+          const score = result.composite_score;
+          const dims = result.dimensions;
+          const grade = score >= 95 ? 'S' : score >= 85 ? 'A' : score >= 75 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
+          const color = score >= 95 ? '🟢' : score >= 75 ? '🟡' : '🔴';
+
+          let body = `## ${color} Schliff Score: ${score}/100 [${grade}]\n\n`;
+          body += `| Dimension | Score |\n|-----------|-------|\n`;
+          for (const [dim, s] of Object.entries(dims)) {
+            if (s >= 0) body += `| ${dim} | ${s}/100 |\n`;
+          }
+          if (result.warnings?.length) {
+            body += `\n**Warnings:**\n`;
+            result.warnings.forEach(w => body += `- ${w}\n`);
+          }
+          body += `\n---\n*Scored by [Schliff](https://github.com/Zandereins/schliff)*`;
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: body
+          });

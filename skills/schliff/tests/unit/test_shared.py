@@ -8,6 +8,7 @@ import pytest
 from shared import (
     read_skill_safe,
     extract_description,
+    estimate_token_cost,
     load_jsonl_safe,
     validate_regex_complexity,
     validate_command_safety,
@@ -243,3 +244,36 @@ class TestRegexSearchSafe:
 
     def test_empty_text_no_match(self):
         assert regex_search_safe(r"something", "") is False
+
+
+class TestEstimateTokenCost:
+    def test_basic_estimation(self, tmp_path):
+        """Create a skill with known word count, verify estimate."""
+        skill_dir = tmp_path / "my-skill"
+        skill_dir.mkdir()
+        # 10 words exactly
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text("one two three four five six seven eight nine ten")
+        result = estimate_token_cost(str(skill_file))
+        assert result == round(10 * 1.3)  # 13
+
+    def test_includes_references(self, tmp_path):
+        """Skill + references/ directory yields higher count."""
+        skill_dir = tmp_path / "ref-skill"
+        skill_dir.mkdir()
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text("one two three four five")  # 5 words
+
+        refs_dir = skill_dir / "references"
+        refs_dir.mkdir()
+        (refs_dir / "extra.md").write_text("alpha beta gamma delta")  # 4 words
+
+        result = estimate_token_cost(str(skill_file))
+        assert result == round(9 * 1.3)  # 12
+        # Must be more than SKILL.md alone
+        assert result > round(5 * 1.3)
+
+    def test_missing_file_returns_zero(self):
+        """Nonexistent path returns 0."""
+        result = estimate_token_cost("/nonexistent/path/SKILL.md")
+        assert result == 0

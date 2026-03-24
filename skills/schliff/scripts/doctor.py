@@ -21,6 +21,7 @@ SCRIPT_DIR = Path(__file__).parent
 import score_skill as scorer
 import skill_mesh
 
+from shared import estimate_token_cost
 from terminal_art import score_to_grade, grade_colored
 
 
@@ -79,6 +80,8 @@ def _score_single_skill(skill_path: str) -> dict:
     else:
         action = "Healthy"
 
+    tokens = estimate_token_cost(skill_path)
+
     return {
         "composite": score,
         "score_type": composite.get("score_type", "structural"),
@@ -89,6 +92,7 @@ def _score_single_skill(skill_path: str) -> dict:
         "issue_count": len(all_issues),
         "issues": all_issues,
         "action": action,
+        "tokens": tokens,
     }
 
 
@@ -142,6 +146,9 @@ def run_doctor(
         else:
             needs_work += 1
 
+    # Compute total token cost across all skills
+    total_tokens = sum(r.get("tokens", 0) for r in results if "error" not in r)
+
     # Sort by score ascending (worst first — they need attention)
     results.sort(key=lambda r: r.get("composite", 0))
 
@@ -165,6 +172,7 @@ def run_doctor(
         "healthy": healthy,
         "needs_work": needs_work,
         "no_eval_suite": no_eval,
+        "total_tokens": total_tokens,
         "mesh_health": mesh_health,
         "mesh_issue_count": len(mesh_issues),
         "results": results,
@@ -193,9 +201,15 @@ def format_doctor_report(report: dict) -> str:
         lines.append("=" * 70)
         return "\n".join(lines)
 
+    # Total token cost
+    total_tokens = report.get("total_tokens", 0)
+    if total_tokens > 0:
+        lines.append(f"  Total context cost: ~{total_tokens:,} tokens")
+        lines.append("")
+
     # Table header
-    lines.append(f"  {'Skill':<25s} {'Score':>6s} {'Grade':>6s} {'Dims':>6s} {'Issues':>7s}  Action")
-    lines.append("  " + "-" * 68)
+    lines.append(f"  {'Skill':<25s} {'Score':>6s} {'Grade':>6s} {'Dims':>6s} {'Tokens':>7s} {'Issues':>7s}  Action")
+    lines.append("  " + "-" * 76)
 
     for r in results:
         if "error" in r:
@@ -206,10 +220,11 @@ def format_doctor_report(report: dict) -> str:
         score = r["composite"]
         grade = grade_colored(r["grade"])
         dims = f"{r['measured']}/{r['total_dims']}"
+        tokens = r.get("tokens", 0)
         issues = r["issue_count"]
         action = r["action"][:35]
 
-        lines.append(f"  {name:<25s} {score:>5.0f} {grade:>6s} {dims:>6s} {issues:>7d}  {action}")
+        lines.append(f"  {name:<25s} {score:>5.0f} {grade:>6s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
 
     lines.append("")
 
