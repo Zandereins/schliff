@@ -84,6 +84,36 @@ def extract_description(content: str) -> str:
     return ""
 
 
+def estimate_token_cost(skill_path: str) -> int:
+    """Estimate token cost when this skill is loaded into context.
+
+    Counts words in SKILL.md + all files in references/ directory.
+    Uses 1.3 tokens/word approximation (standard for English text with code).
+    Returns estimated token count.
+    """
+    total_words = 0
+
+    # Read SKILL.md content
+    try:
+        content = read_skill_safe(skill_path)
+        total_words += len(content.split())
+    except (FileNotFoundError, ValueError):
+        return 0
+
+    # Check for references/ directory alongside SKILL.md
+    refs_dir = Path(skill_path).parent / "references"
+    if refs_dir.is_dir():
+        for ref_file in sorted(refs_dir.glob("*.md")):
+            try:
+                ref_content = ref_file.read_text(encoding="utf-8", errors="replace")
+                if len(ref_content) <= MAX_SKILL_SIZE:
+                    total_words += len(ref_content.split())
+            except (OSError, PermissionError):
+                continue
+
+    return round(total_words * 1.3)
+
+
 def load_eval_suite(skill_path: str) -> Optional[dict]:
     """Auto-discover and load eval-suite.json from skill directory."""
     skill_dir = Path(skill_path).parent
