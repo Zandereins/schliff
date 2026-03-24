@@ -880,10 +880,21 @@ def apply_patches(skill_path: str, patches: list[dict], dry_run: bool = False) -
                     except re.error:
                         skipped += 1
                         continue
-                    if replacement is not None:
-                        lines = [compiled.sub(replacement, l) for l in lines]
-                    else:
-                        lines = [l for l in lines if not compiled.search(l)]
+                    # Skip lines inside code blocks to avoid mangling examples
+                    in_code_block = False
+                    new_lines = []
+                    for l in lines:
+                        if l.strip().startswith("```"):
+                            in_code_block = not in_code_block
+                            new_lines.append(l)
+                        elif in_code_block:
+                            new_lines.append(l)  # preserve code block content
+                        elif replacement is not None:
+                            new_lines.append(compiled.sub(replacement, l))
+                        elif not compiled.search(l):
+                            new_lines.append(l)
+                        # else: line removed (not in code block)
+                    lines = new_lines
                     applied += 1
                 else:
                     skipped += 1
