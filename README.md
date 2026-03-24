@@ -165,16 +165,16 @@ Full scoring methodology: [docs/SCORING.md](docs/SCORING.md)
   Schliff Health Dashboard: schliff
 ======================================================================
 
-  Structural Score: ████████████████████  99.9/100  [S]
-    [7/8 dimensions, 91% coverage]
+  Structural Score: ██████████████████░░  90.2/100  [A]
+    [7/8 dimensions, 90% coverage]
 
   Dimensions:
     structure       ██████████  100/100
-    triggers        ██████████  100/100
-    quality         ██████████  100/100
+    triggers        █████████░   95/100
+    quality         █████████░   91/100
     edges           ██████████  100/100
-    efficiency      █████████░  93/100
-    composability   ██████████  100/100
+    efficiency      ████████░░   84/100
+    composability   █████░░░░░   50/100
     clarity         ██████████  100/100
 ======================================================================
 ```
@@ -185,17 +185,21 @@ Full scoring methodology: [docs/SCORING.md](docs/SCORING.md)
 
 ```
 Scoring baseline...
-Baseline: 99.9/100 (7 dims)
+Baseline: 90.2/100 (7 dims)
 
 --- Iteration 1 ---
-Stopping: composite >= 98 (99.9)
+  [composability] +5.0  Added error behavior description
+  Score: 90.2 → 92.1  ██████████████████░░  [A]  KEEP
+
+--- Iteration 3 ---
+  [composability] +3.0  Added dependency declarations
+  Score: 92.1 → 94.8  ███████████████████░  [A]  KEEP
 
   Schliff Auto-Improve Complete
   ──────────────────────────────────────────────────
-  Score:  100 → 100/100  ████████████████████  (+0.0)  [S]
-  Iters:  0  |  Kept: 0  |  Time: 0s
-  Stop:   composite >= 98 (99.9)
-  (dry run — no changes written)
+  Score:  90 → 94.8/100  ███████████████████░  (+4.6)  [A]
+  Iters:  3  |  Kept: 2  |  Time: 12s
+  Stop:   EMA plateau (ROI < 0.5)
 ```
 </details>
 
@@ -211,7 +215,7 @@ Stopping: composite >= 98 (99.9)
 
   Skill                      Score  Grade   Dims  Issues  Action
   --------------------------------------------------------------------
-  schliff                  100    [S]    7/8       0  Healthy
+  schliff                   90    [A]    7/8       0  Healthy
 
   Mesh Health: 68/100 (4 cross-skill issues)
   Run /schliff:mesh for details.
