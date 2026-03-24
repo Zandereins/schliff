@@ -225,7 +225,16 @@ _COMMAND_BLOCKLIST_PATTERNS = [
     r'>\s*/dev/', r'>\s*/etc/', r'>\s*/tmp/',  # write to system dirs
     r'\beval\b', r'\bexec\b',
 ]
+# Shell metacharacter patterns — block command chaining and subshells
+_COMMAND_METACHAR_PATTERNS = [
+    r';\s*\w',        # semicolon chaining
+    r'&&\s*\w',       # AND chaining
+    r'\|\|\s*\w',     # OR chaining
+    r'\$\(',          # command substitution
+    r'\n',            # newline injection
+]
 _COMMAND_BLOCKLIST_RE = [re.compile(p) for p in _COMMAND_BLOCKLIST_PATTERNS]
+_COMMAND_METACHAR_RE = [re.compile(p) for p in _COMMAND_METACHAR_PATTERNS]
 
 _COMMAND_ALLOWLIST_PREFIXES = (
     'python3 ', 'python ', 'bash scripts/', 'node ', 'grep ', 'wc ', 'jq ',
@@ -237,20 +246,36 @@ _COMMAND_ALLOWLIST_PREFIXES = (
 def validate_command_safety(cmd: str) -> tuple[bool, str]:
     """Validate a command is safe to run in autonomous mode.
 
-    Returns (is_safe, reason). Checks allowlist first, then blocklist.
+    Returns (is_safe, reason). Always checks blocklist + metacharacters,
+    even for allowlisted prefixes. Allowlist is necessary but not sufficient.
     """
     cmd_stripped = cmd.strip()
     if not cmd_stripped:
         return False, "empty command"
 
-    # Check allowlist FIRST (prevents false positives like "run-eval.sh" matching \beval\b)
+    # Always check metacharacters first — blocks command chaining regardless of prefix
+    for pattern in _COMMAND_METACHAR_RE:
+        if pattern.search(cmd_stripped):
+            return False, f"blocked metacharacter: {pattern.pattern}"
+
+    # Check if command starts with an allowed prefix
+    is_allowlisted = False
     for prefix in _COMMAND_ALLOWLIST_PREFIXES:
         if cmd_stripped.startswith(prefix):
-            return True, "allowed prefix"
+            is_allowlisted = True
+            break
 
-    # Check blocklist
+    if not is_allowlisted:
+        return False, "command does not match any allowed prefix"
+
+    # Check blocklist even for allowlisted commands (except known false positives)
+    # Skip eval/exec check for allowlisted bash/python scripts (e.g., "run-eval.sh")
     for pattern in _COMMAND_BLOCKLIST_RE:
+        pat_str = pattern.pattern
+        # Known false positive: \beval\b in "run-eval.sh", \bexec\b in "exec-task.sh"
+        if pat_str in (r'\beval\b', r'\bexec\b') and is_allowlisted:
+            continue
         if pattern.search(cmd_stripped):
-            return False, f"blocked pattern: {pattern.pattern}"
+            return False, f"blocked pattern: {pat_str}"
 
-    return False, "command does not match any allowed prefix"
+    return True, "allowed prefix"

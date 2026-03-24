@@ -74,6 +74,30 @@ _RE_HARD_REQUIREMENTS = re.compile(
 _RE_ALTERNATIVES = re.compile(
     r"(?i)(alternatively|or use|if.*not available|fallback)"
 )
+# New composability patterns (v6.0.1 — granular scoring)
+_RE_ERROR_BEHAVIOR = re.compile(
+    r"(?i)(on\s+error|error\s+handling|if\s+[\w\s]+\s+fails?|when\s+[\w\s]+\s+fails?|"
+    r"graceful(?:ly)?\s+(?:handle|degrad\w+|fail)|recover(?:y|s)?\s+(?:from|when))"
+)
+_RE_IDEMPOTENCY = re.compile(
+    r"(?i)(idempotent|safe to (?:re-?run|run (?:again|twice|multiple))|"
+    r"running (?:again|twice)|no side.?effects?|re-?entrant)"
+)
+_RE_DEPENDENCY_DECL = re.compile(
+    r"(?i)(requires?[:\s]+(?:python|node|npm|pip|git|jq|bash|ruby|go)\b|"
+    r"depends?\s+on|prerequisite|"
+    r"needs?\s+(?:python|node|npm|pip|git|jq|bash|ruby|go)\b|"
+    r"install\s+\w+\s+first)"
+)
+_RE_NAMESPACE_ISOLATION = re.compile(
+    r"(?i)(namespace\s+\w+|namespaced?\b|__\w+__|"
+    r"@[\w-]+/[\w-]+|plugin[_-]\w+|scoped\s+to\b)"
+)
+_RE_VERSION_COMPAT = re.compile(
+    r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
+    r"requires?\s+\w+\s*[><=]+\s*[\d.]+|minimum\s+version|"
+    r"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+)"
+)
 
 # --- Used in score_clarity() ---
 _RE_ALWAYS_PATTERNS = re.compile(r"(?i)\b(always|must)\s+(\w+(?:\s+\w+)?)")
