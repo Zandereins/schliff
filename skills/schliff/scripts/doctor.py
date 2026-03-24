@@ -52,6 +52,7 @@ def _score_single_skill(skill_path: str) -> dict:
         "edges": scorer.score_edges(skill_path, eval_suite),
         "efficiency": scorer.score_efficiency(skill_path),
         "composability": scorer.score_composability(skill_path),
+        "clarity": scorer.score_clarity(skill_path),
     }
 
     composite = scorer.compute_composite(scores)
@@ -68,15 +69,15 @@ def _score_single_skill(skill_path: str) -> dict:
     unmeasured = composite.get("unmeasured", [])
 
     if not has_eval:
-        action = "Run /schliff:init to generate eval suite"
+        action = f"/schliff:init {skill_path}"
     elif score < 50:
-        action = "Run /schliff:auto — significant room for improvement"
+        action = f"/schliff:auto {skill_path}"
     elif score < 80:
-        action = "Run /schliff:auto — moderate improvements possible"
+        action = f"/schliff:auto {skill_path}"
     elif score < 95:
-        action = "Run /schliff:analyze for targeted fixes"
+        action = f"/schliff:analyze {skill_path}"
     else:
-        action = "Healthy — consider runtime eval for validation"
+        action = "Healthy"
 
     return {
         "composite": score,

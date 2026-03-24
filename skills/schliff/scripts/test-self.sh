@@ -36,9 +36,9 @@ section "Self-Score: Schliff evaluates its own SKILL.md"
 
 SELF_SCORE=$(python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR/SKILL.md" --json 2>&1)
 
-# All 6 base dimensions should be measurable
+# All 7 base dimensions should be measurable (6 core + clarity)
 MEASURED=$(echo "$SELF_SCORE" | python3 -c "import sys,json; print(json.load(sys.stdin)['confidence']['measured'])" 2>/dev/null)
-[[ "$MEASURED" == "6" ]] && pass "All 6 dimensions measured" || fail "Expected 6 dimensions, got $MEASURED"
+[[ "$MEASURED" == "7" ]] && pass "All 7 dimensions measured" || fail "Expected 7 dimensions, got $MEASURED"
 
 # Composite should be >= 90 (Schliff should practice what it preaches)
 COMPOSITE=$(echo "$SELF_SCORE" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])" 2>/dev/null)
@@ -118,7 +118,7 @@ HAS_BASELINE=$(echo "$PROG_RESULT" | python3 -c "import sys,json; print(json.loa
 section "Clarity: Self-measure instruction quality"
 ##############################################################################
 
-CLARITY_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR/SKILL.md" --json --clarity 2>&1)
+CLARITY_RESULT=$(python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR/SKILL.md" --json 2>&1)
 CLARITY_SCORE=$(echo "$CLARITY_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['dimensions']['clarity'])" 2>/dev/null)
 python3 -c "import sys; exit(0 if int(sys.argv[1]) >= 80 else 1)" "$CLARITY_SCORE" 2>/dev/null && \
     pass "Clarity >= 80 (got $CLARITY_SCORE)" || fail "Clarity $CLARITY_SCORE < 80"

@@ -125,8 +125,14 @@ def score_triggers(skill_path: str, eval_suite: Optional[dict]) -> dict:
 
     score = int((correct / total) * 100) if total > 0 else 0
 
+    # Cap score for small eval suites — low sample size = low confidence
+    if total < 8:
+        score = min(score, 60)
+
     # Identify failure patterns
     issues = []
+    if total < 8:
+        issues.append(f"low_confidence_triggers:{total}_of_8_minimum")
     false_positives = sum(1 for d in details_per_trigger if d["predicted"] and not d["expected"])
     false_negatives = sum(1 for d in details_per_trigger if not d["predicted"] and d["expected"])
     if false_positives > 0:
