@@ -106,7 +106,7 @@ git clone https://github.com/Zandereins/schliff.git && bash schliff/install.sh
 
 | Skill | Before | After | Iterations | Author |
 |-------|--------|-------|------------|--------|
-| schliff (self-score) | 54.0 [D] | 98.3 [S] | 18 | [@Zandereins](https://github.com/Zandereins) |
+| schliff (self-score)* | 54.0 [D] | 98.3 [S] | 18 | [@Zandereins](https://github.com/Zandereins) |
 | agent-review-panel | 89.1 [A] | 90.8 [A] | 8 | [@wan-huiyan](https://github.com/wan-huiyan) |
 
 The demo skill (`demo/bad-skill/SKILL.md`) — a vague, hedging-filled deployment helper — goes from [D] to [S] in 18 autonomous iterations:
@@ -119,6 +119,8 @@ The demo skill (`demo/bad-skill/SKILL.md`) — a vague, hedging-filled deploymen
 ```
 
 Real-world skills vary. Complex skills plateau around [A] to [S] depending on eval suite coverage.
+
+*\* Peak score during demo improvement loop. Current live score is 95.7 (see above) — lower due to scorer improvements that raised the bar.*
 
 *Run `schliff score` on your skill and [add your result](https://github.com/Zandereins/schliff/edit/main/README.md).*
 
