@@ -54,8 +54,12 @@ def read_skill_safe(skill_path: str) -> str:
     """Read a skill file with size limit enforcement and caching.
 
     Reads first, then checks size (avoids TOCTOU race condition).
+    Rejects symlinks to prevent reading arbitrary files via crafted paths.
     """
-    p = Path(skill_path).resolve()
+    raw = Path(skill_path)
+    if raw.is_symlink():
+        raise ValueError(f"Skill path is a symlink (rejected): {skill_path}")
+    p = raw.resolve()
     key = str(p)
     if key in _file_cache:
         return _file_cache[key]

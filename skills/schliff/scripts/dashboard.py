@@ -224,7 +224,7 @@ def format_dashboard(dashboard: dict) -> str:
     for dim, s in dashboard["dimensions"].items():
         if s >= 0:
             bar = _colored_bar(s)
-            lines.append(f"    {dim:15s} {bar}  {s}/100")
+            lines.append(f"    {dim:15s} {bar}  {s:.0f}/100")
         else:
             lines.append(f"    {dim:15s} {'n/a':>15s}")
     lines.append("")

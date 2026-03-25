@@ -58,6 +58,8 @@ LOOP (N iterations, continues until goal met or budget exhausted):
 - **Don't know what's wrong** → Run `/schliff:analyze` for auto-discovery
 - **Any custom goal** → Define GOAL, pick/create METRIC, set VERIFY command
 
+Do NOT use for creating new skills from scratch — use skill-creator first. Do NOT use for SQL query tuning or prompt template authoring.
+
 ## Interface: GOAL + METRIC + VERIFY
 
 ```bash
