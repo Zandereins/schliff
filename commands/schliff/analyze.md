@@ -177,7 +177,7 @@ Perform a comprehensive analysis of a skill and identify top improvements.
 
 ## Notes
 
-- Composite score is a weighted average: 15% structure + 20% triggers + 20% quality + 15% edges + 10% efficiency + 5% composability + 15% runtime (when enabled). Without runtime, weights are renormalized across the 6 static dimensions.
+- Composite score is a weighted average: 15% structure + 20% triggers + 20% quality + 15% edges + 10% efficiency + 10% composability + 5% clarity + 10% runtime (when enabled). Without runtime, weights are renormalized across the 7 static dimensions.
 - Pass rate is the binary result: X assertions passing out of Y total (requires eval suite).
 - If no eval suite exists, dimension scores are estimates based on manual review.
 - Improvements are ranked by composite impact: (dimension_gap) × (dimension_weight).

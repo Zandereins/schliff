@@ -120,7 +120,11 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
     auto_path = skill_dir / "eval-suite.json"
     if auto_path.exists():
         try:
-            return json.loads(auto_path.read_text(encoding="utf-8"))
+            raw = auto_path.read_text(encoding="utf-8")
+            if len(raw) > MAX_SKILL_SIZE:
+                print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
+                return None
+            return json.loads(raw)
         except json.JSONDecodeError as e:
             print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
     return None

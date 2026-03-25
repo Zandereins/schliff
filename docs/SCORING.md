@@ -40,7 +40,8 @@ When runtime data is available, the composite score blends both tiers. When it i
 | **B** | >= 75 | Good — clear improvement paths exist |
 | **C** | >= 65 | Adequate — significant gaps in multiple dimensions |
 | **D** | >= 50 | Weak — fundamental issues need attention |
-| **F** | < 50 | Failing — major structural problems |
+| **E** | >= 35 | Poor — most dimensions below acceptable |
+| **F** | < 35 | Failing — major structural problems |
 
 Grades apply to both the composite score and each individual dimension. Dashboard and reports show color-coded grade badges.
 
@@ -208,7 +209,7 @@ Starts at 100 pts, deducts for issues:
 
 Code blocks are stripped before analysis to avoid false positives from examples.
 
-### Runtime (15%, opt-in)
+### Runtime (10%, opt-in)
 
 - Runs up to 3 test cases with `response_*` assertions
 - Invokes `claude -p` with skill content prepended to test prompt

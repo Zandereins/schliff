@@ -116,7 +116,8 @@ _RE_RUN_PATTERN = re.compile(
     r"^\s*(?:\d+\.\s*)?(?:Run|Execute|Install|Configure)\s+(.+)", re.IGNORECASE
 )
 _RE_CONCEPTUAL = re.compile(
-    r"(?i)(baseline|all\s+\d+|VERIFY|evolution|the\s+\w+\s+(?:on|for|to|with|against))"
+    r"(?i)(baseline|all\s+\d+|VERIFY|evolution|"
+    r"the\s+(?:process|workflow|pipeline|approach|system|loop|strategy)\s+(?:on|for|to|with|against))"
 )
 _RE_CONCRETE_CMD = re.compile(r"(`[^`]+`|[\w/.-]+\.\w+|/[\w/]+)")
 _RE_CODE_BLOCK_START = re.compile(r"^```")

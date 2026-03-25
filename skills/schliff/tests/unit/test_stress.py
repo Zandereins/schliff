@@ -76,17 +76,12 @@ class TestBoundaryEmptySkill:
         assert result["score"] == 0
         assert "empty_skill_body" in result["issues"]
 
-    def test_composability_empty_returns_nonzero_global_state_pass(self, tmp_path):
-        """Empty content has no global state patterns → gets 20 pts (2 checks pass).
-
-        Composability check 2 (no global state) and check 5 (no tool requirements)
-        pass on empty content because the absence of patterns is still a pass.
-        """
+    def test_composability_empty_returns_zero(self, tmp_path):
+        """Empty content triggers early return with score 0."""
         path = _write(tmp_path, "")
         result = score_composability(path)
-        # No global state patterns → check 2 passes (10 pts)
-        # No hard requirements → check 5 passes (10 pts)
-        assert result["score"] == 20
+        assert result["score"] == 0
+        assert "empty_skill_body" in result["issues"]
 
     def test_clarity_empty_returns_zero(self, tmp_path):
         path = _write(tmp_path, "")
