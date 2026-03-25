@@ -282,7 +282,7 @@ def format_score_display(
     Args:
         scores: Per-dimension score dicts {dim: {"score": float, ...}}.
         composite: Result from compute_composite().
-        version: Version string (e.g. "6.0.1").
+        version: Version string (e.g. "6.1.0").
         contradictions: List of contradiction strings from clarity scorer.
         fix_count: Number of deterministic fixes available.
     """
