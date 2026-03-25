@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-VERSION="6.0.0"
+VERSION="6.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_SRC="$SCRIPT_DIR/skills/schliff"
 COMMANDS_SRC="$SCRIPT_DIR/commands/schliff"

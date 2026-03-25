@@ -32,6 +32,10 @@ def score_composability(skill_path: str) -> dict:
     except (FileNotFoundError, ValueError):
         return {"score": 0, "issues": ["file_not_found"], "details": {}}
 
+    body = content.split('---', 2)[-1].strip() if '---' in content else content.strip()
+    if not body:
+        return {"score": 0, "issues": ["empty_skill_body"], "details": {}}
+
     score = 0
     issues = []
 

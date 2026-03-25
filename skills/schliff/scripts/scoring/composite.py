@@ -72,7 +72,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> di
     if custom_weights:
         # Reject negative weights
         for k, v in custom_weights.items():
-            if isinstance(v, (int, float)) and v >= 0:
+            if k in weights and isinstance(v, (int, float)) and v >= 0:
                 weights[k] = v
         # Normalize all weights to sum to 1.0
         total_w = sum(weights.values())
@@ -82,9 +82,13 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> di
         # Try auto-calibrated weights (second priority)
         calibrated = _load_calibrated_weights()
         if calibrated:
-            total_w = sum(calibrated.values())
-            if total_w > 0:
-                weights = {k: v / total_w for k, v in calibrated.items()}
+            calibrated_filtered = {k: v for k, v in calibrated.items() if k in weights}
+            if calibrated_filtered:
+                for k, v in calibrated_filtered.items():
+                    weights[k] = v
+                total_w = sum(weights.values())
+                if total_w > 0:
+                    weights = {k: v / total_w for k, v in weights.items()}
 
     # If clarity is present, add it with weight 0.05 redistributed proportionally
     if "clarity" in scores and "clarity" not in (custom_weights or {}):
