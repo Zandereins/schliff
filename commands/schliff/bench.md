@@ -1,10 +1,10 @@
 ---
 name: schliff:bench
 description: >
-  Run a full benchmark of a skill's current quality. Measures all 6 dimensions
-  (structure, triggers, quality, edges, efficiency, composability) and runs
-  binary eval assertions if an eval suite exists. Records results in JSONL format
-  and supports comparison against previous benchmarks to show progress deltas.
+  Run a full benchmark of a skill's current quality. Measures all 7 dimensions
+  (structure, triggers, quality, edges, efficiency, composability, clarity) and
+  runs binary eval assertions if an eval suite exists. Records results in JSONL
+  format and supports comparison against previous benchmarks to show progress deltas.
 ---
 
 # /schliff:bench
@@ -25,7 +25,7 @@ Establish or update a quality baseline benchmark for the target skill.
    bash scripts/analyze-skill.sh /path/to/SKILL.md
    ```
 
-4. Run the Python scorer to get all 6 dimensions:
+4. Run the Python scorer to get all 7 dimensions:
    ```bash
    python3 scripts/score-skill.py \
      /path/to/SKILL.md \
@@ -41,9 +41,10 @@ Establish or update a quality baseline benchmark for the target skill.
      --no-runtime-auto
    ```
 
-6. Calculate composite score (weighted average of 6 dimensions) and pass rate:
-   - Composite: (structure × 0.15 + triggers × 0.2 + quality × 0.25 + \
-     edges × 0.15 + efficiency × 0.15 + composability × 0.1) / 100
+6. Calculate composite score (weighted average of 7 dimensions) and pass rate:
+   - Composite: weighted average of 7 dimensions, renormalized to sum 1.0.
+     Base weights: structure=0.15, triggers=0.20, quality=0.20, edges=0.15,
+     efficiency=0.10, composability=0.10, clarity=0.05 (+ runtime=0.10 when enabled).
    - Pass rate: (assertions_passed / assertions_total)
 
 7. Record the benchmark in schliff-results.jsonl:
@@ -79,7 +80,8 @@ Establish or update a quality baseline benchmark for the target skill.
     ├─ Quality:       XX   (output correctness)
     ├─ Edges:         XX   (error handling)
     ├─ Efficiency:    XX   (token usage)
-    └─ Composability: XX   (scope boundaries)
+    ├─ Composability: XX   (scope boundaries)
+    └─ Clarity:       XX   (contradictions, ambiguity)
 
     Eval Results:
     ├─ Positive triggers: X/5 detected correctly

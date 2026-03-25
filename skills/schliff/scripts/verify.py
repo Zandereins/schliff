@@ -116,7 +116,10 @@ def append_history(
     result: dict,
     history_path: str = _DEFAULT_HISTORY,
 ) -> None:
-    """Append a score entry to the history file."""
+    """Append a score entry to the history file.
+
+    Uses fcntl.flock for safe concurrent writes from parallel CI jobs.
+    """
     hp = Path(history_path)
     hp.parent.mkdir(parents=True, exist_ok=True)
 
@@ -128,8 +131,17 @@ def append_history(
         "dimensions": result["dimensions"],
     }
 
-    with open(hp, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, separators=(",", ":")) + "\n")
+    line = json.dumps(entry, separators=(",", ":")) + "\n"
+    try:
+        import fcntl
+        with open(hp, "a", encoding="utf-8") as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            f.write(line)
+            # Lock released on close
+    except (ImportError, OSError):
+        # fcntl unavailable on Windows — fall back to unlocked append
+        with open(hp, "a", encoding="utf-8") as f:
+            f.write(line)
 
 
 def run_verify(

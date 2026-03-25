@@ -2,9 +2,9 @@
 name: schliff:analyze
 description: >
   Perform a comprehensive analysis of an existing Claude Code skill. Examines
-  all 6 dimensions (structure, triggers, quality, edges, efficiency, composability),
-  shows both composite score and binary eval pass rate, and provides specific,
-  actionable improvement suggestions ranked by impact.
+  all 7 dimensions (structure, triggers, quality, edges, efficiency, composability,
+  clarity), shows both composite score and binary eval pass rate, and provides
+  specific, actionable improvement suggestions ranked by impact.
 ---
 
 # /schliff:analyze
@@ -65,7 +65,7 @@ Perform a comprehensive analysis of a skill and identify top improvements.
      * Negative case clarity: Is it obvious when NOT to use it?
      * Actual trigger accuracy from eval suite (if available)
 
-   - **Quality (25% weight)**:
+   - **Quality (20% weight)**:
      * Output correctness: Does the skill produce right answers?
      * Completeness: Does it cover the full scope?
      * Consistency: Are outputs reliable across variations?
@@ -77,7 +77,7 @@ Perform a comprehensive analysis of a skill and identify top improvements.
      * Graceful degradation: Does it fail cleanly or crash?
      * Edge case handling from eval suite (if available)
 
-   - **Efficiency (15% weight)**:
+   - **Efficiency (10% weight)**:
      * Token usage: Are instructions concise?
      * Hedging elimination: Any unnecessary "maybe" language?
      * Example conciseness: Are examples right-sized?
@@ -88,6 +88,11 @@ Perform a comprehensive analysis of a skill and identify top improvements.
      * Conflict risk: Could this clash with similar skills?
      * Dependency clarity: Does it state prerequisites?
      * Integration points: Can other skills call this cleanly?
+
+   - **Clarity (5% weight)**:
+     * Contradictions: Are there always/never conflicts?
+     * Vague references: Are "this", "it", "the above" resolved?
+     * Ambiguous instructions: Are steps concrete and actionable?
 
 9. Identify improvement opportunities by gap analysis:
    - For each dimension below 80: Why is it low?
@@ -177,7 +182,7 @@ Perform a comprehensive analysis of a skill and identify top improvements.
 
 ## Notes
 
-- Composite score is a weighted average: 15% structure + 20% triggers + 20% quality + 15% edges + 10% efficiency + 5% composability + 15% runtime (when enabled). Without runtime, weights are renormalized across the 6 static dimensions.
+- Composite score is a weighted average of measured dimensions, renormalized to sum 1.0. Base weights: structure 15%, triggers 20%, quality 20%, edges 15%, efficiency 10%, composability 10%, clarity 5%, runtime 10% (opt-in). Without runtime, the 7 static dimensions are renormalized to 100%.
 - Pass rate is the binary result: X assertions passing out of Y total (requires eval suite).
 - If no eval suite exists, dimension scores are estimates based on manual review.
 - Improvements are ranked by composite impact: (dimension_gap) × (dimension_weight).

@@ -54,8 +54,12 @@ def read_skill_safe(skill_path: str) -> str:
     """Read a skill file with size limit enforcement and caching.
 
     Reads first, then checks size (avoids TOCTOU race condition).
+    Rejects symlinks to prevent reading arbitrary files via crafted paths.
     """
-    p = Path(skill_path).resolve()
+    raw = Path(skill_path)
+    if raw.is_symlink():
+        raise ValueError(f"Skill path is a symlink (rejected): {skill_path}")
+    p = raw.resolve()
     key = str(p)
     if key in _file_cache:
         return _file_cache[key]
@@ -120,7 +124,11 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
     auto_path = skill_dir / "eval-suite.json"
     if auto_path.exists():
         try:
-            return json.loads(auto_path.read_text(encoding="utf-8"))
+            raw = auto_path.read_text(encoding="utf-8")
+            if len(raw) > MAX_SKILL_SIZE:
+                print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
+                return None
+            return json.loads(raw)
         except json.JSONDecodeError as e:
             print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
     return None
