@@ -161,6 +161,53 @@ def cmd_doctor(args):
         print(formatted)
 
 
+def cmd_badge(args):
+    """Generate a markdown badge for a skill's score."""
+    from pathlib import Path
+    from scoring import (
+        score_structure, score_triggers, score_efficiency,
+        score_composability, score_quality, score_edges,
+        score_clarity, compute_composite,
+    )
+    from shared import load_eval_suite
+    from terminal_art import score_to_grade
+
+    if not Path(args.skill_path).exists():
+        print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
+        sys.exit(1)
+
+    eval_suite = load_eval_suite(args.skill_path)
+
+    scores = {
+        "structure": score_structure(args.skill_path),
+        "triggers": score_triggers(args.skill_path, eval_suite),
+        "quality": score_quality(args.skill_path, eval_suite),
+        "edges": score_edges(args.skill_path, eval_suite),
+        "efficiency": score_efficiency(args.skill_path),
+        "composability": score_composability(args.skill_path),
+        "clarity": score_clarity(args.skill_path),
+    }
+
+    composite = compute_composite(scores)
+    score = composite["score"]
+    grade = score_to_grade(score)
+
+    # Color based on grade
+    colors = {
+        "S": "brightgreen", "A": "green", "B": "yellowgreen",
+        "C": "yellow", "D": "orange", "E": "red", "F": "red",
+    }
+    color = colors.get(grade, "lightgrey")
+
+    # URL-encode the label
+    import urllib.parse
+    label = urllib.parse.quote(f"{score:.0f}/100 [{grade}]")
+
+    badge_md = f"[![Schliff: {score:.0f} [{grade}]](https://img.shields.io/badge/Schliff-{label}-{color})](https://github.com/Zandereins/schliff)"
+
+    print(badge_md)
+
+
 def cmd_version(_args):
     """Print version string."""
     try:
@@ -203,6 +250,10 @@ def main():
     doctor_parser.add_argument("--verbose", "-v", action="store_true",
                                help="Show per-skill issues")
 
+    # badge command
+    badge_parser = subparsers.add_parser("badge", help="Generate markdown badge for a skill")
+    badge_parser.add_argument("skill_path", help="Path to SKILL.md")
+
     # version command
     subparsers.add_parser("version", help="Show version")
 
@@ -212,6 +263,7 @@ def main():
         "score": cmd_score,
         "verify": cmd_verify,
         "doctor": cmd_doctor,
+        "badge": cmd_badge,
         "version": cmd_version,
     }
 

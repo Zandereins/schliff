@@ -138,8 +138,9 @@ Real-world skills vary. Complex skills plateau around [A] to [S] depending on ev
 | Command | Purpose |
 |---------|---------|
 | `schliff score <path>` | Score a SKILL.md (pip CLI, no Claude Code needed) |
-| `schliff verify <path>` | CI gate — exit 0/1, `--min-score`, `--regression` |
+| `schliff verify <path>` | CI gate — exit 0/1, `--min-score`, `--regression`, pre-commit hook |
 | `schliff doctor` | Scan all installed skills, show health grades |
+| `schliff badge <path>` | Generate copy-paste markdown badge |
 | `/schliff:auto` | Autonomous improvement loop with EMA-based stopping |
 | `/schliff:init <path>` | Bootstrap eval suite + baseline from any SKILL.md |
 | `/schliff:analyze` | One-shot gap analysis with ranked fix recommendations |
@@ -164,6 +165,20 @@ Score skills in CI. Block regressions. The Codecov for SKILL.md files.
 ```bash
 # Or use the CLI directly
 schliff verify path/to/SKILL.md --min-score 75 --regression
+```
+
+---
+
+## Pre-commit Hook
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/Zandereins/schliff
+    rev: v6.1.0
+    hooks:
+      - id: schliff-verify
+        args: ['--min-score', '75']
 ```
 
 ---
