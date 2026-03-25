@@ -238,7 +238,7 @@ The trigger scorer uses TF-IDF heuristics. Skills whose domain vocabulary overla
 skill-creator  -->  v1 SKILL.md  -->  schliff score  -->  /schliff:auto  -->  ship
 ```
 
-[skill-creator](https://github.com/anthropics/courses/tree/master/claude-code/09-skill-creator) builds a v1 skill. Schliff grinds it to production quality.
+Anthropic's [skill-creator course](https://github.com/anthropics/courses/tree/master/claude-code/09-skill-creator) teaches you to build a v1 skill. Schliff grinds it to production quality.
 
 ---
 

@@ -21,7 +21,12 @@ Schliff is a deterministic linter for SKILL.md files. No LLM needed — it runs 
 
 What I think is novel: anti-gaming detection. Skills are text files, so it's tempting to stuff keywords or pad sections to inflate scores. Schliff catches all 6 gaming patterns in our benchmark suite — keyword stuffing, empty headers, copy-paste examples, contradictory instructions, bloated preambles, missing scope boundaries.
 
-External validation came from @wan-huiyan, who ran Schliff on agent-review-panel (a multi-agent adversarial code review tool). Their SKILL.md went from 64 [D] to 85.6 [A] across 3 improvement rounds, while shrinking from 1,331 to 340 lines — 75% fewer tokens via references/ extraction. They A/B tested the optimized skill on a 1,132-line document: identical verdict, and the shorter version actually caught 2 additional findings.
+An external user ran Schliff on agent-review-panel (a multi-agent adversarial code review tool). Their SKILL.md went from 64 [D] to 85.6 [A] across 3 improvement rounds, while shrinking from 1,331 to 340 lines — 75% fewer tokens via references/ extraction. They A/B tested the optimized skill on a 1,132-line document: identical verdict, and the shorter version actually caught 2 additional findings.
+
+```
+Before:  54.0/100 [D]  (vague triggers, no edge cases, hedging language)
+After:   98.3/100 [S]  (18 autonomous iterations, zero human input)
+```
 
 Schliff scores itself at 99.0/100 [S]. Same engine, no exceptions. 540+ tests, MIT licensed.
 
