@@ -9,7 +9,7 @@ help: ## Show available targets
 test: ## Run integration tests (99+ tests)
 	cd $(SKILL_DIR) && bash scripts/test-integration.sh --no-runtime-auto
 
-test-self: ## Run self-tests (12 tests)
+test-self: ## Run self-tests (20 tests)
 	cd $(SKILL_DIR) && bash scripts/test-self.sh
 
 test-proof: ## Run proof tests (6 tests)

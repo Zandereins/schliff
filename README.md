@@ -23,18 +23,17 @@ schliff score path/to/SKILL.md
 schliff v6.1.0
 
   structure      ██████████  100/100  perfect
-  triggers       ██████████   97/100  excellent
-  quality        █████████░   91/100  great
+  triggers       ██████████  100/100  perfect
+  quality        ██████████   99/100  excellent
   edges          ██████████  100/100  perfect
-  efficiency     ████████░░   83/100  good
+  efficiency     █████████░   92/100  great
   composability  ██████████  100/100  perfect
   clarity        ██████████  100/100  perfect
 
-  Structural Score  ███████████████████░  95.7/100  [S]
-  → 1 deterministic fix available. Run `schliff auto` to apply.
+  Structural Score  ████████████████████  99.0/100  [S]
 ```
 
-Schliff scores itself at 95.7/100 [S]. Same engine, no exceptions. **Zero dependencies** — Python 3.9+ stdlib only.
+Schliff scores itself at 99.0/100 [S]. Same engine, no exceptions. **Zero dependencies** — Python 3.9+ stdlib only.
 
 ---
 
@@ -120,7 +119,7 @@ The demo skill (`demo/bad-skill/SKILL.md`) — a vague, hedging-filled deploymen
 
 Real-world skills vary. Complex skills plateau around [A] to [S] depending on eval suite coverage.
 
-*\* Peak score during demo improvement loop. Current live score is 95.7 (see above) — lower due to scorer improvements that raised the bar.*
+*\* Peak score during demo improvement loop on the demo skill. Current live self-score is 99.0 (see above).*
 
 *Run `schliff score` on your skill and [add your result](https://github.com/Zandereins/schliff/edit/main/README.md).*
 
@@ -236,10 +235,10 @@ skill-creator  -->  v1 SKILL.md  -->  schliff score  -->  /schliff:auto  -->  sh
 ## Badge
 
 ```markdown
-[![Schliff: 95 [S]](https://img.shields.io/badge/Schliff-95%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
+[![Schliff: 99 [S]](https://img.shields.io/badge/Schliff-99%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
 ```
 
-[![Schliff: 95 [S]](https://img.shields.io/badge/Schliff-95%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
+[![Schliff: 99 [S]](https://img.shields.io/badge/Schliff-99%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
 
 ---
 

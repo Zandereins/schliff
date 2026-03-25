@@ -556,7 +556,7 @@ class TestRegressionBadSkillPinned:
 
 
 class TestRegressionRealSkillMd:
-    """Schliff's own SKILL.md composite must stay within 95.4 ± 0.5."""
+    """Schliff's own SKILL.md composite must stay within 99.0 ± 1.5."""
 
     SKILL_MD_PATH = str(
         Path(__file__).resolve().parent.parent.parent / "SKILL.md"
@@ -564,11 +564,10 @@ class TestRegressionRealSkillMd:
 
     def test_composite_within_tolerance(self):
         result = _score_all(self.SKILL_MD_PATH)
-        # Measured 2026-03-25: composite after efficiency optimization (bash labels,
-        # composability handoff fix, trigger FP fix) = 97.0.
-        # Tolerance 1.5 guards against regressions without breaking on
-        # rounding changes or minor content edits.
-        expected = 97.0
+        # Measured 2026-03-25: composite after quality coherence + efficiency
+        # word compression + composability handoff fix = 99.0.
+        # Tolerance 1.5 guards against regressions.
+        expected = 99.0
         tolerance = 1.5
         assert abs(result["score"] - expected) <= tolerance, (
             f"SKILL.md composite regression: expected {expected} ±{tolerance}, "
