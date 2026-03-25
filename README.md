@@ -83,6 +83,7 @@ Reproduce: `python benchmarks/anti-gaming/run.py`
 
 ```bash
 pip install schliff          # or: pipx install schliff
+schliff demo                            # see it in action on a built-in bad skill
 schliff score path/to/SKILL.md
 schliff score path/to/SKILL.md --json   # machine-readable
 schliff doctor                           # scan all installed skills
@@ -137,6 +138,7 @@ Real-world skills vary. Complex skills plateau around [A] to [S] depending on ev
 
 | Command | Purpose |
 |---------|---------|
+| `schliff demo` | Score a built-in bad skill — see schliff in action instantly |
 | `schliff score <path>` | Score a SKILL.md (pip CLI, no Claude Code needed) |
 | `schliff verify <path>` | CI gate — exit 0/1, `--min-score`, `--regression`, pre-commit hook |
 | `schliff doctor` | Scan all installed skills, show health grades |

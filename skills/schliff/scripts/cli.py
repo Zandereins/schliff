@@ -63,7 +63,7 @@ def cmd_score(args):
         result = {
             "skill_path": args.skill_path,
             "composite_score": composite["score"],
-            "dimensions": {k: v["score"] for k, v in scores.items()},
+            "dimensions": {k: round(v["score"], 1) if isinstance(v["score"], float) else v["score"] for k, v in scores.items()},
             "warnings": composite["warnings"],
         }
         print(json.dumps(result, indent=2))
@@ -201,11 +201,51 @@ def cmd_badge(args):
 
     # URL-encode the label
     import urllib.parse
-    label = urllib.parse.quote(f"{score:.0f}/100 [{grade}]")
+    label = urllib.parse.quote(f"{score:.0f}/100 [{grade}]", safe="")
 
     badge_md = f"[![Schliff: {score:.0f} [{grade}]](https://img.shields.io/badge/Schliff-{label}-{color})](https://github.com/Zandereins/schliff)"
 
     print(badge_md)
+
+
+def cmd_demo(_args):
+    """Score a built-in demo skill to showcase schliff's output."""
+    import tempfile
+    from pathlib import Path
+
+    demo_content = '''---
+name: deploy-helper
+description: Helps with deployment stuff
+---
+
+# Deploy Helper
+
+This skill probably helps with deployment. You might want to use it when deploying things.
+
+## What It Does
+
+- Setting up deployment configurations
+- Running deploy commands
+- Checking if deployment worked
+
+## How To Use
+
+1. Tell Claude you want to deploy something
+2. It will try to help you
+3. Check if it worked
+'''
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        skill_path = str(Path(tmpdir) / "SKILL.md")
+        Path(skill_path).write_text(demo_content, encoding="utf-8")
+
+        # Reuse cmd_score logic
+        import argparse as _ap
+        fake_args = _ap.Namespace(skill_path=skill_path, json=False, eval_suite=None)
+        cmd_score(fake_args)
+
+    print("\n  This is a deliberately bad skill. Try schliff on your own skills!")
+    print("  Usage: schliff score path/to/SKILL.md\n")
 
 
 def cmd_version(_args):
@@ -254,6 +294,9 @@ def main():
     badge_parser = subparsers.add_parser("badge", help="Generate markdown badge for a skill")
     badge_parser.add_argument("skill_path", help="Path to SKILL.md")
 
+    # demo command
+    subparsers.add_parser("demo", help="Score a built-in bad skill to see schliff in action")
+
     # version command
     subparsers.add_parser("version", help="Show version")
 
@@ -264,6 +307,7 @@ def main():
         "verify": cmd_verify,
         "doctor": cmd_doctor,
         "badge": cmd_badge,
+        "demo": cmd_demo,
         "version": cmd_version,
     }
 
