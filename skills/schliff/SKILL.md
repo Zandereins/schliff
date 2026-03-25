@@ -86,8 +86,6 @@ Verify: python3 scripts/score-skill.py SKILL.md --json
 Constraint: efficiency >= 80, composability >= 90
 ```
 
-Use constraints to prevent dimension degradation during optimization.
-
 ## Quality Dimensions (Defaults, Configurable via `--weights`)
 
 | Dimension | Metric | How | Limitation |
@@ -100,9 +98,6 @@ Use constraints to prevent dimension degradation during optimization.
 | **Composability** | Scope boundary declarations | Static analysis | Cannot verify multi-skill interaction |
 | **Clarity** *(default)* | Contradiction + ambiguity score | `score-skill.py` (opt-out: `--no-clarity`) | Pattern-based, not semantic |
 
-**Important:** These dimensions measure structural quality — how well-formed your skill file
-is. They do NOT measure runtime effectiveness. Use `scripts/runtime-evaluator.py` to invoke
-Claude with test prompts and check actual output against assertions.
 See `references/metrics-catalog.md` for detailed rubrics and custom metric setup.
 
 ## Custom Metrics
@@ -158,29 +153,16 @@ Each iteration follows `references/improvement-protocol.md`. Immutable rules:
 
 ## Cross-Session Learning
 
-Schliff reads `history/results.jsonl` at loop start. Extract patterns from past runs:
-1. Parse all previous keep/discard decisions with their change types.
-2. Compute success rate per strategy (e.g., "synonym expansion: 80% keep rate").
-3. Prioritize strategies with highest historical success rate for this skill.
-4. Track diminishing returns: if last 5 iterations gained < 1 point total, suggest stopping.
+Reads `history/results.jsonl` at loop start. Parses keep/discard decisions per strategy type, computes success rates, prioritizes high-ROI strategies. Track diminishing returns: < 1 point over last 5 iterations triggers stop suggestion. Visualize with `scripts/progress.py`.
 
-Use `scripts/progress.py` to visualize convergence curves and detect plateaus.
+## Multi-File Skills
 
-## Agent + Multi-File Skill Improvement
-
-Schliff handles skills that span multiple files (SKILL.md + references/):
-1. Read the full skill tree before each change. Build a file dependency map.
-2. When a change requires a new reference file, create it and add a pointer from SKILL.md.
-3. When SKILL.md exceeds 400 lines, extract the largest section to `references/`.
-4. Verify all cross-file references resolve after each change.
-
-For agent improvement (not just skills): treat the agent's system prompt as SKILL.md
-and tool definitions as reference files. Execute the same loop on agent configs.
+Handles SKILL.md + references/ trees. Reads full skill tree before each change. Extracts sections to `references/` when SKILL.md exceeds 400 lines. Verifies cross-file references resolve after each edit. For agent improvement: treat system prompt as SKILL.md, tool definitions as reference files.
 
 ## Discovery Mode (Auto-Gap Analysis)
 
 Run `/schliff:analyze` without a GOAL. Schliff will:
-1. Run all 6 dimension scorers on the target skill.
+1. Run all 7 dimension scorers on the target skill.
 2. Identify the weakest dimension and its specific failure patterns.
 3. Cluster eval failures to find systemic issues (e.g., "all false negatives share short prompts").
 4. Propose a ranked list of improvements with estimated iteration cost.
@@ -188,46 +170,21 @@ Run `/schliff:analyze` without a GOAL. Schliff will:
 
 Use discovery mode when the user says "my skill needs work" without specifying what.
 
-## Parallel Experimentation (Try 3, Keep Best)
+## Parallel Experimentation
 
-For iterations where multiple plausible changes exist:
-1. Create 3 candidate changes on separate git branches using `git worktree`.
-2. Run VERIFY on all 3 branches independently.
-3. Keep the branch with the highest metric improvement. Discard the other two.
-4. Fall back to sequential mode if git worktree is unavailable.
+Create 3 candidate changes on separate `git worktree` branches, run VERIFY on all 3, keep the highest improvement. Use when stuck (5+ discards) or gap > 15 points. Falls back to sequential if worktree unavailable.
 
-Use parallel mode when stuck (5+ sequential discards) or when the gap-to-target
-is large (>15 points). Explores 3x more search space per iteration.
+## Noisy Metrics
 
-## Noisy Metric + Interaction Effects
+When metrics fluctuate (>5%): run VERIFY 3 times, use median, keep only if improvement > 2x noise floor. Every 5 iterations, check composite against 5 iterations ago — revert to best checkpoint if composite dropped > 2 points despite individual keeps.
 
-When metrics fluctuate (±5%): run VERIFY 3 times, use median, keep only if
-improvement > 2 * noise floor (detected from first 3 baseline runs).
+## Cost Tracking
 
-Guard against interaction effects: every 5 iterations, compare composite against
-5 iterations ago. If composite dropped > 2 points despite individual keeps, revert
-to best-in-window checkpoint and re-apply only non-conflicting keeps.
-
-## Cost Tracking + ROI
-
-Track improvement efficiency to stop when returns diminish:
-1. `run-eval.sh --log` records `duration_ms`, `tokens_estimated`, `delta`, and `status` per run.
-2. Compute ROI: `delta_metric / iterations_spent` after each keep.
-3. Stop when ROI drops below threshold (e.g., last 5 iterations < 0.5 points gained).
-4. Use `progress.py --json` to compare cross-session ROI from logged data.
-
-Stop grinding when ROI drops below threshold to prevent wasted iterations.
+`run-eval.sh --log` records duration, tokens, delta, status per run. Compute ROI: `delta / iterations_spent`. Stop when last 5 iterations gained < 0.5 points. Compare cross-session ROI via `progress.py --json`.
 
 ## Self-Evolving Eval Suites
 
-After every 10 iterations, analyze eval suite effectiveness:
-1. Classify tests as "mastered", "blocked", or "flaky" via `classify_eval_health()`.
-2. Reduce weight of mastered tests — they no longer discriminate quality changes.
-3. Auto-generation of new test cases: classification implemented, auto-generation planned.
-4. Log eval mutations to `history/` separately from skill changes.
-
-Run eval evolution BETWEEN sessions, not during the loop, because this preserves
-Rule 7 (never modify VERIFY during loop) while improving test coverage.
+Every 10 iterations: classify tests as mastered/blocked/flaky via `classify_eval_health()`. Reduce weight of mastered tests. Log eval mutations to `history/` separately. Run eval evolution BETWEEN sessions (preserves Rule 7: never modify VERIFY during loop).
 
 ## Improvement Strategies (Dynamic)
 
@@ -259,17 +216,9 @@ Exp 4: Add edge case for partial audit → 75% → Keep
 Parse `history/results.jsonl` between sessions to extract which strategy types succeed.
 Compare keep rates per strategy to prioritize high-ROI changes in the next session.
 
-## Skill Genealogy + Handoff
+## Lineage
 
-Track lineage: `/skill-creator` → v1 → `/schliff` → autonomous grinding → merge.
-Roll back to any version: `git log --oneline history/` shows the full lineage.
-
-Create new skills with `skill-creator`. For crashing skills, suggest using
-`systematic-debugging` first, then return to Schliff for iteration.
-
-## Roadmap
-
-Planned: `/schliff:mesh-evolve` (auto-fix mesh issues), `/schliff:predict` (strategy prediction), `/schliff:recall` (episodic memory recall).
+`/skill-creator` → v1 → `/schliff` → autonomous grinding → merge. Roll back via `git log --oneline history/`. For crashing skills: use `systematic-debugging` first, then Schliff.
 
 ## Requirements & Compatibility
 
