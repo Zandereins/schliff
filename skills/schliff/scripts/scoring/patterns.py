@@ -116,7 +116,8 @@ _RE_RUN_PATTERN = re.compile(
     r"^\s*(?:\d+\.\s*)?(?:Run|Execute|Install|Configure)\s+(.+)", re.IGNORECASE
 )
 _RE_CONCEPTUAL = re.compile(
-    r"(?i)(baseline|all\s+\d+|VERIFY|evolution|the\s+\w+\s+(?:on|for|to|with|against))"
+    r"(?i)(baseline|all\s+\d+|VERIFY|evolution|"
+    r"the\s+(?:process|workflow|pipeline|approach|system|loop|strategy)\s+(?:on|for|to|with|against))"
 )
 _RE_CONCRETE_CMD = re.compile(r"(`[^`]+`|[\w/.-]+\.\w+|/[\w/]+)")
 _RE_CODE_BLOCK_START = re.compile(r"^```")
@@ -143,7 +144,9 @@ _RE_STRONG_DOMAIN_SIGNAL = re.compile(
 _RE_ANTI_DOMAIN_SIGNAL = re.compile(
     r"python\s+function|rest\s+api|docker|"
     r"security\s+vulnerab|\.py\b|\.ts\b|\.js\b|"
-    r"open\s+source\s+project|readme|prompt\s+template",
+    r"open\s+source\s+project|readme|prompt\s+template|"
+    r"database\s+quer|sql\s+quer|db\s+quer|"
+    r"(?:my|the)\s+(?:database|sql|postgres|mysql|sqlite|mongo)\b",
     re.IGNORECASE,
 )
 
@@ -179,7 +182,10 @@ _RE_CODE_BLOCK_REGION = re.compile(r"```[\s\S]*?```")
 def _has_skill_domain_signal(prompt: str) -> float:
     """Check if prompt is about skills (not generic code/config).
 
-    Returns a multiplier: 1.8 for strong signal, 1.0 for neutral, 0.4 for anti-signal.
+    Returns a multiplier: 1.8 for strong signal, 1.0 for neutral, 0.2 for anti-signal.
+    Anti-signal is set to 0.2 (not 0.4) so that high-scoring generic-action prompts
+    (e.g. 'optimize my database queries') cannot accumulate enough TF-IDF weight to
+    exceed the 4.5 threshold even when they contain multiple skill-adjacent verbs.
     """
     prompt_lower = prompt.lower()
 
@@ -190,6 +196,6 @@ def _has_skill_domain_signal(prompt: str) -> float:
         return 1.2
 
     if _RE_ANTI_DOMAIN_SIGNAL.search(prompt_lower):
-        return 0.4
+        return 0.2
 
     return 1.0

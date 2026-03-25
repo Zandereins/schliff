@@ -13,6 +13,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Repetition detection in efficiency scorer (repeated identical lines count as noise)
 - Screenshot-ready `schliff score` output with per-dimension bars and status words
 - 100+ new tests (init-skill, precision/recall, verify, terminal_art, anti-gaming)
+- 10 new eval-suite test cases (tc-8..tc-17) with 66 coherence-covering assertions
+
+### Changed
+- SKILL.md compressed by 13% (1676→1455 words) without information loss
+- Self-score: 95.7 → 99.0/100 [S] (quality 91→99 via coherence, efficiency 88→92 via compression)
 
 ### Fixed
 - Init script no longer generates Schliff-specific triggers for non-Schliff skills
@@ -21,6 +26,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - `load_last_score` handles corrupted history entries without crashing
 - `run_verify` returns exit code 2 on file-not-found and scorer errors
 - ANSI reset constant used consistently in terminal_art output
+- 10 bugs from 5-agent security audit (shell injection, prompt injection, ReDoS guards)
+- Composability handoff pattern restored (was dropped during SKILL.md compression)
 
 ## [6.0.0] - 2026-03-24
 

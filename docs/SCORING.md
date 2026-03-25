@@ -21,7 +21,7 @@ When runtime data is available, the composite score blends both tiers. When it i
 | Dimension | Weight | What It Measures | What It Does NOT Measure |
 |-----------|--------|-----------------|-------------------------|
 | **Structure** | 15% | Frontmatter (name, description), headers, examples, progressive disclosure, file length, dead content (TODO/FIXME), referenced file existence | Whether instructions are correct or effective |
-| **Trigger Accuracy** | 20% | TF-IDF keyword overlap between skill description and eval suite prompts, with stemming, synonym expansion, domain signal detection, and negation boundary handling | Actual Claude triggering behavior — that requires runtime evaluation |
+| **Trigger Accuracy** | 20% | TF-IDF keyword overlap between skill description and eval suite prompts, with stemming, synonym expansion, domain signal detection, and negation boundary handling. Reports precision and recall separately (v6.1.0+). | Actual Claude triggering behavior — that requires runtime evaluation |
 | **Eval Coverage (Quality)** | 20% | Assertion breadth (type diversity: contains, pattern, excludes, format), feature coverage (analyze, improve, report), assertion descriptions, instruction-assertion coherence | Whether following the skill produces correct output |
 | **Edge Coverage** | 15% | Edge case definitions in eval suite, category diversity (minimal input, invalid path, scale extreme, malformed input, missing deps, unicode), expected behaviors, edge assertions | Whether the skill handles edge cases correctly at runtime |
 | **Token Efficiency** | 10% | Information density (signal-to-noise ratio), actionable instructions, real examples, WHY-based reasoning, verification commands vs hedging, filler phrases, obvious instructions | Whether the content is actually useful to Claude |
@@ -40,7 +40,8 @@ When runtime data is available, the composite score blends both tiers. When it i
 | **B** | >= 75 | Good — clear improvement paths exist |
 | **C** | >= 65 | Adequate — significant gaps in multiple dimensions |
 | **D** | >= 50 | Weak — fundamental issues need attention |
-| **F** | < 50 | Failing — major structural problems |
+| **E** | >= 35 | Poor — most dimensions below acceptable |
+| **F** | < 35 | Failing — major structural problems |
 
 Grades apply to both the composite score and each individual dimension. Dashboard and reports show color-coded grade badges.
 
@@ -208,7 +209,7 @@ Starts at 100 pts, deducts for issues:
 
 Code blocks are stripped before analysis to avoid false positives from examples.
 
-### Runtime (15%, opt-in)
+### Runtime (10%, opt-in)
 
 - Runs up to 3 test cases with `response_*` assertions
 - Invokes `claude -p` with skill content prepended to test prompt
