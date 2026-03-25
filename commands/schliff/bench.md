@@ -42,8 +42,9 @@ Establish or update a quality baseline benchmark for the target skill.
    ```
 
 6. Calculate composite score (weighted average of 7 dimensions) and pass rate:
-   - Composite: (structure × 0.15 + triggers × 0.20 + quality × 0.20 + \
-     edges × 0.15 + efficiency × 0.10 + composability × 0.10 + clarity × 0.05)
+   - Composite: weighted average of 7 dimensions, renormalized to sum 1.0.
+     Base weights: structure=0.15, triggers=0.20, quality=0.20, edges=0.15,
+     efficiency=0.10, composability=0.10, clarity=0.05 (+ runtime=0.10 when enabled).
    - Pass rate: (assertions_passed / assertions_total)
 
 7. Record the benchmark in schliff-results.jsonl:
