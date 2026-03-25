@@ -30,10 +30,10 @@ schliff v6.1.0
   composability  ██████████  100/100  perfect
   clarity        ██████████  100/100  perfect
 
-  Structural Score  ████████████████████  99.0/100  [S]
+  Structural Score  ████████████████████  99.0/100  [S]  (structural)
 ```
 
-Schliff scores itself at 99.0/100 [S]. Same engine, no exceptions. **Zero dependencies** — Python 3.9+ stdlib only.
+Schliff scores itself at 99.0/100 [S] structural. Same engine, no exceptions. **Zero dependencies** — Python 3.9+ stdlib only.
 
 ---
 
@@ -171,7 +171,7 @@ Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) 
 | **Scoring** | 1 metric | 7 dimensions + optional runtime |
 | **Anti-gaming** | None | 6 detection vectors |
 | **Memory** | Stateless | Cross-session episodic store |
-| **Dependencies** | Heavy (PyTorch, etc.) | Python 3.9+ stdlib only |
+| **Dependencies** | External (ML frameworks) | Python 3.9+ stdlib only |
 | **Tests** | Minimal | 540+ |
 
 ---
