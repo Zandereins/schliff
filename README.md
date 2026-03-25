@@ -83,10 +83,10 @@ Reproduce: `python benchmarks/anti-gaming/run.py`
 
 ```bash
 pip install schliff          # or: pipx install schliff
-schliff demo                            # see it in action on a built-in bad skill
-schliff score path/to/SKILL.md
+schliff demo                            # see it in action instantly
+schliff doctor                           # scan YOUR installed skills — prepare for surprises
+schliff score path/to/SKILL.md          # score any specific skill
 schliff score path/to/SKILL.md --json   # machine-readable
-schliff doctor                           # scan all installed skills
 ```
 
 ### Autonomous improvement (requires Claude Code)
