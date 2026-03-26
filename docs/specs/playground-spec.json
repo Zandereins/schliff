@@ -1,0 +1,111 @@
+{
+  "title": "Schliff Web Playground — Design Spec",
+  "created": "2026-03-26",
+  "status": "IMPLEMENTED",
+  "session": "S3 (Web Features)",
+  "tasks": ["T13", "T14"],
+
+  "platform_decision": {
+    "winner": "Vercel Python Functions (Fluid Compute)",
+    "rejected": "Cloudflare Workers (Pyodide)",
+    "blockers_cloudflare": [
+      "threading module non-functional — Thread.start() raises RuntimeError in Pyodide/WASM",
+      "subprocess module non-functional — no fork/exec in WASM sandbox",
+      "Free plan: 10ms CPU time — unusable for scoring (pure computation)"
+    ],
+    "advantages_vercel": [
+      "Full Python 3.12+ stdlib including threading and subprocess",
+      "Zero config: api/*.py auto-detected as Functions",
+      "99.37% zero cold starts (Fluid Compute instance reuse)",
+      "Free tier: 1M invocations, 4h active CPU/month",
+      "Static files + Python API in one project out-of-the-box"
+    ]
+  },
+
+  "playground": {
+    "deployment": "play.schliff.dev (separate Vercel project)",
+    "structure": {
+      "playground/api/score.py": "Vercel Python Function — POST /api/score",
+      "playground/public/index.html": "Self-contained SPA (1105 lines, inline CSS+JS)",
+      "playground/requirements.txt": "schliff>=6.3.0",
+      "playground/vercel.json": "CORS headers, rewrites",
+      "playground/.python-version": "3.12"
+    },
+    "api": {
+      "method": "POST /api/score",
+      "request": { "content": "string (skill markdown)", "filename": "string (default: SKILL.md)" },
+      "response": {
+        "composite_score": "float",
+        "grade": "S/A/B/C/D/F",
+        "dimensions": "dict (dim -> score, -1 = unmeasured)",
+        "warnings": "list[string]",
+        "measured_dimensions": "int",
+        "total_dimensions": "int"
+      },
+      "constraints": [
+        "500KB max content size",
+        "CORS: Access-Control-Allow-Origin: *",
+        "Temp file for scoring (cleaned up in finally block)",
+        "Lazy imports for cold start optimization"
+      ]
+    },
+    "frontend": {
+      "aesthetic": "Dark terminal (#0d1117 bg, JetBrains Mono, CRT scan-lines)",
+      "layout": "60/40 split — editor (left) + results (right), stacks on mobile",
+      "features": [
+        "Line numbers with scroll sync",
+        "Ctrl+Enter to score",
+        "Tab inserts 2 spaces",
+        "Score count-up animation (ease-out cubic)",
+        "Unicode progress bars for dimensions",
+        "Grade badges (S/A/B/C/D/F) color-coded",
+        "Unmeasured dimensions (score=-1) filtered out",
+        "Loading state: terminal cursor animation",
+        "Error state with detail display"
+      ],
+      "examples": [
+        { "name": "Bad Skill", "expected_grade": "F", "description": "Minimal, vague instructions" },
+        { "name": "ShieldClaw Before", "expected_score": 68.3, "expected_grade": "C" },
+        { "name": "ShieldClaw After", "expected_score": 94.6, "expected_grade": "A" }
+      ],
+      "shareable_urls": {
+        "encoding": "btoa(encodeURIComponent(content))",
+        "format": "#content=BASE64",
+        "max_length": 8000,
+        "auto_score_on_load": true
+      },
+      "security": "All dynamic content via safe DOM methods (textContent, createElement) — no innerHTML"
+    }
+  },
+
+  "github_action": {
+    "file": "action/action.yml",
+    "changes": [
+      "Add schliff-version input (configurable, defaults to latest)",
+      "Add grade output (S/A/B/C/D/F)",
+      "Upgrade Python 3.9 → 3.12",
+      "PR comments: Unicode progress bars, dimension breakdown with color icons",
+      "Marker-based comment updates (<!-- schliff-score-comment -->) instead of creating new",
+      "::error:: annotation for minimum score failures",
+      "Playground link in footer"
+    ],
+    "inputs": {
+      "skill-path": "required — path to SKILL.md",
+      "eval-suite": "optional — path to eval-suite.json",
+      "minimum-score": "optional — minimum composite score (default: 0)",
+      "comment-on-pr": "optional — post PR comment (default: true)",
+      "schliff-version": "optional — version to install (default: latest)"
+    },
+    "outputs": {
+      "composite": "float (0-100)",
+      "grade": "string (S/A/B/C/D/F)",
+      "result_b64": "string (full JSON result, base64 encoded)"
+    }
+  },
+
+  "commits": [
+    "6e6fdad feat: add web playground for live SKILL.md scoring",
+    "997c45d feat: enhance GitHub Action with grade output and visual PR comments"
+  ],
+  "branch": "feat/v7-web"
+}
