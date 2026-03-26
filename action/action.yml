@@ -5,7 +5,7 @@ branding:
   color: 'purple'
 inputs:
   skill-path:
-    description: 'Path to SKILL.md file'
+    description: 'Path to SKILL.md file (relative to repo root)'
     required: true
   eval-suite:
     description: 'Path to eval-suite.json (auto-discovered if not set)'
@@ -18,10 +18,17 @@ inputs:
     description: 'Post score as PR comment'
     required: false
     default: 'true'
+  schliff-version:
+    description: 'Schliff version to install (e.g. "6.3.0", ">=7.0"). Defaults to latest.'
+    required: false
+    default: ''
 outputs:
   composite:
     description: 'Composite score (0-100)'
     value: ${{ steps.score.outputs.composite }}
+  grade:
+    description: 'Grade letter (S/A/B/C/D/F)'
+    value: ${{ steps.score.outputs.grade }}
   result_b64:
     description: 'Full JSON score result (base64 encoded)'
     value: ${{ steps.score.outputs.result_b64 }}
@@ -31,12 +38,18 @@ runs:
     - name: Set up Python
       uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
       with:
-        python-version: '3.9'
+        python-version: '3.12'
 
     - name: Install Schliff scorer
       shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.schliff-version }}
       run: |
-        pip install schliff==6.3.0
+        if [ -n "$INPUT_VERSION" ]; then
+          pip install "schliff==$INPUT_VERSION"
+        else
+          pip install schliff
+        fi
 
     - name: Run scorer
       id: score
@@ -65,11 +78,18 @@ runs:
         COMPOSITE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])")
         echo "composite=$COMPOSITE" >> "$GITHUB_OUTPUT"
 
+        GRADE=$(python3 -c "
+        s = float('$COMPOSITE')
+        g = 'S' if s >= 95 else 'A' if s >= 85 else 'B' if s >= 75 else 'C' if s >= 65 else 'D' if s >= 50 else 'F'
+        print(g)
+        ")
+        echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
+
         # Write result to temp file to avoid heredoc injection
         echo "$RESULT" > /tmp/schliff_result.json
         RESULT_B64=$(base64 < /tmp/schliff_result.json)
         echo "result_b64=$RESULT_B64" >> "$GITHUB_OUTPUT"
-        echo "Score: $COMPOSITE/100"
+        echo "Score: $COMPOSITE/100 [$GRADE]"
 
     - name: Check minimum score
       if: inputs.minimum-score != '0'
@@ -83,7 +103,7 @@ runs:
         score = float(os.environ['COMPOSITE'])
         minimum = float(os.environ['MINIMUM'])
         if score < minimum:
-            print(f'Score {score} is below minimum {minimum}')
+            print(f'::error::Score {score} is below minimum {minimum}')
             sys.exit(1)
         print(f'Score {score} passes minimum {minimum}')
         "
@@ -97,23 +117,71 @@ runs:
           const result = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
           const score = result.composite_score;
           const dims = result.dimensions;
-          const grade = score >= 95 ? 'S' : score >= 85 ? 'A' : score >= 75 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
-          const color = score >= 95 ? '🟢' : score >= 75 ? '🟡' : '🔴';
+          const grade = '${{ steps.score.outputs.grade }}';
+          const minimum = parseFloat('${{ inputs.minimum-score }}') || 0;
+          const passed = minimum === 0 || score >= minimum;
+          const icon = score >= 95 ? '🟢' : score >= 75 ? '🟡' : '🔴';
 
-          let body = `## ${color} Schliff Score: ${score}/100 [${grade}]\n\n`;
-          body += `| Dimension | Score |\n|-----------|-------|\n`;
-          for (const [dim, s] of Object.entries(dims)) {
-            if (s >= 0) body += `| ${dim} | ${s}/100 |\n`;
+          // Unicode progress bar
+          function bar(val) {
+            if (val < 0) return '—';
+            const filled = Math.round(val / 5);
+            return '█'.repeat(filled) + '░'.repeat(20 - filled) + ` ${Math.round(val)}`;
           }
+
+          const dimOrder = ['structure', 'triggers', 'quality', 'edges', 'efficiency', 'composability', 'clarity'];
+
+          let body = `<!-- schliff-score-comment -->\n`;
+          body += `## ${icon} Schliff Score: ${score}/100 [${grade}]\n\n`;
+
+          if (minimum > 0) {
+            body += passed
+              ? `✅ Passes minimum score of ${minimum}\n\n`
+              : `❌ Below minimum score of ${minimum}\n\n`;
+          }
+
+          body += `| Dimension | Score | | \n`;
+          body += `|:----------|------:|:----|\n`;
+          for (const dim of dimOrder) {
+            if (dims[dim] === undefined) continue;
+            const s = dims[dim];
+            if (s < 0) {
+              body += `| ${dim} | — | *not measured* |\n`;
+            } else {
+              const dimIcon = s >= 75 ? '🟢' : s >= 50 ? '🟡' : '🔴';
+              body += `| ${dim} | ${Math.round(s)}/100 | ${dimIcon} \`${bar(s)}\` |\n`;
+            }
+          }
+
           if (result.warnings?.length) {
-            body += `\n**Warnings:**\n`;
+            body += `\n<details><summary><b>⚠️ Warnings (${result.warnings.length})</b></summary>\n\n`;
             result.warnings.forEach(w => body += `- ${w}\n`);
+            body += `\n</details>\n`;
           }
-          body += `\n---\n*Scored by [Schliff](https://github.com/Zandereins/schliff)*`;
 
-          await github.rest.issues.createComment({
+          body += `\n---\n<sub>Scored by [Schliff](https://github.com/Zandereins/schliff) · [Try the playground](https://play.schliff.dev)</sub>`;
+
+          // Update existing comment or create new one
+          const marker = '<!-- schliff-score-comment -->';
+          const { data: comments } = await github.rest.issues.listComments({
             owner: context.repo.owner,
             repo: context.repo.repo,
             issue_number: context.issue.number,
-            body: body
           });
+          const existing = comments.find(c => c.body?.includes(marker));
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body: body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body,
+            });
+          }
