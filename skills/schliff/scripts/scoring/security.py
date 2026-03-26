@@ -173,7 +173,7 @@ def score_security(skill_path: str) -> dict:
     """
     try:
         content = read_skill_safe(skill_path)
-    except (FileNotFoundError, ValueError, PermissionError, OSError) as e:
+    except (FileNotFoundError, ValueError, PermissionError, OSError, RuntimeError) as e:
         return _empty_result(error=str(e))
 
     # Meta-discourse detection

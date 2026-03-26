@@ -330,14 +330,22 @@ class TestScoreSecurity:
 
     def test_negation_aware(self, tmp_path):
         """'never run rm -rf' should be safe (negation), but 'run rm -rf' should be flagged."""
-        safe_path = self._write_skill(tmp_path, NEGATION_SAFE_SKILL)
-        safe_result = score_security(safe_path)
+        safe_dir = tmp_path / "safe"
+        safe_dir.mkdir()
+        safe_file = safe_dir / "SKILL.md"
+        safe_file.write_text(NEGATION_SAFE_SKILL)
+        invalidate_cache(str(safe_file))
+        safe_result = score_security(str(safe_file))
 
         assert safe_result["score"] >= 80
         assert safe_result["details"]["negation_excluded"] >= 1
 
-        unsafe_path = self._write_skill(tmp_path, NEGATION_UNSAFE_SKILL)
-        unsafe_result = score_security(unsafe_path)
+        unsafe_dir = tmp_path / "unsafe"
+        unsafe_dir.mkdir()
+        unsafe_file = unsafe_dir / "SKILL.md"
+        unsafe_file.write_text(NEGATION_UNSAFE_SKILL)
+        invalidate_cache(str(unsafe_file))
+        unsafe_result = score_security(str(unsafe_file))
 
         assert unsafe_result["score"] < safe_result["score"]
         assert len(unsafe_result["issues"]) > 0
@@ -372,10 +380,19 @@ class TestScoreSecurity:
     # --- Adversarial tests (from 6-agent review) ---
 
     def test_missing_file_returns_zero(self):
-        """score_security on a nonexistent file should return score 0, not crash."""
+        """score_security on a nonexistent file should return score 0, not crash.
+
+        The return dict must have the same shape as a normal result.
+        """
         result = score_security("/nonexistent/path/SKILL.md")
         assert result["score"] == 0
-        assert len(result["issues"]) >= 1
+        assert "security:unreadable" in result["issues"]
+        assert result["details"]["category_penalties"] == {}
+        assert result["details"]["total_penalty"] == 100
+        assert result["details"]["code_block_excluded"] == 0
+        assert result["details"]["negation_excluded"] == 0
+        assert "error" in result["details"]
+        assert len(result["details"]["error"]) > 0
 
     def test_meta_discourse_abuse_still_penalized(self, tmp_path):
         """Attacker adds 'security' to description but includes real payloads.
