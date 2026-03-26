@@ -277,7 +277,6 @@ _RE_SEC_OVERPERMISSION = re.compile(
 _RE_SEC_BOUNDARY_VIOLATION = re.compile(
     r"(?:/etc/(?:passwd|shadow|sudoers)|"
     r"~/\.ssh/|"
-    r"~/.ssh/|"
     r"id_rsa|"
     r"\.\.(?:/|\\){2,}|"
     r"(?:cat|read|open|access)\s+[^\n]*/etc/(?:passwd|shadow))",
