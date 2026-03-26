@@ -1,0 +1,353 @@
+{
+  "title": "Schliff v7.0 Week 1 — Multi-Format Support + --url Flag",
+  "type": "implementation-plan",
+  "execution_skill": "superpowers:subagent-driven-development or superpowers:executing-plans",
+  "goal": "Enable schliff to score SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md, and generic .md files with format-aware scoring. Add --url flag for remote file scoring.",
+  "architecture": "FormatProfile frozen dataclass with function pointers for metadata extraction. Format registry with filename-based detection. Per-format composite weights. Zero new dependencies. Backward compatible — SKILL.md scores identically to v6.3.0.",
+  "tech_stack": "Python 3.9+ stdlib only (dataclasses, re, pathlib, urllib.request)",
+
+  "file_map": {
+    "create": [
+      "skills/schliff/scripts/scoring/formats.py — FormatProfile dataclass, registry, detect_format(), metadata extractors (~150 LOC)",
+      "skills/schliff/tests/unit/test_formats.py — Format detection, metadata extraction, profile validation (~200 LOC)"
+    ],
+    "modify": [
+      "skills/schliff/scripts/shared.py:139-166 — build_scores() accepts optional fmt parameter",
+      "skills/schliff/scripts/shared.py:77-88 — extract_description() delegates to fmt if provided",
+      "skills/schliff/scripts/scoring/structure.py — score_structure() accepts fmt, uses format-specific checks",
+      "skills/schliff/scripts/scoring/triggers.py — score_triggers() uses fmt.extract_description()",
+      "skills/schliff/scripts/scoring/composite.py:49-104 — compute_composite() accepts format_weights override",
+      "skills/schliff/scripts/scoring/__init__.py — re-export detect_format, FormatProfile",
+      "skills/schliff/scripts/cli.py — auto-detection, --format flag, --url flag, help text update",
+      "skills/schliff/scripts/skill_mesh.py — multi-filename discovery",
+      "skills/schliff/scripts/doctor.py — scan project instruction files"
+    ],
+    "unchanged": [
+      "scoring/efficiency.py — body text analysis, format-agnostic",
+      "scoring/composability.py — body text analysis, format-agnostic",
+      "scoring/clarity.py — body text analysis, format-agnostic",
+      "scoring/quality.py — eval-suite only, format-agnostic",
+      "scoring/edges.py — eval-suite only, format-agnostic",
+      "scoring/patterns.py — regex library, no format awareness needed",
+      "nlp.py — pure text processing",
+      "terminal_art.py — display only"
+    ]
+  },
+
+  "tasks": [
+    {
+      "id": 1,
+      "name": "FormatProfile dataclass + SKILL.md profile",
+      "files": {
+        "create": "skills/schliff/scripts/scoring/formats.py",
+        "test": "skills/schliff/tests/unit/test_formats.py"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "action": "Write failing test for FormatProfile dataclass and SKILL.md detection",
+          "file": "skills/schliff/tests/unit/test_formats.py",
+          "code": "import pytest\nfrom scoring.formats import FormatProfile, detect_format, FORMATS\n\n\ndef test_format_profile_is_frozen():\n    fmt = FORMATS[\"skill.md\"]\n    with pytest.raises(AttributeError):\n        fmt.format_id = \"hacked\"\n\n\ndef test_detect_skill_md():\n    fmt = detect_format(\"path/to/SKILL.md\")\n    assert fmt.format_id == \"skill.md\"\n    assert fmt.has_frontmatter is True\n\n\ndef test_detect_skill_md_nested():\n    fmt = detect_format(\"/home/user/.claude/skills/deploy/SKILL.md\")\n    assert fmt.format_id == \"skill.md\"\n\n\ndef test_skill_md_extract_name():\n    content = '---\\nname: my-skill\\ndescription: A test skill\\n---\\n# Body'\n    fmt = FORMATS[\"skill.md\"]\n    assert fmt.extract_name(content) == \"my-skill\"\n\n\ndef test_skill_md_extract_description():\n    content = '---\\nname: my-skill\\ndescription: A test skill\\n---\\n# Body'\n    fmt = FORMATS[\"skill.md\"]\n    assert fmt.extract_description(content) == \"A test skill\"\n\n\ndef test_skill_md_strip_metadata():\n    content = '---\\nname: my-skill\\ndescription: A test\\n---\\n# Body here'\n    fmt = FORMATS[\"skill.md\"]\n    body = fmt.strip_metadata(content)\n    assert body.startswith(\"# Body here\")\n    assert \"---\" not in body",
+          "run": "cd /Users/franzpaul/schliff/skills/schliff/scripts && python -m pytest ../tests/unit/test_formats.py -v 2>&1 | head -20",
+          "expected": "FAIL — ModuleNotFoundError: No module named 'scoring.formats'"
+        },
+        {
+          "step": 2,
+          "action": "Create formats.py with FormatProfile dataclass and SKILL.md profile",
+          "file": "skills/schliff/scripts/scoring/formats.py",
+          "code": "\"\"\"Format profiles for multi-format skill scoring.\n\nEach FormatProfile defines how to extract metadata and which scoring\nrules apply for a specific instruction file format.\n\"\"\"\nfrom __future__ import annotations\n\nimport re\nfrom dataclasses import dataclass\nfrom pathlib import Path\nfrom typing import Callable\n\n\n@dataclass(frozen=True)\nclass FormatProfile:\n    \"\"\"Describes how to parse and score a specific instruction file format.\"\"\"\n    format_id: str\n    display_name: str\n    filenames: tuple[str, ...]\n    has_frontmatter: bool\n    extract_name: Callable[[str], str]\n    extract_description: Callable[[str], str]\n    strip_metadata: Callable[[str], str]\n    composite_weights: dict[str, float]\n\n\n# --- Metadata extractors ---\n\n_RE_FM_NAME = re.compile(r\"^name:\\s*(\\S.*)$\", re.MULTILINE)\n_RE_FM_DESC_BLOCK = re.compile(\n    r\"^description:\\s*[>|]-?\\s*\\n((?:[ \\t]+.+\\n)*)\", re.MULTILINE\n)\n_RE_FM_DESC_INLINE = re.compile(r'^description:\\s*\"?(.+?)\"?\\s*$', re.MULTILINE)\n_RE_FIRST_HEADING = re.compile(r\"^#\\s+(.+)$\", re.MULTILINE)\n\n\ndef _extract_fm_name(content: str) -> str:\n    \"\"\"Extract name from YAML frontmatter.\"\"\"\n    m = _RE_FM_NAME.search(content)\n    return m.group(1).strip().strip('\"') if m else \"\"\n\n\ndef _extract_fm_description(content: str) -> str:\n    \"\"\"Extract description from YAML frontmatter (block or inline).\"\"\"\n    m = _RE_FM_DESC_BLOCK.search(content)\n    if m:\n        return m.group(1).strip()\n    m = _RE_FM_DESC_INLINE.search(content)\n    if m:\n        return m.group(1).strip()\n    return \"\"\n\n\ndef _strip_yaml_frontmatter(content: str) -> str:\n    \"\"\"Strip YAML frontmatter (---...---) from content.\"\"\"\n    if content.startswith(\"---\"):\n        end = content.find(\"---\", 3)\n        if end >= 4:\n            return content[end + 3:].lstrip(\"\\n\")\n    return content\n\n\ndef _extract_first_heading(content: str) -> str:\n    \"\"\"Extract name from first markdown heading.\"\"\"\n    m = _RE_FIRST_HEADING.search(content)\n    return m.group(1).strip() if m else \"\"\n\n\ndef _extract_first_paragraph(content: str) -> str:\n    \"\"\"Extract first non-empty paragraph as description.\"\"\"\n    body = _strip_yaml_frontmatter(content)\n    for line in body.split(\"\\n\"):\n        stripped = line.strip()\n        if stripped and not stripped.startswith(\"#\"):\n            return stripped\n    return \"\"\n\n\ndef _name_from_content_or_empty(content: str) -> str:\n    \"\"\"Try frontmatter name, then first heading, then empty.\"\"\"\n    name = _extract_fm_name(content)\n    if name:\n        return name\n    return _extract_first_heading(content)\n\n\ndef _desc_from_frontmatter_or_paragraph(content: str) -> str:\n    \"\"\"Try frontmatter description, then first paragraph.\"\"\"\n    desc = _extract_fm_description(content)\n    if desc:\n        return desc\n    return _extract_first_paragraph(content)\n\n\ndef _strip_optional_frontmatter(content: str) -> str:\n    \"\"\"Strip frontmatter if present, otherwise return content as-is.\"\"\"\n    if content.startswith(\"---\"):\n        return _strip_yaml_frontmatter(content)\n    return content\n\n\ndef _identity(content: str) -> str:\n    \"\"\"Return content unchanged (for formats with no metadata to strip).\"\"\"\n    return content\n\n\n# --- Format Registry ---\n\nFORMATS: dict[str, FormatProfile] = {\n    \"skill.md\": FormatProfile(\n        format_id=\"skill.md\",\n        display_name=\"SKILL.md\",\n        filenames=(\"SKILL.md\",),\n        has_frontmatter=True,\n        extract_name=_extract_fm_name,\n        extract_description=_extract_fm_description,\n        strip_metadata=_strip_yaml_frontmatter,\n        composite_weights={\n            \"structure\": 0.15, \"triggers\": 0.20, \"quality\": 0.20,\n            \"edges\": 0.15, \"efficiency\": 0.10, \"composability\": 0.10,\n            \"runtime\": 0.10,\n        },\n    ),\n    \"claude.md\": FormatProfile(\n        format_id=\"claude.md\",\n        display_name=\"CLAUDE.md\",\n        filenames=(\"CLAUDE.md\",),\n        has_frontmatter=False,\n        extract_name=_extract_first_heading,\n        extract_description=_extract_first_paragraph,\n        strip_metadata=_identity,\n        composite_weights={\n            \"structure\": 0.20, \"triggers\": 0.10, \"quality\": 0.15,\n            \"edges\": 0.10, \"efficiency\": 0.15, \"composability\": 0.05,\n            \"runtime\": 0.10,\n        },\n    ),\n    \"cursorrules\": FormatProfile(\n        format_id=\"cursorrules\",\n        display_name=\".cursorrules\",\n        filenames=(\".cursorrules\",),\n        has_frontmatter=False,\n        extract_name=_name_from_content_or_empty,\n        extract_description=_extract_first_paragraph,\n        strip_metadata=_identity,\n        composite_weights={\n            \"structure\": 0.10, \"triggers\": 0.10, \"quality\": 0.15,\n            \"edges\": 0.10, \"efficiency\": 0.20, \"composability\": 0.05,\n            \"runtime\": 0.10,\n        },\n    ),\n    \"agents.md\": FormatProfile(\n        format_id=\"agents.md\",\n        display_name=\"AGENTS.md\",\n        filenames=(\"AGENTS.md\",),\n        has_frontmatter=True,\n        extract_name=_name_from_content_or_empty,\n        extract_description=_desc_from_frontmatter_or_paragraph,\n        strip_metadata=_strip_optional_frontmatter,\n        composite_weights={\n            \"structure\": 0.15, \"triggers\": 0.15, \"quality\": 0.20,\n            \"edges\": 0.15, \"efficiency\": 0.10, \"composability\": 0.10,\n            \"runtime\": 0.10,\n        },\n    ),\n    \"generic\": FormatProfile(\n        format_id=\"generic\",\n        display_name=\"Generic\",\n        filenames=(),\n        has_frontmatter=False,\n        extract_name=_name_from_content_or_empty,\n        extract_description=_desc_from_frontmatter_or_paragraph,\n        strip_metadata=_strip_optional_frontmatter,\n        composite_weights={\n            \"structure\": 0.15, \"triggers\": 0.10, \"quality\": 0.15,\n            \"edges\": 0.10, \"efficiency\": 0.15, \"composability\": 0.05,\n            \"runtime\": 0.10,\n        },\n    ),\n}\n\n\ndef detect_format(file_path: str) -> FormatProfile:\n    \"\"\"Detect format from filename. Falls back to generic.\"\"\"\n    name = Path(file_path).name\n    for fmt in FORMATS.values():\n        if name in fmt.filenames:\n            return fmt\n    return FORMATS[\"generic\"]\n",
+          "run": "cd /Users/franzpaul/schliff/skills/schliff/scripts && python -m pytest ../tests/unit/test_formats.py -v",
+          "expected": "6 tests PASSED"
+        },
+        {
+          "step": 3,
+          "action": "Commit",
+          "run": "git add skills/schliff/scripts/scoring/formats.py skills/schliff/tests/unit/test_formats.py && git commit -m 'feat(v7): add FormatProfile dataclass with 5 format profiles'"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "CLAUDE.md, .cursorrules, AGENTS.md metadata extraction tests",
+      "files": {
+        "modify": "skills/schliff/tests/unit/test_formats.py"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "action": "Add tests for non-SKILL.md formats",
+          "file": "skills/schliff/tests/unit/test_formats.py",
+          "code_to_append": "\n\n# --- CLAUDE.md format ---\n\ndef test_detect_claude_md():\n    fmt = detect_format(\"CLAUDE.md\")\n    assert fmt.format_id == \"claude.md\"\n    assert fmt.has_frontmatter is False\n\n\ndef test_claude_md_extract_name():\n    content = \"# My Project Config\\n\\nAlways use TypeScript.\"\n    fmt = FORMATS[\"claude.md\"]\n    assert fmt.extract_name(content) == \"My Project Config\"\n\n\ndef test_claude_md_extract_description():\n    content = \"# My Project\\n\\nThis project uses React and TypeScript.\"\n    fmt = FORMATS[\"claude.md\"]\n    assert fmt.extract_description(content) == \"This project uses React and TypeScript.\"\n\n\ndef test_claude_md_strip_metadata_is_identity():\n    content = \"# Title\\n\\nBody text here.\"\n    fmt = FORMATS[\"claude.md\"]\n    assert fmt.strip_metadata(content) == content\n\n\n# --- .cursorrules format ---\n\ndef test_detect_cursorrules():\n    fmt = detect_format(\".cursorrules\")\n    assert fmt.format_id == \"cursorrules\"\n    assert fmt.has_frontmatter is False\n\n\ndef test_cursorrules_extract_description():\n    content = \"You are a senior Python developer. Always use type hints.\"\n    fmt = FORMATS[\"cursorrules\"]\n    assert \"senior Python developer\" in fmt.extract_description(content)\n\n\n# --- AGENTS.md format ---\n\ndef test_detect_agents_md():\n    fmt = detect_format(\"AGENTS.md\")\n    assert fmt.format_id == \"agents.md\"\n    assert fmt.has_frontmatter is True\n\n\ndef test_agents_md_with_frontmatter():\n    content = '---\\nname: deploy-agent\\ndescription: Deploys to prod\\n---\\n# Deploy Agent'\n    fmt = FORMATS[\"agents.md\"]\n    assert fmt.extract_name(content) == \"deploy-agent\"\n    assert fmt.extract_description(content) == \"Deploys to prod\"\n\n\ndef test_agents_md_without_frontmatter():\n    content = \"# Deploy Agent\\n\\nHandles production deployments.\"\n    fmt = FORMATS[\"agents.md\"]\n    assert fmt.extract_name(content) == \"Deploy Agent\"\n    assert fmt.extract_description(content) == \"Handles production deployments.\"\n\n\n# --- Generic fallback ---\n\ndef test_detect_generic_md():\n    fmt = detect_format(\"README.md\")\n    assert fmt.format_id == \"generic\"\n\n\ndef test_detect_generic_unknown():\n    fmt = detect_format(\"random-file.txt\")\n    assert fmt.format_id == \"generic\"\n\n\ndef test_all_formats_have_composite_weights():\n    for fmt_id, fmt in FORMATS.items():\n        total = sum(fmt.composite_weights.values())\n        assert 0.95 <= total <= 1.05, f\"{fmt_id} weights sum to {total}\"",
+          "run": "cd /Users/franzpaul/schliff/skills/schliff/scripts && python -m pytest ../tests/unit/test_formats.py -v",
+          "expected": "18 tests PASSED"
+        },
+        {
+          "step": 2,
+          "action": "Commit",
+          "run": "git add skills/schliff/tests/unit/test_formats.py && git commit -m 'test(v7): format detection and metadata extraction for all 5 formats'"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Wire FormatProfile into build_scores() and composite",
+      "files": {
+        "modify": [
+          "skills/schliff/scripts/shared.py:139-166",
+          "skills/schliff/scripts/scoring/composite.py:49-104",
+          "skills/schliff/scripts/scoring/__init__.py"
+        ]
+      },
+      "steps": [
+        {
+          "step": 1,
+          "action": "Write regression test: SKILL.md scores must be identical to v6.3.0",
+          "file": "skills/schliff/tests/unit/test_formats.py",
+          "code_to_append": "\n\ndef test_skill_md_scores_identical_to_v6(tmp_path):\n    \"\"\"Regression: SKILL.md format must produce identical scores to v6.3.0.\"\"\"\n    import sys\n    scripts_dir = str(Path(__file__).resolve().parent.parent.parent / \"scripts\")\n    if scripts_dir not in sys.path:\n        sys.path.insert(0, scripts_dir)\n    from shared import build_scores\n    from scoring.composite import compute_composite\n\n    skill = tmp_path / \"SKILL.md\"\n    skill.write_text('---\\nname: test\\ndescription: A test skill\\n---\\n# Test\\n\\n## Rules\\n\\n1. Do X because Y.\\n')\n\n    # Score without fmt (v6 behavior)\n    scores_v6 = build_scores(str(skill))\n    composite_v6 = compute_composite(scores_v6)\n\n    # Score with explicit fmt (v7 behavior)\n    from scoring.formats import FORMATS\n    scores_v7 = build_scores(str(skill), fmt=FORMATS[\"skill.md\"])\n    composite_v7 = compute_composite(scores_v7, format_weights=FORMATS[\"skill.md\"].composite_weights)\n\n    assert composite_v6[\"score\"] == composite_v7[\"score\"], (\n        f\"v6={composite_v6['score']} != v7={composite_v7['score']}\")",
+          "run": "cd /Users/franzpaul/schliff/skills/schliff/scripts && python -m pytest ../tests/unit/test_formats.py::test_skill_md_scores_identical_to_v6 -v",
+          "expected": "FAIL — build_scores() got unexpected keyword argument 'fmt'"
+        },
+        {
+          "step": 2,
+          "action": "Modify build_scores() to accept optional fmt parameter",
+          "file": "skills/schliff/scripts/shared.py",
+          "change": "Line 139: Add fmt parameter. When fmt is provided, pass fmt.extract_description to triggers scorer. When fmt is None, use existing behavior.",
+          "code_diff": "Replace lines 139-166:\n\ndef build_scores(skill_path: str, eval_suite: Optional[dict] = None,\n                  include_runtime: bool = False, fmt=None) -> dict:\n    from scoring import (\n        score_structure, score_triggers, score_efficiency,\n        score_composability, score_quality, score_edges,\n        score_clarity,\n    )\n\n    scores = {\n        \"structure\": score_structure(skill_path, fmt=fmt),\n        \"triggers\": score_triggers(skill_path, eval_suite, fmt=fmt),\n        \"quality\": score_quality(skill_path, eval_suite),\n        \"edges\": score_edges(skill_path, eval_suite),\n        \"efficiency\": score_efficiency(skill_path),\n        \"composability\": score_composability(skill_path),\n        \"clarity\": score_clarity(skill_path),\n    }\n\n    if include_runtime:\n        from scoring import score_runtime\n        scores[\"runtime\"] = score_runtime(skill_path, eval_suite, enabled=False)\n\n    return scores"
+        },
+        {
+          "step": 3,
+          "action": "Modify compute_composite() to accept format_weights parameter",
+          "file": "skills/schliff/scripts/scoring/composite.py",
+          "change": "Line 49: Add format_weights parameter. When provided, use as base weights instead of hardcoded defaults.",
+          "code_diff": "Line 49: def compute_composite(scores: dict, custom_weights: Optional[dict] = None, format_weights: Optional[dict] = None) -> dict:\n\nLine 61-69: Replace hardcoded weights with:\n    if format_weights:\n        weights = dict(format_weights)\n    else:\n        weights = {\n            \"structure\": 0.15, \"triggers\": 0.20, \"quality\": 0.20,\n            \"edges\": 0.15, \"efficiency\": 0.10, \"composability\": 0.10,\n            \"runtime\": 0.10,\n        }"
+        },
+        {
+          "step": 4,
+          "action": "Add fmt parameter stubs to score_structure() and score_triggers()",
+          "files_to_modify": ["scoring/structure.py", "scoring/triggers.py"],
+          "change_structure": "Line 1 of score_structure(): Add fmt=None parameter, ignore for now (Task 4 will use it). Same for score_triggers().",
+          "code_structure": "def score_structure(skill_path: str, fmt=None) -> dict:  # fmt added, unused yet",
+          "code_triggers": "def score_triggers(skill_path: str, eval_suite=None, fmt=None) -> dict:  # fmt added"
+        },
+        {
+          "step": 5,
+          "action": "Update scoring/__init__.py to re-export formats",
+          "file": "skills/schliff/scripts/scoring/__init__.py",
+          "code_to_append": "from scoring.formats import FormatProfile, FORMATS, detect_format",
+          "run": "cd /Users/franzpaul/schliff/skills/schliff/scripts && python -m pytest ../tests/unit/test_formats.py -v",
+          "expected": "19 tests PASSED (including regression test)"
+        },
+        {
+          "step": 6,
+          "action": "Commit",
+          "run": "git add skills/schliff/scripts/shared.py skills/schliff/scripts/scoring/composite.py skills/schliff/scripts/scoring/structure.py skills/schliff/scripts/scoring/triggers.py skills/schliff/scripts/scoring/__init__.py skills/schliff/tests/unit/test_formats.py && git commit -m 'feat(v7): wire FormatProfile into build_scores() and compute_composite()'"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Format-aware structure scoring",
+      "files": {
+        "modify": "skills/schliff/scripts/scoring/structure.py"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "action": "Write tests for format-specific structure scoring",
+          "test_cases": [
+            "CLAUDE.md with no frontmatter should NOT lose frontmatter points",
+            ".cursorrules (plain text) should score on efficiency/imperative only",
+            "AGENTS.md with optional frontmatter should handle both cases"
+          ],
+          "note": "The structure scorer currently gives 30 of 100 points for frontmatter. For formats without frontmatter (CLAUDE.md, .cursorrules), these points must be redistributed to other checks."
+        },
+        {
+          "step": 2,
+          "action": "Modify score_structure() to use fmt.has_frontmatter",
+          "change": "When fmt is provided and has_frontmatter is False, skip frontmatter checks and redistribute those 30 points to other checks (length, examples, headers, imperative_voice). When fmt is None, use existing SKILL.md behavior."
+        },
+        {
+          "step": 3,
+          "action": "Run full test suite to verify no regressions",
+          "run": "cd /Users/franzpaul/schliff/skills/schliff/scripts && python -m pytest ../tests/ -v --tb=short",
+          "expected": "All 540+ existing tests PASS"
+        },
+        {
+          "step": 4,
+          "action": "Commit",
+          "run": "git commit -am 'feat(v7): format-aware structure scoring (skip frontmatter for non-YAML formats)'"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Format-aware trigger scoring",
+      "files": {
+        "modify": "skills/schliff/scripts/scoring/triggers.py"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "action": "Write test: triggers scorer uses fmt.extract_description() for non-SKILL.md formats",
+          "note": "For CLAUDE.md (no frontmatter), description comes from first paragraph. For .cursorrules, from first sentences."
+        },
+        {
+          "step": 2,
+          "action": "Modify score_triggers() to use fmt.extract_description() when fmt is provided",
+          "change": "Replace direct call to extract_description() from shared.py with fmt.extract_description(content) when fmt is provided."
+        },
+        {
+          "step": 3,
+          "action": "Commit",
+          "run": "git commit -am 'feat(v7): format-aware trigger scoring (description extraction via FormatProfile)'"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "CLI: auto-detection + --format flag",
+      "files": {
+        "modify": "skills/schliff/scripts/cli.py"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "action": "Add --format flag to score parser",
+          "change": "Add optional --format flag with choices=['skill.md', 'claude.md', 'cursorrules', 'agents.md', 'generic']. When not provided, auto-detect from filename."
+        },
+        {
+          "step": 2,
+          "action": "Wire auto-detection into cmd_score()",
+          "change": "In cmd_score(), detect format from skill_path, pass to build_scores() and compute_composite(). Update help text from 'SKILL.md' to 'skill or instruction file'."
+        },
+        {
+          "step": 3,
+          "action": "Update terminal output to show detected format",
+          "change": "Add format display name next to the version line, e.g., 'schliff v7.0  [CLAUDE.md]'"
+        },
+        {
+          "step": 4,
+          "action": "Run CLI manually to verify",
+          "run": "schliff score /tmp/shieldclaw/SKILL.md && echo '---' && schliff score --format generic /tmp/shieldclaw/SKILL.md",
+          "expected": "First: detected as skill.md with full scoring. Second: detected as generic with adapted weights."
+        },
+        {
+          "step": 5,
+          "action": "Commit",
+          "run": "git commit -am 'feat(v7): CLI auto-detection and --format override flag'"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "--url flag for remote scoring",
+      "files": {
+        "modify": "skills/schliff/scripts/cli.py"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "action": "Write test for URL validation",
+          "test_cases": [
+            "HTTPS GitHub raw URL accepted",
+            "HTTP URL rejected",
+            "Non-allowed host rejected",
+            "URL > 500KB rejected (mocked)"
+          ]
+        },
+        {
+          "step": 2,
+          "action": "Implement URL fetching in cli.py",
+          "code_outline": "import urllib.request, urllib.parse, tempfile\n\nALLOWED_HOSTS = {'raw.githubusercontent.com', 'github.com', 'gist.githubusercontent.com'}\nMAX_REMOTE_SIZE = 500_000\n\ndef _fetch_remote_skill(url: str) -> str:\n    parsed = urllib.parse.urlparse(url)\n    if parsed.scheme != 'https':\n        raise ValueError('Only HTTPS URLs supported')\n    if parsed.hostname not in ALLOWED_HOSTS:\n        raise ValueError(f'Host not allowed: {parsed.hostname}')\n    # Convert github.com blob URLs to raw URLs\n    raw_url = _github_to_raw(url)\n    req = urllib.request.Request(raw_url, headers={'User-Agent': 'schliff'})\n    with urllib.request.urlopen(req, timeout=10) as resp:\n        content = resp.read(MAX_REMOTE_SIZE + 1)\n        if len(content) > MAX_REMOTE_SIZE:\n            raise ValueError(f'Remote file exceeds {MAX_REMOTE_SIZE} bytes')\n        return content.decode('utf-8', errors='replace')"
+        },
+        {
+          "step": 3,
+          "action": "Wire --url flag into cmd_score()",
+          "change": "Add --url argument to score parser. When provided, fetch content, write to tempfile, score, clean up."
+        },
+        {
+          "step": 4,
+          "action": "Test manually",
+          "run": "schliff score --url https://raw.githubusercontent.com/Zandereins/openclaw-skill-shieldclaw/main/SKILL.md",
+          "expected": "ShieldClaw scores ~94.6 [A]"
+        },
+        {
+          "step": 5,
+          "action": "Commit",
+          "run": "git commit -am 'feat(v7): --url flag for remote skill scoring (GitHub URLs)'"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Multi-filename discovery (doctor + skill_mesh)",
+      "files": {
+        "modify": [
+          "skills/schliff/scripts/skill_mesh.py",
+          "skills/schliff/scripts/doctor.py"
+        ]
+      },
+      "steps": [
+        {
+          "step": 1,
+          "action": "Extend skill_mesh discovery to find all format filenames",
+          "change": "Replace rglob('SKILL.md') with loop over FORMATS filenames. Return ScanTarget-like tuples with format hint."
+        },
+        {
+          "step": 2,
+          "action": "Update doctor to show project instruction files",
+          "change": "Add second section 'Project Instruction Files' showing CLAUDE.md, .cursorrules, AGENTS.md with partial scoring."
+        },
+        {
+          "step": 3,
+          "action": "Run full test suite",
+          "run": "cd /Users/franzpaul/schliff/skills/schliff/scripts && python -m pytest ../tests/ -v --tb=short 2>&1 | tail -5",
+          "expected": "All tests PASS, no regressions"
+        },
+        {
+          "step": 4,
+          "action": "Commit",
+          "run": "git commit -am 'feat(v7): multi-filename discovery in doctor and skill_mesh'"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Final integration test + version bump",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Run schliff score on real files of each format",
+          "run": "schliff score /Users/franzpaul/schliff/skills/schliff/SKILL.md && schliff score /Users/franzpaul/schliff/CLAUDE.md 2>/dev/null; schliff score /tmp/shieldclaw/SKILL.md",
+          "expected": "Each file scores with correct format detection and appropriate dimension coverage"
+        },
+        {
+          "step": 2,
+          "action": "Run schliff self-score to verify no regression",
+          "run": "schliff score /Users/franzpaul/schliff/skills/schliff/SKILL.md --json | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d[\"composite_score\"] >= 98, f\"Self-score regression: {d[\"composite_score\"]}\"; print(f\"OK: {d[\"composite_score\"]}\")'",
+          "expected": "OK: 99.0 (or similar, no regression)"
+        },
+        {
+          "step": 3,
+          "action": "Bump version in pyproject.toml to 7.0.0",
+          "file": "pyproject.toml",
+          "change": "version = '7.0.0'"
+        },
+        {
+          "step": 4,
+          "action": "Update CHANGELOG with v7.0.0 multi-format entry",
+          "file": "CHANGELOG.md"
+        },
+        {
+          "step": 5,
+          "action": "Final commit",
+          "run": "git commit -am 'feat: v7.0.0 — multi-format scoring, --url flag, format auto-detection'"
+        }
+      ]
+    }
+  ],
+
+  "total_tasks": 9,
+  "estimated_hours": 24,
+  "test_count_target": "560+ (540 existing + ~20 new format tests)"
+}
