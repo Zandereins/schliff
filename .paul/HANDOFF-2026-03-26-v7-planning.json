@@ -1,0 +1,143 @@
+{
+  "session": {
+    "date": "2026-03-26",
+    "duration": "~3 hours",
+    "context": "Shieldclaw case study + v7.0 strategic planning + implementation plan creation"
+  },
+
+  "accomplishments": [
+    "ShieldClaw Case Study: Optimized OpenClaw SKILL.md from 68.3 [C] → 94.6 [A] in 1 round",
+    "PR created: Zandereins/openclaw-skill-shieldclaw#3 (SKILL.md + eval-suite.json)",
+    "Schliff README updated: Results table, cross-ecosystem paragraph, Used-by entry",
+    "Case study artefacts saved: docs/case-studies/shieldclaw/ (6 files)",
+    "CHANGELOG v6.3.0 updated with ShieldClaw entry",
+    "Show HN draft updated with ShieldClaw as second proof point",
+    "Obsidian Launch Playbook: All 7 posting texts updated with ShieldClaw data",
+    "Strategic market analysis: 3 research agents (market, competitive, trends)",
+    "Strategic assessment saved: Obsidian vault + Claude memory",
+    "v7.0 Design Spec created: docs/specs/2026-03-26-v7-design.json",
+    "v7.0 Week 1 Plan created: docs/specs/plans/v7-week1-multiformat-plan.json",
+    "v7.0 Revised Plan (post 6-agent review): docs/specs/plans/v7-revised-plan.json",
+    "All changes pushed to main on GitHub"
+  ],
+
+  "decisions": [
+    {
+      "decision": "Multi-format via normalize_content() not FormatProfile",
+      "rationale": "40 LOC vs 350 LOC, 0 scorers touched, zero regression risk",
+      "impact": "Dramatically simpler v7.0 implementation"
+    },
+    {
+      "decision": "10 security patterns not 16",
+      "rationale": "Higher signal-to-noise, negation-aware matching eliminates 'safety instruction' false positives",
+      "impact": "Fewer false positives, simpler code"
+    },
+    {
+      "decision": "No batch module — extend doctor instead",
+      "rationale": "Doctor already has discovery + scoring + table output",
+      "impact": "0 new modules for batch functionality"
+    },
+    {
+      "decision": "3 viral features added: compare, suggest, report --gist",
+      "rationale": "High impact/effort ratio, creates shareable moments for launch",
+      "impact": "Additional ~9h effort, significant virality potential"
+    },
+    {
+      "decision": "3 worktree parallel execution strategy",
+      "rationale": "S1=core, S2=security, S3=web — minimize cli.py conflicts via serialized merges",
+      "impact": "Can execute 3 features simultaneously"
+    },
+    {
+      "decision": "Security opt-in v7.0, always-on v7.1",
+      "rationale": "False positive rate not validated at scale yet, would break existing CI",
+      "impact": "Phased rollout, calibration window"
+    },
+    {
+      "decision": "Per-format composite weights deferred to v7.1",
+      "rationale": "No data to validate different weights, premature optimization",
+      "impact": "Simpler v7.0, data-driven v7.1"
+    },
+    {
+      "decision": "Show HN timing: Saturday/Sunday (28-29.03) not today",
+      "rationale": "11.75% breakout rate on weekends vs 9.5% weekdays, HN account needs karma first",
+      "impact": "2-3 days for karma building via substantive comments"
+    }
+  ],
+
+  "key_files": {
+    "plans": [
+      "docs/specs/plans/v7-revised-plan.json — THE plan to execute (supersedes v7-week1-multiformat-plan.json)",
+      "docs/specs/2026-03-26-v7-design.json — Full design spec (context, not execution)"
+    ],
+    "case_study": [
+      "docs/case-studies/shieldclaw/ — All artefacts (SKILL before/after, scores, eval-suite, case-study.json)"
+    ],
+    "launch": [
+      "docs/specs/show-hn-draft.md — GITIGNORED but exists locally with ShieldClaw update",
+      "Obsidian: 1 Projects/schliff/Schliff Launch Playbook.md — All posting texts ready",
+      "Obsidian: 1 Projects/schliff/Schliff Strategic Assessment.json — Market analysis",
+      "Obsidian: 1 Projects/schliff/Schliff v7.0 Design Spec.json — Design spec copy"
+    ],
+    "code_to_modify": [
+      "skills/schliff/scripts/scoring/formats.py — NEW (normalize_content, detect_format)",
+      "skills/schliff/scripts/scoring/security.py — NEW (10 patterns, deductive scoring)",
+      "skills/schliff/scripts/shared.py — build_scores() normalization (8 LOC), fetch_url_safe()",
+      "skills/schliff/scripts/cli.py — --format, --url, --security, compare, suggest commands",
+      "skills/schliff/scripts/scoring/composite.py — security weight + graduated cap (S2 only)",
+      "skills/schliff/scripts/scoring/patterns.py — _RE_SEC_* patterns (S2 only)",
+      "skills/schliff/scripts/skill_mesh.py — multi-filename discovery",
+      "skills/schliff/scripts/doctor.py — project instruction file scanning"
+    ]
+  },
+
+  "open_questions": [
+    "Web playground: Vercel or Cloudflare for serverless Python? (decide in S3 session)",
+    "Leaderboard: separate repo or subdirectory? (decide in S3 session)",
+    "schliff report --gist: require GITHUB_TOKEN env var or use gh CLI? (decide during T16)",
+    "Should schliff compare also support --url for remote comparison?"
+  ],
+
+  "next_actions": [
+    {
+      "priority": 1,
+      "action": "Create 3 worktrees for parallel execution",
+      "commands": [
+        "git worktree add ../schliff-v7-core -b feat/v7-core main",
+        "git worktree add ../schliff-v7-security -b feat/v7-security main",
+        "git worktree add ../schliff-v7-web -b feat/v7-web main"
+      ]
+    },
+    {
+      "priority": 2,
+      "action": "S1: Capture v630 baseline BEFORE any code changes",
+      "command": "cd ../schliff-v7-core && schliff score skills/schliff/SKILL.md --json > skills/schliff/tests/fixtures/v630_baseline.json"
+    },
+    {
+      "priority": 3,
+      "action": "S1: Start subagent-driven-development on v7-revised-plan.json tasks T1-T8",
+      "skill": "superpowers:subagent-driven-development"
+    },
+    {
+      "priority": 4,
+      "action": "S2 (parallel session): Start security dimension tasks T9-T12",
+      "command": "claude --worktree v7-security"
+    },
+    {
+      "priority": 5,
+      "action": "S3 (parallel session): Start web features tasks T13-T14",
+      "command": "claude --worktree v7-web"
+    },
+    {
+      "priority": 6,
+      "action": "TODAY: Post on X/Twitter + Reddit r/ClaudeAI (Launch Phase 1)",
+      "reference": "Obsidian Launch Playbook — all texts copy-paste ready with ShieldClaw"
+    },
+    {
+      "priority": 7,
+      "action": "TODAY: Start building HN karma (3-5 substantive comments)",
+      "reference": "Obsidian Launch Playbook — Section 'HN Karma aufbauen'"
+    }
+  ],
+
+  "resume_instructions": "Read docs/specs/plans/v7-revised-plan.json — that is the execution plan. Create worktrees, capture baseline, start S1 with subagent-driven-development skill. Launch S2 and S3 as separate claude sessions."
+}
