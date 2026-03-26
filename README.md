@@ -17,6 +17,9 @@ schliff score path/to/SKILL.md
   <a href=".github/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg"></a>
   <a href="CHANGELOG.md"><img alt="v6.2.0" src="https://img.shields.io/badge/v6.2.0-F59E0B?label=version"></a>
+  <a href="https://pypi.org/project/schliff/"><img alt="PyPI" src="https://img.shields.io/pypi/v/schliff?style=flat-square"></a>
+  <a href="https://pypi.org/project/schliff/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/schliff?style=flat-square"></a>
+  <a href="https://pypi.org/project/schliff/"><img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9+-blue?style=flat-square"></a>
 </p>
 
 ```
@@ -131,6 +134,11 @@ Real-world skills vary. Complex skills plateau around [A] to [S] depending on ev
 > "It's become a core part of my skill development workflow!" — [@wan-huiyan](https://github.com/wan-huiyan)
 
 [@wan-huiyan](https://github.com/wan-huiyan) used schliff to improve [agent-review-panel](https://github.com/wan-huiyan/claude-client-proposal-slide) from 64 to 85.6 across three rounds. Along the way, SKILL.md went from 1,331 to 340 lines — a 75% token reduction via `references/` extraction. A/B testing on a 1,132-line document confirmed identical review quality with fewer tokens.
+
+### Used by
+
+- [@wan-huiyan](https://github.com/wan-huiyan) — agent-review-panel (64 → 85.6, 3 rounds)
+- *[Add your project](https://github.com/Zandereins/schliff/issues/new?template=share_results.md)*
 
 ---
 
