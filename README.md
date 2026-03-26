@@ -281,4 +281,3 @@ MIT
 ---
 
 *schliff (German) — the finishing cut. "Den letzten Schliff geben" = to give something its final polish.*
-*Built by [Franz Paul](https://github.com/Zandereins) with Claude Code.*
