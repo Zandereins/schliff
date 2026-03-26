@@ -14,6 +14,7 @@ import sys
 import os
 import json
 import argparse
+import urllib.parse
 
 # Ensure scripts dir is on sys.path so existing modules (scoring, shared, etc.)
 # can be imported without restructuring the project.
@@ -36,75 +37,125 @@ def _load_eval_suite_from_args(args: argparse.Namespace) -> "dict | None":
             print(f"Error: eval-suite exceeds {MAX_SKILL_SIZE} byte size limit", file=sys.stderr)
             sys.exit(1)
         return json.loads(eval_path.read_text(encoding="utf-8"))
-    return load_eval_suite(args.skill_path)
+    skill_path = getattr(args, "skill_path", None)
+    if skill_path:
+        return load_eval_suite(skill_path)
+    return None
 
 
 def cmd_score(args: argparse.Namespace) -> None:
     """Run the structural scorer on a single SKILL.md file."""
+    import tempfile
     from pathlib import Path
     from scoring import compute_composite
-    from shared import build_scores
+    from shared import build_scores, fetch_url_safe
 
-    if not Path(args.skill_path).exists():
-        print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
+    skill_path = getattr(args, "skill_path", None)
+    url = getattr(args, "url", None)
+
+    # Validate that exactly one of skill_path or --url is provided
+    if not skill_path and not url:
+        print("Error: provide a skill path or --url", file=sys.stderr)
+        sys.exit(1)
+    if skill_path and url:
+        print("Error: skill_path and --url are mutually exclusive", file=sys.stderr)
         sys.exit(1)
 
-    eval_suite = _load_eval_suite_from_args(args)
-    fmt_override = getattr(args, "format", None)
-    scores = build_scores(args.skill_path, eval_suite, include_runtime=True, fmt=fmt_override)
+    tmp_path: "str | None" = None
+    display_source: str
 
-    # Determine the effective format for display
-    if fmt_override:
-        detected_fmt = fmt_override
-    else:
-        from scoring.formats import detect_format
-        detected_fmt = detect_format(args.skill_path)
+    try:
+        if url:
+            # Fetch URL content into a tempfile
+            try:
+                content = fetch_url_safe(url)
+            except ValueError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                sys.exit(1)
 
-    composite = compute_composite(scores)
-
-    if getattr(args, "json", False):
-        result = {
-            "skill_path": args.skill_path,
-            "format": detected_fmt,
-            "composite_score": composite["score"],
-            "dimensions": {k: round(v["score"], 1) if isinstance(v["score"], float) else v["score"] for k, v in scores.items()},
-            "warnings": composite["warnings"],
-        }
-        print(json.dumps(result, indent=2))
-    else:
-        from terminal_art import format_score_display
-        import text_gradient
-
-        # Extract contradictions from clarity details
-        clarity_data = scores.get("clarity", {})
-        contradictions = clarity_data.get("details", {}).get("contradictions", [])
-
-        # Count available deterministic fixes
-        try:
-            gradients = text_gradient.compute_gradients(
-                args.skill_path, eval_suite, include_clarity=True,
+            # Derive a filename from the URL path for format detection
+            url_filename = Path(urllib.parse.urlparse(url).path).name or "SKILL.md"
+            suffix = Path(url_filename).suffix or ".md"
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=suffix, delete=False, encoding="utf-8",
+                prefix=Path(url_filename).stem + "_",
             )
-            fix_count = len(gradients)
-        except Exception:
-            fix_count = 0
+            tmp.write(content)
+            tmp.close()
+            tmp_path = tmp.name
+            skill_path = tmp_path
+            display_source = url
+        else:
+            if not Path(skill_path).exists():
+                print(f"Error: file not found: {skill_path}", file=sys.stderr)
+                sys.exit(1)
+            display_source = skill_path
 
-        # Get version
-        try:
-            from importlib.metadata import version
-            ver = version("schliff")
-        except Exception:
-            ver = "6.3.0"
+        eval_suite = _load_eval_suite_from_args(args)
+        fmt_override = getattr(args, "format", None)
+        scores = build_scores(skill_path, eval_suite, include_runtime=True, fmt=fmt_override)
 
-        output = format_score_display(
-            scores=scores,
-            composite=composite,
-            version=ver,
-            contradictions=contradictions if contradictions else None,
-            fix_count=fix_count,
-        )
-        print(output)
-        if detected_fmt != "skill.md":
-            print(f"  Format: {detected_fmt} (normalized)")
+        # Determine the effective format for display
+        if fmt_override:
+            detected_fmt = fmt_override
+        else:
+            from scoring.formats import detect_format
+            detected_fmt = detect_format(skill_path)
+
+        composite = compute_composite(scores)
+
+        if getattr(args, "json", False):
+            result = {
+                "skill_path": display_source,
+                "format": detected_fmt,
+                "composite_score": composite["score"],
+                "dimensions": {k: round(v["score"], 1) if isinstance(v["score"], float) else v["score"] for k, v in scores.items()},
+                "warnings": composite["warnings"],
+            }
+            print(json.dumps(result, indent=2))
+        else:
+            from terminal_art import format_score_display
+            import text_gradient
+
+            # Extract contradictions from clarity details
+            clarity_data = scores.get("clarity", {})
+            contradictions = clarity_data.get("details", {}).get("contradictions", [])
+
+            # Count available deterministic fixes
+            try:
+                gradients = text_gradient.compute_gradients(
+                    skill_path, eval_suite, include_clarity=True,
+                )
+                fix_count = len(gradients)
+            except Exception:
+                fix_count = 0
+
+            # Get version
+            try:
+                from importlib.metadata import version
+                ver = version("schliff")
+            except Exception:
+                ver = "6.3.0"
+
+            output = format_score_display(
+                scores=scores,
+                composite=composite,
+                version=ver,
+                contradictions=contradictions if contradictions else None,
+                fix_count=fix_count,
+            )
+            print(output)
+            if url:
+                print(f"  Source: {url}")
+            if detected_fmt != "skill.md":
+                print(f"  Format: {detected_fmt} (normalized)")
+
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 def cmd_verify(args: argparse.Namespace) -> None:
@@ -381,7 +432,8 @@ def main():
 
     # score command
     score_parser = subparsers.add_parser("score", help="Score a SKILL.md file")
-    score_parser.add_argument("skill_path", help="Path to SKILL.md")
+    score_parser.add_argument("skill_path", nargs="?", help="Path to SKILL.md")
+    score_parser.add_argument("--url", help="URL to fetch and score (HTTPS only, allowlisted hosts)")
     score_parser.add_argument("--json", action="store_true", help="JSON output")
     score_parser.add_argument("--eval-suite", help="Path to eval-suite.json")
     score_parser.add_argument(
