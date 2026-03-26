@@ -10,8 +10,18 @@ import json
 import re
 import sys
 import threading
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Optional
+
+# Allowlist of hosts permitted for --url fetching
+_URL_ALLOWED_HOSTS = frozenset({
+    "github.com",
+    "raw.githubusercontent.com",
+    "gitlab.com",
+    "bitbucket.org",
+})
 
 # Maximum skill file size (1 MB) to prevent DoS via large inputs
 MAX_SKILL_SIZE = 1_000_000
@@ -283,6 +293,55 @@ def load_jsonl_safe(path: str | Path, max_size: int = 10_000_000) -> list[dict]:
         except (json.JSONDecodeError, ValueError):
             continue
     return results
+
+
+def fetch_url_safe(url: str, max_bytes: int = 500_000) -> str:
+    """Fetch a URL safely with security restrictions.
+
+    - HTTPS only (no HTTP)
+    - Host allowlist: github.com, raw.githubusercontent.com, gitlab.com, bitbucket.org
+    - Max response size: 500KB
+    - Timeout: 10 seconds
+    - Returns content as string
+    - Raises ValueError for security violations
+    """
+    parsed = urllib.parse.urlparse(url)
+
+    if parsed.scheme != "https":
+        raise ValueError(
+            f"Only HTTPS URLs are allowed (got scheme '{parsed.scheme}'): {url}"
+        )
+
+    host = parsed.netloc.lower()
+    # Strip port if present (e.g. raw.githubusercontent.com:443)
+    if ":" in host:
+        host = host.split(":")[0]
+
+    if host not in _URL_ALLOWED_HOSTS:
+        raise ValueError(
+            f"Host '{host}' is not in the allowed list "
+            f"({', '.join(sorted(_URL_ALLOWED_HOSTS))}): {url}"
+        )
+
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310
+            # Honour Content-Length if present to avoid reading oversized responses
+            content_length = response.headers.get("Content-Length")
+            if content_length is not None and int(content_length) > max_bytes:
+                raise ValueError(
+                    f"Response too large: Content-Length {content_length} "
+                    f"exceeds limit of {max_bytes} bytes"
+                )
+            data = response.read(max_bytes + 1)
+    except urllib.error.URLError as exc:
+        raise ValueError(f"Failed to fetch URL: {exc}") from exc
+
+    if len(data) > max_bytes:
+        raise ValueError(
+            f"Response too large: received more than {max_bytes} bytes from {url}"
+        )
+
+    return data.decode("utf-8", errors="replace")
 
 
 # --- Security: Command validation for autonomous execution ---
