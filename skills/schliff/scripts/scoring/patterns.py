@@ -199,3 +199,87 @@ def _has_skill_domain_signal(prompt: str) -> float:
         return 0.2
 
     return 1.0
+
+
+# --- Used in score_security() ---
+
+# Category: injection
+_RE_SEC_PROMPT_INJECTION = re.compile(
+    r"<!--\s*(?:you\s+(?:must|should|will|are)|ignore|forget|disregard|override|"
+    r"new\s+instructions?|system\s+prompt|act\s+as|pretend)\b[^>]{0,500}-->",
+    re.IGNORECASE | re.DOTALL,
+)
+_RE_SEC_INSTRUCTION_OVERRIDE = re.compile(
+    r"(?:ignore\s+(?:all\s+)?previous\s+instructions?|"
+    r"disregard\s+(?:all\s+)?(?:above|prior|previous)|"
+    r"override\s+system\s+prompt|"
+    r"forget\s+(?:all\s+)?(?:your|prior|previous)\s+instructions?|"
+    r"new\s+instructions?\s*:|"
+    r"you\s+are\s+now\s+(?:a|an|the)\b)",
+    re.IGNORECASE,
+)
+
+# Category: exfil
+_RE_SEC_DATA_EXFIL = re.compile(
+    r"(?:(?:curl|wget|fetch|nc|ncat|netcat)\s+[^\n]*(?:\$\(|`[^`]*`|<\(|\|)|"
+    r"\$\(cat\s[^\)]+\)\s*\|\s*(?:curl|wget|nc|netcat)|"
+    r"(?:curl|wget)\s+[^\n]*(?:--data|--upload|-d\s|-F\s|-T\s)[^\n]*(?:https?://|ftp://))",
+    re.IGNORECASE,
+)
+_RE_SEC_ENV_LEAK = re.compile(
+    r"(?:(?:echo|print|cat|send|post|curl|wget|log)\s[^\n]*(?:\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)|"
+    r"process\.env\.[A-Z_]+|os\.environ\[))|"
+    r"(?:\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)\s*[|>])",
+    re.IGNORECASE,
+)
+
+# Category: dangerous_cmd
+_RE_SEC_DANGEROUS_CMD = re.compile(
+    r"(?:rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/|"
+    r"rm\s+-[a-z]*f[a-z]*r[a-z]*\s+/|"
+    r"chmod\s+777\s|"
+    r"dd\s+if=/dev/(?:zero|random|urandom)\s+of=/dev/|"
+    r"mkfs\.\w+\s+/dev/|"
+    r":\(\)\s*\{\s*:\|:\s*&\s*\}\s*;|"
+    r"format\s+[a-z]:\s*/)",
+    re.IGNORECASE,
+)
+
+# Category: obfuscation
+_RE_SEC_BASE64_CMD = re.compile(
+    r"(?:echo\s+[^\n]*\|\s*base64\s+-d\s*\|\s*(?:sh|bash|zsh|exec)|"
+    r"base64\s+-d\s*[^\n]*\|\s*(?:sh|bash|zsh|exec|eval)|"
+    r"atob\s*\([^\)]*\)\s*[^\n]*eval|"
+    r"eval\s*\(\s*atob\s*\()",
+    re.IGNORECASE,
+)
+_RE_SEC_ZERO_WIDTH = re.compile(
+    r"[\u200b\u200c\u200d\ufeff\u2060]",
+)
+_RE_SEC_HEX_ESCAPE = re.compile(
+    r"(?:\\x[0-9a-fA-F]{2}){4,}",
+)
+
+# Category: overpermission
+_RE_SEC_OVERPERMISSION = re.compile(
+    r"(?:run\s+as\s+root|"
+    r"sudo\s+\w|"
+    r"disable\s+security|"
+    r"turn\s+off\s+(?:the\s+)?firewall|"
+    r"allow\s+all\s+origins|"
+    r"--no-verify\b|"
+    r"--disable-web-security\b|"
+    r"allowAll\s*[=:]\s*true)",
+    re.IGNORECASE,
+)
+
+# Category: boundaries
+_RE_SEC_BOUNDARY_VIOLATION = re.compile(
+    r"(?:/etc/(?:passwd|shadow|sudoers)|"
+    r"~/\.ssh/|"
+    r"~/.ssh/|"
+    r"id_rsa|"
+    r"\.\.(?:/|\\){2,}|"
+    r"(?:cat|read|open|access)\s+[^\n]*/etc/(?:passwd|shadow))",
+    re.IGNORECASE,
+)
