@@ -345,13 +345,22 @@ def fetch_url_safe(url: str, max_bytes: int = 500_000) -> str:
         with opener.open(url, timeout=10) as response:  # noqa: S310
             # Honour Content-Length if present to avoid reading oversized responses
             content_length = response.headers.get("Content-Length")
-            if content_length is not None and int(content_length) > max_bytes:
-                raise ValueError(
-                    f"Response too large: Content-Length {content_length} "
-                    f"exceeds limit of {max_bytes} bytes"
-                )
+            if content_length is not None:
+                try:
+                    cl_int = int(content_length)
+                except ValueError:
+                    cl_int = 0  # treat unparseable Content-Length as absent
+                if cl_int > max_bytes:
+                    raise ValueError(
+                        f"Response too large: Content-Length {content_length} "
+                        f"exceeds limit of {max_bytes} bytes"
+                    )
             data = response.read(max_bytes + 1)
     except urllib.error.URLError as exc:
+        # Unwrap redirect-handler security errors for clear messaging
+        cause = getattr(exc, "reason", None)
+        if isinstance(cause, ValueError):
+            raise cause from exc
         raise ValueError(f"Failed to fetch URL: {exc}") from exc
 
     if len(data) > max_bytes:

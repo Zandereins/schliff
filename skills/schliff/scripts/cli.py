@@ -38,7 +38,11 @@ def _load_eval_suite_from_args(args: argparse.Namespace) -> "dict | None":
         if eval_path.stat().st_size > MAX_SKILL_SIZE:
             print(f"Error: eval-suite exceeds {MAX_SKILL_SIZE} byte size limit", file=sys.stderr)
             sys.exit(1)
-        return json.loads(eval_path.read_text(encoding="utf-8"))
+        try:
+            return json.loads(eval_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            print(f"Error: malformed eval-suite: {e}", file=sys.stderr)
+            sys.exit(1)
     skill_path = getattr(args, "skill_path", None)
     if skill_path:
         return load_eval_suite(skill_path)
@@ -77,6 +81,9 @@ def cmd_score(args: argparse.Namespace) -> None:
 
             # Derive a filename from the URL path for format detection
             url_filename = Path(urllib.parse.urlparse(url).path).name or "SKILL.md"
+            # Detect format from URL filename (not tempfile name)
+            from scoring.formats import detect_format as _detect_fmt
+            url_fmt = _detect_fmt(url_filename)
             suffix = Path(url_filename).suffix or ".md"
             tmp = tempfile.NamedTemporaryFile(
                 mode="w", suffix=suffix, delete=False, encoding="utf-8",
@@ -88,6 +95,7 @@ def cmd_score(args: argparse.Namespace) -> None:
             skill_path = tmp_path
             display_source = url
         else:
+            url_fmt = None
             if not Path(skill_path).exists():
                 print(f"Error: file not found: {skill_path}", file=sys.stderr)
                 sys.exit(1)
@@ -95,11 +103,13 @@ def cmd_score(args: argparse.Namespace) -> None:
 
         eval_suite = _load_eval_suite_from_args(args)
         fmt_override = getattr(args, "format", None)
-        scores = build_scores(skill_path, eval_suite, include_runtime=True, fmt=fmt_override)
+        # For --url, use format detected from URL filename (not tempfile name)
+        effective_fmt = fmt_override or url_fmt
+        scores = build_scores(skill_path, eval_suite, include_runtime=True, fmt=effective_fmt)
 
         # Determine the effective format for display
-        if fmt_override:
-            detected_fmt = fmt_override
+        if effective_fmt:
+            detected_fmt = effective_fmt
         else:
             from scoring.formats import detect_format
             detected_fmt = detect_format(skill_path)
@@ -590,9 +600,6 @@ def cmd_suggest(args: argparse.Namespace) -> None:
         print(f"  {i:2d}. [{delta_label:>4}] {g['instruction']}")
 
     print()
-    total_delta_display = f"~{total_delta:.1f}" if any(
-        g.get("delta_display") for g in top_gradients
-    ) else f"+{total_delta:.1f}"
     print(
         f"  Current: {current_score:.1f} [{current_grade}]"
         f"  →  Estimated after fixes: ~{estimated_score:.1f} [{estimated_grade}]"

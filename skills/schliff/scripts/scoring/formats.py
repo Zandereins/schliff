@@ -61,8 +61,10 @@ def normalize_content(content: str, fmt: str) -> str:
 def _yaml_safe(value: str) -> str:
     """Escape a value for safe YAML scalar embedding."""
     if any(c in value for c in (':', '#', '{', '}', '[', ']', ',', '&', '*',
-                                 '?', '|', '>', '!', "'", '"', '\n')):
-        escaped = value.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+                                 '?', '|', '>', '!', "'", '"', '\n', '\r',
+                                 '%', '@', '`')):
+        escaped = (value.replace('\\', '\\\\').replace('"', '\\"')
+                   .replace('\n', '\\n').replace('\r', '\\r'))
         return f'"{escaped}"'
     return value
 
