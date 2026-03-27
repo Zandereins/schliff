@@ -1,5 +1,5 @@
 #!/bin/bash
-# Demo recording script for schliff v7.1.0
+# Demo recording script for schliff v7
 # Run from repo root: bash demo/record-demo-v7.sh
 set -e
 cd "$(dirname "$0")/.."
@@ -44,23 +44,9 @@ $CLI suggest demo/bad-skill/SKILL.md --top 5 2>/dev/null || true
 printf '\n'
 sleep 3
 
-# ── Scene 6: Sync check across directory ──────────────────────────────
-printf '\033[1;36m$ schliff sync demo/sync-conflict/\033[0m\n\n'
-sleep 0.8
-$CLI sync demo/sync-conflict/ 2>/dev/null || true
-printf '\n'
-sleep 3
-
-# ── Scene 7: Report generation ──────────────────────────────────────
+# ── Scene 6: Report generation ──────────────────────────────────────
 printf '\033[1;36m$ schliff report demo/bad-skill/SKILL.md\033[0m\n\n'
 sleep 0.8
 $CLI report demo/bad-skill/SKILL.md 2>/dev/null || true
-printf '\n'
-sleep 3
-
-# ── Scene 8: Drift detection ────────────────────────────────────────
-printf '\033[1;36m$ schliff drift --repo demo/sync-conflict/\033[0m\n\n'
-sleep 0.8
-$CLI drift --repo demo/sync-conflict/ 2>/dev/null || true
 printf '\n'
 sleep 3

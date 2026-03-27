@@ -1,43 +1,29 @@
 # Schliff
 
-AI coding agents use instruction files — SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md — to define behavior. **These files degrade silently.** A skill that worked last month misfires today — triggers overlap, instructions contradict, edge cases slip through. You don't notice until production. Schliff catches that before your users do.
+A deterministic quality scorer for AI agent instruction files. The Codecov for your SKILL.md.
+
+<p align="center">
+  <a href="https://pypi.org/project/schliff/"><img alt="PyPI" src="https://img.shields.io/pypi/v/schliff?style=flat-square&color=F59E0B&label=version"></a>
+  <a href="https://pypi.org/project/schliff/"><img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9+-blue?style=flat-square"></a>
+  <a href="https://pypi.org/project/schliff/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/schliff?style=flat-square"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
+  <a href="https://github.com/Zandereins/schliff"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Zandereins/schliff?style=flat-square"></a>
+  <a href="skills/schliff/scripts/score-skill.py"><img alt="Structural Score" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json&style=flat-square"></a>
+  <a href=".github/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json&style=flat-square"></a>
+</p>
+
+AI coding agents use instruction files — SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md — to define behavior. These files degrade silently: triggers overlap, instructions contradict, edge cases slip through. Schliff catches that before your users do.
+
+**Zero dependencies.** No LLM needed. Same input, same score. Python 3.9+ stdlib only.
 
 ```bash
 pip install schliff
-schliff score path/to/SKILL.md          # or CLAUDE.md, .cursorrules, AGENTS.md
-schliff score --url https://github.com/user/repo/blob/main/SKILL.md
+schliff score path/to/SKILL.md
 ```
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/Zandereins/schliff/main/demo/schliff-demo.gif?v=10" alt="schliff score: bad skill [D] vs production skill [S]" width="600">
 </p>
-
-<p align="center">
-  <a href="https://github.com/Zandereins/schliff"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Zandereins/schliff?style=flat-square"></a>
-  <a href="skills/schliff/scripts/score-skill.py"><img alt="Structural Score" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json"></a>
-  <a href=".github/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg"></a>
-  <a href="CHANGELOG.md"><img alt="v7.1.0" src="https://img.shields.io/badge/v7.1.0-F59E0B?label=version"></a>
-  <a href="https://pypi.org/project/schliff/"><img alt="PyPI" src="https://img.shields.io/pypi/v/schliff?style=flat-square"></a>
-  <a href="https://pypi.org/project/schliff/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/schliff?style=flat-square"></a>
-  <a href="https://pypi.org/project/schliff/"><img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9+-blue?style=flat-square"></a>
-</p>
-
-```
-schliff v7.1.0
-
-  structure      ██████████  100/100  perfect
-  triggers       ██████████  100/100  perfect
-  quality        ██████████   99/100  excellent
-  edges          ██████████  100/100  perfect
-  efficiency     █████████░   92/100  great
-  composability  ██████████  100/100  perfect
-  clarity        ██████████  100/100  perfect
-
-  Structural Score  ████████████████████  99.0/100  [S]  (structural)
-```
-
-Schliff scores itself with the same engine it applies to your skills — no exceptions, no special cases. **Zero dependencies** — Python 3.9+ stdlib only. Scores SKILL.md, CLAUDE.md, .cursorrules, and AGENTS.md out of the box.
 
 ---
 
