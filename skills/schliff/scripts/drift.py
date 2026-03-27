@@ -148,7 +148,7 @@ def _load_package_json_scripts(repo_root: str) -> Optional[Dict[str, str]]:
             data = json.load(f)
         return data.get("scripts", {})
     except (json.JSONDecodeError, OSError) as exc:
-        print(f"[drift] warning: could not parse package.json: {exc}", file=sys.stderr)
+        print(f"Warning: could not parse package.json: {exc}", file=sys.stderr)
         return None
 
 
@@ -161,7 +161,7 @@ def _load_makefile_targets(repo_root: str) -> Optional[set[str]]:
         with open(makefile_path, "r", encoding="utf-8") as f:
             content = f.read()
     except OSError as exc:
-        print(f"[drift] warning: could not read Makefile: {exc}", file=sys.stderr)
+        print(f"Warning: could not read Makefile: {exc}", file=sys.stderr)
         return None
 
     targets: set[str] = set()

@@ -5,7 +5,7 @@ Scans all installed skills, scores each one, and produces a summary table
 with actionable recommendations. Single command, zero arguments needed.
 
 Usage:
-    python3 doctor.py [--skill-dirs DIR...] [--json] [--verbose]
+    python3 doctor.py [--skill-dirs DIR...] [--repo DIR] [--json] [--verbose]
 
 Output: Table of skills with structural scores, issues, and suggested actions.
 """
@@ -319,7 +319,7 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
         lines.append("")
 
     lines.append("  NOTE: Scores are STRUCTURAL — they measure file organization,")
-    lines.append("  not runtime effectiveness. Use --runtime for validated scoring.")
+    lines.append("  not runtime effectiveness. Runtime scoring requires an eval suite.")
     lines.append("")
     lines.append("=" * 70)
     return "\n".join(lines)
@@ -332,7 +332,7 @@ def main():
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show per-skill issues")
     parser.add_argument("--repo", default=None,
-                        help="Repository root for drift detection and instruction file discovery")
+                        help="Repository root for instruction file discovery")
     args = parser.parse_args()
 
     report = run_doctor(skill_dirs=args.skill_dirs, verbose=args.verbose,

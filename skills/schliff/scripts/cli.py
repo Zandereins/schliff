@@ -53,7 +53,7 @@ def _load_eval_suite_from_args(args: argparse.Namespace) -> "dict | None":
 
 
 def cmd_score(args: argparse.Namespace) -> None:
-    """Run the structural scorer on a single SKILL.md file."""
+    """Score a single SKILL.md file (structural + runtime when eval suite available)."""
     import tempfile
     from pathlib import Path
     from scoring import compute_composite
@@ -121,7 +121,11 @@ def cmd_score(args: argparse.Namespace) -> None:
 
         # Token budget check
         from scoring.formats import estimate_tokens, check_token_budget
-        skill_content = Path(skill_path).read_text(encoding="utf-8")
+        try:
+            skill_content = Path(skill_path).read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            print(f"Error: {display_source} is not a valid UTF-8 text file", file=sys.stderr)
+            sys.exit(1)
         token_info = check_token_budget(skill_content, detected_fmt)
 
         if getattr(args, "json", False):
@@ -747,7 +751,7 @@ def main():
     doctor_parser.add_argument("--verbose", "-v", action="store_true",
                                help="Show per-skill issues")
     doctor_parser.add_argument("--repo", default=None,
-                               help="Repository root for drift detection and instruction file discovery")
+                               help="Repository root for instruction file discovery")
 
     # badge command
     badge_parser = subparsers.add_parser("badge", help="Generate markdown badge for a skill")
