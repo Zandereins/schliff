@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from typing import Any
 
@@ -95,6 +96,7 @@ def generate_report_markdown(
     skill_path: str,
     composite: dict[str, Any],
     grade: str,
+    token_info: dict[str, Any] | None = None,
 ) -> str:
     """Generate a Markdown score report.
 
@@ -105,6 +107,7 @@ def generate_report_markdown(
         composite: Dict with at least ``"score"`` (float) and optional
             ``"warnings"`` (list[str]).
         grade: Letter grade (e.g. ``"A"``, ``"B"``).
+        token_info: Optional token budget dict from ``check_token_budget()``.
 
     Returns:
         A complete Markdown string ready for display or upload.
@@ -137,6 +140,14 @@ def generate_report_markdown(
         bar = _ascii_bar(dim_score)
         lines.append(f"| {dim_name.capitalize()} | {dim_score:.1f} | `{bar}` |")
     lines.append("")
+
+    # Token budget
+    if token_info:
+        tok = token_info.get("tokens", 0)
+        bud = token_info.get("budget", 0)
+        sev = token_info.get("severity", "unknown")
+        lines.append(f"**Token Budget:** {tok:,} / {bud:,} ({sev})")
+        lines.append("")
 
     # Recommendations (top 3 issues)
     top_issues = _collect_top_issues(scores, limit=3)

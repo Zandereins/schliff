@@ -150,6 +150,7 @@ def run_doctor(
             "mesh_issue_count": 0,
             "results": [],
             "instruction_files": instruction_files,
+            "drift_findings": [],
             "summary": "No skills found. Check skill directories.",
         }
 
@@ -211,6 +212,30 @@ def run_doctor(
     scan_root = repo_root or "."
     instruction_files = discover_instruction_files(scan_root)
 
+    # Drift analysis on discovered instruction files
+    drift_findings: list[dict] = []
+    if instruction_files and repo_root:
+        try:
+            import drift as drift_mod
+            for ifile in instruction_files:
+                try:
+                    content = Path(ifile["path"]).read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                refs = drift_mod.extract_references(content)
+                if refs:
+                    findings = drift_mod.validate_references(refs, repo_root)
+                    missing = [f for f in findings if f["status"] == "missing"]
+                    if missing:
+                        drift_findings.extend(
+                            {**f, "source_file": ifile["name"]} for f in missing
+                        )
+        except ImportError:
+            pass  # drift module not available — skip
+
+    if drift_findings:
+        summary_parts.append(f"{len(drift_findings)} stale references")
+
     return {
         "skills_found": len(results),
         "healthy": healthy,
@@ -221,6 +246,7 @@ def run_doctor(
         "mesh_issue_count": len(mesh_issues),
         "results": results,
         "instruction_files": instruction_files,
+        "drift_findings": drift_findings,
         "summary": " | ".join(summary_parts),
     }
 
@@ -288,6 +314,17 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
     else:
         lines.append("  No project instruction files found.")
     lines.append("")
+
+    # Drift findings
+    drift_findings = report.get("drift_findings", [])
+    if drift_findings:
+        lines.append(f"  Stale References ({len(drift_findings)} found)")
+        lines.append("  " + "-" * 25)
+        for df in drift_findings[:10]:  # Cap at 10 to avoid flooding
+            lines.append(f"    {df.get('source_file', '?')}: `{df['ref']}` (line {df['line']})")
+        if len(drift_findings) > 10:
+            lines.append(f"    ... and {len(drift_findings) - 10} more")
+        lines.append("")
 
     # Mesh health
     mesh_health = report.get("mesh_health", 100)

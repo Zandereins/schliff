@@ -349,7 +349,7 @@ This skill probably helps with deployment. You might want to use it when deployi
 
         # Reuse cmd_score logic
         import argparse as _ap
-        fake_args = _ap.Namespace(skill_path=skill_path, json=False, eval_suite=None, url=None, format=None)
+        fake_args = _ap.Namespace(skill_path=skill_path, json=False, eval_suite=None, url=None, format=None, tokens=False)
         cmd_score(fake_args)
 
     print("\n  This is a deliberately bad skill. Try schliff on your own skills!")
@@ -678,11 +678,22 @@ def cmd_report(args: argparse.Namespace) -> None:
     composite = compute_composite(scores)
     grade = score_to_grade(composite["score"])
 
+    # Token budget for report
+    from scoring.formats import detect_format, check_token_budget
+    detected_fmt = detect_format(args.skill_path)
+    try:
+        skill_content = Path(args.skill_path).read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        print(f"Error: {args.skill_path} is not a valid UTF-8 text file", file=sys.stderr)
+        sys.exit(1)
+    token_info = check_token_budget(skill_content, detected_fmt)
+
     markdown = report_mod.generate_report_markdown(
         scores=scores,
         skill_path=args.skill_path,
         composite=composite,
         grade=grade,
+        token_info=token_info,
     )
 
     if getattr(args, "gist", False):
