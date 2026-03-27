@@ -321,9 +321,12 @@ def main():
                         help="Directories to scan (default: ~/.claude/skills/, .claude/skills/)")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show per-skill issues")
+    parser.add_argument("--repo", default=None,
+                        help="Repository root for drift detection and instruction file discovery")
     args = parser.parse_args()
 
-    report = run_doctor(skill_dirs=args.skill_dirs, verbose=args.verbose)
+    report = run_doctor(skill_dirs=args.skill_dirs, verbose=args.verbose,
+                        repo_root=args.repo)
 
     if args.json:
         print(json.dumps(report, indent=2))

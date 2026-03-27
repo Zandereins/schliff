@@ -47,6 +47,9 @@ _RE_MAKE_TARGET = re.compile(
 # File extension check for filtering path candidates
 _RE_HAS_EXTENSION = re.compile(r"\.[A-Za-z0-9]{1,10}$")
 
+# Strip backtick spans for bare-path scanning
+_RE_BACKTICK_SPAN = re.compile(r"`[^`]*`")
+
 
 def _is_plausible_path(candidate: str) -> bool:
     """Return True if the candidate looks like a real file path."""
@@ -95,7 +98,7 @@ def extract_references(content: str) -> List[Dict[str, object]]:
                     })
 
         # Bare paths — search in line with backtick spans removed
-        line_no_backticks = re.sub(r"`[^`]*`", "", line)
+        line_no_backticks = _RE_BACKTICK_SPAN.sub("", line)
         for m in _RE_BARE_PATH.finditer(line_no_backticks):
             candidate = m.group(1)
             if _is_plausible_path(candidate):

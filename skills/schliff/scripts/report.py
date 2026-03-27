@@ -212,6 +212,6 @@ def upload_gist(
     except urllib.error.HTTPError as exc:
         print(f"Gist upload failed: HTTP {exc.code} — {exc.reason}", file=sys.stderr)
         return None
-    except (urllib.error.URLError, OSError) as exc:
-        print(f"Gist upload failed: {exc}", file=sys.stderr)
+    except (urllib.error.URLError, OSError):
+        print("Gist upload failed: network error", file=sys.stderr)
         return None

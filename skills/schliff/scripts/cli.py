@@ -13,6 +13,8 @@ Usage:
     schliff demo                     Score a built-in bad skill
     schliff version                  Show version
 """
+from __future__ import annotations
+
 import sys
 import os
 import json
