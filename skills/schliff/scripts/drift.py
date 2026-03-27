@@ -149,7 +149,7 @@ def _load_package_json_scripts(repo_root: str) -> Optional[Dict[str, str]]:
         return data.get("scripts", {})
     except (json.JSONDecodeError, OSError) as exc:
         print(f"[drift] warning: could not parse package.json: {exc}", file=sys.stderr)
-        return {}
+        return None
 
 
 def _load_makefile_targets(repo_root: str) -> Optional[set[str]]:
@@ -162,7 +162,7 @@ def _load_makefile_targets(repo_root: str) -> Optional[set[str]]:
             content = f.read()
     except OSError as exc:
         print(f"[drift] warning: could not read Makefile: {exc}", file=sys.stderr)
-        return set()
+        return None
 
     targets: set[str] = set()
     # Match lines like "target-name:" at start of line (bounded)

@@ -111,3 +111,48 @@ class TestUploadGist:
         monkeypatch.delenv("GITHUB_TOKEN", raising=False)
         result = upload_gist("# test", token=None)
         assert result is None
+
+    def test_returns_url_on_success(self, monkeypatch) -> None:
+        """upload_gist returns the gist HTML URL when the API call succeeds."""
+        from unittest.mock import patch, MagicMock
+        import io
+
+        fake_response = MagicMock()
+        fake_response.read.return_value = b'{"html_url": "https://gist.github.com/abc123"}'
+        fake_response.__enter__ = lambda s: s
+        fake_response.__exit__ = MagicMock(return_value=False)
+
+        with patch("report.urllib.request.urlopen", return_value=fake_response):
+            url = upload_gist("# report content", token="ghp_fake_token")
+
+        assert url == "https://gist.github.com/abc123"
+
+    def test_returns_none_on_http_error(self, monkeypatch) -> None:
+        """upload_gist returns None when the API returns an HTTP error."""
+        from unittest.mock import patch
+        import urllib.error
+
+        exc = urllib.error.HTTPError(
+            url="https://api.github.com/gists",
+            code=401,
+            msg="Unauthorized",
+            hdrs=None,  # type: ignore[arg-type]
+            fp=None,
+        )
+
+        with patch("report.urllib.request.urlopen", side_effect=exc):
+            result = upload_gist("# report", token="ghp_bad_token")
+
+        assert result is None
+
+    def test_returns_none_on_url_error(self, monkeypatch) -> None:
+        """upload_gist returns None on network/connection errors."""
+        from unittest.mock import patch
+        import urllib.error
+
+        exc = urllib.error.URLError("Connection refused")
+
+        with patch("report.urllib.request.urlopen", side_effect=exc):
+            result = upload_gist("# report", token="ghp_fake_token")
+
+        assert result is None

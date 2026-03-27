@@ -137,9 +137,19 @@ def run_doctor(
     skills = skill_mesh.discover_skills(dirs)
 
     if not skills:
+        # Discover instruction files even when no skills found
+        scan_root = repo_root or "."
+        instruction_files = discover_instruction_files(scan_root)
         return {
             "skills_found": 0,
+            "healthy": 0,
+            "needs_work": 0,
+            "no_eval_suite": 0,
+            "total_tokens": 0,
+            "mesh_health": 100,
+            "mesh_issue_count": 0,
             "results": [],
+            "instruction_files": instruction_files,
             "summary": "No skills found. Check skill directories.",
         }
 

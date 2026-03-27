@@ -208,7 +208,10 @@ def upload_gist(
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-            return data.get("html_url")
+            url = data.get("html_url")
+            if not url:
+                print("Gist created but response missing html_url", file=sys.stderr)
+            return url
     except urllib.error.HTTPError as exc:
         print(f"Gist upload failed: HTTP {exc.code} — {exc.reason}", file=sys.stderr)
         return None

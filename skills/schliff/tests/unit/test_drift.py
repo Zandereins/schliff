@@ -206,3 +206,35 @@ class TestGenerateDriftReport:
         missing_pos = report.index("Missing References")
         valid_pos = report.index("Valid References")
         assert missing_pos < valid_pos
+
+
+# ---------------------------------------------------------------------------
+# validate_references — malformed package.json edge case
+# ---------------------------------------------------------------------------
+
+class TestValidateReferencesEdgeCases:
+    """Edge cases for validate_references with broken project files."""
+
+    def test_malformed_package_json_treats_script_as_missing(self, tmp_path):
+        """A malformed package.json should not crash; script is treated as missing."""
+        # Write invalid JSON to package.json
+        (tmp_path / "package.json").write_text("{not valid json!!!", encoding="utf-8")
+
+        refs = [{"ref": "build", "type": "script", "line": 1}]
+        findings = drift_mod.validate_references(refs, str(tmp_path))
+
+        assert len(findings) == 1
+        # _load_package_json_scripts catches JSONDecodeError and returns None
+        # so the script is reported as missing (package.json unavailable)
+        assert findings[0]["status"] == "missing"
+        assert "package.json" in findings[0]["detail"]
+
+    def test_empty_package_json_treats_script_as_missing(self, tmp_path):
+        """An empty package.json (no scripts key) marks scripts as missing."""
+        (tmp_path / "package.json").write_text("{}", encoding="utf-8")
+
+        refs = [{"ref": "test", "type": "script", "line": 5}]
+        findings = drift_mod.validate_references(refs, str(tmp_path))
+
+        assert len(findings) == 1
+        assert findings[0]["status"] == "missing"
