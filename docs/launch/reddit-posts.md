@@ -12,7 +12,7 @@
 
 If you use CLAUDE.md or SKILL.md files with Claude Code, you've probably noticed they degrade over time. Instructions contradict each other, sections bloat, critical constraints get buried. The agent still follows them — just worse.
 
-I built **[schliff](https://github.com/Zandereins/schliff)** — a deterministic quality scorer for AI instruction files. It analyzes SKILL.md, CLAUDE.md, .cursorrules, and AGENTS.md across 8 dimensions using static analysis (TF-IDF heuristics, sqrt density curves, antonym pair detection, entropy analysis). No LLM in the scoring path.
+I built **[schliff](https://github.com/Zandereins/schliff)** — a deterministic quality scorer for AI instruction files. It analyzes SKILL.md, CLAUDE.md, .cursorrules, and AGENTS.md across 7 dimensions (structure, triggers, quality, edges, efficiency, composability, clarity) using static analysis (TF-IDF heuristics, sqrt density curves, antonym pair detection, entropy analysis). No LLM in the scoring path.
 
 **Surprising findings from scoring 100+ public skills:**
 
@@ -27,10 +27,10 @@ I built **[schliff](https://github.com/Zandereins/schliff)** — a deterministic
 pip install schliff
 schliff score CLAUDE.md          # single file score
 schliff report .                 # score all instruction files in a project
-schliff leaderboard .            # ranked comparison across files
+schliff doctor                   # scan all installed skills, health grades
 ```
 
-The autonomous improvement loop (`schliff auto SKILL.md`) can take a file from 54 [D] to 98 [S] by iterating edits against the scoring engine — no LLM needed for the scoring itself.
+The autonomous improvement loop (via `/schliff:auto` in Claude Code) can take a file from 54 [D] to 98 [S] by iterating edits against the scoring engine — no LLM needed for the scoring itself.
 
 There's also a pre-commit hook and GitHub Action for CI integration, so scores can't silently regress.
 
@@ -65,11 +65,11 @@ The scoring engine is ~2,000 lines of pure stdlib Python with no ML/LLM in the s
 ```bash
 pip install schliff
 schliff score CLAUDE.md                    # single file
-schliff report . --format json             # machine-readable output
-schliff drift --baseline scores.json       # detect score regression
+schliff report SKILL.md                    # markdown quality report
+schliff drift --repo .                     # detect stale paths and references
 ```
 
-- Pre-commit hook: `schliff sync .pre-commit-config.yaml`
+- Pre-commit hook: see `schliff verify` with `--min-score` and `--regression`
 - GitHub Action available for CI gating
 - `schliff track` for score history over time
 

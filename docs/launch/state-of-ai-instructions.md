@@ -8,7 +8,7 @@ The first large-scale, deterministic quality audit of public AI instruction file
 
 ## Methodology
 
-- **Tool:** schliff v7.1.0 — deterministic quality scorer, 8 dimensions + security
+- **Tool:** schliff v7.1.0 — deterministic quality scorer, 8 dimensions
 - **Sources:** awesome-claude-code, awesome-cursorrules, awesome-claude-skills, public GitHub repos
 - **Anonymization:** Individual repos anonymized; aggregates shown for all, top 10 shown with explicit permission
 - **Reproducibility:** Deterministic scoring — same file, same score, every run. No LLM in the loop.
@@ -151,7 +151,7 @@ schliff report <directory>  # full report with visualizations
 
 ## About Schliff
 
-**Schliff** is a deterministic quality scorer for AI agent instruction files. 8 dimensions + security. 732 tests. MIT license. Zero dependencies.
+**Schliff** is a deterministic quality scorer for AI agent instruction files. 8 dimensions. 732 tests. MIT license. Zero dependencies.
 
 - GitHub: [github.com/Zandereins/schliff](https://github.com/Zandereins/schliff)
 - Install: `pip install schliff`
