@@ -14,6 +14,7 @@ FORMAT_SKILL_MD = "skill.md"
 FORMAT_CLAUDE_MD = "claude.md"
 FORMAT_CURSORRULES = "cursorrules"
 FORMAT_AGENTS_MD = "agents.md"
+FORMAT_SYSTEM_PROMPT = "system_prompt"
 FORMAT_UNKNOWN = "unknown"
 
 _BASENAME_MAP: dict[str, str] = {
@@ -24,16 +25,46 @@ _BASENAME_MAP: dict[str, str] = {
 }
 
 _RE_H1 = re.compile(r"^#\s+(.+)", re.MULTILINE)
+_RE_ROLE_DEFINITION = re.compile(
+    r"(?i)(you are|your role is|act as|you're a|as a \w+ assistant|your purpose)"
+)
 
 
-def detect_format(filename: str) -> str:
+def detect_format(filename: str, content: str | None = None) -> str:
     """Return the format identifier for a project instruction file.
 
-    Matches by basename (case-insensitive). Returns one of:
-    "skill.md", "claude.md", "cursorrules", "agents.md", "unknown".
+    Matches by basename (case-insensitive) first. If the filename doesn't
+    match a known format, falls back to content heuristics for system_prompt
+    detection.
+
+    Returns one of:
+    "skill.md", "claude.md", "cursorrules", "agents.md", "system_prompt", "unknown".
     """
     basename = Path(filename).name.lower()
-    return _BASENAME_MAP.get(basename, FORMAT_UNKNOWN)
+    fmt = _BASENAME_MAP.get(basename, FORMAT_UNKNOWN)
+
+    # Filename-based formats always take priority
+    if fmt != FORMAT_UNKNOWN:
+        return fmt
+
+    # Extension-based detection for system prompts
+    ext = Path(filename).suffix.lower()
+    if ext in (".prompt", ".system"):
+        return FORMAT_SYSTEM_PROMPT
+
+    # Content heuristic: .txt files with role-definition patterns and no YAML frontmatter
+    # If content was not passed, try reading it from the file for .txt heuristic
+    if ext == ".txt":
+        if content is None:
+            try:
+                content = Path(filename).read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                return FORMAT_UNKNOWN
+        has_yaml_frontmatter = content.startswith("---")
+        if not has_yaml_frontmatter and _RE_ROLE_DEFINITION.search(content):
+            return FORMAT_SYSTEM_PROMPT
+
+    return FORMAT_UNKNOWN
 
 
 def normalize_content(content: str, fmt: str) -> str:
@@ -127,6 +158,7 @@ FORMAT_TOKEN_BUDGETS: dict[str, int] = {
     "claude.md": 2000,
     "cursorrules": 500,
     "agents.md": 3000,
+    "system_prompt": 1500,
     "unknown": 1500,
 }
 

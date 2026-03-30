@@ -129,6 +129,16 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
 
     composite = round(total / weight_sum, 1) if weight_sum > 0 else 0.0
 
+    # Security cap: limit composite when security score is critically low
+    _security_cap_warning = None
+    if "security" in scores:
+        from scoring.security import get_composite_cap
+        sec_score = scores["security"].get("score", 100)
+        cap = get_composite_cap(sec_score)
+        if cap is not None and composite > cap:
+            composite = float(cap)
+            _security_cap_warning = f"Composite capped at {cap} due to security score {sec_score}"
+
     # Confidence: what fraction of total weight is actually measured
     confidence = round(weight_sum, 2)
     measured_count = len(measured)
@@ -156,6 +166,9 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
                 f"(weight coverage: {confidence:.0%}). "
                 f"Unmeasured: {', '.join(warn_unmeasured)}"
             )
+
+    if _security_cap_warning:
+        warnings.append(_security_cap_warning)
 
     # Confidence notes: explain what each dimension can and cannot tell you
     confidence_notes = {

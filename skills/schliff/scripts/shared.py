@@ -167,6 +167,28 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
 
     if fmt is None:
         fmt = detect_format(skill_path)
+
+    # System prompts: no normalization, no temp file, dedicated scorer set
+    if fmt == "system_prompt":
+        from scoring.structure_prompt import score_structure_prompt
+        from scoring.output_contract import score_output_contract
+        from scoring.completeness import score_completeness
+        from scoring.efficiency import score_efficiency
+        from scoring.clarity import score_clarity
+        from scoring.security import score_security
+        from scoring.composability import score_composability
+
+        scores = {
+            "structure_prompt": score_structure_prompt(skill_path),
+            "output_contract": score_output_contract(skill_path),
+            "efficiency": score_efficiency(skill_path),
+            "clarity": score_clarity(skill_path),
+            "security": score_security(skill_path),
+            "composability": score_composability(skill_path),
+            "completeness": score_completeness(skill_path),
+        }
+        return scores
+
     tmp_path: Optional[str] = None
     try:
         if fmt != "skill.md":

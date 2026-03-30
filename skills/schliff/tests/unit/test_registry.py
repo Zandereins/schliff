@@ -49,17 +49,21 @@ def test_weight_profiles_are_floats():
 def test_clarity_is_explicit_weight():
     """clarity has an explicit weight in all profiles — A3 fix verification."""
     from scoring.registry import WEIGHT_PROFILES
+    _EXPECTED_CLARITY = {"system_prompt": 0.15}
     for fmt, weights in WEIGHT_PROFILES.items():
         assert "clarity" in weights, f"clarity missing from {fmt} weight profile"
-        assert weights["clarity"] == 0.05, f"clarity weight for {fmt} is {weights['clarity']}, expected 0.05"
+        expected = _EXPECTED_CLARITY.get(fmt, 0.05)
+        assert weights["clarity"] == expected, f"clarity weight for {fmt} is {weights['clarity']}, expected {expected}"
 
 
 def test_security_is_explicit_weight():
     """security has an explicit weight in all profiles."""
     from scoring.registry import WEIGHT_PROFILES
+    _EXPECTED_SECURITY = {"system_prompt": 0.15}
     for fmt, weights in WEIGHT_PROFILES.items():
         assert "security" in weights, f"security missing from {fmt} weight profile"
-        assert weights["security"] == 0.08, f"security weight for {fmt} is {weights['security']}, expected 0.08"
+        expected = _EXPECTED_SECURITY.get(fmt, 0.08)
+        assert weights["security"] == expected, f"security weight for {fmt} is {weights['security']}, expected {expected}"
 
 
 def test_get_scorers_with_alias():
