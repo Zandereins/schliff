@@ -1,24 +1,20 @@
 # Schliff
 
-A deterministic quality scorer for AI agent instruction files. The Codecov for your SKILL.md.
+The quality score for AI instructions.
 
 <p align="center">
   <a href="https://pypi.org/project/schliff/"><img alt="PyPI" src="https://img.shields.io/pypi/v/schliff?style=flat-square&color=F59E0B&label=version"></a>
-  <a href="https://pypi.org/project/schliff/"><img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9+-blue?style=flat-square"></a>
   <a href="https://pypi.org/project/schliff/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/schliff?style=flat-square"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
-  <a href="https://github.com/Zandereins/schliff"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Zandereins/schliff?style=flat-square"></a>
-  <a href="skills/schliff/scripts/score-skill.py"><img alt="Structural Score" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json&style=flat-square"></a>
   <a href=".github/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json&style=flat-square"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
+  <a href="skills/schliff/scripts/score-skill.py"><img alt="Structural Score" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json&style=flat-square"></a>
 </p>
 
-AI coding agents use instruction files — SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md — to define behavior. These files degrade silently: triggers overlap, instructions contradict, edge cases slip through. Schliff catches that before your users do.
-
-**Zero dependencies.** No LLM needed. Same input, same score. Python 3.9+ stdlib only.
+Deterministic static analysis for AI agent instruction files -- SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md. Zero dependencies, no LLM needed, same input same score. Python 3.9+ stdlib only.
 
 ```bash
 pip install schliff
-schliff score path/to/SKILL.md
+schliff demo
 ```
 
 <p align="center">
@@ -27,7 +23,16 @@ schliff score path/to/SKILL.md
 
 ---
 
-## Scoring
+## Why?
+
+- **Instruction files degrade silently.** Triggers overlap, agents fire on wrong tasks, nobody notices until production breaks.
+- **Contradictions hide in long files.** "always X" vs "never X" buried 200 lines apart. No human catches that reliably.
+- **No eval suite means three dimensions score zero.** Triggers, quality, and edges go unmeasured -- the most impactful dimensions.
+- **Hedging wastes tokens.** "you might want to consider" is noise. Every filler phrase burns context window and dilutes intent.
+
+---
+
+## What Schliff Catches
 
 Deterministic static analysis. No LLM required. Same input, same output, every time.
 
@@ -51,41 +56,16 @@ Full methodology and weight rationale: [docs/SCORING.md](docs/SCORING.md)
 
 ---
 
-## Anti-Gaming
-
-Schliff detects score inflation. The [benchmark suite](benchmarks/anti-gaming/) tests 6 common gaming patterns — all caught:
-
-| Gaming attempt | How Schliff catches it |
-|----------------|----------------------|
-| Empty headers (inflate structure) | Header content check — empty sections penalized |
-| Keyword stuffing (inflate triggers) | Dedup + frequency cap on repeated terms |
-| Copy-paste examples | Repeated-line detection — score drops 94 → 43 |
-| Contradictory instructions | "always X" vs "never X" contradiction finder |
-| Bloated preamble | Signal-to-noise ratio via sqrt density curve |
-| Missing scope boundaries | 10 composability sub-checks, not a single binary |
-
-Reproduce: `python benchmarks/anti-gaming/run.py`
-
----
-
 ## Quick Start
 
-### Score any instruction file (no Claude Code needed)
-
 ```bash
-pip install schliff          # or: pipx install schliff
-schliff demo                                        # see it in action instantly
-schliff score path/to/SKILL.md                      # score any skill file
-schliff score CLAUDE.md                             # works with any format
-schliff score --url https://github.com/.../SKILL.md # score remote files
-schliff compare skill-v1.md skill-v2.md             # side-by-side comparison
-schliff suggest path/to/SKILL.md                    # ranked fixes with impact
-schliff doctor                                       # scan all installed skills
-schliff report path/to/SKILL.md                    # markdown report (+ --gist)
-schliff drift --repo .                              # find stale references
-schliff sync .                                      # cross-file consistency check
-schliff track path/to/SKILL.md                     # score history + sparkline
+schliff score path/to/SKILL.md          # score any instruction file
+schliff compare skill-v1.md skill-v2.md  # side-by-side comparison
+schliff suggest path/to/SKILL.md         # ranked fixes with impact estimates
+schliff doctor                           # scan all installed skills
 ```
+
+More commands: `schliff report`, `schliff drift`, `schliff sync`, `schliff track`, `schliff verify`, `schliff badge`, `schliff diff`. Run `schliff --help` for the full list.
 
 ### Autonomous improvement (requires Claude Code)
 
@@ -94,22 +74,45 @@ git clone https://github.com/Zandereins/schliff.git && bash schliff/install.sh
 
 # Inside Claude Code:
 /schliff:init path/to/SKILL.md    # bootstrap eval suite + baseline
-/schliff:auto                      # patch → measure → keep or revert → repeat
+/schliff:auto                      # patch -> measure -> keep or revert -> repeat
 ```
 
-**Prerequisites:** Python 3.9+, Bash, Git, jq
+---
 
-### Where Schliff fits
+## State of AI Instructions
 
+> We scored 100+ public instruction files. 73% score below C.
+>
+> [Read the full report](docs/launch/state-of-ai-instructions.md)
+
+---
+
+## CI Integration
+
+```yaml
+- uses: Zandereins/schliff@v7
+  with:
+    skill-path: '.claude/skills/my-skill/SKILL.md'
+    minimum-score: '75'
 ```
-Write instruction file  -->  schliff score  -->  schliff suggest  -->  fix  -->  ship
-     (any format)            (9 dimensions)      (ranked fixes)        │
-                                                                       ↓
-                             schliff track  <--  schliff sync  <--  schliff drift
-                             (trend over time)   (cross-file)    (stale references)
+
+Or use the CLI directly:
+
+```bash
+schliff verify path/to/SKILL.md --min-score 75 --regression
 ```
 
-Works with any AI coding agent: Claude Code (SKILL.md), Cursor (.cursorrules), GitHub Copilot (AGENTS.md), or project configs (CLAUDE.md). Schliff grinds instruction files to production quality.
+### Pre-commit Hook
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/Zandereins/schliff
+    rev: v7.1.0
+    hooks:
+      - id: schliff-verify
+        args: ['--min-score', '75']
+```
 
 ---
 
@@ -121,52 +124,67 @@ Works with any AI coding agent: Claude Code (SKILL.md), Cursor (.cursorrules), G
 | shieldclaw (OpenClaw plugin) | 68.3 [C] | 94.6 [A] | 1 round | [@Zandereins](https://github.com/Zandereins) |
 | demo skill (`demo/bad-skill/`) | 54.0 [D] | 98.3 [S] | 18 | [@Zandereins](https://github.com/Zandereins) |
 
-The demo skill — a vague, hedging-filled deployment helper — goes from [D] to [S] in 18 autonomous iterations:
+The demo skill -- a vague, hedging-filled deployment helper -- goes from [D] to [S] in 18 autonomous iterations:
 
 ```
-  structure         70 → 100     Frontmatter, examples, concrete commands
-  triggers           0 → 100     Description keywords, negative boundaries
-  quality            0 → 95      Eval suite generated, assertions added
-  edges              0 → 100     Edge cases synthesized
-  efficiency        35 → 93      Hedging removed, information density up
-  composability     30 → 90      Scope boundaries, error behavior, deps
-  clarity           90 → 100     Vague references resolved
+  structure         70 -> 100     Frontmatter, examples, concrete commands
+  triggers           0 -> 100     Description keywords, negative boundaries
+  quality            0 -> 95      Eval suite generated, assertions added
+  edges              0 -> 100     Edge cases synthesized
+  efficiency        35 -> 93      Hedging removed, information density up
+  composability     30 -> 90      Scope boundaries, error behavior, deps
+  clarity           90 -> 100     Vague references resolved
 ```
 
 Real-world skills vary. Complex skills plateau around [A] to [S] depending on eval suite coverage.
-
-[ShieldClaw](https://github.com/Zandereins/openclaw-skill-shieldclaw) is a prompt injection defense plugin for the OpenClaw agent framework — not a Claude Code skill. Schliff scored its SKILL.md at 68.3 [C], and after one round of `/schliff:auto`, it reached 94.6 [A] while staying under 300 tokens. Adding an eval-suite unlocked 3 previously-unmeasured dimensions (triggers, quality, edges), which drove most of the 26-point gain.
 
 *Run `schliff score` on your skill and [add your result](https://github.com/Zandereins/schliff/edit/main/README.md).*
 
 ### Community
 
-> "It's become a core part of my skill development workflow!" — [@wan-huiyan](https://github.com/wan-huiyan)
+> "It's become a core part of my skill development workflow!" -- [@wan-huiyan](https://github.com/wan-huiyan)
 
-[@wan-huiyan](https://github.com/wan-huiyan) used schliff to improve [agent-review-panel](https://github.com/wan-huiyan/claude-client-proposal-slide) from 64 to 85.6 across three rounds. Along the way, SKILL.md went from 1,331 to 340 lines — a 75% token reduction via `references/` extraction. A/B testing on a 1,132-line document confirmed identical review quality with fewer tokens.
+[@wan-huiyan](https://github.com/wan-huiyan) used schliff to improve [agent-review-panel](https://github.com/wan-huiyan/claude-client-proposal-slide) from 64 to 85.6 across three rounds. Along the way, SKILL.md went from 1,331 to 340 lines -- a 75% token reduction via `references/` extraction. A/B testing on a 1,132-line document confirmed identical review quality with fewer tokens.
 
 ### Used by
 
-- [@wan-huiyan](https://github.com/wan-huiyan) — agent-review-panel (64 → 85.6, 3 rounds)
-- [@Zandereins](https://github.com/Zandereins) — shieldclaw, OpenClaw plugin (68.3 → 94.6, 1 round)
+- [@wan-huiyan](https://github.com/wan-huiyan) -- agent-review-panel (64 -> 85.6, 3 rounds)
+- [@Zandereins](https://github.com/Zandereins) -- shieldclaw, OpenClaw plugin (68.3 -> 94.6, 1 round)
 - *[Add your project](https://github.com/Zandereins/schliff/issues/new?template=share_results.md)*
+
+---
+
+## Anti-Gaming
+
+Schliff detects score inflation. The [benchmark suite](benchmarks/anti-gaming/) tests 6 common gaming patterns -- all caught:
+
+| Gaming attempt | How Schliff catches it |
+|----------------|----------------------|
+| Empty headers (inflate structure) | Header content check -- empty sections penalized |
+| Keyword stuffing (inflate triggers) | Dedup + frequency cap on repeated terms |
+| Copy-paste examples | Repeated-line detection -- score drops 94 -> 43 |
+| Contradictory instructions | "always X" vs "never X" contradiction finder |
+| Bloated preamble | Signal-to-noise ratio via sqrt density curve |
+| Missing scope boundaries | 10 composability sub-checks, not a single binary |
+
+Reproduce: `python benchmarks/anti-gaming/run.py`
 
 ---
 
 ## Commands
 
-### CLI (standalone — `pip install schliff`)
+### CLI (standalone -- `pip install schliff`)
 
 | Command | Purpose |
 |---------|---------|
-| `schliff demo` | Score a built-in bad skill — see schliff in action instantly |
+| `schliff demo` | Score a built-in bad skill -- see schliff in action instantly |
 | `schliff score <path>` | Score any instruction file (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md) |
 | `schliff score --url <url>` | Score a remote file from GitHub (HTTPS-only) |
 | `schliff score --security` | Include security dimension (injection, exfiltration, obfuscation) |
 | `schliff compare <a> <b>` | Side-by-side quality comparison with dimension deltas |
 | `schliff suggest <path>` | Ranked actionable fixes with estimated score impact |
 | `schliff diff <path>` | Show score delta vs. previous commit (or any `--ref`) |
-| `schliff verify <path>` | CI gate — exit 0/1, `--min-score`, `--regression`, pre-commit hook |
+| `schliff verify <path>` | CI gate -- exit 0/1, `--min-score`, `--regression`, pre-commit hook |
 | `schliff doctor` | Scan all installed skills + instruction files, health grades, drift analysis |
 | `schliff badge <path>` | Generate copy-paste markdown badge |
 | `schliff report <path>` | Generate Markdown quality report (`--gist` for shareable link) |
@@ -187,50 +205,16 @@ Real-world skills vary. Complex skills plateau around [A] to [S] depending on ev
 
 ---
 
-## CI Integration
-
-Score skills in CI. Block regressions. The Codecov for SKILL.md files.
-
-```yaml
-# GitHub Action
-- uses: Zandereins/schliff@v7
-  with:
-    skill-path: '.claude/skills/my-skill/SKILL.md'
-    minimum-score: '75'
-    comment-on-pr: 'true'
-```
-
-```bash
-# Or use the CLI directly
-schliff verify path/to/SKILL.md --min-score 75 --regression
-```
-
----
-
-## Pre-commit Hook
-
-```yaml
-# .pre-commit-config.yaml
-repos:
-  - repo: https://github.com/Zandereins/schliff
-    rev: v7.1.0
-    hooks:
-      - id: schliff-verify
-        args: ['--min-score', '75']
-```
-
----
-
 ## Web
 
-- **[Playground](web/playground/)** — interactive browser-based scorer, try before installing
-- **[Leaderboard](web/leaderboard/)** — community scoreboard (scaffold, external storage coming)
+- **[Playground](web/playground/)** -- interactive browser-based scorer, try before installing
+- **[Leaderboard](web/leaderboard/)** -- community scoreboard (scaffold, external storage coming)
 
 ---
 
 ## How it differs from autoresearch
 
-Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) — but Schliff is a **linter**, not a research loop. You can run `schliff score` in CI without ever touching the improvement loop.
+Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) -- but Schliff is a **linter**, not a research loop. You can run `schliff score` in CI without ever touching the improvement loop.
 
 | | autoresearch | Schliff |
 |---|---|---|
@@ -245,7 +229,7 @@ Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) 
 ---
 
 <details>
-<summary><b>Architecture</b> — How the scoring engine and improvement loop connect (<a href="https://github.com/Zandereins/schliff">view diagram on GitHub</a>)</summary>
+<summary><b>Architecture</b> -- How the scoring engine and improvement loop connect (<a href="https://github.com/Zandereins/schliff">view diagram on GitHub</a>)</summary>
 
 The scorer is the ruler. Claude is the craftsman.
 
@@ -279,14 +263,14 @@ flowchart TB
 
 *Note: Mermaid diagram renders on GitHub. On PyPI, view the [repository](https://github.com/Zandereins/schliff) for the visual.*
 
-60-70% of patches follow deterministic rules (frontmatter fixes, noise removal, TODO cleanup, hedging elimination). The LLM handles the remaining 30-40% — structural reorganization, example generation, edge case synthesis.
+60-70% of patches follow deterministic rules (frontmatter fixes, noise removal, TODO cleanup, hedging elimination). The LLM handles the remaining 30-40% -- structural reorganization, example generation, edge case synthesis.
 </details>
 
 ---
 
 ## Limitations
 
-The structural score measures **file organization**, not runtime effectiveness. A skill scoring 95/100 structurally can still produce wrong output at runtime — use `--runtime` scoring for that.
+The structural score measures **file organization**, not runtime effectiveness. A skill scoring 95/100 structurally can still produce wrong output at runtime -- use `--runtime` scoring for that.
 
 The trigger scorer uses TF-IDF heuristics. Skills whose domain vocabulary overlaps with generic terms (e.g., "review", "analyze") may hit a precision ceiling around 75-80. [Precision/recall reporting](skills/schliff/scripts/scoring/triggers.py) helps diagnose this.
 
@@ -300,8 +284,6 @@ The trigger scorer uses TF-IDF heuristics. Skills whose domain vocabulary overla
 
 [![Schliff: 99 [S]](https://img.shields.io/badge/Schliff-99%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
 
----
-
 ## Contributing
 
 Found a scoring bug? Add a test case and [open an issue](https://github.com/Zandereins/schliff/issues).
@@ -313,4 +295,4 @@ MIT
 
 ---
 
-*schliff (German) — the finishing cut. "Den letzten Schliff geben" = to give something its final polish.*
+*schliff (German) -- the finishing cut. "Den letzten Schliff geben" = to give something its final polish.*
