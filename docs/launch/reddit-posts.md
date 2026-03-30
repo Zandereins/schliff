@@ -12,7 +12,7 @@
 
 If you use CLAUDE.md or SKILL.md files with Claude Code, you've probably noticed they degrade over time. Instructions contradict each other, sections bloat, critical constraints get buried. The agent still follows them — just worse.
 
-I built **[schliff](https://github.com/Zandereins/schliff)** — a deterministic quality scorer for AI instruction files. It analyzes SKILL.md, CLAUDE.md, .cursorrules, and AGENTS.md across 7 dimensions (structure, triggers, quality, edges, efficiency, composability, clarity) using static analysis (TF-IDF heuristics, sqrt density curves, antonym pair detection, entropy analysis). No LLM in the scoring path.
+I built **[schliff](https://github.com/Zandereins/schliff)** — a deterministic quality scorer for AI instruction files. It analyzes SKILL.md, CLAUDE.md, .cursorrules, and AGENTS.md across 8 dimensions (structure, triggers, quality, edges, efficiency, composability, clarity, security) using static analysis (TF-IDF heuristics, sqrt density curves, antonym pair detection, entropy analysis). No LLM in the scoring path.
 
 **Surprising findings from scoring 100+ public skills:**
 
@@ -26,7 +26,7 @@ I built **[schliff](https://github.com/Zandereins/schliff)** — a deterministic
 ```bash
 pip install schliff
 schliff score CLAUDE.md          # single file score
-schliff report .                 # score all instruction files in a project
+schliff report SKILL.md          # markdown quality report
 schliff doctor                   # scan all installed skills, health grades
 ```
 
@@ -46,7 +46,7 @@ Happy to score anyone's SKILL.md or CLAUDE.md live in the comments — just past
 
 **Body:**
 
-I've been building **[schliff](https://github.com/Zandereins/schliff)** — a CLI tool that scores AI agent instruction files (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md) across 8 quality dimensions. The interesting part from a Python perspective: it's pure stdlib with zero dependencies.
+I've been building **[schliff](https://github.com/Zandereins/schliff)** — a CLI tool that scores AI agent instruction files (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md) across 7 quality dimensions (structure, triggers, quality, edges, efficiency, composability, clarity). The interesting part from a Python perspective: it's pure stdlib with zero dependencies.
 
 **Technical approach:**
 
