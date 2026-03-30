@@ -27,10 +27,10 @@ SCORER_REGISTRY: dict[str, list[str]] = {
     "cursorrules": list(_INSTRUCTION_FILE_SCORERS),
     "agents.md": list(_INSTRUCTION_FILE_SCORERS),
     # Phase 1b:
-    # "system_prompt": [
-    #     "structure_prompt", "output_contract", "efficiency",
-    #     "clarity", "security", "composability", "completeness",
-    # ],
+    "system_prompt": [
+        "structure_prompt", "output_contract", "efficiency",
+        "clarity", "security", "composability", "completeness",
+    ],
     # Phase 1c:
     # "mcp_tool": [
     #     "schema_quality", "trigger_alignment", "efficiency",
@@ -45,10 +45,10 @@ WEIGHT_PROFILES: dict[str, dict[str, float]] = {
     "cursorrules": dict(_INSTRUCTION_FILE_WEIGHTS),
     "agents.md": dict(_INSTRUCTION_FILE_WEIGHTS),
     # Phase 1b:
-    # "system_prompt": {
-    #     "structure_prompt": 0.15, "output_contract": 0.15, "efficiency": 0.15,
-    #     "clarity": 0.15, "security": 0.15, "composability": 0.10, "completeness": 0.15,
-    # },
+    "system_prompt": {
+        "structure_prompt": 0.15, "output_contract": 0.15, "efficiency": 0.15,
+        "clarity": 0.15, "security": 0.15, "composability": 0.10, "completeness": 0.15,
+    },
     # Phase 1c:
     # "mcp_tool": {
     #     "schema_quality": 0.25, "trigger_alignment": 0.20, "efficiency": 0.15,
@@ -62,9 +62,10 @@ FORMAT_ALIASES: dict[str, str] = {
     "claude": "claude.md",
     "cursor": "cursorrules",
     "agents": "agents.md",
-    # Phase 1b/1c:
-    # "system-prompt": "system_prompt",
-    # "system_prompt": "system_prompt",
+    # Phase 1b:
+    "system-prompt": "system_prompt",
+    "system_prompt": "system_prompt",
+    # Phase 1c:
     # "mcp-tool": "mcp_tool",
     # "mcp_tool": "mcp_tool",
 }
