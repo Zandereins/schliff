@@ -8,7 +8,7 @@ The first large-scale, deterministic quality audit of public AI instruction file
 
 ## Methodology
 
-- **Tool:** schliff v7.1.0 — deterministic quality scorer, 8 dimensions
+- **Tool:** schliff v7.1.0 — deterministic quality scorer, 7 dimensions
 - **Sources:** awesome-claude-code, awesome-cursorrules, awesome-claude-skills, public GitHub repos
 - **Anonymization:** Individual repos anonymized; aggregates shown for all, top 10 shown with explicit permission
 - **Reproducibility:** Deterministic scoring — same file, same score, every run. No LLM in the loop.
@@ -20,7 +20,7 @@ The first large-scale, deterministic quality audit of public AI instruction file
 
 > 61% of public skills score 0/100 on triggers, quality, AND edges — because they have no eval suite.
 
-Three of schliff's eight dimensions require an eval suite to unlock. Without one, those dimensions are unmeasurable and default to zero. The majority of public files simply never considered evaluation.
+Three of schliff's seven dimensions require an eval suite to unlock. Without one, those dimensions are unmeasurable and default to zero. The majority of public files simply never considered evaluation.
 
 <!-- DATA TABLE PLACEHOLDER — fill after scoring run -->
 
@@ -52,11 +52,9 @@ Structured formats with frontmatter (name, description, triggers) give schliff's
 
 ### Finding 5: The Security Blind Spot
 
-> Less than 5% of files pass the security check.
+> Almost no public instruction files address prompt injection or tool-use boundaries.
 
-Almost no public instruction files address prompt injection, tool-use boundaries, or output sanitization. The security dimension exists because agents increasingly have write access to codebases, APIs, and infrastructure.
-
-<!-- SECURITY FINDINGS PLACEHOLDER — pass rate, common gaps -->
+Security scoring exists as a separate module (`scoring/security.py`) but is not part of the default composite score. As agents increasingly have write access to codebases, this gap is worth noting even outside the scored dimensions.
 
 ## Score Distribution
 
@@ -67,7 +65,7 @@ Almost no public instruction files address prompt injection, tool-use boundaries
 ## Dimension Heatmap
 
 <!-- HEATMAP PLACEHOLDER — average score per dimension across all files -->
-<!-- Dimensions: structure, triggers, quality, edges, efficiency, composability, clarity, security -->
+<!-- Dimensions: structure, triggers, quality, edges, efficiency, composability, clarity -->
 <!-- Expected pattern: structure and efficiency moderate, triggers/quality/edges near zero for majority -->
 
 ## Top 10 Best-Scored Public Skills
@@ -87,8 +85,7 @@ Almost no public instruction files address prompt injection, tool-use boundaries
 | 6 | No error handling section | ~65% | -8 pts quality |
 | 7 | Copy-paste examples without adaptation | ~40% | -5 pts quality |
 | 8 | Token bloat (>1000 tokens, low density) | ~30% | -12 pts efficiency |
-| 9 | No security patterns | ~95% | -8 pts security |
-| 10 | Stale file references | ~25% | -5 pts structure |
+| 9 | Stale file references | ~25% | -5 pts structure |
 
 ## Actionable Takeaways
 
@@ -134,8 +131,6 @@ Find and replace: "try to" -> direct instruction, "you might want to" -> "do X w
 | Efficiency | 10% | Token density, no redundancy, no hedging |
 | Composability | 10% | Scope boundaries, interop with other skills |
 | Clarity | 5% | No contradictions, unambiguous instructions |
-| Security | 8% | Injection resistance, tool boundaries, sanitization |
-
 ### Anti-Gaming
 
 6 detection vectors active to prevent score manipulation through keyword stuffing, structural padding, or synthetic eval suites.
@@ -145,13 +140,13 @@ Find and replace: "try to" -> direct instruction, "you might want to" -> "do X w
 ```bash
 pip install schliff
 schliff score <file>        # single file
-schliff score <directory>   # batch scoring
-schliff report <directory>  # full report with visualizations
+schliff doctor              # scan all installed skills
+schliff report <file>       # markdown quality report
 ```
 
 ## About Schliff
 
-**Schliff** is a deterministic quality scorer for AI agent instruction files. 8 dimensions. 732 tests. MIT license. Zero dependencies.
+**Schliff** is a deterministic quality scorer for AI agent instruction files. 7 dimensions. 732 tests. MIT license. Zero dependencies.
 
 - GitHub: [github.com/Zandereins/schliff](https://github.com/Zandereins/schliff)
 - Install: `pip install schliff`
