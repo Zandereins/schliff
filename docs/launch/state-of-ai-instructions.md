@@ -95,11 +95,7 @@ Security scoring exists as a separate module (`scoring/security.py`) but is not 
 
 Unlocks 3 unmeasured dimensions (triggers, quality, edges). Without evals, 55% of your possible score is locked at zero.
 
-```bash
-schliff init   # generates eval scaffold
-```
-
-Or add manually: define expected trigger phrases, quality assertions, and edge cases.
+Use `/schliff:init path/to/SKILL.md` inside Claude Code to bootstrap an eval suite, or create `eval-suite.json` manually with trigger phrases, quality assertions, and edge cases.
 
 ### 2. Add frontmatter with name + description
 

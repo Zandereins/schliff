@@ -14,7 +14,7 @@ Instruction files degrade silently. Triggers overlap, instructions contradict ("
 
 ## Tweet 3 — The Solution
 
-Schliff: deterministic quality scoring for AI instruction files. 8 dimensions. Zero dependencies. No LLM needed. Same input, same score, every time. pip install schliff && schliff score path/to/SKILL.md. Works with SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md.
+Schliff: deterministic quality scoring for AI instruction files. 7 dimensions. Zero dependencies. No LLM needed. Same input, same score, every time. pip install schliff && schliff score path/to/SKILL.md. Works with SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md.
 
 ## Tweet 4 — Demo
 
