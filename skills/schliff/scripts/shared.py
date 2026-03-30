@@ -148,7 +148,8 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
 
 
 def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
-                  include_runtime: bool = False, fmt: Optional[str] = None) -> dict:
+                  include_runtime: bool = False, fmt: Optional[str] = None,
+                  include_security: bool = False) -> dict:
     """Build the standard scoring dict for a skill.
 
     Centralizes the dimension-scoring calls used by score, badge, and doctor.
@@ -185,7 +186,6 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
             score_composability, score_quality, score_edges,
             score_clarity,
         )
-
         scores = {
             "structure": score_structure(skill_path),
             "triggers": score_triggers(skill_path, eval_suite),
@@ -199,6 +199,10 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
         if include_runtime:
             from scoring import score_runtime
             scores["runtime"] = score_runtime(skill_path, eval_suite, enabled=False)
+
+        if include_security:
+            from scoring.security import score_security
+            scores["security"] = score_security(skill_path)
     finally:
         if tmp_path is not None:
             try:
