@@ -5,8 +5,10 @@ were actually measured, so users know how trustworthy the number is.
 """
 import json
 import math
-from typing import Optional
 from pathlib import Path
+from typing import Optional
+
+from scoring.registry import get_weights
 
 _calibrated_weights_cache: Optional[dict] = None
 _calibrated_weights_mtime: float = 0.0
@@ -46,7 +48,8 @@ def _load_calibrated_weights() -> Optional[dict]:
     return None
 
 
-def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> dict:
+def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
+                      fmt: Optional[str] = None) -> dict:
     """Compute weighted composite score with confidence indicator.
 
     Returns both the score and metadata about how many dimensions
@@ -57,16 +60,23 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> di
         custom_weights: Optional dict of dimension_name -> float weight.
             Values are normalized to sum to 1.0. Example:
             {"structure": 0.3, "triggers": 0.4, "efficiency": 0.3}
+        fmt: Optional format identifier. When provided, weights are loaded
+            from the scorer registry instead of using hardcoded defaults.
+            This skips dynamic clarity injection (clarity is explicit in
+            registry weight profiles).
     """
-    weights = {
-        "structure": 0.15,
-        "triggers": 0.20,
-        "quality": 0.20,
-        "edges": 0.15,
-        "efficiency": 0.10,
-        "composability": 0.10,
-        "runtime": 0.10,
-    }
+    if fmt is not None:
+        weights = get_weights(fmt)
+    else:
+        weights = {
+            "structure": 0.15,
+            "triggers": 0.20,
+            "quality": 0.20,
+            "edges": 0.15,
+            "efficiency": 0.10,
+            "composability": 0.10,
+            "runtime": 0.10,
+        }
 
     # Apply custom weights if provided (highest priority)
     # Custom weights OVERRIDE defaults for specified keys but keep unspecified dimensions
@@ -92,8 +102,8 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> di
                     weights = {k: v / total_w for k, v in weights.items()}
 
     # If clarity is present, add it with weight 0.05 redistributed proportionally
-    # Skip auto-injection when user provided custom weights — custom weights take full precedence
-    if "clarity" in scores and not custom_weights:
+    # Skip auto-injection when user provided custom weights or fmt — those have explicit clarity weights
+    if "clarity" in scores and not custom_weights and fmt is None:
         clarity_weight = 0.05
         scale = (1.0 - clarity_weight) / sum(weights.values())
         weights = {k: v * scale for k, v in weights.items()}
