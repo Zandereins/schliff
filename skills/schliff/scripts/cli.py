@@ -738,9 +738,10 @@ def main():
     score_parser.add_argument("--url", help="URL to fetch and score (HTTPS only, allowlisted hosts)")
     score_parser.add_argument("--json", action="store_true", help="JSON output")
     score_parser.add_argument("--eval-suite", help="Path to eval-suite.json")
+    from scoring.registry import get_format_choices
     score_parser.add_argument(
         "--format",
-        choices=["skill.md", "claude.md", "cursorrules", "agents.md", "unknown"],
+        choices=get_format_choices() + ["unknown"],
         default=None,
         help="Override format detection (useful when filename doesn't match content type)",
     )
