@@ -711,6 +711,55 @@ def cmd_report(args: argparse.Namespace) -> None:
         print(markdown)
 
 
+def cmd_evolve(args: argparse.Namespace) -> None:
+    """Run the evolution engine on an instruction file."""
+    from evolve.content import EvolutionConfig, score_to_threshold
+    from evolve.engine import run_evolution
+
+    try:
+        target_score = score_to_threshold(args.target)
+    except ValueError:
+        print(f"Error: Unknown target '{args.target}'. Use S/A/B/C or a numeric score.", file=sys.stderr)
+        raise SystemExit(1)
+
+    config = EvolutionConfig(
+        skill_path=args.skill_path,
+        target_score=target_score,
+        max_generations=args.generations,
+        budget_tokens=args.budget,
+        min_improvement=args.min_improvement,
+        strategy=args.strategy,
+        dimension=args.dimension,
+        model=args.model,
+        provider=args.provider,
+        dry_run=args.dry_run,
+        json_output=args.json,
+        lineage_dir=args.lineage,
+        no_snapshots=args.no_snapshots,
+        fmt=args.fmt,
+    )
+
+    try:
+        result = run_evolution(config)
+    except KeyboardInterrupt:
+        print("\nEvolution interrupted.", file=sys.stderr)
+        raise SystemExit(130)
+    except SystemExit:
+        raise
+    except FileNotFoundError:
+        print(f"Error: File not found: {args.skill_path}", file=sys.stderr)
+        raise SystemExit(1)
+    except Exception as exc:
+        from evolve.sanitize import redact_exception
+        print(f"Error: Evolution failed: {redact_exception(exc)}", file=sys.stderr)
+        raise SystemExit(1)
+
+    if args.json:
+        import json
+        from dataclasses import asdict
+        print(json.dumps(asdict(result), indent=2))
+
+
 def cmd_version(_args: argparse.Namespace) -> None:
     """Print version string."""
     try:
@@ -810,6 +859,35 @@ def main():
     # version command
     subparsers.add_parser("version", help="Show version")
 
+    # evolve command
+    evolve_parser = subparsers.add_parser("evolve", help="Evolve an instruction file to improve its score")
+    evolve_parser.add_argument("skill_path", help="Path to instruction file")
+    evolve_parser.add_argument("--target", default="A",
+                               help="Target grade (S/A/B/C) or numeric score (default: A)")
+    evolve_parser.add_argument("--generations", type=int, default=10,
+                               help="Max generations (default: 10)")
+    evolve_parser.add_argument("--budget", type=int, default=50000,
+                               help="Token budget, 0=deterministic only (default: 50000)")
+    evolve_parser.add_argument("--provider", default=None,
+                               help="LiteLLM provider (ollama, anthropic, openai, openrouter)")
+    evolve_parser.add_argument("--model", default=None,
+                               help="Specific model string (e.g., anthropic/claude-sonnet-4-20250514)")
+    evolve_parser.add_argument("--min-improvement", type=float, default=0.5,
+                               help="Min score improvement per gen to continue (default: 0.5)")
+    evolve_parser.add_argument("--strategy", choices=["gradient", "holistic", "dimension"],
+                               default="gradient", help="Evolution strategy (default: gradient)")
+    evolve_parser.add_argument("--dimension", default=None,
+                               help="Target dimension (with --strategy dimension)")
+    evolve_parser.add_argument("--format", dest="fmt", default=None,
+                               help="Override format detection")
+    evolve_parser.add_argument("--json", action="store_true", help="JSON output")
+    evolve_parser.add_argument("--dry-run", action="store_true",
+                               help="Show plan without making changes")
+    evolve_parser.add_argument("--lineage", default="~/.schliff/lineage",
+                               help="Lineage directory (default: ~/.schliff/lineage)")
+    evolve_parser.add_argument("--no-snapshots", action="store_true",
+                               help="Disable content snapshots in lineage")
+
     args = parser.parse_args()
 
     commands = {
@@ -823,6 +901,7 @@ def main():
         "report": cmd_report,
         "demo": cmd_demo,
         "version": cmd_version,
+        "evolve": cmd_evolve,
     }
 
     handler = commands.get(args.command)
