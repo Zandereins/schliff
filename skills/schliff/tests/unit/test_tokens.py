@@ -36,7 +36,7 @@ class TestFormatTokenBudgets:
     """Tests for the FORMAT_TOKEN_BUDGETS constant."""
 
     def test_has_all_expected_keys(self) -> None:
-        expected = {"skill.md", "claude.md", "cursorrules", "agents.md", "unknown"}
+        expected = {"skill.md", "claude.md", "cursorrules", "agents.md", "system_prompt", "unknown"}
         assert set(FORMAT_TOKEN_BUDGETS.keys()) == expected
 
     def test_values_are_positive_ints(self) -> None:

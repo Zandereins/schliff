@@ -21,3 +21,6 @@ from scoring.runtime import score_runtime
 from scoring.clarity import score_clarity
 from scoring.diff import score_diff, explain_score_change
 from scoring.composite import compute_composite
+from scoring.structure_prompt import score_structure_prompt
+from scoring.output_contract import score_output_contract
+from scoring.completeness import score_completeness
