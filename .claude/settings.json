@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "vercel@claude-plugins-official": false,
+    "figma@claude-plugins-official": false,
+    "supabase@claude-plugins-official": false
+  }
+}
