@@ -8,7 +8,7 @@
 
 AI instruction files -- CLAUDE.md, .cursorrules, AGENTS.md, SKILL.md -- silently degrade as teams edit them over months. Nobody notices until agents start hallucinating or ignoring constraints.
 
-Schliff is a deterministic, zero-dependency quality scorer for these files. It evaluates across 8 dimensions (structure, triggers, quality, edges, efficiency, composability, clarity, security) using only Python 3.9+ stdlib. No LLM, no API key, no network calls.
+Schliff is a deterministic, zero-dependency quality scorer for these files. It evaluates across 7 dimensions (structure, triggers, quality, edges, efficiency, composability, clarity) using only Python 3.9+ stdlib. No LLM, no API key, no network calls.
 
 What it finds that surprises people:
 
