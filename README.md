@@ -45,7 +45,6 @@ schliff demo
 | efficiency | 10% | Hedging, filler words, repetition, low signal-to-noise |
 | composability | 10% | Missing scope boundaries, no error behavior, no handoff points |
 | clarity | 5% | Contradictions, vague references, ambiguous instructions |
-| security | 8% | *(opt-in via --security)* Prompt injection, data exfiltration, obfuscation, dangerous commands |
 | runtime | 10% | *(opt-in)* Actual Claude behavior against eval assertions |
 
 Weights are renormalized across measured dimensions (sum to 1.0). Without `--runtime`, the 7 structural dimensions carry 100% of the score.

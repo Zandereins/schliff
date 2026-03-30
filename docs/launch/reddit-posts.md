@@ -46,7 +46,7 @@ Happy to score anyone's SKILL.md or CLAUDE.md live in the comments — just past
 
 **Body:**
 
-I've been building **[schliff](https://github.com/Zandereins/schliff)** — a CLI tool that scores AI agent instruction files (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md) across 7 quality dimensions (structure, triggers, quality, edges, efficiency, composability, clarity). The interesting part from a Python perspective: it's pure stdlib with zero dependencies.
+I've been building **[schliff](https://github.com/Zandereins/schliff)** — a CLI tool that scores AI agent instruction files (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md) across 8 quality dimensions (structure, triggers, quality, edges, efficiency, composability, clarity, security). The interesting part from a Python perspective: it's pure stdlib with zero dependencies.
 
 **Technical approach:**
 
@@ -66,12 +66,11 @@ The scoring engine is ~2,000 lines of pure stdlib Python with no ML/LLM in the s
 pip install schliff
 schliff score CLAUDE.md                    # single file
 schliff report SKILL.md                    # markdown quality report
-schliff drift --repo .                     # detect stale paths and references
+schliff suggest SKILL.md                   # ranked fixes with impact estimates
 ```
 
 - Pre-commit hook: see `schliff verify` with `--min-score` and `--regression`
 - GitHub Action available for CI gating
-- `schliff track` for score history over time
 
 732 tests, Python 3.9+, MIT licensed. Feedback on the architecture welcome — especially if you've built similar stdlib-only analysis tools.
 
@@ -87,7 +86,7 @@ GitHub: https://github.com/Zandereins/schliff
 
 AI coding agents (Claude Code, Cursor, Copilot) rely on natural-language instruction files (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md) to steer behavior. These files have no validation — they degrade silently as projects evolve.
 
-**[schliff](https://github.com/Zandereins/schliff)** is a deterministic scoring tool that evaluates these files across 8 dimensions using classical NLP and information-theoretic methods. No learned model in the scoring path.
+**[schliff](https://github.com/Zandereins/schliff)** is a deterministic scoring tool that evaluates these files across 8 dimensions (structure, triggers, quality, edges, efficiency, composability, clarity, security) using classical NLP and information-theoretic methods. No learned model in the scoring path.
 
 **Approach:**
 
