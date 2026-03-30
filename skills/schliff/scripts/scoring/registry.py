@@ -62,10 +62,8 @@ FORMAT_ALIASES: dict[str, str] = {
     "claude": "claude.md",
     "cursor": "cursorrules",
     "agents": "agents.md",
-    # Phase 1b:
     "system-prompt": "system_prompt",
     "system_prompt": "system_prompt",
-    # Phase 1c:
     # "mcp-tool": "mcp_tool",
     # "mcp_tool": "mcp_tool",
 }

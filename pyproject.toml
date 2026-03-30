@@ -58,7 +58,7 @@ ignore = ["E501"]
 known-first-party = ["scoring", "shared", "nlp"]
 
 [project.optional-dependencies]
-# Phase 2: evolve = ["litellm>=1.40.0,<2.0.0"]
+evolve = ["litellm>=1.40.0,<2.0.0"]
 # Phase 3b: mcp = ["mcp>=1.0.0,<2.0.0"]
 
 [tool.pytest.ini_options]
