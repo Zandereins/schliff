@@ -4,10 +4,12 @@ The quality score for AI instructions.
 
 <p align="center">
   <a href="https://pypi.org/project/schliff/"><img alt="PyPI" src="https://img.shields.io/pypi/v/schliff?style=flat-square&color=F59E0B&label=version"></a>
+  <a href="https://pypi.org/project/schliff/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/schliff?style=flat-square"></a>
   <a href="https://pypi.org/project/schliff/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/schliff?style=flat-square"></a>
   <a href=".github/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json&style=flat-square"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
   <a href="skills/schliff/scripts/score-skill.py"><img alt="Structural Score" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json&style=flat-square"></a>
+  <a href="https://github.com/Zandereins/schliff/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/Zandereins/schliff?style=flat-square"></a>
 </p>
 
 Deterministic static analysis for AI agent instruction files -- SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md. Zero dependencies, no LLM needed, same input same score. Python 3.9+ stdlib only.
@@ -34,8 +36,6 @@ schliff demo
 
 ## What Schliff Catches
 
-Deterministic static analysis. No LLM required. Same input, same output, every time.
-
 | Dimension | Weight | What it catches |
 |-----------|--------|-----------------|
 | structure | 15% | Missing frontmatter, empty headers, no examples, dead content |
@@ -58,14 +58,17 @@ Full methodology and weight rationale: [docs/SCORING.md](docs/SCORING.md)
 
 ## Quick Start
 
+Try in the browser first: **[Web Playground](web/playground/)** -- no install needed.
+
 ```bash
 schliff score path/to/SKILL.md          # score any instruction file
+schliff score --url https://github.com/user/repo/blob/main/SKILL.md  # score a remote file
 schliff compare skill-v1.md skill-v2.md  # side-by-side comparison
 schliff suggest path/to/SKILL.md         # ranked fixes with impact estimates
 schliff doctor                           # scan all installed skills
 ```
 
-More commands: `schliff report`, `schliff drift`, `schliff sync`, `schliff track`, `schliff verify`, `schliff badge`, `schliff diff`. Run `schliff --help` for the full list.
+Run `schliff --help` for the full command list (`report`, `verify`, `badge`, `diff`, `compare`).
 
 ### Autonomous improvement (requires Claude Code)
 
@@ -173,27 +176,27 @@ Reproduce: `python benchmarks/anti-gaming/run.py`
 
 ## Commands
 
-### CLI (standalone -- `pip install schliff`)
+| Command | Purpose |
+|---------|---------|
+| `schliff demo` | See schliff in action instantly |
+| `schliff score <path>` | Score any instruction file (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md) |
+| `schliff score --url <url>` | Score a remote file from GitHub (HTTPS-only) |
+| `schliff suggest <path>` | Ranked fixes with estimated score impact |
+| `schliff doctor` | Scan all installed skills, health grades, drift analysis |
+| `schliff verify <path>` | CI gate -- exit 0/1, `--min-score`, `--regression` |
+
+<details>
+<summary><b>All commands</b> (<code>schliff --help</code>)</summary>
 
 | Command | Purpose |
 |---------|---------|
-| `schliff demo` | Score a built-in bad skill -- see schliff in action instantly |
-| `schliff score <path>` | Score any instruction file (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md) |
-| `schliff score --url <url>` | Score a remote file from GitHub (HTTPS-only) |
-| `schliff score --security` | Include security dimension (injection, exfiltration, obfuscation) |
+| `schliff score --tokens` | Section-by-section token breakdown with format-specific budgets |
 | `schliff compare <a> <b>` | Side-by-side quality comparison with dimension deltas |
-| `schliff suggest <path>` | Ranked actionable fixes with estimated score impact |
 | `schliff diff <path>` | Show score delta vs. previous commit (or any `--ref`) |
-| `schliff verify <path>` | CI gate -- exit 0/1, `--min-score`, `--regression`, pre-commit hook |
-| `schliff doctor` | Scan all installed skills + instruction files, health grades, drift analysis |
 | `schliff badge <path>` | Generate copy-paste markdown badge |
 | `schliff report <path>` | Generate Markdown quality report (`--gist` for shareable link) |
-| `schliff score --tokens` | Section-by-section token breakdown with format-specific budgets |
-| `schliff drift --repo <dir>` | Find stale paths, scripts, and make targets in instruction files |
-| `schliff sync <dir>` | Cross-file consistency: contradictions, gaps, redundancies |
-| `schliff track <path>` | Score history over time with sparkline and regression detection |
 
-### Claude Code skills (require integration)
+**Claude Code skills** (require integration):
 
 | Command | Purpose |
 |---------|---------|
@@ -203,16 +206,12 @@ Reproduce: `python benchmarks/anti-gaming/run.py`
 | `/schliff:mesh` | Detect trigger conflicts across all installed skills |
 | `/schliff:report` | Generate shareable markdown report with badge |
 
----
-
-## Web
-
-- **[Playground](web/playground/)** -- interactive browser-based scorer, try before installing
-- **[Leaderboard](web/leaderboard/)** -- community scoreboard (scaffold, external storage coming)
+</details>
 
 ---
 
-## How it differs from autoresearch
+<details>
+<summary><b>How it differs from autoresearch</b></summary>
 
 Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) -- but Schliff is a **linter**, not a research loop. You can run `schliff score` in CI without ever touching the improvement loop.
 
@@ -225,6 +224,8 @@ Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) 
 | **Memory** | Stateless | Cross-session episodic store |
 | **Dependencies** | External (ML frameworks) | Python 3.9+ stdlib only |
 | **Tests** | Minimal | [732 unit](skills/schliff/tests/unit/) + [99 integration](skills/schliff/scripts/test-integration.sh) |
+
+</details>
 
 ---
 
@@ -278,9 +279,7 @@ The trigger scorer uses TF-IDF heuristics. Skills whose domain vocabulary overla
 
 ## Badge
 
-```markdown
-[![Schliff: 99 [S]](https://img.shields.io/badge/Schliff-99%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
-```
+Add a score badge to your README: `schliff badge path/to/SKILL.md`
 
 [![Schliff: 99 [S]](https://img.shields.io/badge/Schliff-99%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
 

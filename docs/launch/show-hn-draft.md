@@ -1,14 +1,14 @@
-# Show HN: Schliff -- A deterministic quality scorer for AI instruction files
+# Show HN: Schliff -- Quality scorer for AI instruction files
 
 ## Post
 
-**Title:** Show HN: Schliff -- A deterministic quality scorer for AI instruction files
+**Title:** Show HN: Schliff -- Quality scorer for AI instruction files
 
 ---
 
 AI instruction files -- CLAUDE.md, .cursorrules, AGENTS.md, SKILL.md -- silently degrade as teams edit them over months. Nobody notices until agents start hallucinating or ignoring constraints.
 
-Schliff is a deterministic, zero-dependency quality scorer for these files. It evaluates across 8 dimensions (structure, clarity, specificity, completeness, consistency, deduplication, scope boundaries, anti-gaming) using only Python 3.9+ stdlib -- no LLM, no API key, no network calls.
+Schliff is a deterministic, zero-dependency quality scorer for these files. It evaluates across 8 dimensions (structure, triggers, quality, edges, efficiency, composability, clarity, security) using only Python 3.9+ stdlib. No LLM, no API key, no network calls.
 
 What it finds that surprises people:
 
@@ -19,7 +19,7 @@ What it finds that surprises people:
 
 Schliff detects 6 gaming vectors -- keyword stuffing, padding, repetition, structural inflation, contradictory filler, and scope bleed -- so scores reflect actual instruction quality, not surface polish.
 
-The optional autonomous improvement loop (using Claude Code) can take a file from 54 [D] to 98 [S] grade in a single pass, rewriting weak sections while preserving intent. This is opt-in and not required for scoring.
+The optional autonomous improvement loop (requires Claude Code, invoked via `/schliff:auto`) can take a file from 54 [D] to 98 [S] grade in a single pass, rewriting weak sections while preserving intent. This is opt-in and not required for scoring.
 
 Integrate into CI like Codecov -- fail PRs that drop instruction quality below your team's threshold.
 
@@ -49,7 +49,7 @@ Three reasons. First, reproducibility: the same file always produces the same sc
 
 ### 4. "How does this compare to prompt engineering tools?"
 
-Prompt engineering tools help you write prompts for API calls -- single-shot inputs to an LLM endpoint. Schliff scores persistent instruction files that shape agent behavior across entire sessions or codebases. Different artifact, different failure modes. A prompt might be too vague; an instruction file might have 12 contradictions across 800 lines. The scoring dimensions (deduplication, scope boundaries, consistency, anti-gaming) are specific to long-lived instruction documents, not ephemeral prompts.
+Prompt engineering tools help you write prompts for API calls -- single-shot inputs to an LLM endpoint. Schliff scores persistent instruction files that shape agent behavior across entire sessions or codebases. Different artifact, different failure modes. A prompt might be too vague; an instruction file might have 12 contradictions across 800 lines. The scoring dimensions (structure, triggers, quality, edges, efficiency, composability, clarity -- plus optional security) are specific to long-lived instruction documents, not ephemeral prompts.
 
 ### 5. "Score inflation / gaming?"
 
