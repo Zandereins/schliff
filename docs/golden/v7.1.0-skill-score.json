@@ -1,0 +1,23 @@
+{
+  "skill_path": "skills/schliff/SKILL.md",
+  "format": "skill.md",
+  "composite_score": 99.0,
+  "dimensions": {
+    "structure": 100,
+    "triggers": 100,
+    "quality": 99,
+    "edges": 100,
+    "efficiency": 92,
+    "composability": 100,
+    "clarity": 100,
+    "runtime": -1
+  },
+  "warnings": [],
+  "token_budget": {
+    "tokens": 2925,
+    "budget": 1000,
+    "within_budget": false,
+    "ratio": 2.925,
+    "severity": "over"
+  }
+}
