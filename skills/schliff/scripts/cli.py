@@ -117,7 +117,7 @@ def cmd_score(args: argparse.Namespace) -> None:
             from scoring.formats import detect_format
             detected_fmt = detect_format(skill_path)
 
-        composite = compute_composite(scores)
+        composite = compute_composite(scores, fmt=effective_fmt)
 
         # Token budget check — reuse cached content from shared.read_skill_safe
         from scoring.formats import estimate_tokens, check_token_budget
