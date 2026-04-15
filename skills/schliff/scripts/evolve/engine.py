@@ -260,13 +260,6 @@ def run_evolution(config: EvolutionConfig,
                 if best_composite >= config.target_score:
                     break
 
-                # Conservative: content + prompt overhead (~200 words), tokenization factor 1.3, round trip x2
-                estimated = int((len(best_content.split()) + 200) * 1.3 * 2)
-                if not budget.can_afford(estimated):
-                    break
-
-                gen_num += 1
-
                 # Build prompt based on strategy
                 eval_suite = load_eval_suite(skill_path)
                 gradients = text_gradient.compute_gradients(skill_path, eval_suite, include_clarity=True)
@@ -286,6 +279,13 @@ def run_evolution(config: EvolutionConfig,
                         best_content, best_composite, grade_from_score(best_composite),
                         best_scores, gradients, config.target_score,
                     )
+
+                # Prompt-aware token estimation: includes both prompt and content
+                estimated = int((len(user_prompt.split()) + len(best_content.split())) * 1.3 + 800)
+                if not budget.can_afford(estimated):
+                    break
+
+                gen_num += 1
 
                 # Call LLM
                 llm_result = call_llm(
