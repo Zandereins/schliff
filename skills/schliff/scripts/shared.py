@@ -45,6 +45,11 @@ _RE_DESC_BLOCK = re.compile(
 )
 _RE_DESC_INLINE = re.compile(r'^description:\s*"?(.+?)"?\s*$', re.MULTILINE)
 
+# Regex complexity validation patterns (used by validate_regex_complexity)
+_RE_NESTED_QUANT = re.compile(r'[+*]\)?[+*?{]')
+_RE_OVERLAP_QUANT = re.compile(r'\((?!\?:)[^)]*\|[^)]*\)[+*]{1,2}')
+_RE_GROUP_INNER_QUANT = re.compile(r'\([^)]*[.][*+][^)]*\)[+*?{]')
+
 
 def strip_frontmatter(content: str) -> str:
     """Strip YAML frontmatter (---...---) from skill content."""
@@ -243,21 +248,11 @@ def validate_regex_complexity(pattern: str, max_length: int = 500) -> tuple[bool
     if len(pattern) > max_length:
         return False, f"pattern too long ({len(pattern)} > {max_length})"
 
-    # Detect nested quantifiers: (a+)+, (a*)+, (a+)*, etc.
-    nested_quant = re.compile(r'[+*]\)?[+*?{]')
-    if nested_quant.search(pattern):
+    if _RE_NESTED_QUANT.search(pattern):
         return False, "nested quantifiers detected (potential ReDoS)"
-
-    # Detect overlapping alternations with quantifiers.
-    # Non-capturing groups (?:...) are excluded: (?:a|b)+ is safe because
-    # the alternatives are atomic and cannot cause catastrophic backtracking.
-    overlap = re.compile(r'\((?!\?:)[^)]*\|[^)]*\)[+*]{1,2}')
-    if overlap.search(pattern):
+    if _RE_OVERLAP_QUANT.search(pattern):
         return False, "overlapping alternation with quantifier (potential ReDoS)"
-
-    # Dot-star or dot-plus inside a repeated group: (.*X)+
-    group_inner_quant = re.compile(r'\([^)]*[.][*+][^)]*\)[+*?{]')
-    if group_inner_quant.search(pattern):
+    if _RE_GROUP_INNER_QUANT.search(pattern):
         return False, "dot-wildcard quantifier inside repeated group (potential ReDoS)"
 
     return True, "ok"
