@@ -3,13 +3,6 @@
 Each dimension is scored in its own module. Import everything from here
 for backward compatibility with code that used the monolithic score-skill.py.
 """
-import sys as _sys
-from pathlib import Path as _Path
-
-# Ensure scripts/ is on sys.path so scoring modules can import shared, nlp
-_scripts_dir = str(_Path(__file__).resolve().parent.parent)
-if _scripts_dir not in _sys.path:
-    _sys.path.insert(0, _scripts_dir)
 from scoring.structure import score_structure
 from scoring.triggers import score_triggers
 from scoring.efficiency import score_efficiency
