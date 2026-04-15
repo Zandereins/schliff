@@ -217,6 +217,23 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
                 pass
 
 
+# Scorer dimension → (module_path, function_name) mapping.
+# Module-level to avoid per-call dict reconstruction.
+_SCORER_MAP: dict[str, tuple[str, str]] = {
+    "structure": ("scoring.structure", "score_structure"),
+    "triggers": ("scoring.triggers", "score_triggers"),
+    "quality": ("scoring.quality", "score_quality"),
+    "edges": ("scoring.edges", "score_edges"),
+    "efficiency": ("scoring.efficiency", "score_efficiency"),
+    "composability": ("scoring.composability", "score_composability"),
+    "clarity": ("scoring.clarity", "score_clarity"),
+    "security": ("scoring.security", "score_security"),
+    "runtime": ("scoring.runtime", "score_runtime"),
+    "structure_prompt": ("scoring.structure_prompt", "score_structure_prompt"),
+    "output_contract": ("scoring.output_contract", "score_output_contract"),
+    "completeness": ("scoring.completeness", "score_completeness"),
+}
+
 # Scorers that accept (skill_path, eval_suite) instead of just (skill_path)
 _EVAL_SUITE_SCORERS = frozenset({"triggers", "quality", "edges"})
 
@@ -224,25 +241,9 @@ _EVAL_SUITE_SCORERS = frozenset({"triggers", "quality", "edges"})
 def _call_scorer(dim: str, skill_path: str, eval_suite) -> dict:
     """Call a single scorer by dimension name.
 
-    Uses lazy imports to avoid circular deps and keep CLI startup fast.
+    Uses lazy imports via importlib (cached in sys.modules after first call).
     """
     import importlib
-
-    _SCORER_MAP = {
-        "structure": ("scoring.structure", "score_structure"),
-        "triggers": ("scoring.triggers", "score_triggers"),
-        "quality": ("scoring.quality", "score_quality"),
-        "edges": ("scoring.edges", "score_edges"),
-        "efficiency": ("scoring.efficiency", "score_efficiency"),
-        "composability": ("scoring.composability", "score_composability"),
-        "clarity": ("scoring.clarity", "score_clarity"),
-        "security": ("scoring.security", "score_security"),
-        "runtime": ("scoring.runtime", "score_runtime"),
-        # System prompt scorers
-        "structure_prompt": ("scoring.structure_prompt", "score_structure_prompt"),
-        "output_contract": ("scoring.output_contract", "score_output_contract"),
-        "completeness": ("scoring.completeness", "score_completeness"),
-    }
 
     if dim not in _SCORER_MAP:
         raise ValueError(f"Unknown scorer dimension: {dim}")
