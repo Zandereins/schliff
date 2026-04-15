@@ -7,9 +7,13 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from typing import Any, Callable, Optional
 
 from evolve.sanitize import redact_exception
+
+# Retry delays in seconds for transient LLM errors
+RETRY_DELAYS: list[int] = [1, 2, 4]
 
 # Type alias for the completion function (dependency injection)
 CompletionFn = Callable[..., Any]
@@ -120,29 +124,43 @@ def call_llm(
 
     # Real LiteLLM path
     _check_litellm_available()
-    try:
-        import litellm
-        response = litellm.completion(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        content = response.choices[0].message.content or ""
-        usage = response.usage
-        tokens = (usage.prompt_tokens or 0) + (usage.completion_tokens or 0) if usage else 0
-        return {
-            "content": content,
-            "tokens_used": tokens,
-            "model": model,
-        }
-    except KeyboardInterrupt:
-        raise
-    except SystemExit:
-        raise
-    except Exception as exc:
-        # SECURITY: Never expose raw tracebacks — they may contain API keys in locals
-        safe_msg = redact_exception(exc)
-        print(f"Error: LLM call failed: {safe_msg}", file=sys.stderr)
-        print("Hint: Use --budget 0 to skip LLM and run deterministic patches only.", file=sys.stderr)
-        raise SystemExit(1)
+    import litellm
+
+    last_exc: Exception | None = None
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        try:
+            response = litellm.completion(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=120,
+            )
+            content = response.choices[0].message.content or ""
+            usage = response.usage
+            tokens = (usage.prompt_tokens or 0) + (usage.completion_tokens or 0) if usage else 0
+            return {
+                "content": content,
+                "tokens_used": tokens,
+                "model": model,
+            }
+        except KeyboardInterrupt:
+            raise
+        except SystemExit:
+            raise
+        except Exception as exc:
+            last_exc = exc
+            if attempt < len(RETRY_DELAYS):
+                delay = RETRY_DELAYS[attempt]
+                safe_msg = redact_exception(exc)
+                print(f"Warning: LLM call failed (attempt {attempt + 1}/{len(RETRY_DELAYS) + 1}): "
+                      f"{safe_msg} — retrying in {delay}s", file=sys.stderr)
+                time.sleep(delay)
+            # else: fall through to final error handling
+
+    # All retries exhausted
+    # SECURITY: Never expose raw tracebacks — they may contain API keys in locals
+    safe_msg = redact_exception(last_exc) if last_exc else "unknown error"
+    print(f"Error: LLM call failed after {len(RETRY_DELAYS) + 1} attempts: {safe_msg}", file=sys.stderr)
+    print("Hint: Use --budget 0 to skip LLM and run deterministic patches only.", file=sys.stderr)
+    raise SystemExit(1)

@@ -103,6 +103,24 @@ class TestCallLLM:
         result = call_llm("s", "u", "m", completion_fn=mock_fn)
         assert result["content"] == ""
 
+    def test_completion_fn_no_retry(self):
+        """DI path should NOT retry — errors propagate immediately."""
+        call_count = 0
+
+        def failing_fn(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            raise ConnectionError("transient")
+
+        with pytest.raises(ConnectionError):
+            call_llm("s", "u", "m", completion_fn=failing_fn)
+        assert call_count == 1  # called exactly once, no retry
+
+    def test_retry_delays(self):
+        """Verify the retry delay sequence is [1, 2, 4]."""
+        from evolve.llm import RETRY_DELAYS
+        assert RETRY_DELAYS == [1, 2, 4]
+
     def test_real_path_without_litellm_exits(self):
         """Without litellm installed and no completion_fn, should exit."""
         with pytest.raises(SystemExit):
