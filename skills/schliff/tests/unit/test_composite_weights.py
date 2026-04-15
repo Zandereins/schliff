@@ -413,24 +413,19 @@ class TestDefaultWeightsSum:
         """Built-in weights in compute_composite must sum to 1.0 within float tolerance.
 
         We verify this by running compute_composite with a full set of measured
-        dimensions that fill all default weight keys, then checking weight_coverage.
+        dimensions that fill all default weight keys (from registry), then
+        checking weight_coverage.
         """
-        # Populate every default dimension so weight_sum == total weight sum
-        scores = {
-            "structure": _score(50),
-            "triggers": _score(50),
-            "quality": _score(50),
-            "edges": _score(50),
-            "efficiency": _score(50),
-            "composability": _score(50),
-            "runtime": _score(50),
-        }
+        from scoring.registry import get_weights
+        registry_weights = get_weights("skill.md")
+        # Populate every registry-weighted dimension
+        scores = {dim: _score(50) for dim in registry_weights}
         result = compute_composite(scores)
         # weight_coverage == weight_sum across measured dims; all dims measured -> ~1.0
         assert abs(result["weight_coverage"] - 1.0) < 1e-6
 
-    def test_default_weights_without_runtime_sum_to_less_than_one(self):
-        """Without runtime, weight_coverage < 1.0 because runtime weight is unmeasured."""
+    def test_default_weights_without_clarity_security_sum_to_less_than_one(self):
+        """Without clarity+security, weight_coverage < 1.0 because those weights are unmeasured."""
         scores = {
             "structure": _score(50),
             "triggers": _score(50),
@@ -442,18 +437,11 @@ class TestDefaultWeightsSum:
         result = compute_composite(scores)
         assert result["weight_coverage"] < 1.0
 
-    def test_clarity_injection_preserves_total_weight(self):
-        """After clarity injection the total weight across all measured dims must be ~1.0."""
-        scores = {
-            "structure": _score(50),
-            "triggers": _score(50),
-            "quality": _score(50),
-            "edges": _score(50),
-            "efficiency": _score(50),
-            "composability": _score(50),
-            "runtime": _score(50),
-            "clarity": _score(50),
-        }
+    def test_all_registry_dims_measured_preserves_total_weight(self):
+        """When all registry-weighted dims are measured, weight_coverage must be ~1.0."""
+        from scoring.registry import get_weights
+        registry_weights = get_weights("skill.md")
+        scores = {dim: _score(50) for dim in registry_weights}
         result = compute_composite(scores)
         # weight_coverage == sum of weights for *measured* dimensions after normalization
         assert abs(result["weight_coverage"] - 1.0) < 1e-6

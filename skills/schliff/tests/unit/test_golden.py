@@ -192,7 +192,9 @@ class TestGoldenBadSkill:
     def test_composite_low(self, tmp_path):
         path = _write_skill(tmp_path, BAD_SKILL)
         result = _score_all(path)
-        _assert_score_in_range(result["score"], 45, tolerance=5, label="bad_composite")
+        # Golden value shifted from 45 to ~40 after registry weight unification
+        # (clarity 0.05, security 0.05 now explicit; runtime removed from defaults)
+        _assert_score_in_range(result["score"], 40, tolerance=5, label="bad_composite")
 
 
 class TestGoldenMediumSkill:
