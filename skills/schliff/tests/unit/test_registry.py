@@ -71,16 +71,11 @@ class TestRegistryIntegrity:
         assert "hacked" not in get_weights("skill.md")
 
 
-class TestRegistryDivergence:
-    """Tests that PROVE the current divergence between registry, build_scores, composite."""
+class TestRegistryAlignment:
+    """Tests verifying that build_scores, composite, and registry are aligned."""
 
     def test_build_scores_keys_match_registry(self, tmp_path):
-        """build_scores() output keys should match registry scorer list for each format.
-
-        EXPECTED TO FAIL until build_scores() is migrated to use the registry:
-        - build_scores() omits 'security' (registry includes it)
-        - build_scores() includes 'clarity' (registry also includes it)
-        """
+        """build_scores() output keys should match registry scorer list (minus opt-in)."""
         from shared import build_scores
 
         skill = tmp_path / "SKILL.md"
@@ -91,56 +86,53 @@ class TestRegistryDivergence:
 
         scores = build_scores(str(skill), fmt="skill.md")
         registry_scorers = set(get_scorers("skill.md"))
-        # Remove opt-in dimensions that are not always present
         registry_scorers -= OPT_IN_SCORERS
         score_keys = set(scores.keys())
         assert score_keys == registry_scorers, (
             f"build_scores keys {score_keys} != registry {registry_scorers}"
         )
 
-    def test_composite_has_runtime_weight_but_registry_does_not(self):
-        """Prove: composite hardcodes runtime weight=0.10 but registry has no runtime weight.
+    def test_build_scores_with_security_matches_registry(self, tmp_path):
+        """build_scores(include_security=True) includes security from registry."""
+        from shared import build_scores
 
-        This divergence means composite always reserves 10% weight for runtime
-        even though the registry treats runtime as opt-in without a default weight.
-        """
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            "---\nname: test\ndescription: test skill\n---\n\n"
+            "# Test\n\nDo things.\n"
+        )
+
+        scores = build_scores(str(skill), fmt="skill.md", include_security=True)
+        assert "security" in scores
+
+    def test_composite_uses_registry_weights(self):
+        """compute_composite() weights come from the registry — no hardcoded fallbacks."""
         from scoring.composite import compute_composite
 
-        # Score all non-runtime dims — runtime is unmeasured
-        scores = {
-            "structure": {"score": 50, "issues": [], "details": {}},
-            "triggers": {"score": 50, "issues": [], "details": {}},
-            "quality": {"score": 50, "issues": [], "details": {}},
-            "edges": {"score": 50, "issues": [], "details": {}},
-            "efficiency": {"score": 50, "issues": [], "details": {}},
-            "composability": {"score": 50, "issues": [], "details": {}},
-        }
+        registry_weights = get_weights("skill.md")
+        scores = {dim: {"score": 50, "issues": [], "details": {}} for dim in registry_weights}
         result = compute_composite(scores)
 
+        # All registry-weighted dimensions should be measured
+        assert result["measured_dimensions"] == len(registry_weights)
+        assert len(result["unmeasured"]) == 0
+        assert abs(result["weight_coverage"] - 1.0) < 1e-6
+
+    def test_composite_does_not_have_runtime_weight(self):
+        """Runtime is opt-in and has no default weight in the registry."""
         registry_weights = get_weights("skill.md")
-        # Registry does NOT have runtime weight
-        assert "runtime" not in registry_weights, (
-            "Registry should not have runtime weight (it's opt-in)"
-        )
-        # But composite DOES have runtime in its unmeasured list (proves it expects runtime)
-        assert "runtime" in result["unmeasured"], (
-            "Composite should list runtime as unmeasured (it hardcodes runtime weight)"
-        )
+        assert "runtime" not in registry_weights
 
-    def test_composite_lacks_security_weight_but_registry_has_it(self):
-        """Prove: registry has security weight=0.05 but composite ignores security.
+    def test_composite_has_clarity_and_security_weights(self):
+        """Clarity and security are explicit in registry weights."""
+        registry_weights = get_weights("skill.md")
+        assert "clarity" in registry_weights
+        assert "security" in registry_weights
 
-        This divergence means security scores from build_scores() are never
-        included in the composite calculation.
-        """
+    def test_composite_security_is_measured_when_scored(self):
+        """Security scores flow through composite correctly via registry weights."""
         from scoring.composite import compute_composite
 
-        registry_weights = get_weights("skill.md")
-        assert "security" in registry_weights, (
-            "Registry should have security weight"
-        )
-
-        # Score with security included
         scores = {
             "structure": {"score": 50, "issues": [], "details": {}},
             "triggers": {"score": 50, "issues": [], "details": {}},
@@ -151,28 +143,18 @@ class TestRegistryDivergence:
             "security": {"score": 100, "issues": [], "details": {}},
         }
         result = compute_composite(scores)
-        # Security is NOT in composite's weight dict, so it's ignored
-        assert "security" not in result.get("confidence_notes", {}), (
-            "Composite should not have security in confidence_notes (not in its weights)"
-        )
+        # Security is in registry weights, so it should be measured
+        assert "security" not in result["unmeasured"]
 
-    def test_composite_no_extra_weights_beyond_registry(self):
-        """composite should not have weight for dimensions not in the registry weights.
-
-        This tests that composite doesn't have 'runtime' weighted by default
-        while the registry treats it as opt-in without a weight.
-        """
+    def test_all_registry_weighted_dims_measured_by_composite(self):
+        """Every dimension with a registry weight must be recognized by composite."""
         from scoring.composite import compute_composite
 
-        # Score only registry-weighted (non-opt-in) dimensions
         registry_weights = get_weights("skill.md")
-        non_optin = {k: v for k, v in registry_weights.items() if k not in OPT_IN_SCORERS}
-        scores = {dim: {"score": 50, "issues": [], "details": {}} for dim in non_optin}
-
+        scores = {dim: {"score": 50, "issues": [], "details": {}} for dim in registry_weights}
         result = compute_composite(scores)
 
-        # All non-opt-in weighted dimensions should be measured
-        for dim in non_optin:
+        for dim in registry_weights:
             assert dim not in result["unmeasured"], (
                 f"Registry-weighted dimension '{dim}' is unmeasured by composite"
             )
