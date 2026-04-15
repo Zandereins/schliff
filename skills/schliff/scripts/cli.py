@@ -21,8 +21,11 @@ import json
 import argparse
 import urllib.parse
 
-# Ensure scripts dir is on sys.path so existing modules (scoring, shared, etc.)
-# can be imported without restructuring the project.
+# sys.path hack: scripts/ must be on sys.path because scripts/ is NOT a Python
+# package (no __init__.py) — it's a flat collection of modules (shared.py, nlp.py)
+# plus sub-packages (scoring/, evolve/).  cli.py is the sole entry point (via the
+# `schliff` console_script in pyproject.toml), so this single path insertion is
+# sufficient for all transitive imports.  Do NOT duplicate this in sub-packages.
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
