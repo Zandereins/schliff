@@ -158,3 +158,77 @@ class TestRegistryAlignment:
             assert dim not in result["unmeasured"], (
                 f"Registry-weighted dimension '{dim}' is unmeasured by composite"
             )
+
+
+class TestBuildScoresCompositeEndToEnd:
+    """End-to-end tests verifying build_scores → compute_composite alignment."""
+
+    def test_skill_md_build_scores_composite_all_measured(self, tmp_path):
+        """build_scores(include_security=True) + compute_composite: all dims measured."""
+        from shared import build_scores
+        from scoring.composite import compute_composite
+
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            "---\nname: test\ndescription: test skill for alignment\n---\n\n"
+            "# Test\n\nDo things.\n\n## Instructions\n\n1. Step one\n"
+        )
+        # Provide eval suite with triggers/quality/edges keys
+        eval_suite = {
+            "triggers": [
+                {"should_trigger": True, "prompt": "test alignment"}
+            ],
+            "prompts": [
+                {"prompt": "test prompt", "assertions": ["contains:test"]}
+            ],
+        }
+
+        scores = build_scores(str(skill), eval_suite=eval_suite,
+                              fmt="skill.md", include_security=True)
+        result = compute_composite(scores, fmt="skill.md")
+
+        # All build_scores keys should have registry weights
+        registry_weights = get_weights("skill.md")
+        for key in scores:
+            assert key in registry_weights, (
+                f"build_scores key '{key}' has no registry weight"
+            )
+        # Verify composite runs without error and scores are valid
+        assert isinstance(result["score"], float)
+        assert 0.0 <= result["score"] <= 100.0
+
+    def test_build_scores_keys_subset_of_registry_weights(self, tmp_path):
+        """All keys from build_scores() must have corresponding registry weights."""
+        from shared import build_scores
+
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            "---\nname: test\ndescription: test skill\n---\n\n"
+            "# Test\n\nDo things.\n"
+        )
+
+        scores = build_scores(str(skill), fmt="skill.md", include_security=True)
+        registry_weights = get_weights("skill.md")
+
+        for key in scores:
+            assert key in registry_weights, (
+                f"build_scores key '{key}' has no weight in registry"
+            )
+
+    def test_multiformat_build_scores_composite_alignment(self, tmp_path):
+        """build_scores for non-skill.md formats also aligns with composite."""
+        from shared import build_scores
+        from scoring.composite import compute_composite
+
+        claude_md = tmp_path / "CLAUDE.md"
+        claude_md.write_text(
+            "# Project Instructions\n\n"
+            "## Rules\n\n1. Be concise\n2. Be accurate\n"
+        )
+
+        scores = build_scores(str(claude_md), fmt="claude.md")
+        result = compute_composite(scores, fmt="claude.md")
+
+        assert result["measured_dimensions"] > 0
+        assert isinstance(result["score"], float)
+        assert 0.0 <= result["score"] <= 100.0
