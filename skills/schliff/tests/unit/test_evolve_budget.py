@@ -61,3 +61,23 @@ class TestBudgetTracker:
         bt.record(2000, "gen 2")
         assert len(bt._history) == 2
         assert bt._history[0] == (1000, "gen 1")
+
+    def test_cost_estimate_with_opus_model(self):
+        bt = BudgetTracker(50000)
+        bt.record(10000, "gen 1")
+        cost = bt.estimate_cost_usd(model="anthropic/claude-opus-4-20250514")
+        # Opus: $15/$75 per 1M → 6000*15/1M + 4000*75/1M = 0.09 + 0.30 = 0.39
+        assert 0.35 < cost < 0.45
+
+    def test_cost_estimate_default_sonnet(self):
+        bt = BudgetTracker(50000)
+        bt.record(10000, "gen 1")
+        cost_default = bt.estimate_cost_usd()
+        cost_explicit = bt.estimate_cost_usd(model="anthropic/claude-sonnet-4-20250514")
+        assert cost_default == cost_explicit
+
+    def test_cost_estimate_ollama_free(self):
+        bt = BudgetTracker(50000)
+        bt.record(10000, "gen 1")
+        cost = bt.estimate_cost_usd(model="ollama/llama3")
+        assert cost == 0.0
