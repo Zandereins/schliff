@@ -46,7 +46,8 @@ def _load_calibrated_weights() -> Optional[dict]:
     return None
 
 
-def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> dict:
+def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
+                      fmt: Optional[str] = None) -> dict:
     """Compute weighted composite score with confidence indicator.
 
     Returns both the score and metadata about how many dimensions
@@ -57,20 +58,27 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> di
         custom_weights: Optional dict of dimension_name -> float weight.
             Values are normalized to sum to 1.0. Example:
             {"structure": 0.3, "triggers": 0.4, "efficiency": 0.3}
+        fmt: Optional format identifier. When provided, weights are loaded
+            from the scorer registry. Defaults to "skill.md" weights.
     """
-    weights = {
-        "structure": 0.15,
-        "triggers": 0.20,
-        "quality": 0.20,
-        "edges": 0.15,
-        "efficiency": 0.10,
-        "composability": 0.10,
-        "runtime": 0.10,
-    }
+    from scoring.registry import get_weights
+
+    weights = get_weights(fmt if fmt is not None else "skill.md")
 
     # Apply custom weights if provided (highest priority)
-    # Custom weights OVERRIDE defaults for specified keys but keep unspecified dimensions
+    # Custom weights OVERRIDE defaults for specified keys but keep unspecified dimensions.
+    # When custom_weights are active, opt-in dimensions (security, clarity) are excluded
+    # unless the user explicitly includes them in custom_weights.
     if custom_weights:
+        # When custom weights are provided, only keep dimensions that the user
+        # explicitly included. Dimensions not in custom_weights but present in
+        # the registry defaults are kept (they form the baseline). However,
+        # "supplementary" dimensions (clarity, security) that were traditionally
+        # handled specially are excluded unless explicitly in custom_weights.
+        _SUPPLEMENTARY = {"clarity", "security"}
+        for dim in list(weights):
+            if dim in _SUPPLEMENTARY and dim not in custom_weights:
+                del weights[dim]
         # Reject negative weights
         for k, v in custom_weights.items():
             if k in weights and isinstance(v, (int, float)) and math.isfinite(v) and v >= 0:
@@ -90,18 +98,6 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> di
                 total_w = sum(weights.values())
                 if total_w > 0:
                     weights = {k: v / total_w for k, v in weights.items()}
-
-    # If clarity is present, add it with weight 0.05 redistributed proportionally
-    # Skip auto-injection when user provided custom weights — custom weights take full precedence
-    if "clarity" in scores and not custom_weights:
-        clarity_weight = 0.05
-        scale = (1.0 - clarity_weight) / sum(weights.values())
-        weights = {k: v * scale for k, v in weights.items()}
-        weights["clarity"] = clarity_weight
-        # Safety: ensure weights sum to 1.0
-        total = sum(weights.values())
-        if abs(total - 1.0) > 1e-9:
-            weights = {k: v / total for k, v in weights.items()}
 
     total = 0.0
     weight_sum = 0.0
@@ -125,8 +121,9 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> di
     total_count = len(weights)
 
     warnings = []
-    # Only warn about non-opt-in unmeasured dimensions (runtime is opt-in)
-    warn_unmeasured = [d for d in unmeasured if d != "runtime"]
+    # Only warn about non-opt-in unmeasured dimensions (runtime, security are opt-in)
+    from scoring.registry import OPT_IN_SCORERS
+    warn_unmeasured = [d for d in unmeasured if d not in OPT_IN_SCORERS]
     if warn_unmeasured:
         if measured_count <= 2:
             warnings.append(
@@ -161,12 +158,11 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None) -> di
                       "Cannot assess whether the content is actually useful to Claude.",
         "composability": "Measures scope boundaries and handoff declarations. "
                          "Cannot verify the skill works correctly alongside other skills.",
+        "clarity": "Measures contradiction, vague reference, and ambiguity patterns. "
+                   "Cannot assess whether instructions are clear to Claude in practice.",
+        "security": "Measures security anti-patterns (hardcoded secrets, injection vectors, "
+                     "unsafe operations). Cannot assess runtime security posture.",
     }
-    if "clarity" in scores:
-        confidence_notes["clarity"] = (
-            "Measures contradiction, vague reference, and ambiguity patterns. "
-            "Cannot assess whether instructions are clear to Claude in practice."
-        )
 
     # Determine score type based on what was measured
     has_runtime = "runtime" in measured
