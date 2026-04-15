@@ -78,7 +78,7 @@ schliff compare skill-v1.md skill-v2.md  # side-by-side comparison
 schliff doctor                           # scan all installed skills
 ```
 
-Or try in the browser: **[Web Playground](web/playground/)**
+Or try instantly: `schliff demo`
 
 ---
 
