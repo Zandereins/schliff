@@ -148,21 +148,25 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
 
 
 def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
-                  include_runtime: bool = False, fmt: Optional[str] = None) -> dict:
+                  include_runtime: bool = False, fmt: Optional[str] = None,
+                  include_security: bool = False) -> dict:
     """Build the standard scoring dict for a skill.
 
     Centralizes the dimension-scoring calls used by score, badge, and doctor.
-    Supports non-SKILL.md formats (CLAUDE.md, .cursorrules, AGENTS.md) by
-    normalizing content to SKILL.md shape before scoring — zero scorer changes.
+    Uses the scorer registry as single source of truth for which dimensions
+    to score per format. Supports non-SKILL.md formats (CLAUDE.md, .cursorrules,
+    AGENTS.md) by normalizing content to SKILL.md shape before scoring.
 
     Args:
+        eval_suite: Optional eval suite dict for trigger/quality/edge scoring.
+        include_runtime: Whether to include the runtime dimension (opt-in).
         fmt: Optional format override. When provided, skips auto-detection.
-             Useful when the filename doesn't match the actual format
-             (e.g., a file named 'instructions.md' that is CLAUDE.md-style).
+        include_security: Whether to include the security dimension (opt-in).
     """
     import os
     import tempfile
     from scoring.formats import detect_format, normalize_content
+    from scoring.registry import get_scorers, OPT_IN_SCORERS
 
     if fmt is None:
         fmt = detect_format(skill_path)
@@ -179,26 +183,19 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
             tmp_path = tmp.name
             skill_path = tmp_path  # scorers now see normalized content
 
-        # Lazy imports to avoid circular deps and keep CLI startup fast
-        from scoring import (
-            score_structure, score_triggers, score_efficiency,
-            score_composability, score_quality, score_edges,
-            score_clarity,
-        )
+        scorers = get_scorers(fmt)
+        scores = {}
 
-        scores = {
-            "structure": score_structure(skill_path),
-            "triggers": score_triggers(skill_path, eval_suite),
-            "quality": score_quality(skill_path, eval_suite),
-            "edges": score_edges(skill_path, eval_suite),
-            "efficiency": score_efficiency(skill_path),
-            "composability": score_composability(skill_path),
-            "clarity": score_clarity(skill_path),
-        }
+        for dim in scorers:
+            # Skip opt-in dimensions unless explicitly requested
+            if dim == "runtime" and not include_runtime:
+                continue
+            if dim == "security" and not include_security:
+                continue
 
-        if include_runtime:
-            from scoring import score_runtime
-            scores["runtime"] = score_runtime(skill_path, eval_suite, enabled=False)
+            scores[dim] = _call_scorer(dim, skill_path, eval_suite)
+
+        return scores
     finally:
         if tmp_path is not None:
             try:
@@ -206,7 +203,43 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
             except OSError:
                 pass
 
-    return scores
+
+# Scorers that accept (skill_path, eval_suite) instead of just (skill_path)
+_EVAL_SUITE_SCORERS = frozenset({"triggers", "quality", "edges"})
+
+
+def _call_scorer(dim: str, skill_path: str, eval_suite) -> dict:
+    """Call a single scorer by dimension name.
+
+    Uses lazy imports to avoid circular deps and keep CLI startup fast.
+    """
+    import importlib
+
+    _SCORER_MAP = {
+        "structure": ("scoring.structure", "score_structure"),
+        "triggers": ("scoring.triggers", "score_triggers"),
+        "quality": ("scoring.quality", "score_quality"),
+        "edges": ("scoring.edges", "score_edges"),
+        "efficiency": ("scoring.efficiency", "score_efficiency"),
+        "composability": ("scoring.composability", "score_composability"),
+        "clarity": ("scoring.clarity", "score_clarity"),
+        "security": ("scoring.security", "score_security"),
+        "runtime": ("scoring.runtime", "score_runtime"),
+    }
+
+    if dim not in _SCORER_MAP:
+        raise ValueError(f"Unknown scorer dimension: {dim}")
+
+    module_path, func_name = _SCORER_MAP[dim]
+    mod = importlib.import_module(module_path)
+    func = getattr(mod, func_name)
+
+    if dim in _EVAL_SUITE_SCORERS:
+        return func(skill_path, eval_suite)
+    elif dim == "runtime":
+        return func(skill_path, eval_suite, enabled=False)
+    else:
+        return func(skill_path)
 
 
 def validate_regex_complexity(pattern: str, max_length: int = 500) -> tuple[bool, str]:
