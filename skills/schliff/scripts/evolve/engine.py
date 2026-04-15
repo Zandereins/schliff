@@ -262,6 +262,23 @@ def run_evolution(config: EvolutionConfig,
                 if best_composite >= config.target_score:
                     break
 
+                # Plateau check — runs every iteration (accepted AND rejected)
+                if plateau.is_plateau:
+                    escape = plateau.get_escape_strategy()
+                    if escape == "strategy_switch":
+                        strategy = "holistic" if strategy == "gradient" else "gradient"
+                        if verbose:
+                            print(f"  → Plateau detected, switching to {strategy}")
+                    elif escape == "temperature_bump":
+                        temperature = 0.6
+                        if verbose:
+                            print(f"  → Plateau persists, bumping temperature to {temperature}")
+                    else:
+                        if verbose:
+                            print("  → Plateau is real, stopping")
+                        stop_reason = "plateau"
+                        break
+
                 # Build prompt based on strategy
                 eval_suite = load_eval_suite(skill_path)
                 gradients = text_gradient.compute_gradients(skill_path, eval_suite, include_clarity=True)
@@ -369,33 +386,18 @@ def run_evolution(config: EvolutionConfig,
                                            tokens_used=llm_result["tokens_used"])
                     lineage.save_snapshot(gen_num, best_content)
 
-                # Plateau detection
-                if plateau.is_plateau:
-                    escape = plateau.get_escape_strategy()
-                    if escape == "strategy_switch":
-                        strategy = "holistic" if strategy == "gradient" else "gradient"
-                        if verbose:
-                            print(f"  → Plateau detected, switching to {strategy}")
-                    elif escape == "temperature_bump":
-                        temperature = 0.6
-                        if verbose:
-                            print(f"  → Plateau persists, bumping temperature to {temperature}")
-                    else:
-                        if verbose:
-                            print("  → Plateau is real, stopping")
-                        break
+                # (plateau check moved to top of loop)
 
-            # Determine stop reason
-            if best_composite >= config.target_score:
-                stop_reason = "target_reached"
-            elif budget.is_exhausted or not budget.can_afford(1):
-                stop_reason = "budget_exhausted"
-            elif gen_num >= config.max_generations:
-                stop_reason = "max_generations"
-            elif plateau.is_plateau:
-                stop_reason = "plateau"
-            else:
-                stop_reason = "no_improvement"
+            # Determine stop reason (skip if already set by plateau break)
+            if stop_reason == "no_improvement":
+                if best_composite >= config.target_score:
+                    stop_reason = "target_reached"
+                elif budget.is_exhausted or not budget.can_afford(1):
+                    stop_reason = "budget_exhausted"
+                elif gen_num >= config.max_generations:
+                    stop_reason = "max_generations"
+                elif plateau.is_plateau:
+                    stop_reason = "plateau"
 
     except KeyboardInterrupt:
         stop_reason = "interrupted"

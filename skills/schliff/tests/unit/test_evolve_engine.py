@@ -100,6 +100,37 @@ class TestLineage:
         assert os.path.exists(result.lineage_path)
 
 
+class TestRejectionPlateauStopsLoop:
+    """Verify that consecutive rejections trigger plateau and stop the loop."""
+
+    def test_consecutive_rejections_stop_loop(self, sample_skill):
+        """A mock that always returns garbage should trigger plateau, not burn entire budget."""
+        call_count = 0
+
+        def bad_completion(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            # Return content identical to the original (will be rejected as identical)
+            return {
+                "content": "```markdown\n---\nname: test-skill\ndescription: A test skill for evolution\n---\n\n# Test Skill\n\nDo things.\n```",
+                "usage": {"total_tokens": 100},
+            }
+
+        config = EvolutionConfig(
+            skill_path=sample_skill,
+            budget_tokens=50000,  # large budget
+            max_generations=50,   # many generations allowed
+            target_score=99.0,
+        )
+        result = run_evolution(config, completion_fn=bad_completion)
+        # With max_consecutive_rejections=10 and plateau window=5,
+        # the loop should stop well before 50 generations
+        assert result.stop_reason == "plateau", (
+            f"Expected plateau stop, got '{result.stop_reason}' after {call_count} LLM calls"
+        )
+        assert call_count < 30, f"Too many LLM calls ({call_count}), plateau should have stopped earlier"
+
+
 class TestApplySinglePatch:
     def test_insert_before(self):
         content = "line1\nline2\nline3"
