@@ -1,6 +1,15 @@
 """Token budget tracking for evolution sessions."""
 from __future__ import annotations
 
+# (input_price_per_1m, output_price_per_1m) in USD
+MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "anthropic/claude-sonnet-4-20250514": (3.0, 15.0),
+    "anthropic/claude-opus-4-20250514": (15.0, 75.0),
+    "anthropic/claude-haiku-4-5-20251001": (0.80, 4.0),
+    "openai/gpt-4o": (2.50, 10.0),
+    "ollama/llama3": (0.0, 0.0),
+}
+
 
 class BudgetTracker:
     """Track token consumption against a budget.
@@ -42,10 +51,25 @@ class BudgetTracker:
 
     def estimate_cost_usd(
         self,
+        model: str = "",
         input_price_per_1m: float = 3.0,
         output_price_per_1m: float = 15.0,
     ) -> float:
-        """Rough cost estimate assuming 60/40 input/output split."""
+        """Rough cost estimate assuming 60/40 input/output split.
+
+        If model is provided, looks up pricing from MODEL_PRICING.
+        Falls back to explicit prices or Sonnet defaults.
+        """
+        if model:
+            pricing = MODEL_PRICING.get(model)
+            if pricing is None:
+                # Try prefix match (e.g. "anthropic/..." matches "anthropic")
+                for key, val in MODEL_PRICING.items():
+                    if model.startswith(key.split("/")[0]):
+                        pricing = val
+                        break
+            if pricing:
+                input_price_per_1m, output_price_per_1m = pricing
         input_tokens = int(self.used * 0.6)
         output_tokens = int(self.used * 0.4)
         return (

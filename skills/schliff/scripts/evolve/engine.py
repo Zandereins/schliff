@@ -216,6 +216,7 @@ def run_evolution(config: EvolutionConfig,
     accepted = 0
     rejected = 0
     gen_num = 0
+    resolved_model = ""
 
     try:
         det_content, det_scores, det_composite, det_count = _apply_deterministic_patches(
@@ -253,6 +254,7 @@ def run_evolution(config: EvolutionConfig,
             from shared import load_eval_suite
 
             model = resolve_model(config.provider, config.model) if not completion_fn else (config.model or "mock/injected")
+            resolved_model = model
             strategy = config.strategy
             temperature = 0.3
 
@@ -403,7 +405,7 @@ def run_evolution(config: EvolutionConfig,
         stop_reason = "error"
     finally:
         _finalize(config, lineage, initial_composite, best_composite, budget, stop_reason, verbose,
-                  det_count=det_count, accepted=accepted, rejected=rejected)
+                  det_count=det_count, accepted=accepted, rejected=rejected, model=resolved_model)
         # Remove backup on success
         if stop_reason not in ("error", "interrupted"):
             try:
@@ -416,7 +418,7 @@ def run_evolution(config: EvolutionConfig,
         initial_grade=initial_grade, final_grade=grade_from_score(best_composite),
         generations=gen_num, accepted=det_count + accepted, rejected=rejected,
         deterministic_patches=det_count, tokens_used=budget.used,
-        cost_usd=budget.estimate_cost_usd(), stop_reason=stop_reason,
+        cost_usd=budget.estimate_cost_usd(model=resolved_model), stop_reason=stop_reason,
         lineage_path=lineage.path if lineage else None,
     )
 
@@ -424,11 +426,12 @@ def run_evolution(config: EvolutionConfig,
 def _finalize(config: EvolutionConfig, lineage: Optional[LineageSession],
               initial: float, final: float, budget: BudgetTracker,
               stop_reason: str, verbose: bool,
-              det_count: int = 0, accepted: int = 0, rejected: int = 0) -> None:
+              det_count: int = 0, accepted: int = 0, rejected: int = 0,
+              model: str = "") -> None:
     """Print summary and close lineage."""
     if lineage:
         lineage.log_footer(final, final - initial, budget.used,
-                           budget.estimate_cost_usd(), stop_reason)
+                           budget.estimate_cost_usd(model=model), stop_reason)
 
     if verbose:
         print(f"\n  Result: {initial:.1f} → {final:.1f} (+{final - initial:.1f})  "
@@ -437,7 +440,7 @@ def _finalize(config: EvolutionConfig, lineage: Optional[LineageSession],
         print(f"  Generations: {total_gens} ({accepted} accepted, {rejected} rejected, {det_count} deterministic)")
         if budget.used > 0:
             print(f"  Tokens: {budget.used:,} / {budget.budget:,}  "
-                  f"Cost: ${budget.estimate_cost_usd():.3f}")
+                  f"Cost: ${budget.estimate_cost_usd(model=model):.3f}")
         if lineage:
             print(f"  Lineage: {lineage.path}")
         print()
