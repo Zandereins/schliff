@@ -201,17 +201,15 @@ def run_evolution(config: EvolutionConfig,
         lineage.log_generation(0, initial_composite, "baseline")
 
     # Phase 1: Deterministic patches
-    content = read_skill_safe(skill_path)
-    best_content = content
+    best_content = read_skill_safe(skill_path)
     best_scores = initial_scores
     best_composite = initial_composite
 
     # Backup original before any modification
-    original_content = read_skill_safe(skill_path)
     backup_path = skill_path + ".schliff-backup"
-    _atomic_write(backup_path, original_content)
+    _atomic_write(backup_path, best_content)
 
-    stop_reason = "no_improvement"
+    stop_reason: Optional[str] = None
     det_count = 0
     accepted = 0
     rejected = 0
@@ -257,6 +255,7 @@ def run_evolution(config: EvolutionConfig,
             resolved_model = model
             strategy = config.strategy
             temperature = 0.3
+            cached_eval_suite = load_eval_suite(skill_path)
 
             for _ in range(config.max_generations - det_count):
                 if best_composite >= config.target_score:
@@ -280,8 +279,7 @@ def run_evolution(config: EvolutionConfig,
                         break
 
                 # Build prompt based on strategy
-                eval_suite = load_eval_suite(skill_path)
-                gradients = text_gradient.compute_gradients(skill_path, eval_suite, include_clarity=True)
+                gradients = text_gradient.compute_gradients(skill_path, cached_eval_suite, include_clarity=True)
 
                 if strategy == "dimension" and config.dimension:
                     user_prompt = build_dimension_prompt(
@@ -388,8 +386,8 @@ def run_evolution(config: EvolutionConfig,
 
                 # (plateau check moved to top of loop)
 
-            # Determine stop reason (skip if already set by plateau break)
-            if stop_reason == "no_improvement":
+            # Determine stop reason (skip if already set, e.g. by plateau break)
+            if stop_reason is None:
                 if best_composite >= config.target_score:
                     stop_reason = "target_reached"
                 elif budget.is_exhausted or not budget.can_afford(1):
@@ -398,6 +396,8 @@ def run_evolution(config: EvolutionConfig,
                     stop_reason = "max_generations"
                 elif plateau.is_plateau:
                     stop_reason = "plateau"
+                else:
+                    stop_reason = "no_improvement"
 
     except KeyboardInterrupt:
         stop_reason = "interrupted"
@@ -406,10 +406,11 @@ def run_evolution(config: EvolutionConfig,
     except SystemExit:
         stop_reason = "error"
     finally:
-        _finalize(config, lineage, initial_composite, best_composite, budget, stop_reason, verbose,
+        _finalize(config, lineage, initial_composite, best_composite, budget,
+                  stop_reason or "no_improvement", verbose,
                   det_count=det_count, accepted=accepted, rejected=rejected, model=resolved_model)
         # Remove backup on success
-        if stop_reason not in ("error", "interrupted"):
+        if (stop_reason or "no_improvement") not in ("error", "interrupted"):
             try:
                 os.unlink(backup_path)
             except OSError:
@@ -420,7 +421,8 @@ def run_evolution(config: EvolutionConfig,
         initial_grade=initial_grade, final_grade=grade_from_score(best_composite),
         generations=gen_num, accepted=det_count + accepted, rejected=rejected,
         deterministic_patches=det_count, tokens_used=budget.used,
-        cost_usd=budget.estimate_cost_usd(model=resolved_model), stop_reason=stop_reason,
+        cost_usd=budget.estimate_cost_usd(model=resolved_model),
+        stop_reason=stop_reason or "no_improvement",
         lineage_path=lineage.path if lineage else None,
     )
 

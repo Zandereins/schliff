@@ -125,24 +125,13 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     from scoring.registry import OPT_IN_SCORERS
     warn_unmeasured = [d for d in unmeasured if d not in OPT_IN_SCORERS]
     if warn_unmeasured:
-        if measured_count <= 2:
-            warnings.append(
-                f"Only {measured_count}/{total_count} dimensions measured "
-                f"(weight coverage: {confidence:.0%}). Score is unreliable — "
-                f"unmeasured: {', '.join(warn_unmeasured)}"
-            )
-        elif measured_count <= 4:
-            warnings.append(
-                f"{measured_count}/{total_count} dimensions measured "
-                f"(weight coverage: {confidence:.0%}). "
-                f"Unmeasured: {', '.join(warn_unmeasured)}"
-            )
-        else:
-            warnings.append(
-                f"{measured_count}/{total_count} dimensions measured "
-                f"(weight coverage: {confidence:.0%}). "
-                f"Unmeasured: {', '.join(warn_unmeasured)}"
-            )
+        prefix = "Only " if measured_count <= 2 else ""
+        suffix = " Score is unreliable —" if measured_count <= 2 else ""
+        warnings.append(
+            f"{prefix}{measured_count}/{total_count} dimensions measured "
+            f"(weight coverage: {confidence:.0%}).{suffix} "
+            f"{'u' if measured_count <= 2 else 'U'}nmeasured: {', '.join(warn_unmeasured)}"
+        )
 
     # Confidence notes: explain what each dimension can and cannot tell you
     confidence_notes = {
