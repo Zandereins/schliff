@@ -45,6 +45,11 @@ _RE_DESC_BLOCK = re.compile(
 )
 _RE_DESC_INLINE = re.compile(r'^description:\s*"?(.+?)"?\s*$', re.MULTILINE)
 
+# Regex complexity validation patterns (used by validate_regex_complexity)
+_RE_NESTED_QUANT = re.compile(r'[+*]\)?[+*?{]')
+_RE_OVERLAP_QUANT = re.compile(r'\((?!\?:)[^)]*\|[^)]*\)[+*]{1,2}')
+_RE_GROUP_INNER_QUANT = re.compile(r'\([^)]*[.][*+][^)]*\)[+*?{]')
+
 
 def strip_frontmatter(content: str) -> str:
     """Strip YAML frontmatter (---...---) from skill content."""
@@ -148,24 +153,36 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
 
 
 def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
-                  include_runtime: bool = False, fmt: Optional[str] = None) -> dict:
+                  include_runtime: bool = False, fmt: Optional[str] = None,
+                  include_security: bool = False) -> dict:
     """Build the standard scoring dict for a skill.
 
     Centralizes the dimension-scoring calls used by score, badge, and doctor.
-    Supports non-SKILL.md formats (CLAUDE.md, .cursorrules, AGENTS.md) by
-    normalizing content to SKILL.md shape before scoring — zero scorer changes.
+    Uses the scorer registry as single source of truth for which dimensions
+    to score per format. Supports non-SKILL.md formats (CLAUDE.md, .cursorrules,
+    AGENTS.md) by normalizing content to SKILL.md shape before scoring.
 
     Args:
+        eval_suite: Optional eval suite dict for trigger/quality/edge scoring.
+        include_runtime: Whether to include the runtime dimension (opt-in).
         fmt: Optional format override. When provided, skips auto-detection.
-             Useful when the filename doesn't match the actual format
-             (e.g., a file named 'instructions.md' that is CLAUDE.md-style).
+        include_security: Whether to include the security dimension (opt-in).
     """
     import os
     import tempfile
     from scoring.formats import detect_format, normalize_content
+    from scoring.registry import get_scorers, OPT_IN_SCORERS
 
     if fmt is None:
         fmt = detect_format(skill_path)
+
+    # System prompts: no normalization, no temp file, dedicated scorer set
+    if fmt == "system_prompt":
+        scores = {}
+        for dim in get_scorers("system_prompt"):
+            scores[dim] = _call_scorer(dim, skill_path, None)
+        return scores
+
     tmp_path: Optional[str] = None
     try:
         if fmt != "skill.md":
@@ -179,26 +196,19 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
             tmp_path = tmp.name
             skill_path = tmp_path  # scorers now see normalized content
 
-        # Lazy imports to avoid circular deps and keep CLI startup fast
-        from scoring import (
-            score_structure, score_triggers, score_efficiency,
-            score_composability, score_quality, score_edges,
-            score_clarity,
-        )
+        scorers = get_scorers(fmt)
+        scores = {}
 
-        scores = {
-            "structure": score_structure(skill_path),
-            "triggers": score_triggers(skill_path, eval_suite),
-            "quality": score_quality(skill_path, eval_suite),
-            "edges": score_edges(skill_path, eval_suite),
-            "efficiency": score_efficiency(skill_path),
-            "composability": score_composability(skill_path),
-            "clarity": score_clarity(skill_path),
-        }
+        for dim in scorers:
+            # Skip opt-in dimensions unless explicitly requested
+            if dim == "runtime" and not include_runtime:
+                continue
+            if dim == "security" and not include_security:
+                continue
 
-        if include_runtime:
-            from scoring import score_runtime
-            scores["runtime"] = score_runtime(skill_path, eval_suite, enabled=False)
+            scores[dim] = _call_scorer(dim, skill_path, eval_suite)
+
+        return scores
     finally:
         if tmp_path is not None:
             try:
@@ -206,7 +216,48 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
             except OSError:
                 pass
 
-    return scores
+
+# Scorer dimension → (module_path, function_name) mapping.
+# Module-level to avoid per-call dict reconstruction.
+_SCORER_MAP: dict[str, tuple[str, str]] = {
+    "structure": ("scoring.structure", "score_structure"),
+    "triggers": ("scoring.triggers", "score_triggers"),
+    "quality": ("scoring.quality", "score_quality"),
+    "edges": ("scoring.edges", "score_edges"),
+    "efficiency": ("scoring.efficiency", "score_efficiency"),
+    "composability": ("scoring.composability", "score_composability"),
+    "clarity": ("scoring.clarity", "score_clarity"),
+    "security": ("scoring.security", "score_security"),
+    "runtime": ("scoring.runtime", "score_runtime"),
+    "structure_prompt": ("scoring.structure_prompt", "score_structure_prompt"),
+    "output_contract": ("scoring.output_contract", "score_output_contract"),
+    "completeness": ("scoring.completeness", "score_completeness"),
+}
+
+# Scorers that accept (skill_path, eval_suite) instead of just (skill_path)
+_EVAL_SUITE_SCORERS = frozenset({"triggers", "quality", "edges"})
+
+
+def _call_scorer(dim: str, skill_path: str, eval_suite) -> dict:
+    """Call a single scorer by dimension name.
+
+    Uses lazy imports via importlib (cached in sys.modules after first call).
+    """
+    import importlib
+
+    if dim not in _SCORER_MAP:
+        raise ValueError(f"Unknown scorer dimension: {dim}")
+
+    module_path, func_name = _SCORER_MAP[dim]
+    mod = importlib.import_module(module_path)
+    func = getattr(mod, func_name)
+
+    if dim in _EVAL_SUITE_SCORERS:
+        return func(skill_path, eval_suite)
+    elif dim == "runtime":
+        return func(skill_path, eval_suite, enabled=False)
+    else:
+        return func(skill_path)
 
 
 def validate_regex_complexity(pattern: str, max_length: int = 500) -> tuple[bool, str]:
@@ -217,21 +268,11 @@ def validate_regex_complexity(pattern: str, max_length: int = 500) -> tuple[bool
     if len(pattern) > max_length:
         return False, f"pattern too long ({len(pattern)} > {max_length})"
 
-    # Detect nested quantifiers: (a+)+, (a*)+, (a+)*, etc.
-    nested_quant = re.compile(r'[+*]\)?[+*?{]')
-    if nested_quant.search(pattern):
+    if _RE_NESTED_QUANT.search(pattern):
         return False, "nested quantifiers detected (potential ReDoS)"
-
-    # Detect overlapping alternations with quantifiers.
-    # Non-capturing groups (?:...) are excluded: (?:a|b)+ is safe because
-    # the alternatives are atomic and cannot cause catastrophic backtracking.
-    overlap = re.compile(r'\((?!\?:)[^)]*\|[^)]*\)[+*]{1,2}')
-    if overlap.search(pattern):
+    if _RE_OVERLAP_QUANT.search(pattern):
         return False, "overlapping alternation with quantifier (potential ReDoS)"
-
-    # Dot-star or dot-plus inside a repeated group: (.*X)+
-    group_inner_quant = re.compile(r'\([^)]*[.][*+][^)]*\)[+*?{]')
-    if group_inner_quant.search(pattern):
+    if _RE_GROUP_INNER_QUANT.search(pattern):
         return False, "dot-wildcard quantifier inside repeated group (potential ReDoS)"
 
     return True, "ok"

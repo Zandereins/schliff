@@ -593,11 +593,11 @@ def compute_gradients(
     if include_clarity:
         gradients.extend(_compute_clarity_gradients(skill_path))
 
-    # Dimension weights from scorer (match composite formula)
-    DIM_WEIGHTS = {
-        "structure": 0.15, "triggers": 0.20, "quality": 0.20,
-        "edges": 0.15, "efficiency": 0.10, "composability": 0.10, "clarity": 0.05,
-    }
+    # Dimension weights from registry (match composite formula)
+    from scoring.registry import get_weights
+    DIM_WEIGHTS = get_weights("skill.md")
+    # Remove security from weights — text_gradient doesn't compute security gradients
+    DIM_WEIGHTS.pop("security", None)
     CONFIDENCE_MULT = {"high": 1.0, "medium": 0.6, "low": 0.3}
 
     # Normalize delta to float and compute composite-weighted priority
