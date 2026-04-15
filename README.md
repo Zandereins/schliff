@@ -56,13 +56,11 @@ Grades: **S** (≥95) · **A** (≥85) · **B** (≥75) · **C** (≥65) · **D*
 
 | Skill | Score | Rounds | Author |
 |-------|-------|--------|--------|
-| agent-review-panel | 64 [D] → 85.6 [A] | 3 | [@wan-huiyan](https://github.com/wan-huiyan) |
+| agent-review-panel | 75 [C] → 85.6 [A] | 2 | [@wan-huiyan](https://github.com/wan-huiyan) |
 | shieldclaw (OpenClaw) | 68 [C] → 94.6 [A] | 1 | [@Zandereins](https://github.com/Zandereins) |
 | demo skill | 54 [D] → 98.3 [S] | 18 auto | [@Zandereins](https://github.com/Zandereins) |
 
-> "It's become a core part of my skill development workflow!" — [@wan-huiyan](https://github.com/wan-huiyan)
-
-wan-huiyan used schliff to improve [agent-review-panel](https://github.com/wan-huiyan/claude-client-proposal-slide): SKILL.md went from 1,331 to 340 lines — **75% token reduction** via `references/` extraction. A/B testing confirmed identical review quality with fewer tokens.
+[@wan-huiyan](https://github.com/wan-huiyan) ran schliff on a 1,331-line SKILL.md for [agent-review-panel](https://github.com/wan-huiyan/agent-review-panel). Two optimization rounds later: 340 lines, **75% fewer tokens**, Structure 65→100, Composability 56→91. A/B tested on a 1,132-line document — identical review quality with a quarter of the tokens.
 
 **Score yours:** `schliff score path/to/SKILL.md` — [share what you find](https://github.com/Zandereins/schliff/issues/new?template=share_results.md)
 
