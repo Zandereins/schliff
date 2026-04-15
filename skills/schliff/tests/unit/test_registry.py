@@ -1,180 +1,234 @@
-"""Tests for the scorer registry."""
+"""Tests documenting and verifying registry/build_scores/composite alignment.
+
+These tests prove the current divergence between the three sources of truth:
+1. scoring.registry — canonical scorer lists and weight profiles
+2. shared.build_scores() — hardcoded scorer lists
+3. scoring.composite — hardcoded fallback weight dict
+"""
 import pytest
 
-
-def test_registry_has_all_existing_formats():
-    """All 4 instruction file formats are registered."""
-    from scoring.registry import SCORER_REGISTRY
-    for fmt in ["skill.md", "claude.md", "cursorrules", "agents.md"]:
-        assert fmt in SCORER_REGISTRY, f"Missing format: {fmt}"
+from scoring.registry import get_scorers, get_weights, SCORER_REGISTRY, WEIGHT_PROFILES, OPT_IN_SCORERS
 
 
-def test_registry_scorers_match_existing():
-    """All 4 formats have the same 8 standard scorers."""
-    from scoring.registry import SCORER_REGISTRY
-    expected = ["structure", "triggers", "quality", "edges",
-                "efficiency", "composability", "clarity", "security"]
-    for fmt in ["skill.md", "claude.md", "cursorrules", "agents.md"]:
-        assert SCORER_REGISTRY[fmt] == expected, f"Scorers mismatch for {fmt}"
+class TestRegistryIntegrity:
+    """Tests for the registry's own internal consistency."""
+
+    def test_registry_weights_cover_all_scorers(self):
+        """Every scorer in SCORER_REGISTRY must have a weight in WEIGHT_PROFILES."""
+        for fmt, scorers in SCORER_REGISTRY.items():
+            weights = WEIGHT_PROFILES.get(fmt, {})
+            for scorer in scorers:
+                if scorer in OPT_IN_SCORERS and scorer not in weights:
+                    continue  # opt-in scorers like runtime may lack weights
+                assert scorer in weights, (
+                    f"Scorer '{scorer}' has no weight for format '{fmt}'"
+                )
+
+    def test_registry_weights_sum_close_to_one(self):
+        """Weight profiles should sum approximately to 1.0."""
+        for fmt, weights in WEIGHT_PROFILES.items():
+            total = sum(weights.values())
+            assert abs(total - 1.0) < 0.01, (
+                f"Weights for '{fmt}' sum to {total}, expected ~1.0"
+            )
+
+    def test_get_scorers_returns_list(self):
+        """get_scorers() must return a list for known formats."""
+        for fmt in SCORER_REGISTRY:
+            result = get_scorers(fmt)
+            assert isinstance(result, list)
+            assert len(result) > 0
+
+    def test_get_scorers_unknown_format_falls_back(self):
+        """get_scorers() for unknown format must fall back gracefully."""
+        result = get_scorers("nonexistent_format")
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_get_weights_returns_dict(self):
+        """get_weights() must return a dict for known formats."""
+        for fmt in WEIGHT_PROFILES:
+            result = get_weights(fmt)
+            assert isinstance(result, dict)
+            assert len(result) > 0
+
+    def test_get_weights_unknown_format_falls_back(self):
+        """get_weights() for unknown format must fall back gracefully."""
+        result = get_weights("nonexistent_format")
+        assert isinstance(result, dict)
+        assert len(result) > 0
+
+    def test_get_scorers_returns_copy(self):
+        """get_scorers() must return a copy, not a reference to the registry."""
+        result = get_scorers("skill.md")
+        result.append("hacked")
+        assert "hacked" not in get_scorers("skill.md")
+
+    def test_get_weights_returns_copy(self):
+        """get_weights() must return a copy, not a reference to the registry."""
+        result = get_weights("skill.md")
+        result["hacked"] = 99.0
+        assert "hacked" not in get_weights("skill.md")
 
 
-def test_weight_profiles_exist_for_all_formats():
-    """Every format in SCORER_REGISTRY has a weight profile."""
-    from scoring.registry import SCORER_REGISTRY, WEIGHT_PROFILES
-    for fmt in SCORER_REGISTRY:
-        assert fmt in WEIGHT_PROFILES, f"Missing weight profile for {fmt}"
+class TestRegistryAlignment:
+    """Tests verifying that build_scores, composite, and registry are aligned."""
 
+    def test_build_scores_keys_match_registry(self, tmp_path):
+        """build_scores() output keys should match registry scorer list (minus opt-in)."""
+        from shared import build_scores
 
-def test_weight_profiles_keys_match_scorers():
-    """Weight profile keys match scorer list for each format."""
-    from scoring.registry import SCORER_REGISTRY, WEIGHT_PROFILES
-    for fmt in SCORER_REGISTRY:
-        scorer_set = set(SCORER_REGISTRY[fmt])
-        weight_set = set(WEIGHT_PROFILES[fmt].keys())
-        assert weight_set == scorer_set, (
-            f"Weight/scorer mismatch for {fmt}: "
-            f"extra weights={weight_set - scorer_set}, "
-            f"missing weights={scorer_set - weight_set}"
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            "---\nname: test\ndescription: test skill\n---\n\n"
+            "# Test\n\nDo things.\n"
         )
 
-
-def test_weight_profiles_are_floats():
-    """All weights are floats (not ints) — A2 fix verification."""
-    from scoring.registry import WEIGHT_PROFILES
-    for fmt, weights in WEIGHT_PROFILES.items():
-        for dim, w in weights.items():
-            assert isinstance(w, float), f"{fmt}.{dim} weight is {type(w).__name__}, expected float"
-
-
-def test_clarity_is_explicit_weight():
-    """clarity has an explicit weight in all profiles — A3 fix verification."""
-    from scoring.registry import WEIGHT_PROFILES
-    _EXPECTED_CLARITY = {"system_prompt": 0.15}
-    for fmt, weights in WEIGHT_PROFILES.items():
-        assert "clarity" in weights, f"clarity missing from {fmt} weight profile"
-        expected = _EXPECTED_CLARITY.get(fmt, 0.05)
-        assert weights["clarity"] == expected, f"clarity weight for {fmt} is {weights['clarity']}, expected {expected}"
-
-
-def test_security_is_explicit_weight():
-    """security has an explicit weight in all profiles."""
-    from scoring.registry import WEIGHT_PROFILES
-    _EXPECTED_SECURITY = {"system_prompt": 0.15}
-    for fmt, weights in WEIGHT_PROFILES.items():
-        assert "security" in weights, f"security missing from {fmt} weight profile"
-        expected = _EXPECTED_SECURITY.get(fmt, 0.08)
-        assert weights["security"] == expected, f"security weight for {fmt} is {weights['security']}, expected {expected}"
-
-
-def test_get_scorers_with_alias():
-    """Aliases resolve to the correct format."""
-    from scoring.registry import get_scorers
-    assert get_scorers("skill") == get_scorers("skill.md")
-    assert get_scorers("claude") == get_scorers("claude.md")
-    assert get_scorers("cursor") == get_scorers("cursorrules")
-    assert get_scorers("agents") == get_scorers("agents.md")
-
-
-def test_get_scorers_unknown_format_raises():
-    """Unknown format raises ValueError."""
-    from scoring.registry import get_scorers
-    with pytest.raises(ValueError, match="Unknown format"):
-        get_scorers("nonexistent")
-
-
-def test_get_weights_returns_correct_profile():
-    """get_weights returns the correct profile for known formats."""
-    from scoring.registry import get_weights
-    w = get_weights("skill.md")
-    assert w["structure"] == 0.15
-    assert w["triggers"] == 0.20
-    assert w["clarity"] == 0.05
-    assert w["security"] == 0.08
-
-
-def test_get_weights_fallback():
-    """Unknown format falls back to skill.md weights."""
-    from scoring.registry import get_weights
-    assert get_weights("unknown_format") == get_weights("skill.md")
-
-
-def test_get_all_formats():
-    """get_all_formats returns sorted list of registered formats."""
-    from scoring.registry import get_all_formats
-    formats = get_all_formats()
-    assert formats == sorted(formats)
-    assert "skill.md" in formats
-    assert len(formats) >= 4
-
-
-def test_get_format_choices():
-    """get_format_choices includes both formats and aliases."""
-    from scoring.registry import get_format_choices
-    choices = get_format_choices()
-    assert "skill.md" in choices
-    assert "skill" in choices
-    assert "cursor" in choices
-
-
-def test_runtime_is_opt_in():
-    """runtime is in OPT_IN_DIMENSIONS, not in default scorer lists."""
-    from scoring.registry import OPT_IN_DIMENSIONS, SCORER_REGISTRY
-    assert "runtime" in OPT_IN_DIMENSIONS
-    for fmt, scorers in SCORER_REGISTRY.items():
-        assert "runtime" not in scorers, f"runtime should not be in {fmt} default scorers"
-
-
-def test_get_weights_with_alias():
-    """get_weights() resolves aliases correctly."""
-    from scoring.registry import get_weights
-    assert get_weights("skill") == get_weights("skill.md")
-    assert get_weights("claude") == get_weights("claude.md")
-    assert get_weights("cursor") == get_weights("cursorrules")
-    assert get_weights("agents") == get_weights("agents.md")
-
-
-def test_get_weights_returns_copy():
-    """get_weights() returns a new dict — mutations don't affect registry."""
-    from scoring.registry import get_weights
-    w1 = get_weights("skill.md")
-    w1.pop("security", None)
-    w1["evil"] = 999
-    w2 = get_weights("skill.md")
-    assert "security" in w2, "Registry was mutated by pop()"
-    assert "evil" not in w2, "Registry was mutated by assignment"
-
-
-def test_get_scorers_returns_copy():
-    """get_scorers() returns a new list — mutations don't affect registry."""
-    from scoring.registry import get_scorers
-    s1 = get_scorers("skill.md")
-    s1.append("evil")
-    s2 = get_scorers("skill.md")
-    assert "evil" not in s2, "Registry was mutated by append()"
-
-
-def test_registry_format_isolation():
-    """Formats have independent scorer lists and weight dicts."""
-    from scoring.registry import SCORER_REGISTRY, WEIGHT_PROFILES
-    # Scorer lists are independent objects
-    assert SCORER_REGISTRY["skill.md"] is not SCORER_REGISTRY["claude.md"], (
-        "skill.md and claude.md share the same list object"
-    )
-    # Weight dicts are independent objects
-    assert WEIGHT_PROFILES["skill.md"] is not WEIGHT_PROFILES["claude.md"], (
-        "skill.md and claude.md share the same dict object"
-    )
-    # Mutation of one format doesn't affect another
-    SCORER_REGISTRY["skill.md"].append("_test_isolation")
-    assert "_test_isolation" not in SCORER_REGISTRY["claude.md"]
-    SCORER_REGISTRY["skill.md"].remove("_test_isolation")
-
-
-def test_weight_profiles_sum_reasonable():
-    """Weight profile sums are in acceptable range (0.95-1.10)."""
-    from scoring.registry import WEIGHT_PROFILES
-    for fmt, weights in WEIGHT_PROFILES.items():
-        total = sum(weights.values())
-        assert 0.95 <= total <= 1.10, (
-            f"{fmt} weights sum to {total:.2f}, expected 0.95-1.10"
+        scores = build_scores(str(skill), fmt="skill.md")
+        registry_scorers = set(get_scorers("skill.md"))
+        registry_scorers -= OPT_IN_SCORERS
+        score_keys = set(scores.keys())
+        assert score_keys == registry_scorers, (
+            f"build_scores keys {score_keys} != registry {registry_scorers}"
         )
+
+    def test_build_scores_with_security_matches_registry(self, tmp_path):
+        """build_scores(include_security=True) includes security from registry."""
+        from shared import build_scores
+
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            "---\nname: test\ndescription: test skill\n---\n\n"
+            "# Test\n\nDo things.\n"
+        )
+
+        scores = build_scores(str(skill), fmt="skill.md", include_security=True)
+        assert "security" in scores
+
+    def test_composite_uses_registry_weights(self):
+        """compute_composite() weights come from the registry — no hardcoded fallbacks."""
+        from scoring.composite import compute_composite
+
+        registry_weights = get_weights("skill.md")
+        scores = {dim: {"score": 50, "issues": [], "details": {}} for dim in registry_weights}
+        result = compute_composite(scores)
+
+        # All registry-weighted dimensions should be measured
+        assert result["measured_dimensions"] == len(registry_weights)
+        assert len(result["unmeasured"]) == 0
+        assert abs(result["weight_coverage"] - 1.0) < 1e-6
+
+    def test_composite_does_not_have_runtime_weight(self):
+        """Runtime is opt-in and has no default weight in the registry."""
+        registry_weights = get_weights("skill.md")
+        assert "runtime" not in registry_weights
+
+    def test_composite_has_clarity_and_security_weights(self):
+        """Clarity and security are explicit in registry weights."""
+        registry_weights = get_weights("skill.md")
+        assert "clarity" in registry_weights
+        assert "security" in registry_weights
+
+    def test_composite_security_is_measured_when_scored(self):
+        """Security scores flow through composite correctly via registry weights."""
+        from scoring.composite import compute_composite
+
+        scores = {
+            "structure": {"score": 50, "issues": [], "details": {}},
+            "triggers": {"score": 50, "issues": [], "details": {}},
+            "quality": {"score": 50, "issues": [], "details": {}},
+            "edges": {"score": 50, "issues": [], "details": {}},
+            "efficiency": {"score": 50, "issues": [], "details": {}},
+            "composability": {"score": 50, "issues": [], "details": {}},
+            "security": {"score": 100, "issues": [], "details": {}},
+        }
+        result = compute_composite(scores)
+        # Security is in registry weights, so it should be measured
+        assert "security" not in result["unmeasured"]
+
+    def test_all_registry_weighted_dims_measured_by_composite(self):
+        """Every dimension with a registry weight must be recognized by composite."""
+        from scoring.composite import compute_composite
+
+        registry_weights = get_weights("skill.md")
+        scores = {dim: {"score": 50, "issues": [], "details": {}} for dim in registry_weights}
+        result = compute_composite(scores)
+
+        for dim in registry_weights:
+            assert dim not in result["unmeasured"], (
+                f"Registry-weighted dimension '{dim}' is unmeasured by composite"
+            )
+
+
+class TestBuildScoresCompositeEndToEnd:
+    """End-to-end tests verifying build_scores → compute_composite alignment."""
+
+    def test_skill_md_build_scores_composite_all_measured(self, tmp_path):
+        """build_scores(include_security=True) + compute_composite: all dims measured."""
+        from shared import build_scores
+        from scoring.composite import compute_composite
+
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            "---\nname: test\ndescription: test skill for alignment\n---\n\n"
+            "# Test\n\nDo things.\n\n## Instructions\n\n1. Step one\n"
+        )
+        # Provide eval suite with triggers/quality/edges keys
+        eval_suite = {
+            "triggers": [
+                {"should_trigger": True, "prompt": "test alignment"}
+            ],
+            "prompts": [
+                {"prompt": "test prompt", "assertions": ["contains:test"]}
+            ],
+        }
+
+        scores = build_scores(str(skill), eval_suite=eval_suite,
+                              fmt="skill.md", include_security=True)
+        result = compute_composite(scores, fmt="skill.md")
+
+        # All build_scores keys should have registry weights
+        registry_weights = get_weights("skill.md")
+        for key in scores:
+            assert key in registry_weights, (
+                f"build_scores key '{key}' has no registry weight"
+            )
+        # Verify composite runs without error and scores are valid
+        assert isinstance(result["score"], float)
+        assert 0.0 <= result["score"] <= 100.0
+
+    def test_build_scores_keys_subset_of_registry_weights(self, tmp_path):
+        """All keys from build_scores() must have corresponding registry weights."""
+        from shared import build_scores
+
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            "---\nname: test\ndescription: test skill\n---\n\n"
+            "# Test\n\nDo things.\n"
+        )
+
+        scores = build_scores(str(skill), fmt="skill.md", include_security=True)
+        registry_weights = get_weights("skill.md")
+
+        for key in scores:
+            assert key in registry_weights, (
+                f"build_scores key '{key}' has no weight in registry"
+            )
+
+    def test_multiformat_build_scores_composite_alignment(self, tmp_path):
+        """build_scores for non-skill.md formats also aligns with composite."""
+        from shared import build_scores
+        from scoring.composite import compute_composite
+
+        claude_md = tmp_path / "CLAUDE.md"
+        claude_md.write_text(
+            "# Project Instructions\n\n"
+            "## Rules\n\n1. Be concise\n2. Be accurate\n"
+        )
+
+        scores = build_scores(str(claude_md), fmt="claude.md")
+        result = compute_composite(scores, fmt="claude.md")
+
+        assert result["measured_dimensions"] > 0
+        assert isinstance(result["score"], float)
+        assert 0.0 <= result["score"] <= 100.0

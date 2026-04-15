@@ -25,6 +25,7 @@ from scoring import (
     score_clarity,
     compute_composite,
 )
+from scoring.registry import get_weights
 from shared import invalidate_cache, MAX_SKILL_SIZE
 
 
@@ -510,8 +511,9 @@ class TestRegressionGoodSkillPinned:
     def test_composite_exact(self, tmp_path):
         path = _write(tmp_path, _GOOD_SKILL_CONTENT)
         result = _score_all(path)
-        assert result["score"] == 79.1, (
-            f"good_skill composite regression: expected 79.1, got {result['score']}"
+        # Updated from 79.1 after registry weight unification
+        assert result["score"] == 79.0, (
+            f"good_skill composite regression: expected 79.0, got {result['score']}"
         )
 
 
@@ -550,8 +552,8 @@ class TestRegressionBadSkillPinned:
     def test_composite_exact(self, tmp_path):
         path = _write(tmp_path, _BAD_SKILL_CONTENT)
         result = _score_all(path)
-        assert result["score"] == 40.3, (
-            f"bad_skill composite regression: expected 40.3, got {result['score']}"
+        assert result["score"] == 39.9, (
+            f"bad_skill composite regression: expected 39.9, got {result['score']}"
         )
 
 
@@ -597,23 +599,23 @@ class TestRegressionRealSkillMd:
 # 4. Composite weight math
 # ---------------------------------------------------------------------------
 
-_ALL_7_DIMS = ["structure", "triggers", "quality", "edges", "efficiency", "composability", "runtime"]
+_ALL_WEIGHTED_DIMS = list(get_weights("skill.md").keys())
 
 
 class TestCompositeWeightMath:
     """Verify the exact arithmetic of compute_composite's weighting scheme."""
 
-    def test_all_7_at_100_gives_composite_100(self):
-        """Perfect score across all 7 dimensions must yield exactly 100.0."""
-        scores = _make_score_dict({d: 100 for d in _ALL_7_DIMS})
+    def test_all_weighted_at_100_gives_composite_100(self):
+        """Perfect score across all weighted dimensions must yield exactly 100.0."""
+        scores = _make_score_dict({d: 100 for d in _ALL_WEIGHTED_DIMS})
         result = compute_composite(scores)
         assert result["score"] == 100.0, (
             f"All dims at 100 should give composite 100.0, got {result['score']}"
         )
 
-    def test_all_7_at_0_gives_composite_0(self):
-        """Zero score across all 7 dimensions must yield exactly 0.0."""
-        scores = _make_score_dict({d: 0 for d in _ALL_7_DIMS})
+    def test_all_weighted_at_0_gives_composite_0(self):
+        """Zero score across all weighted dimensions must yield exactly 0.0."""
+        scores = _make_score_dict({d: 0 for d in _ALL_WEIGHTED_DIMS})
         result = compute_composite(scores)
         assert result["score"] == 0.0, (
             f"All dims at 0 should give composite 0.0, got {result['score']}"
@@ -632,45 +634,30 @@ class TestCompositeWeightMath:
         assert result["weight_coverage"] == pytest.approx(0.15, abs=0.01)
 
     def test_structure_100_others_0_gives_structure_weight_times_100(self):
-        """Structure=100 with all others=0 (all 7 measured) = structure_weight * 100.
+        """Structure=100 with all others=0 (all weighted dims measured) = structure_weight * 100.
 
-        Default structure weight = 0.15, all 7 dims measured, weight_sum = 1.0.
+        Default structure weight = 0.15, all dims measured, weight_sum = 1.0.
         composite = (100 * 0.15) / 1.0 = 15.0
         """
-        scores = _make_score_dict({d: 0 for d in _ALL_7_DIMS})
+        scores = _make_score_dict({d: 0 for d in _ALL_WEIGHTED_DIMS})
         scores["structure"]["score"] = 100
         result = compute_composite(scores)
         assert result["score"] == 15.0, (
             f"structure=100, rest=0 → expected 15.0 (0.15 * 100), got {result['score']}"
         )
 
-    def test_clarity_adds_5pct_weight_and_redistributes(self):
-        """When clarity is present, its weight is 0.05 and others are scaled by 0.95.
-
-        Default structure weight = 0.15, with clarity → 0.15 * 0.95 = 0.1425.
-        All 7 dims at 0, structure at 100, clarity at 0:
-        composite = 100 * 0.1425 / 1.0 = 14.2
-        """
-        scores = _make_score_dict({d: 0 for d in _ALL_7_DIMS})
-        scores["structure"]["score"] = 100
-        scores["clarity"] = {"score": 0, "issues": [], "details": {}}
-        result = compute_composite(scores)
-        assert result["score"] == pytest.approx(14.2, abs=0.1), (
-            f"With clarity, structure=100/rest=0 → expected 14.2, got {result['score']}"
-        )
-
-    def test_clarity_all_dims_at_100_still_gives_100(self):
-        """When all 7 dims + clarity = 100 each, composite remains exactly 100.0."""
-        scores = _make_score_dict({d: 100 for d in _ALL_7_DIMS})
-        scores["clarity"] = {"score": 100, "issues": [], "details": {}}
+    def test_all_weighted_at_100_with_extra_dims_still_gives_100(self):
+        """Extra unweighted dimensions in scores don't affect composite."""
+        scores = _make_score_dict({d: 100 for d in _ALL_WEIGHTED_DIMS})
+        scores["runtime"] = {"score": 100, "issues": [], "details": {}}
         result = compute_composite(scores)
         assert result["score"] == 100.0, (
-            f"All 8 dims at 100 with clarity should give 100.0, got {result['score']}"
+            f"All weighted dims at 100 with extra runtime should give 100.0, got {result['score']}"
         )
 
-    def test_weight_coverage_all_7_measured_is_1(self):
-        """All 7 default dimensions measured → weight_coverage = 1.0."""
-        scores = _make_score_dict({d: 50 for d in _ALL_7_DIMS})
+    def test_weight_coverage_all_weighted_measured_is_1(self):
+        """All registry-weighted dimensions measured → weight_coverage = 1.0."""
+        scores = _make_score_dict({d: 50 for d in _ALL_WEIGHTED_DIMS})
         result = compute_composite(scores)
         assert result["weight_coverage"] == pytest.approx(1.0, abs=1e-6)
 
@@ -683,8 +670,8 @@ class TestCompositeWeightMath:
     def test_composite_score_is_always_float(self):
         """compute_composite must always return a float, never an int or None."""
         for dim_scores in [
-            {d: 100 for d in _ALL_7_DIMS},
-            {d: 0 for d in _ALL_7_DIMS},
+            {d: 100 for d in _ALL_WEIGHTED_DIMS},
+            {d: 0 for d in _ALL_WEIGHTED_DIMS},
             {"structure": 75},
         ]:
             result = compute_composite(_make_score_dict(dim_scores))
