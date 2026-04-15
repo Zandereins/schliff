@@ -1,14 +1,14 @@
 {
+  "_comment": [
+    "REFERENCE ONLY — Claude Code does not auto-discover this file.",
+    "To activate, add the hook config below to ~/.claude/settings.json",
+    "under the top-level 'hooks' key. See install.sh for instructions."
+  ],
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume|clear|compact",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$SKILL_DIR/hooks/session-injector.js\""
-          }
-        ]
+        "type": "command",
+        "command": "node ~/.claude/skills/schliff/hooks/session-injector.js"
       }
     ]
   }
