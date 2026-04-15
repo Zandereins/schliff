@@ -228,3 +228,23 @@ echo "    /schliff:init demo/bad-skill/SKILL.md   Try the demo (56 → 99)"
 echo "    /schliff:doctor                          Scan all your skills"
 echo "    /schliff:auto                            Autonomous improvement"
 echo ""
+line
+echo ""
+echo "  ${BOLD}Optional: Session hook${RESET}"
+echo ""
+echo "  Schliff can surface untriaged failures at session start."
+echo "  To enable, add this to ${BOLD}~/.claude/settings.json${RESET}:"
+echo ""
+echo '    {'
+echo '      "hooks": {'
+echo '        "SessionStart": ['
+echo '          {'
+echo '            "type": "command",'
+echo '            "command": "node ~/.claude/skills/schliff/hooks/session-injector.js"'
+echo '          }'
+echo '        ]'
+echo '      }'
+echo '    }'
+echo ""
+echo "  (Merge into existing hooks if you already have a 'hooks' key.)"
+echo ""
