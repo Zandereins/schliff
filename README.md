@@ -8,7 +8,7 @@ The quality score for AI instructions.
   <a href="https://pypi.org/project/schliff/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/schliff?style=flat-square"></a>
   <a href=".github/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json&style=flat-square"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
-  <a href="skills/schliff/scripts/score-skill.py"><img alt="Structural Score" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json&style=flat-square"></a>
+  <a href="skills/schliff/scripts/scoring/"><img alt="Structural Score" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-score.json&style=flat-square"></a>
   <a href="https://github.com/Zandereins/schliff/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/Zandereins/schliff?style=flat-square"></a>
 </p>
 
@@ -45,9 +45,10 @@ schliff demo
 | efficiency | 10% | Hedging, filler words, repetition, low signal-to-noise |
 | composability | 10% | Missing scope boundaries, no error behavior, no handoff points |
 | clarity | 5% | Contradictions, vague references, ambiguous instructions |
-| runtime | 10% | *(opt-in)* Actual Claude behavior against eval assertions |
+| security | 5% | *(opt-in)* Hardcoded secrets, unsafe commands, exposed credentials |
+| runtime | *(opt-in)* | Actual Claude behavior against eval assertions |
 
-Weights are renormalized across measured dimensions (sum to 1.0). Without `--runtime`, the 7 structural dimensions carry 100% of the score.
+Weights are renormalized across measured dimensions (sum to 1.0). Without `--runtime` and `--security`, the 7 structural dimensions carry 100% of the score.
 
 Grades: **S** (>=95) / **A** (>=85) / **B** (>=75) / **C** (>=65) / **D** (>=50) / **E** (>=35) / **F** (<35)
 
@@ -69,7 +70,16 @@ schliff doctor                           # scan all installed skills
 
 Run `schliff --help` for the full command list (`report`, `verify`, `badge`, `diff`, `compare`).
 
-### Autonomous improvement (requires Claude Code)
+### Evolution engine (LLM-powered, optional)
+
+```bash
+pip install schliff[evolve]        # adds litellm for LLM calls
+schliff evolve path/to/SKILL.md    # deterministic patches + LLM improvement loop
+```
+
+The evolution engine scores your file, generates improvements via LLM, then re-scores deterministically. Only improvements that pass all dimension guards are kept. Features: exponential backoff on API errors, EMA-based plateau detection (stops when stuck), budget tracking with per-model pricing, atomic writes with rollback.
+
+### Claude Code integration
 
 ```bash
 git clone https://github.com/Zandereins/schliff.git && bash schliff/install.sh
@@ -222,7 +232,7 @@ Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) 
 | **Anti-gaming** | None | 6 detection vectors |
 | **Memory** | Stateless | Cross-session episodic store |
 | **Dependencies** | External (ML frameworks) | Python 3.9+ stdlib only |
-| **Tests** | Minimal | [732 unit](skills/schliff/tests/unit/) + [99 integration](skills/schliff/scripts/test-integration.sh) |
+| **Tests** | Minimal | [1007 unit](skills/schliff/tests/unit/) + [99 integration](skills/schliff/scripts/test-integration.sh) |
 
 </details>
 
@@ -244,7 +254,8 @@ flowchart TB
         PARSE --> S5[Efficiency]
         PARSE --> S6[Composability]
         PARSE --> S7[Clarity]
-        S1 & S2 & S3 & S4 & S5 & S6 & S7 --> COMPOSITE[Weighted Composite + Grade]
+        PARSE --> S8[Security]
+        S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 --> COMPOSITE[Weighted Composite + Grade]
     end
 
     subgraph Loop ["Improvement Loop (Claude Code)"]
