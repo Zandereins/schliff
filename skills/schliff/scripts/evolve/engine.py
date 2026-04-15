@@ -299,6 +299,7 @@ def run_evolution(config: EvolutionConfig,
 
                 if not new_content.strip() or content_hash(new_content) == content_hash(best_content):
                     rejected += 1
+                    plateau.record_rejection()
                     if lineage:
                         lineage.log_generation(gen_num, best_composite, "rejected_identical",
                                                strategy=strategy, model=model,
@@ -322,6 +323,7 @@ def run_evolution(config: EvolutionConfig,
 
                 if not guard.passed or not sec_guard.passed:
                     rejected += 1
+                    plateau.record_rejection()
                     violations = guard.violations + sec_guard.violations
                     if verbose:
                         print(f"  Gen {gen_num}  [{strategy}/{model.split('/')[-1]}]  ——.— [—]  ——    "
@@ -335,6 +337,7 @@ def run_evolution(config: EvolutionConfig,
 
                 if new_composite <= best_composite:
                     rejected += 1
+                    plateau.record_rejection()
                     if lineage:
                         lineage.log_generation(gen_num, new_composite, "rejected_no_improvement",
                                                strategy=strategy, model=model,

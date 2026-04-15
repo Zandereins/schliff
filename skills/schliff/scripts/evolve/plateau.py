@@ -14,17 +14,27 @@ class PlateauDetector:
         window: int = 5,
         min_improvement: float = 0.5,
         alpha: float = 0.3,
+        max_consecutive_rejections: int = 10,
     ):
         self.window = window
         self.min_improvement = min_improvement
         self.alpha = alpha
+        self.max_consecutive_rejections = max_consecutive_rejections
         self.ema_delta: float = 0.0
         self.stale_count: int = 0
+        self.consecutive_rejections: int = 0
         self.previous: float | None = None
         self._escape_level: int = 0  # 0=none, 1=strategy_switch, 2=temp_bump, 3=stop
 
+    def record_rejection(self) -> None:
+        """Record a rejected generation. Consecutive rejections trigger plateau."""
+        self.consecutive_rejections += 1
+        if self.consecutive_rejections >= self.max_consecutive_rejections:
+            self.stale_count = self.window  # force plateau state
+
     def update(self, score: float) -> None:
-        """Update with a new score observation."""
+        """Update with accepted score. Resets rejection counter."""
+        self.consecutive_rejections = 0  # acceptance breaks rejection streak
         if self.previous is not None:
             delta = score - self.previous
             self.ema_delta = self.alpha * delta + (1 - self.alpha) * self.ema_delta
@@ -64,5 +74,6 @@ class PlateauDetector:
         """Full reset for a new session."""
         self.ema_delta = 0.0
         self.stale_count = 0
+        self.consecutive_rejections = 0
         self.previous = None
         self._escape_level = 0

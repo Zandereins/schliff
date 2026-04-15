@@ -66,3 +66,40 @@ class TestPlateauDetector:
         pd.reset()
         assert not pd.is_plateau
         assert pd.previous is None
+
+    def test_record_rejection_increments_counter(self):
+        pd = PlateauDetector(window=3)
+        pd.update(70.0)  # initial
+        pd.record_rejection()
+        assert pd.consecutive_rejections == 1
+
+    def test_consecutive_rejections_trigger_plateau(self):
+        pd = PlateauDetector(window=3, max_consecutive_rejections=5)
+        pd.update(70.0)
+        for _ in range(5):
+            pd.record_rejection()
+        assert pd.is_plateau
+
+    def test_acceptance_resets_rejection_counter(self):
+        pd = PlateauDetector(window=3, max_consecutive_rejections=10)
+        pd.update(70.0)
+        for _ in range(5):
+            pd.record_rejection()
+        pd.update(75.0)  # acceptance
+        assert pd.consecutive_rejections == 0
+
+    def test_rejection_plateau_uses_escape_sequence(self):
+        pd = PlateauDetector(window=2, max_consecutive_rejections=3)
+        pd.update(70.0)
+        for _ in range(3):
+            pd.record_rejection()
+        assert pd.is_plateau
+        escape = pd.get_escape_strategy()
+        assert escape == "strategy_switch"
+
+    def test_reset_clears_rejections(self):
+        pd = PlateauDetector()
+        pd.update(70.0)
+        pd.record_rejection()
+        pd.reset()
+        assert pd.consecutive_rejections == 0
