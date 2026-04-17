@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/Alen-guo__SoundScape-AI__.cursorrules-zh.md.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 59.4,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 40,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 380,
+    "budget": 500,
+    "within_budget": true,
+    "ratio": 0.76,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/cursor/Alen-guo__SoundScape-AI__.cursorrules-zh.md.cursorrules",
+  "_format_key": "cursor"
+}

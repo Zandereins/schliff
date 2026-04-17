@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/cxblovedd__etl_neo4j_health_portrait__AGENTS.MD.md",
+  "format": "agents.md",
+  "composite_score": 56.4,
+  "dimensions": {
+    "structure": 65,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 48,
+    "composability": 30,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1619,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.5396666666666666,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/cxblovedd__etl_neo4j_health_portrait__AGENTS.MD.md",
+  "_format_key": "agents"
+}

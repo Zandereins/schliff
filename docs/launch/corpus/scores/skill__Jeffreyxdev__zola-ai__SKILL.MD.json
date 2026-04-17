@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/skill/Jeffreyxdev__zola-ai__SKILL.MD.md",
+  "format": "skill.md",
+  "composite_score": 51.4,
+  "dimensions": {
+    "structure": 45,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 57,
+    "composability": 31,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 2361,
+    "budget": 1000,
+    "within_budget": false,
+    "ratio": 2.361,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/skill/Jeffreyxdev__zola-ai__SKILL.MD.md",
+  "_format_key": "skill"
+}

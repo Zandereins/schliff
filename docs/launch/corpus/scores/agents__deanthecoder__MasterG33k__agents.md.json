@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/deanthecoder__MasterG33k__agents.md.md",
+  "format": "agents.md",
+  "composite_score": 66.2,
+  "dimensions": {
+    "structure": 90,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 60,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1547,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.5156666666666667,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/deanthecoder__MasterG33k__agents.md.md",
+  "_format_key": "agents"
+}

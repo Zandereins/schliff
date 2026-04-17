@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/zixindh__shdr__Agents.md.md",
+  "format": "agents.md",
+  "composite_score": 54.4,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 35,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 151,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.050333333333333334,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/zixindh__shdr__Agents.md.md",
+  "_format_key": "agents"
+}

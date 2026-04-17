@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/skill/xunhe730__ZotPilot__SKILL.md.md",
+  "format": "skill.md",
+  "composite_score": 67.6,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 63,
+    "composability": 30,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1366,
+    "budget": 1000,
+    "within_budget": false,
+    "ratio": 1.366,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/skill/xunhe730__ZotPilot__SKILL.md.md",
+  "_format_key": "skill"
+}

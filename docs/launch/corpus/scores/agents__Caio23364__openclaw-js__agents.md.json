@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/Caio23364__openclaw-js__agents.md.md",
+  "format": "agents.md",
+  "composite_score": 61.9,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 53,
+    "composability": 36,
+    "clarity": 92
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 6308,
+    "budget": 3000,
+    "within_budget": false,
+    "ratio": 2.1026666666666665,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/agents/Caio23364__openclaw-js__agents.md.md",
+  "_format_key": "agents"
+}

@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/HenryAllen04__Life-KB__.cursorrules.md.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 56.3,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 40,
+    "composability": 25,
+    "clarity": 95
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 279,
+    "budget": 500,
+    "within_budget": true,
+    "ratio": 0.558,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/cursor/HenryAllen04__Life-KB__.cursorrules.md.cursorrules",
+  "_format_key": "cursor"
+}

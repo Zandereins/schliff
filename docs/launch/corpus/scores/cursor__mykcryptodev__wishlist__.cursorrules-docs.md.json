@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/mykcryptodev__wishlist__.cursorrules-docs.md.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 73.1,
+  "dimensions": {
+    "structure": 95,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 70,
+    "composability": 30,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 730,
+    "budget": 500,
+    "within_budget": false,
+    "ratio": 1.46,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/cursor/mykcryptodev__wishlist__.cursorrules-docs.md.cursorrules",
+  "_format_key": "cursor"
+}

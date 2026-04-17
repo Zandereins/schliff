@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/iamJpRowan__obsidian-simple-icons__.cursorrules.md.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 59.9,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 57,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 302,
+    "budget": 500,
+    "within_budget": true,
+    "ratio": 0.604,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/cursor/iamJpRowan__obsidian-simple-icons__.cursorrules.md.cursorrules",
+  "_format_key": "cursor"
+}

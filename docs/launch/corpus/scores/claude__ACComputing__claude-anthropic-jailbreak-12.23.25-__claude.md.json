@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/ACComputing__claude-anthropic-jailbreak-12.23.25-__claude.md.md",
+  "format": "claude.md",
+  "composite_score": 60.6,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 60,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 371,
+    "budget": 2000,
+    "within_budget": true,
+    "ratio": 0.1855,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/claude/ACComputing__claude-anthropic-jailbreak-12.23.25-__claude.md.md",
+  "_format_key": "claude"
+}

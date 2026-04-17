@@ -1,0 +1,18 @@
+[
+  {
+    "format": "skill",
+    "count": 30
+  },
+  {
+    "format": "claude",
+    "count": 30
+  },
+  {
+    "format": "agents",
+    "count": 30
+  },
+  {
+    "format": "cursor",
+    "count": 30
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/mherod__get-cookie__CLAUDE.md.md",
+  "format": "claude.md",
+  "composite_score": 68.6,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 62,
+    "composability": 50,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 2464,
+    "budget": 2000,
+    "within_budget": false,
+    "ratio": 1.232,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/claude/mherod__get-cookie__CLAUDE.md.md",
+  "_format_key": "claude"
+}

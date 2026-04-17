@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/olefson__EduPlat__.cursorrules.md.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 72.1,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 74,
+    "composability": 41,
+    "clarity": 92
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 2675,
+    "budget": 500,
+    "within_budget": false,
+    "ratio": 5.35,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/cursor/olefson__EduPlat__.cursorrules.md.cursorrules",
+  "_format_key": "cursor"
+}

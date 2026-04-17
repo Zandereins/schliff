@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/capnknives__WitsV3__.cursorrules.txt.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 64.2,
+  "dimensions": {
+    "structure": 80,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 52,
+    "composability": 35,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 962,
+    "budget": 500,
+    "within_budget": false,
+    "ratio": 1.924,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/cursor/capnknives__WitsV3__.cursorrules.txt.cursorrules",
+  "_format_key": "cursor"
+}
