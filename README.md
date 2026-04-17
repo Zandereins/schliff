@@ -11,7 +11,7 @@ Your AI instructions are silently degrading. Schliff catches it.
   <a href="https://github.com/Zandereins/schliff/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/Zandereins/schliff?style=flat-square"></a>
 </p>
 
-Deterministic quality scoring for AI instruction files — CLAUDE.md, SKILL.md, .cursorrules, AGENTS.md, system prompts. No LLM, no API key, same input → same score. Python 3.9+, zero dependencies.
+Deterministic quality scoring for AI instruction files — CLAUDE.md, SKILL.md, .cursorrules, AGENTS.md, system prompts. No LLM, no API key, same input → same score. Python 3.9+, **zero core dependencies** (optional `schliff[evolve]` adds litellm for the evolution loop).
 
 ```bash
 pip install schliff
@@ -24,12 +24,12 @@ schliff score path/to/SKILL.md
 
 ---
 
-> We scored 100+ public instruction files. **73% score below C.**
+> We scored 120 public instruction files. **Mean grade: D. 59% below C.**
 
-- **Triggers overlap** — agents fire on wrong tasks, nobody notices until production breaks
-- **Contradictions hide in long files** — "always X" vs "never X" buried 200 lines apart
-- **Hedging wastes tokens** — "you might want to consider" is noise that dilutes intent
-- **No eval suite means three dimensions score zero** — the most impactful ones
+- **Composability is the real weak spot** — mean 30.4/100. Agents learn what to do, rarely where to stop or hand off
+- **No companion eval suite across the corpus** — verified across 60 source repos. Three dimensions stay unmeasured, locking 45% of the score. Adding one lifts the mean **+22 points**
+- **Hedging dilutes intent** — efficiency averages 52.8/100. "You might want to consider" wastes tokens that could carry constraint
+- **Format alone doesn't save you** — AGENTS.md averages 64.8, SKILL.md 55.4. Skipping frontmatter costs ~15 points regardless of format
 
 [Read the full report →](docs/launch/state-of-ai-instructions.md)
 
@@ -167,6 +167,23 @@ Schliff detects score inflation. The [benchmark suite](benchmarks/anti-gaming/) 
 </details>
 
 <details>
+<summary><b>How it compares to other AI-instruction linters</b></summary>
+
+| | [agnix](https://github.com/agent-sh/agnix) | [AgentLinter](https://github.com/seojoonkim/agentlinter) | Schliff |
+|---|---|---|---|
+| **Approach** | 399 rules across 9 tools | 8-dim scoring + secret scan | 7-dim 0–100 composite + evolution loop |
+| **Stack** | Rust (npm/cargo/brew) | Node.js (npx) | Python 3.9+ stdlib |
+| **Core dependencies** | Rust toolchain | npm/node | **None** (core) |
+| **Output** | Pass/fail rule violations | Score + diagnostics | Composite grade + ranked fixes + auto-improve |
+| **Evolution loop** | — | — | ✅ `schliff evolve` (54→98 in 18 iter) |
+| **Anti-gaming detection** | — | — | ✅ 6 detectors |
+| **CI gate (regression)** | via action | via CLI exit | ✅ `--min-score` + `--regression` |
+
+agnix is great if you want immediate rule-based validation with zero scoring nuance. AgentLinter adds scoring but no evolution. Schliff is the only tool that gives you a deterministic composite you can gate PRs on, plus an evolution engine that closes the loop.
+
+</details>
+
+<details>
 <summary><b>How it differs from autoresearch</b></summary>
 
 Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) — but Schliff is a **linter**, not a research loop. `schliff score` runs in CI without touching the improvement loop.
@@ -177,8 +194,7 @@ Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) 
 | **Patches** | 100% LLM | 60-70% deterministic, 30-40% LLM |
 | **Scoring** | 1 metric | 7 dimensions + optional runtime |
 | **Anti-gaming** | None | 6 detection vectors |
-| **Dependencies** | ML frameworks | Python 3.9+ stdlib only |
-| **Tests** | Minimal | [1007 unit](skills/schliff/tests/unit/) + [99 integration](skills/schliff/scripts/test-integration.sh) |
+| **Dependencies** | ML frameworks | Python 3.9+ stdlib only (core) |
 
 </details>
 
