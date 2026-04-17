@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/OneCoach-org__onecoach-ui__AGENTS.MD.md",
+  "format": "agents.md",
+  "composite_score": 67.4,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 62,
+    "composability": 30,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 749,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.24966666666666668,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/OneCoach-org__onecoach-ui__AGENTS.MD.md",
+  "_format_key": "agents"
+}

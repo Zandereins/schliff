@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/skill/Aojianlong__markdown-to-feishu__skill.md.md",
+  "format": "skill.md",
+  "composite_score": 55.6,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 40,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 638,
+    "budget": 1000,
+    "within_budget": true,
+    "ratio": 0.638,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/skill/Aojianlong__markdown-to-feishu__skill.md.md",
+  "_format_key": "skill"
+}

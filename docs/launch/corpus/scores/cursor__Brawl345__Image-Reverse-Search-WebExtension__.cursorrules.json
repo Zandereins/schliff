@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/Brawl345__Image-Reverse-Search-WebExtension__.cursorrules.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 65.6,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 60,
+    "composability": 25,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 347,
+    "budget": 500,
+    "within_budget": true,
+    "ratio": 0.694,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/cursor/Brawl345__Image-Reverse-Search-WebExtension__.cursorrules.cursorrules",
+  "_format_key": "cursor"
+}

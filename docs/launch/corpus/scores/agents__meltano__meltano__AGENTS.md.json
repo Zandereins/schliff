@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/meltano__meltano__AGENTS.md.md",
+  "format": "agents.md",
+  "composite_score": 73.6,
+  "dimensions": {
+    "structure": 95,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 76,
+    "composability": 26,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 528,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.176,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/meltano__meltano__AGENTS.md.md",
+  "_format_key": "agents"
+}

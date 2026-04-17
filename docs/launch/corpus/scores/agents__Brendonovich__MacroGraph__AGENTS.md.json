@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/Brendonovich__MacroGraph__AGENTS.md.md",
+  "format": "agents.md",
+  "composite_score": 74.0,
+  "dimensions": {
+    "structure": 90,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 70,
+    "composability": 41,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1159,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.3863333333333333,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/Brendonovich__MacroGraph__AGENTS.md.md",
+  "_format_key": "agents"
+}

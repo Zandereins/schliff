@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/tailwind-ai__patriot-heavy-ops__.cursorrules.md.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 66.6,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 57,
+    "composability": 51,
+    "clarity": 92
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 3396,
+    "budget": 500,
+    "within_budget": false,
+    "ratio": 6.792,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/cursor/tailwind-ai__patriot-heavy-ops__.cursorrules.md.cursorrules",
+  "_format_key": "cursor"
+}

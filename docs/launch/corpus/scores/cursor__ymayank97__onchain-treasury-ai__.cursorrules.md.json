@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/ymayank97__onchain-treasury-ai__.cursorrules.md.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 57.1,
+  "dimensions": {
+    "structure": 65,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 61,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 645,
+    "budget": 500,
+    "within_budget": false,
+    "ratio": 1.29,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/cursor/ymayank97__onchain-treasury-ai__.cursorrules.md.cursorrules",
+  "_format_key": "cursor"
+}

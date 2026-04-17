@@ -1,0 +1,141 @@
+{
+  "n_total": 120,
+  "n_scored": 120,
+  "n_errors": 0,
+  "composite_mean": 61.69,
+  "composite_median": 62.5,
+  "composite_stdev": 9.8,
+  "grade_distribution": {
+    "B": 2,
+    "C": 47,
+    "D": 61,
+    "E": 8,
+    "F": 2
+  },
+  "pct_below_c": 59.2,
+  "pct_at_or_above_c": 40.8,
+  "pct_no_eval": 100.0,
+  "tokens_mean": 2209.4,
+  "tokens_median": 1389.5,
+  "short_files": {
+    "n": 12,
+    "avg_score": 51.27
+  },
+  "long_files": {
+    "n": 71,
+    "avg_score": 62.43
+  },
+  "dimensions": {
+    "structure": {
+      "n_measured": 120,
+      "mean": 76.54,
+      "median": 80.0
+    },
+    "triggers": {
+      "n_measured": 0,
+      "mean": null,
+      "median": null
+    },
+    "quality": {
+      "n_measured": 0,
+      "mean": null,
+      "median": null
+    },
+    "edges": {
+      "n_measured": 0,
+      "mean": null,
+      "median": null
+    },
+    "efficiency": {
+      "n_measured": 120,
+      "mean": 52.8,
+      "median": 53.0
+    },
+    "composability": {
+      "n_measured": 120,
+      "mean": 30.39,
+      "median": 30.0
+    },
+    "clarity": {
+      "n_measured": 120,
+      "mean": 97.5,
+      "median": 100.0
+    }
+  },
+  "per_format": {
+    "skill": {
+      "n": 30,
+      "avg_composite": 55.43,
+      "median_composite": 57.35
+    },
+    "cursor": {
+      "n": 30,
+      "avg_composite": 62.63,
+      "median_composite": 61.65
+    },
+    "claude": {
+      "n": 30,
+      "avg_composite": 63.87,
+      "median_composite": 64.25
+    },
+    "agents": {
+      "n": 30,
+      "avg_composite": 64.83,
+      "median_composite": 66.15
+    }
+  },
+  "top5": [
+    {
+      "file": "docs/launch/corpus/cursor/rob9206__DynoAI_3__.cursorrules.md.cursorrules",
+      "composite": 78.0,
+      "grade": "B"
+    },
+    {
+      "file": "docs/launch/corpus/agents/markov-kernel__databricks-mcp__AGENTS.md.md",
+      "composite": 75.4,
+      "grade": "B"
+    },
+    {
+      "file": "docs/launch/corpus/cursor/onigetoc__terminalx-experience__.cursorrules.md.cursorrules",
+      "composite": 74.4,
+      "grade": "C"
+    },
+    {
+      "file": "docs/launch/corpus/claude/jxcross__english-practice-streamlit__CLAUDE.md.md",
+      "composite": 74.0,
+      "grade": "C"
+    },
+    {
+      "file": "docs/launch/corpus/agents/Brendonovich__MacroGraph__AGENTS.md.md",
+      "composite": 74.0,
+      "grade": "C"
+    }
+  ],
+  "bottom5": [
+    {
+      "file": "docs/launch/corpus/agents/VCnoC__Claude-Code-Zen-mcp-Skill-Work__AGENTS.md.md",
+      "composite": 45.0,
+      "grade": "E"
+    },
+    {
+      "file": "docs/launch/corpus/skill/luofengmacheng__algorithms__skill.md.md",
+      "composite": 43.1,
+      "grade": "E"
+    },
+    {
+      "file": "docs/launch/corpus/skill/neatsarab__GAP-Design-System__Skill.md.md",
+      "composite": 37.5,
+      "grade": "E"
+    },
+    {
+      "file": "docs/launch/corpus/skill/onimisim2204430__church-digital-engagement-platform__Skill.md.md",
+      "composite": 34.0,
+      "grade": "F"
+    },
+    {
+      "file": "docs/launch/corpus/skill/SukinShetty__Nemp-memory__SKILL.md.md",
+      "composite": 0.0,
+      "grade": "F"
+    }
+  ]
+}

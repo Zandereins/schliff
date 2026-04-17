@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/adhi-thirumala__oxeye__claude.md.md",
+  "format": "claude.md",
+  "composite_score": 72.4,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 77,
+    "composability": 35,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1580,
+    "budget": 2000,
+    "within_budget": true,
+    "ratio": 0.79,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/claude/adhi-thirumala__oxeye__claude.md.md",
+  "_format_key": "claude"
+}

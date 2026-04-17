@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/alpgul__Cursorrules-Database__cursorrules_manifoldmarkets_manifold_knowledge.cursorrules.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 55.4,
+  "dimensions": {
+    "structure": 60,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 44,
+    "composability": 45,
+    "clarity": 85
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 3979,
+    "budget": 500,
+    "within_budget": false,
+    "ratio": 7.958,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/cursor/alpgul__Cursorrules-Database__cursorrules_manifoldmarkets_manifold_knowledge.cursorrules.cursorrules",
+  "_format_key": "cursor"
+}

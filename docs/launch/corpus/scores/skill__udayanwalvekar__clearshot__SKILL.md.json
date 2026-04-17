@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/skill/udayanwalvekar__clearshot__SKILL.md.md",
+  "format": "skill.md",
+  "composite_score": 53.8,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 43,
+    "composability": 16,
+    "clarity": 87
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 4273,
+    "budget": 1000,
+    "within_budget": false,
+    "ratio": 4.273,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/skill/udayanwalvekar__clearshot__SKILL.md.md",
+  "_format_key": "skill"
+}
