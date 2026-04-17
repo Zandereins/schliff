@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/jxcross__english-practice-streamlit__CLAUDE.md.md",
+  "format": "claude.md",
+  "composite_score": 74.0,
+  "dimensions": {
+    "structure": 90,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 66,
+    "composability": 45,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1022,
+    "budget": 2000,
+    "within_budget": true,
+    "ratio": 0.511,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/claude/jxcross__english-practice-streamlit__CLAUDE.md.md",
+  "_format_key": "claude"
+}

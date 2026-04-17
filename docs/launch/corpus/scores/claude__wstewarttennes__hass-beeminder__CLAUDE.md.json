@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/wstewarttennes__hass-beeminder__CLAUDE.md.md",
+  "format": "claude.md",
+  "composite_score": 67.4,
+  "dimensions": {
+    "structure": 80,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 57,
+    "composability": 45,
+    "clarity": 95
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 821,
+    "budget": 2000,
+    "within_budget": true,
+    "ratio": 0.4105,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/claude/wstewarttennes__hass-beeminder__CLAUDE.md.md",
+  "_format_key": "claude"
+}

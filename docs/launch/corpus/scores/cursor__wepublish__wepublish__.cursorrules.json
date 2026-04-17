@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/wepublish__wepublish__.cursorrules.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 66.1,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 52,
+    "composability": 35,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 658,
+    "budget": 500,
+    "within_budget": false,
+    "ratio": 1.316,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/cursor/wepublish__wepublish__.cursorrules.cursorrules",
+  "_format_key": "cursor"
+}

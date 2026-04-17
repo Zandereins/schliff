@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/skill/auyelbekov__rawq__SKILL.md.md",
+  "format": "skill.md",
+  "composite_score": 61.1,
+  "dimensions": {
+    "structure": 60,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 67,
+    "composability": 40,
+    "clarity": 95
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1270,
+    "budget": 1000,
+    "within_budget": false,
+    "ratio": 1.27,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/skill/auyelbekov__rawq__SKILL.md.md",
+  "_format_key": "skill"
+}

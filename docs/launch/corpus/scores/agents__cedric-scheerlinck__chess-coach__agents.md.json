@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/cedric-scheerlinck__chess-coach__agents.md.md",
+  "format": "agents.md",
+  "composite_score": 64.1,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 54,
+    "composability": 25,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 968,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.32266666666666666,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/cedric-scheerlinck__chess-coach__agents.md.md",
+  "_format_key": "agents"
+}

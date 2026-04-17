@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/jiaweing__youtube.pub__.claude_CLAUDE.md.md",
+  "format": "claude.md",
+  "composite_score": 70.1,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 53,
+    "composability": 50,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 2514,
+    "budget": 2000,
+    "within_budget": false,
+    "ratio": 1.257,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/claude/jiaweing__youtube.pub__.claude_CLAUDE.md.md",
+  "_format_key": "claude"
+}

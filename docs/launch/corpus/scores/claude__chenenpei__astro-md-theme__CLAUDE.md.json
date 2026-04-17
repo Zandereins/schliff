@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/chenenpei__astro-md-theme__CLAUDE.md.md",
+  "format": "claude.md",
+  "composite_score": 65.0,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 55,
+    "composability": 30,
+    "clarity": 95
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1020,
+    "budget": 2000,
+    "within_budget": true,
+    "ratio": 0.51,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/claude/chenenpei__astro-md-theme__CLAUDE.md.md",
+  "_format_key": "claude"
+}

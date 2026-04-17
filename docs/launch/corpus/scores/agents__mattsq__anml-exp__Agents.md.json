@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/mattsq__anml-exp__Agents.md.md",
+  "format": "agents.md",
+  "composite_score": 58.1,
+  "dimensions": {
+    "structure": 75,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 40,
+    "composability": 30,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1528,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.5093333333333333,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/mattsq__anml-exp__Agents.md.md",
+  "_format_key": "agents"
+}

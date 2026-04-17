@@ -6,11 +6,11 @@
 
 ## Tweet 1 — Hook
 
-AI coding agents are only as good as their instruction files. I scored 100+ public SKILL.md and CLAUDE.md files. 73% score below C. The most common problem: they tell the agent WHAT to do but never define WHEN to activate or HOW to fail. Here's what I found.
+I scored 120 public AI instruction files across 4 formats (SKILL.md, CLAUDE.md, AGENTS.md, .cursorrules). 59% grade below C. 100% ship with no eval suite — locking 45% of the possible score by construction. Here's what the data says.
 
 ## Tweet 2 — The Problem
 
-Instruction files degrade silently. Triggers overlap, instructions contradict ("always X" vs "never X"), no edge cases defined, hedging wastes tokens. There was no linter for this.
+Instruction files degrade silently. Triggers overlap, scope dissolves, edge cases stay undefined, hedging wastes tokens. Existing linters (agnix, AgentLinter) validate rule sets. Schliff scores on a 0-100 scale and closes the loop.
 
 ## Tweet 3 — The Solution
 
@@ -18,15 +18,17 @@ Schliff: deterministic quality scoring for AI instruction files. 7 dimensions. Z
 
 ## Tweet 4 — Demo
 
-A vague deployment helper goes from 54 [D] to 98 [S] in 18 autonomous iterations. Structure: 70->100. Triggers: 0->100. Quality: 0->95. Efficiency: 35->93. The scorer is the ruler. Claude is the craftsman. [DEMO GIF PLACEHOLDER]
+A vague deployment helper goes from 54 [D] to 98 [S] in 18 autonomous iterations. Structure: 70->100. Triggers: 0->100. Quality: 0->95. Efficiency: 35->93. The scorer is the ruler. Claude is the craftsman.
+
+*(Attach demo GIF when posting — `demo/schliff-demo.gif` in repo.)*
 
 ## Tweet 5 — Data
 
-The "State of AI Instructions" report: 61% of public skills score 0/100 on triggers, quality, AND edges. Average score: 47 [D]. Most common fix: adding an eval-suite unlocks 3 unmeasured dimensions. Top skills use <300 tokens with higher scores than 1000+ token files.
+State of AI Instructions (n=120): 100% ship without a companion eval suite. Adding one lifts mean score +22 points. Weakest dimension: composability (30/100). Best format: AGENTS.md (64.8). Worst: SKILL.md (55.4). Mean composite: 62 [D].
 
 ## Tweet 6 — Try It
 
-Try it in 10 seconds: pip install schliff && schliff demo. Score your files: schliff score SKILL.md. Get fixes: schliff suggest SKILL.md. Scan all skills: schliff doctor. 732 tests. MIT license. Zero dependencies.
+Try it in 10 seconds: pip install schliff && schliff demo. Score your files: schliff score SKILL.md. Get fixes: schliff suggest SKILL.md. Scan all skills: schliff doctor. MIT license. Zero dependencies.
 
 ## Tweet 7 — CTA
 

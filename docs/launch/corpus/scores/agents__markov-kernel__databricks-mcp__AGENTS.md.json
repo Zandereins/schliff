@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/markov-kernel__databricks-mcp__AGENTS.md.md",
+  "format": "agents.md",
+  "composite_score": 75.4,
+  "dimensions": {
+    "structure": 95,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 64,
+    "composability": 45,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 2079,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.693,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/markov-kernel__databricks-mcp__AGENTS.md.md",
+  "_format_key": "agents"
+}

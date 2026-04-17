@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/giobi__brain-seo-template__agents.md.md",
+  "format": "agents.md",
+  "composite_score": 71.6,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 78,
+    "composability": 31,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 1900,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.6333333333333333,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/giobi__brain-seo-template__agents.md.md",
+  "_format_key": "agents"
+}

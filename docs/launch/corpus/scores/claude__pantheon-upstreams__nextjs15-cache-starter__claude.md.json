@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/pantheon-upstreams__nextjs15-cache-starter__claude.md.md",
+  "format": "claude.md",
+  "composite_score": 68.6,
+  "dimensions": {
+    "structure": 90,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 57,
+    "composability": 35,
+    "clarity": 95
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 823,
+    "budget": 2000,
+    "within_budget": true,
+    "ratio": 0.4115,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/claude/pantheon-upstreams__nextjs15-cache-starter__claude.md.md",
+  "_format_key": "claude"
+}

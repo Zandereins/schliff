@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/rafaelcostaleite__new_blog_veloder__claude.md.md",
+  "format": "claude.md",
+  "composite_score": 55.0,
+  "dimensions": {
+    "structure": 70,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 25,
+    "composability": 40,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 10841,
+    "budget": 2000,
+    "within_budget": false,
+    "ratio": 5.4205,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/claude/rafaelcostaleite__new_blog_veloder__claude.md.md",
+  "_format_key": "claude"
+}

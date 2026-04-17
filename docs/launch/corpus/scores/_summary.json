@@ -1,0 +1,1922 @@
+[
+  {
+    "file": "docs/launch/corpus/skill/0xAstroAlpha__office-design-toolkit__SKILL.md.md",
+    "format": "skill",
+    "composite": 59.9,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 46,
+      "composability": 35,
+      "clarity": 92
+    },
+    "tokens": 7434,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/AIPMAndy__dna-memory__SKILL.md.md",
+    "format": "skill",
+    "composite": 61.5,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 61,
+      "composability": 15,
+      "clarity": 100
+    },
+    "tokens": 1243,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/Aojianlong__markdown-to-feishu__skill.md.md",
+    "format": "skill",
+    "composite": 55.6,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 638,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/CorporateSmalltalkConsultingLtd__ClaudeSmalltalk__SKILL.md.md",
+    "format": "skill",
+    "composite": 69.8,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 58,
+      "composability": 36,
+      "clarity": 100
+    },
+    "tokens": 1443,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/Jeffreyxdev__zola-ai__SKILL.MD.md",
+    "format": "skill",
+    "composite": 51.4,
+    "dims": {
+      "structure": 45,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 57,
+      "composability": 31,
+      "clarity": 100
+    },
+    "tokens": 2361,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/SukinShetty__Nemp-memory__SKILL.md.md",
+    "format": "skill",
+    "composite": 0.0,
+    "dims": {
+      "structure": 0,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 0,
+      "composability": 0,
+      "clarity": 0
+    },
+    "tokens": 52,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/Sunwood-ai-labs__draw-io-skill__SKILL.md.md",
+    "format": "skill",
+    "composite": 66.0,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 59,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 3902,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/YouMingYeh__ntu__SKILL.md.md",
+    "format": "skill",
+    "composite": 70.9,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 65,
+      "composability": 41,
+      "clarity": 100
+    },
+    "tokens": 3006,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/abracadabra50__claude-code-voice-skill__SKILL.md.md",
+    "format": "skill",
+    "composite": 65.1,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 78,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 678,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/ankushKun__pumpmyclaw__skill.md.md",
+    "format": "skill",
+    "composite": 48.1,
+    "dims": {
+      "structure": 45,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 3661,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/auyelbekov__rawq__SKILL.md.md",
+    "format": "skill",
+    "composite": 61.1,
+    "dims": {
+      "structure": 60,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 67,
+      "composability": 40,
+      "clarity": 95
+    },
+    "tokens": 1270,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/chihpao__dinner-picker__Skill.MD.md",
+    "format": "skill",
+    "composite": 48.1,
+    "dims": {
+      "structure": 55,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 320,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/hienlh__claude-skill-slack-api__skill.md.md",
+    "format": "skill",
+    "composite": 63.1,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 65,
+      "composability": 10,
+      "clarity": 100
+    },
+    "tokens": 539,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/iri-pycpt__PyCPT2-Seasonal-Forecast-User-Guide__skill.md.md",
+    "format": "skill",
+    "composite": 48.1,
+    "dims": {
+      "structure": 55,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 701,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/jackwener__xhs-cli__SKILL.md.md",
+    "format": "skill",
+    "composite": 73.0,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 62,
+      "composability": 45,
+      "clarity": 100
+    },
+    "tokens": 1108,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/jamierpond__yapi__SKILL.md.md",
+    "format": "skill",
+    "composite": 53.3,
+    "dims": {
+      "structure": 50,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 62,
+      "composability": 30,
+      "clarity": 92
+    },
+    "tokens": 3059,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/luofengmacheng__algorithms__skill.md.md",
+    "format": "skill",
+    "composite": 43.1,
+    "dims": {
+      "structure": 45,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 15,
+      "clarity": 100
+    },
+    "tokens": 137,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/majiayu000__claude-skill-registry__skills_data_raindrop_SKILL.md.md",
+    "format": "skill",
+    "composite": 68.8,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 65,
+      "composability": 25,
+      "clarity": 100
+    },
+    "tokens": 920,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/mfranzon__tdd__SKILL.md.md",
+    "format": "skill",
+    "composite": 70.9,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 85,
+      "composability": 36,
+      "clarity": 100
+    },
+    "tokens": 1284,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/na57__chinese-copyright-application-skill__SKILL.md.md",
+    "format": "skill",
+    "composite": 55.6,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 691,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/naoterumaker__japan-gyousei-data__SKILL.md.md",
+    "format": "skill",
+    "composite": 65.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 64,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 397,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/neatsarab__GAP-Design-System__Skill.md.md",
+    "format": "skill",
+    "composite": 37.5,
+    "dims": {
+      "structure": 30,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 25,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 15676,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/onimisim2204430__church-digital-engagement-platform__Skill.md.md",
+    "format": "skill",
+    "composite": 34.0,
+    "dims": {
+      "structure": 20,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 25,
+      "composability": 40,
+      "clarity": 82
+    },
+    "tokens": 7299,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/openclawfice__openclawfice__SKILL.md.md",
+    "format": "skill",
+    "composite": 59.1,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 59,
+      "composability": 15,
+      "clarity": 100
+    },
+    "tokens": 3146,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/revengerrr__clawdsign__skill.md.md",
+    "format": "skill",
+    "composite": 52.8,
+    "dims": {
+      "structure": 50,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 51,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 1500,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/trsoliu__mini-wiki__SKILL.md.md",
+    "format": "skill",
+    "composite": 64.8,
+    "dims": {
+      "structure": 70,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 43,
+      "composability": 61,
+      "clarity": 100
+    },
+    "tokens": 6071,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/udayanwalvekar__clearshot__SKILL.md.md",
+    "format": "skill",
+    "composite": 53.8,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 43,
+      "composability": 16,
+      "clarity": 87
+    },
+    "tokens": 4273,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/umami-software__react-zen__SKILL.md.md",
+    "format": "skill",
+    "composite": 48.9,
+    "dims": {
+      "structure": 35,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 53,
+      "composability": 40,
+      "clarity": 100
+    },
+    "tokens": 3294,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/xunhe730__ZotPilot__SKILL.md.md",
+    "format": "skill",
+    "composite": 67.6,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 63,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 1366,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/skill/zentai__bayes_excersice__skill.md.md",
+    "format": "skill",
+    "composite": 45.6,
+    "dims": {
+      "structure": 45,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 35,
+      "composability": 35,
+      "clarity": 90
+    },
+    "tokens": 1455,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/Alen-guo__SoundScape-AI__.cursorrules-zh.md.cursorrules",
+    "format": "cursor",
+    "composite": 59.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 380,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/Brawl345__Image-Reverse-Search-WebExtension__.cursorrules.cursorrules",
+    "format": "cursor",
+    "composite": 65.6,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 60,
+      "composability": 25,
+      "clarity": 100
+    },
+    "tokens": 347,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/HenryAllen04__Life-KB__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 56.3,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 25,
+      "clarity": 95
+    },
+    "tokens": 279,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/JoseDCV__TesisSQLi__.cursorrules.txt.cursorrules",
+    "format": "cursor",
+    "composite": 51.9,
+    "dims": {
+      "structure": 65,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 132,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/LawrenceTon__LeadGen-Factory__.cursorrules.txt.cursorrules",
+    "format": "cursor",
+    "composite": 55.6,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 109,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/Pataco80__capriati-sa-nextjs__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 58.1,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 2560,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/adamdez__dominion-ranger__.cursorrules.txt.cursorrules",
+    "format": "cursor",
+    "composite": 65.5,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 52,
+      "composability": 40,
+      "clarity": 100
+    },
+    "tokens": 6022,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/alisonc6__danish-buddy__.cursorrules.txt.cursorrules",
+    "format": "cursor",
+    "composite": 66.4,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 83,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 94,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/alpgul__Cursorrules-Database__cursorrules_manifoldmarkets_manifold_knowledge.cursorrules.cursorrules",
+    "format": "cursor",
+    "composite": 55.4,
+    "dims": {
+      "structure": 60,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 44,
+      "composability": 45,
+      "clarity": 85
+    },
+    "tokens": 3979,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/asfalots__obsidian-epub-reader__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 62.5,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 60,
+      "composability": 30,
+      "clarity": 95
+    },
+    "tokens": 1174,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/capnknives__WitsV3__.cursorrules.txt.cursorrules",
+    "format": "cursor",
+    "composite": 64.2,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 52,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 962,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/emielregis2__SmartFlowAI__.cursorrules.txt.cursorrules",
+    "format": "cursor",
+    "composite": 61.9,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 200,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/everycure-org__matrix__.cursorrules.cursorrules",
+    "format": "cursor",
+    "composite": 58.8,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 95
+    },
+    "tokens": 440,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/fredconv__base-react-template__.cursorrules.backup.cursorrules",
+    "format": "cursor",
+    "composite": 60.1,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 43,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 2056,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/iamJpRowan__obsidian-occurrences__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 64.9,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 47,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 1815,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/iamJpRowan__obsidian-simple-icons__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 59.9,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 57,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 302,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/jakelit__cash-sync__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 62.1,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 51,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 2001,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/joaosilva-source__natralha__.cursorrules.txt.cursorrules",
+    "format": "cursor",
+    "composite": 59.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 1587,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/jongchoon580325__webgallery-kim__.cursorrules.txt.cursorrules",
+    "format": "cursor",
+    "composite": 57.5,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 60,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/kay8723__CookMate-AI__.cursorrules.txt.cursorrules",
+    "format": "cursor",
+    "composite": 58.1,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 879,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/mgrossmann__libmyrtx__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 60.0,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 317,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/mykcryptodev__wishlist__.cursorrules-docs.md.cursorrules",
+    "format": "cursor",
+    "composite": 73.1,
+    "dims": {
+      "structure": 95,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 70,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 730,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/olefson__EduPlat__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 72.1,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 74,
+      "composability": 41,
+      "clarity": 92
+    },
+    "tokens": 2675,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/onigetoc__terminalx-experience__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 74.4,
+    "dims": {
+      "structure": 95,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 75,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 990,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/rob9206__DynoAI_3__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 78.0,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 91,
+      "composability": 40,
+      "clarity": 92
+    },
+    "tokens": 1143,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/sfc-gh-jkang__cortex-cost-app-spcs__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 61.4,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 38,
+      "composability": 45,
+      "clarity": 100
+    },
+    "tokens": 5924,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/simtlix__series-sample__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 66.4,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 48,
+      "composability": 50,
+      "clarity": 95
+    },
+    "tokens": 2810,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/tailwind-ai__patriot-heavy-ops__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 66.6,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 57,
+      "composability": 51,
+      "clarity": 92
+    },
+    "tokens": 3396,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/wepublish__wepublish__.cursorrules.cursorrules",
+    "format": "cursor",
+    "composite": 66.1,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 52,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 658,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/cursor/ymayank97__onchain-treasury-ai__.cursorrules.md.cursorrules",
+    "format": "cursor",
+    "composite": 57.1,
+    "dims": {
+      "structure": 65,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 61,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 645,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/ACComputing__claude-anthropic-jailbreak-12.23.25-__claude.md.md",
+    "format": "claude",
+    "composite": 60.6,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 60,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 371,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/HaschekSolutions__pictshare__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 63.6,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 72,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 916,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/JasonMaggard__wcag-audit__Claude.md.md",
+    "format": "claude",
+    "composite": 62.5,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 35,
+      "composability": 45,
+      "clarity": 100
+    },
+    "tokens": 5838,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/RyutaroYako__hackathon-template__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 65.0,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 54,
+      "composability": 36,
+      "clarity": 100
+    },
+    "tokens": 1557,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/SIGNALDECODE__deasung-kiosk-frontend__claude.md.md",
+    "format": "claude",
+    "composite": 55.6,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 1950,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/TamaEaston__frontier__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 60.9,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 26,
+      "clarity": 100
+    },
+    "tokens": 1516,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/adhi-thirumala__oxeye__claude.md.md",
+    "format": "claude",
+    "composite": 72.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 77,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 1580,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/ainavikabu-crypto__AIhimo_blog_post__claude.md.md",
+    "format": "claude",
+    "composite": 53.8,
+    "dims": {
+      "structure": 70,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 3106,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/aqeelwebbing__app__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 64.9,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 52,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 749,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/carosellagiuliano-max__claudeweb__claude.md.md",
+    "format": "claude",
+    "composite": 52.1,
+    "dims": {
+      "structure": 55,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 25,
+      "composability": 51,
+      "clarity": 100
+    },
+    "tokens": 13490,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/chatchailim__SecureGen__CLAUDE.MD.md",
+    "format": "claude",
+    "composite": 62.2,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 39,
+      "composability": 40,
+      "clarity": 100
+    },
+    "tokens": 4091,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/chenenpei__astro-md-theme__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 65.0,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 55,
+      "composability": 30,
+      "clarity": 95
+    },
+    "tokens": 1020,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/hyunolike__insurance-claims-platform__CLAUDE.MD.md",
+    "format": "claude",
+    "composite": 62.9,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 69,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 2013,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/instructure__instructure-ui__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 71.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 78,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 1696,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/jamesob__tunes__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 65.5,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 57,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 1413,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/jiaweing__youtube.pub__.claude_CLAUDE.md.md",
+    "format": "claude",
+    "composite": 70.1,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 53,
+      "composability": 50,
+      "clarity": 100
+    },
+    "tokens": 2514,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/jo-m__fluffy__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 58.1,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 35,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 263,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/jxcross__english-practice-streamlit__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 74.0,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 66,
+      "composability": 45,
+      "clarity": 100
+    },
+    "tokens": 1022,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/mariepop13__mivoa__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 71.9,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 65,
+      "composability": 45,
+      "clarity": 100
+    },
+    "tokens": 2721,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/mbadawy1__AYMB_WhatsApp__claude.md.md",
+    "format": "claude",
+    "composite": 60.5,
+    "dims": {
+      "structure": 70,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 46,
+      "composability": 41,
+      "clarity": 100
+    },
+    "tokens": 5036,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/mherod__get-cookie__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 68.6,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 62,
+      "composability": 50,
+      "clarity": 100
+    },
+    "tokens": 2464,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/ouro-ai-labs__ouro__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 68.6,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 62,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 1966,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/paidinesh7__onepager__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 57.1,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 35,
+      "composability": 50,
+      "clarity": 62
+    },
+    "tokens": 15645,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/pantheon-upstreams__nextjs15-cache-starter__claude.md.md",
+    "format": "claude",
+    "composite": 68.6,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 57,
+      "composability": 35,
+      "clarity": 95
+    },
+    "tokens": 823,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/ppf__resymf-cms__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 70.5,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 81,
+      "composability": 20,
+      "clarity": 92
+    },
+    "tokens": 532,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/rafael-sgoncalves__rafael-sgoncalves.github.io__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 67.2,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 59,
+      "composability": 25,
+      "clarity": 100
+    },
+    "tokens": 1001,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/rafaelcostaleite__new_blog_veloder__claude.md.md",
+    "format": "claude",
+    "composite": 55.0,
+    "dims": {
+      "structure": 70,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 25,
+      "composability": 40,
+      "clarity": 100
+    },
+    "tokens": 10841,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/severity1__terraform-cloud-mcp__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 60.9,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 51,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 1445,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/stibiums__terminator_task_manager__claude.md.md",
+    "format": "claude",
+    "composite": 59.2,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 47,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 2077,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/claude/wstewarttennes__hass-beeminder__CLAUDE.md.md",
+    "format": "claude",
+    "composite": 67.4,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 57,
+      "composability": 45,
+      "clarity": 95
+    },
+    "tokens": 821,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/AdventDevInc__kudu__AGENTS.md.md",
+    "format": "agents",
+    "composite": 58.1,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 35,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 163,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/Brendonovich__MacroGraph__AGENTS.md.md",
+    "format": "agents",
+    "composite": 74.0,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 70,
+      "composability": 41,
+      "clarity": 100
+    },
+    "tokens": 1159,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/Caio23364__openclaw-js__agents.md.md",
+    "format": "agents",
+    "composite": 61.9,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 53,
+      "composability": 36,
+      "clarity": 92
+    },
+    "tokens": 6308,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/FilOzone__synapse-sdk__AGENTS.md.md",
+    "format": "agents",
+    "composite": 70.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 54,
+      "composability": 50,
+      "clarity": 100
+    },
+    "tokens": 3219,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/JanDeDobbeleer__copilot-ralph__AGENTS.md.md",
+    "format": "agents",
+    "composite": 62.6,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 53,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 5169,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/KazanderDad__agent-context-seed-files__seed.AGENTS.md.md",
+    "format": "agents",
+    "composite": 68.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 61,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 1451,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/MinistryPlatform-Community__MPCustomWidgets__AGENTS.md.md",
+    "format": "agents",
+    "composite": 59.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 797,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/OneCoach-org__onecoach-ui__AGENTS.MD.md",
+    "format": "agents",
+    "composite": 67.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 62,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 749,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/PNNL-CIM-Tools__CIM-Graph__AGENTS.md.md",
+    "format": "agents",
+    "composite": 61.9,
+    "dims": {
+      "structure": 95,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 35,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 1565,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/VCnoC__Claude-Code-Zen-mcp-Skill-Work__AGENTS.md.md",
+    "format": "agents",
+    "composite": 45.0,
+    "dims": {
+      "structure": 50,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 25,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 7177,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/bnomei__kirby-mcp__AGENTS.md.md",
+    "format": "agents",
+    "composite": 59.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 813,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/byteowlz__eaRS__AGENTS.md.md",
+    "format": "agents",
+    "composite": 66.1,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 67,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 798,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/canning1295__ClipDownloader__Agents.md.md",
+    "format": "agents",
+    "composite": 70.1,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 58,
+      "composability": 45,
+      "clarity": 100
+    },
+    "tokens": 3453,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/cedric-scheerlinck__chess-coach__agents.md.md",
+    "format": "agents",
+    "composite": 64.1,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 54,
+      "composability": 25,
+      "clarity": 100
+    },
+    "tokens": 968,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/constROD__template-hono-prisma-kysely__AGENTS.md.md",
+    "format": "agents",
+    "composite": 68.4,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 76,
+      "composability": 30,
+      "clarity": 95
+    },
+    "tokens": 796,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/cxblovedd__etl_neo4j_health_portrait__AGENTS.MD.md",
+    "format": "agents",
+    "composite": 56.4,
+    "dims": {
+      "structure": 65,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 48,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 1619,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/deanthecoder__MasterG33k__agents.md.md",
+    "format": "agents",
+    "composite": 66.2,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 60,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 1547,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/giobi__brain-seo-template__agents.md.md",
+    "format": "agents",
+    "composite": 71.6,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 78,
+      "composability": 31,
+      "clarity": 100
+    },
+    "tokens": 1900,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/gordonwatts__sx_training_fetch__Agents.md.md",
+    "format": "agents",
+    "composite": 51.9,
+    "dims": {
+      "structure": 65,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 142,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/hexlet-codebattle__codebattle__AGENTS.md.md",
+    "format": "agents",
+    "composite": 73.3,
+    "dims": {
+      "structure": 95,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 77,
+      "composability": 26,
+      "clarity": 95
+    },
+    "tokens": 818,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/kdubois__kubernetes-aiops-agent__agents.md.md",
+    "format": "agents",
+    "composite": 73.3,
+    "dims": {
+      "structure": 80,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 78,
+      "composability": 45,
+      "clarity": 100
+    },
+    "tokens": 1491,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/markov-kernel__databricks-mcp__AGENTS.md.md",
+    "format": "agents",
+    "composite": 75.4,
+    "dims": {
+      "structure": 95,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 64,
+      "composability": 45,
+      "clarity": 100
+    },
+    "tokens": 2079,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/mattsq__anml-exp__Agents.md.md",
+    "format": "agents",
+    "composite": 58.1,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 1528,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/maxcountryman__underway__AGENTS.md.md",
+    "format": "agents",
+    "composite": 72.1,
+    "dims": {
+      "structure": 95,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 66,
+      "composability": 30,
+      "clarity": 100
+    },
+    "tokens": 1728,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/meltano__meltano__AGENTS.md.md",
+    "format": "agents",
+    "composite": 73.6,
+    "dims": {
+      "structure": 95,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 76,
+      "composability": 26,
+      "clarity": 100
+    },
+    "tokens": 528,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/onethree7__Easy-Edit-ee__agents.md.md",
+    "format": "agents",
+    "composite": 64.2,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 52,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 843,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/surajfale__surajfale__AGENTS.MD.md",
+    "format": "agents",
+    "composite": 69.2,
+    "dims": {
+      "structure": 90,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 57,
+      "composability": 35,
+      "clarity": 100
+    },
+    "tokens": 852,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/usnistgov__AFL-automation__AGENTS.md.md",
+    "format": "agents",
+    "composite": 59.4,
+    "dims": {
+      "structure": 85,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 40,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 381,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/zHanyo__ultimate-setup__Agents.md.md",
+    "format": "agents",
+    "composite": 68.6,
+    "dims": {
+      "structure": 95,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 62,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 864,
+    "error": null
+  },
+  {
+    "file": "docs/launch/corpus/agents/zixindh__shdr__Agents.md.md",
+    "format": "agents",
+    "composite": 54.4,
+    "dims": {
+      "structure": 75,
+      "triggers": -1,
+      "quality": -1,
+      "edges": -1,
+      "efficiency": 35,
+      "composability": 20,
+      "clarity": 100
+    },
+    "tokens": 151,
+    "error": null
+  }
+]

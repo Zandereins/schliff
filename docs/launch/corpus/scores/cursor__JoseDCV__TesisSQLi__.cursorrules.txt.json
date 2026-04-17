@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/JoseDCV__TesisSQLi__.cursorrules.txt.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 51.9,
+  "dimensions": {
+    "structure": 65,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 40,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 132,
+    "budget": 500,
+    "within_budget": true,
+    "ratio": 0.264,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/cursor/JoseDCV__TesisSQLi__.cursorrules.txt.cursorrules",
+  "_format_key": "cursor"
+}

@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/VCnoC__Claude-Code-Zen-mcp-Skill-Work__AGENTS.md.md",
+  "format": "agents.md",
+  "composite_score": 45.0,
+  "dimensions": {
+    "structure": 50,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 25,
+    "composability": 30,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 7177,
+    "budget": 3000,
+    "within_budget": false,
+    "ratio": 2.392333333333333,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/agents/VCnoC__Claude-Code-Zen-mcp-Skill-Work__AGENTS.md.md",
+  "_format_key": "agents"
+}

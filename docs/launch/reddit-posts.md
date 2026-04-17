@@ -1,25 +1,26 @@
 # Reddit Launch Posts
 
-> Prepared 2026-03-30. Copy-paste ready. Adjust tone/length per subreddit norms.
+> Prepared 2026-03-30, refreshed 2026-04-17. Copy-paste ready. Adjust tone/length per subreddit norms.
 
 ---
 
 ## Post 1 — r/ClaudeAI
 
-**Title:** I built a linter for SKILL.md and CLAUDE.md files — scored 100+ public skills, 73% are below C
+**Title:** Most public SKILL.md / CLAUDE.md files are broken — I scored 120 of them and the fix lifts the average +22 points
 
 **Body:**
 
-If you use CLAUDE.md or SKILL.md files with Claude Code, you've probably noticed they degrade over time. Instructions contradict each other, sections bloat, critical constraints get buried. The agent still follows them — just worse.
+If you use CLAUDE.md or SKILL.md files with Claude Code, you've probably noticed they degrade over time. Instructions drift, scope boundaries disappear, critical constraints get buried. The agent still follows them — just worse.
 
 I built **[schliff](https://github.com/Zandereins/schliff)** — a deterministic quality scorer for AI instruction files. It analyzes SKILL.md, CLAUDE.md, .cursorrules, and AGENTS.md across 7 dimensions (structure, triggers, quality, edges, efficiency, composability, clarity) using static analysis (TF-IDF heuristics, sqrt density curves, antonym pair detection, entropy analysis). No LLM in the scoring path.
 
-**Surprising findings from scoring 100+ public skills:**
+**Findings from scoring 120 public files (30 per format):**
 
-- 73% of public SKILL.md files score below C grade — most lose points on contradiction detection and structural coherence
-- Files with more than 800 lines almost always score worse than shorter, focused ones
-- Copy-pasted boilerplate is the #1 score killer — TF-IDF catches repeated low-signal phrases instantly
-- The gap between a D-grade and S-grade file is usually 4-6 targeted edits, not a rewrite
+- **100% of files ship without an eval suite** — three dimensions (triggers, quality, edges) stay unmeasured, locking 45% of the possible composite
+- **59% grade below C.** Mean composite: 61.7 (median 62.5)
+- **Composability is the real weak spot** — mean 30.4 of 100 across the corpus. Files tell agents what to do, almost never where to stop
+- **AGENTS.md files score highest on average (64.8); SKILL.md lowest (55.4)** — structured formats don't help if frontmatter is skipped
+- The gap between a D-grade and S-grade file is usually 4-6 targeted edits, not a rewrite — start with an eval suite
 
 **How to try it:**
 
@@ -34,7 +35,7 @@ The autonomous improvement loop (via `/schliff:auto` in Claude Code) can take a 
 
 There's also a pre-commit hook and GitHub Action for CI integration, so scores can't silently regress.
 
-**Stats:** 732 tests, zero dependencies (pure Python stdlib), MIT license, Python 3.9+.
+**Stats:** Zero dependencies (pure Python stdlib), MIT license, Python 3.9+.
 
 Happy to score anyone's SKILL.md or CLAUDE.md live in the comments — just paste a link.
 
@@ -42,7 +43,7 @@ Happy to score anyone's SKILL.md or CLAUDE.md live in the comments — just past
 
 ## Post 2 — r/Python
 
-**Title:** schliff: a zero-dependency Python CLI that lints AI instruction files (SKILL.md, CLAUDE.md, .cursorrules) — 732 tests, stdlib only
+**Title:** schliff: a zero-dependency Python CLI that lints AI instruction files (SKILL.md, CLAUDE.md, .cursorrules) — stdlib only
 
 **Body:**
 
@@ -72,7 +73,7 @@ schliff suggest SKILL.md                   # ranked fixes with impact estimates
 - Pre-commit hook: see `schliff verify` with `--min-score` and `--regression`
 - GitHub Action available for CI gating
 
-732 tests, Python 3.9+, MIT licensed. Feedback on the architecture welcome — especially if you've built similar stdlib-only analysis tools.
+Python 3.9+, MIT licensed. Feedback on the architecture welcome — especially if you've built similar stdlib-only analysis tools.
 
 GitHub: https://github.com/Zandereins/schliff
 
@@ -102,16 +103,17 @@ AI coding agents (Claude Code, Cursor, Copilot) rely on natural-language instruc
    - Contradictory instruction injection
    - Structure mimicry without substance
 
-**Key findings from scoring 100+ public instruction files:**
+**Key findings from scoring 120 public instruction files (30 per format: SKILL.md, CLAUDE.md, AGENTS.md, .cursorrules):**
 
-- Instruction quality follows a power law — a small number of files are well-structured, the vast majority are not
-- Contradiction rate increases roughly linearly with file length beyond ~500 lines
-- Files maintained by single authors score significantly higher on structural coherence than committee-edited files
+- 100% of files ship without an eval suite — three dimensions (triggers, quality, edges) stay locked at zero, so 45% of the possible composite weight is unmeasured by default
+- Mean composite is 61.7 (median 62.5); 59% grade below C. Grade distribution is concentrated at D (50.8%) with a thin tail at B (1.7%) and no A or S files in the corpus
+- Composability is the weakest measured dimension (mean 30.4/100). Structure (76.5) and clarity (97.5) score well; scope definition does not
+- Format does matter: AGENTS.md averages 64.8, CLAUDE.md 63.9, .cursorrules 62.6, SKILL.md 55.4
 
 The scoring methodology is documented in detail: [docs/SCORING.md](https://github.com/Zandereins/schliff/blob/main/docs/SCORING.md)
 
 The autonomous improvement loop iterates edits against the deterministic scorer until convergence — demonstrated improvements from 54/100 to 98/100 on real-world files.
 
-732 tests, zero dependencies, pure Python stdlib, MIT license.
+Zero dependencies, pure Python stdlib, MIT license.
 
 GitHub: https://github.com/Zandereins/schliff
