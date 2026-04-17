@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/emielregis2__SmartFlowAI__.cursorrules.txt.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 61.9,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 40,
+    "composability": 30,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 200,
+    "budget": 500,
+    "within_budget": true,
+    "ratio": 0.4,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/cursor/emielregis2__SmartFlowAI__.cursorrules.txt.cursorrules",
+  "_format_key": "cursor"
+}

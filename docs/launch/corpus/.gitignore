@@ -1,0 +1,8 @@
+# Raw third-party content (re-fetchable via scripts/launch/collect_corpus.py)
+# License of individual files varies by source repo — not bundled under Schliff's MIT.
+skill/*.md
+skill/*.cursorrules
+claude/*.md
+agents/*.md
+cursor/*.cursorrules
+cursor/*.md

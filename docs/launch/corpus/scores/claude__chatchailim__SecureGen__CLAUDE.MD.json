@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/claude/chatchailim__SecureGen__CLAUDE.MD.md",
+  "format": "claude.md",
+  "composite_score": 62.2,
+  "dimensions": {
+    "structure": 80,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 39,
+    "composability": 40,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 4091,
+    "budget": 2000,
+    "within_budget": false,
+    "ratio": 2.0455,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/claude/chatchailim__SecureGen__CLAUDE.MD.md",
+  "_format_key": "claude"
+}

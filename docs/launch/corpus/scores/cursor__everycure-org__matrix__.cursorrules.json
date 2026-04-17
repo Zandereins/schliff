@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/everycure-org__matrix__.cursorrules.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 58.8,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 40,
+    "composability": 20,
+    "clarity": 95
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 440,
+    "budget": 500,
+    "within_budget": true,
+    "ratio": 0.88,
+    "severity": "warning"
+  },
+  "_file": "docs/launch/corpus/cursor/everycure-org__matrix__.cursorrules.cursorrules",
+  "_format_key": "cursor"
+}

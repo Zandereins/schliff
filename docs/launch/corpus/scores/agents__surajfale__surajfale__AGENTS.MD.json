@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/surajfale__surajfale__AGENTS.MD.md",
+  "format": "agents.md",
+  "composite_score": 69.2,
+  "dimensions": {
+    "structure": 90,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 57,
+    "composability": 35,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 852,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.284,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/surajfale__surajfale__AGENTS.MD.md",
+  "_format_key": "agents"
+}

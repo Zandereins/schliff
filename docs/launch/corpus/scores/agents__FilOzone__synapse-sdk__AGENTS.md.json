@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/FilOzone__synapse-sdk__AGENTS.md.md",
+  "format": "agents.md",
+  "composite_score": 70.4,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 54,
+    "composability": 50,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 3219,
+    "budget": 3000,
+    "within_budget": false,
+    "ratio": 1.073,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/agents/FilOzone__synapse-sdk__AGENTS.md.md",
+  "_format_key": "agents"
+}

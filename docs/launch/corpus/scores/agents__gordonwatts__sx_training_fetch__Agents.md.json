@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/gordonwatts__sx_training_fetch__Agents.md.md",
+  "format": "agents.md",
+  "composite_score": 51.9,
+  "dimensions": {
+    "structure": 65,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 40,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 142,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.04733333333333333,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/gordonwatts__sx_training_fetch__Agents.md.md",
+  "_format_key": "agents"
+}

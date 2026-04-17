@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/cursor/simtlix__series-sample__.cursorrules.md.cursorrules",
+  "format": "cursorrules",
+  "composite_score": 66.4,
+  "dimensions": {
+    "structure": 80,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 48,
+    "composability": 50,
+    "clarity": 95
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 2810,
+    "budget": 500,
+    "within_budget": false,
+    "ratio": 5.62,
+    "severity": "over"
+  },
+  "_file": "docs/launch/corpus/cursor/simtlix__series-sample__.cursorrules.md.cursorrules",
+  "_format_key": "cursor"
+}

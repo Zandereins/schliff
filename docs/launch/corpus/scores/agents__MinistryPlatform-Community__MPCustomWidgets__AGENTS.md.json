@@ -1,0 +1,26 @@
+{
+  "skill_path": "/Users/franzpaul/schliff/docs/launch/corpus/agents/MinistryPlatform-Community__MPCustomWidgets__AGENTS.md.md",
+  "format": "agents.md",
+  "composite_score": 59.4,
+  "dimensions": {
+    "structure": 85,
+    "triggers": -1,
+    "quality": -1,
+    "edges": -1,
+    "efficiency": 40,
+    "composability": 20,
+    "clarity": 100
+  },
+  "warnings": [
+    "4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges"
+  ],
+  "token_budget": {
+    "tokens": 797,
+    "budget": 3000,
+    "within_budget": true,
+    "ratio": 0.26566666666666666,
+    "severity": "ok"
+  },
+  "_file": "docs/launch/corpus/agents/MinistryPlatform-Community__MPCustomWidgets__AGENTS.md.md",
+  "_format_key": "agents"
+}
