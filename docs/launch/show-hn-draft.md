@@ -12,11 +12,13 @@ I didn't know about this until I saw schliff in their Acknowledgements section.
 
 Schliff is a deterministic quality scorer for AI instruction files -- CLAUDE.md, .cursorrules, AGENTS.md, SKILL.md. It evaluates 7 dimensions (structure, triggers, quality, edges, efficiency, composability, clarity) using Python 3.9+ stdlib only. No LLM, no API key, scores in milliseconds.
 
+Other linters for AI configs exist -- agnix validates 399 rules across 9 tools, AgentLinter scores across 8 dimensions. Schliff's angle is different: a 0-100 composite you can gate PRs on, plus an evolution engine that closes the loop (score → patch → re-score → stop when plateaued). It's the only tool I've found that combines all three.
+
 What it catches: copy-paste blocks that inflate scores without adding signal (one file dropped from 94 to 43 after dedup), "always X" vs "never X" contradictions hiding across sections, hedging language that wastes tokens, missing scope boundaries that cause agents to hallucinate responsibilities. It detects 6 gaming vectors so scores reflect actual quality, not surface polish.
 
 The optional evolution engine (`pip install schliff[evolve]`) applies deterministic patches first, then uses an LLM for what rules can't fix. A demo file went from 54 to 98 in 18 iterations.
 
-We scored 100+ public instruction files -- 73% grade below C.
+We scored 120 public instruction files (30 each of SKILL.md, CLAUDE.md, AGENTS.md, .cursorrules) -- 59% grade below C, mean composite 62. We then checked the 120 source repos for any eval-suite or companion test file; zero of 60 sampled repos shipped one. Adding a perfect eval suite would lift the mean by +22 points and move 87% of files to B or better. The weakest measured dimension is composability (mean 30.4/100) -- files tell agents what to do, almost never define scope or handoff.
 
 MIT licensed: https://github.com/Zandereins/schliff
 
@@ -34,7 +36,7 @@ Ruff checks syntax and style of *code*. Schliff scores the *semantic quality* of
 
 ### 2. "This seems over-engineered for a markdown file"
 
-It would be, if these files stayed small. In practice, team-maintained instruction files grow to 500-2000 lines over months. At that scale, contradictions creep in, sections get copy-pasted between projects, and nobody audits whether directives still make sense together. The 73% below-C finding is not because people write bad instructions -- it is because nobody has tooling to catch the decay.
+It would be, if these files stayed small. In practice, team-maintained instruction files grow to 500-2000 lines over months. At that scale, contradictions creep in, sections get copy-pasted between projects, and nobody audits whether directives still make sense together. The 59% below-C finding is not because people write bad instructions -- it is because nobody has tooling to catch the decay. The 100% eval-suite gap is the starker number: every file in the public corpus has three dimensions left unmeasured.
 
 ### 3. "Why deterministic instead of LLM-based scoring?"
 
