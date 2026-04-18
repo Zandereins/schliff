@@ -3,6 +3,12 @@
 All notable changes to Schliff are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [7.1.1] - 2026-04-18
+
+### Fixed
+- **List-marker support in actionable-line patterns**: `_RE_ACTIONABLE_LINES` and three sibling patterns (`_RE_RUN_PATTERN`, `_RE_DIFF_SIGNAL`, `_RE_IMPERATIVE_INSTRUCTION`) previously only matched numbered list prefixes (`1. Run X`) or bare imperatives, silently dropping markdown bullets (`- Run X`, `* Use Y`, `+ Install Z`). A shared `_LIST_MARKER` alternation is now applied to all four. Impact on a real public CLAUDE.md (root file merged into `modelcontextprotocol/servers`): efficiency 57 → 64, composite 59.2 → 61.0.
+- **10 new regression and false-positive tests** in `TestListMarkerSupport` covering supported markers, bare-imperative regression, nested indentation, word-boundary guards, and marker-without-verb cases. Full suite: 1017 passed (up from 1007).
+
 ## [7.1.0] - 2026-03-27
 
 ### Added
