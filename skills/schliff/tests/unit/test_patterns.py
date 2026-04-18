@@ -511,3 +511,89 @@ class TestEfficiencyDedup:
         content = "Run the build\nRUN the build\nrun the build\n"
         # All match 'Run'/'RUN'/'run', lowercase[:60] -> all 'run'
         assert self._count_actionable(content) == 1
+
+
+# ---------------------------------------------------------------------------
+# 8. List-marker support in _RE_ACTIONABLE_LINES
+# ---------------------------------------------------------------------------
+
+class TestListMarkerSupport:
+    """Tests for leading markdown list-marker support in _RE_ACTIONABLE_LINES.
+
+    Markdown documents commonly list actionable steps as bullet items
+    (`- Install X`, `* Use Y`) or numbered items (`1. Run Z`). The pattern
+    must match both styles so imperatives aren't silently dropped for
+    files that prefer bullets over numbers.
+
+    These tests exercise the production per-line match loop from
+    efficiency.py (line 50), which differs from the dedup helper above
+    in that it matches against `line.strip()` and dedups on full-line
+    content rather than on the captured verb token.
+    """
+
+    def _count_actionable_via_match(self, content: str) -> int:
+        """Replicate efficiency.py's production per-line match loop."""
+        seen = set()
+        for line in content.split("\n"):
+            if _RE_ACTIONABLE_LINES.match(line.strip()):
+                seen.add(line.strip().lower()[:80])
+        return len(seen)
+
+    # --- Supported list markers ---
+
+    def test_numbered_list_imperatives_match(self):
+        content = "1. Run the build\n2. Install deps\n"
+        assert self._count_actionable_via_match(content) == 2
+
+    def test_dash_bullet_imperatives_match(self):
+        content = "- Run the build\n- Install deps\n"
+        assert self._count_actionable_via_match(content) == 2
+
+    def test_asterisk_bullet_imperatives_match(self):
+        content = "* Run the build\n* Install deps\n"
+        assert self._count_actionable_via_match(content) == 2
+
+    def test_plus_bullet_imperatives_match(self):
+        content = "+ Run the build\n+ Install deps\n"
+        assert self._count_actionable_via_match(content) == 2
+
+    # --- Regression: bare imperatives still work ---
+
+    def test_bare_imperatives_still_match(self):
+        content = "Run the build\nInstall deps\n"
+        assert self._count_actionable_via_match(content) == 2
+
+    # --- Nested lists (strip removes leading whitespace) ---
+
+    def test_indented_bullet_imperatives_match(self):
+        content = "  - Run the build\n    - Install deps\n"
+        assert self._count_actionable_via_match(content) == 2
+
+    # --- False-positive guards ---
+
+    def test_bullet_without_space_does_not_match(self):
+        """A '-' with no whitespace after is not a list marker."""
+        content = "-Run the build\n"
+        assert self._count_actionable_via_match(content) == 0
+
+    def test_bullet_without_imperative_does_not_match(self):
+        """List marker alone is not enough — verb must follow."""
+        content = "- The build pipeline is fast\n* A description line\n"
+        assert self._count_actionable_via_match(content) == 0
+
+    def test_word_boundary_prevents_partial_match(self):
+        """'Running' must not match 'Run' due to \\b."""
+        content = "- Running tests takes time\n"
+        assert self._count_actionable_via_match(content) == 0
+
+    # --- Mixed content ---
+
+    def test_mixed_markers_and_prose(self):
+        content = (
+            "This skill analyzes code.\n"
+            "- Run the score script to get results.\n"
+            "1. Check the issues list for details.\n"
+            "* Install any missing deps first.\n"
+            "The output shows dimension scores.\n"
+        )
+        assert self._count_actionable_via_match(content) == 3

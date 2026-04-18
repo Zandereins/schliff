@@ -48,8 +48,12 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Efficiency patterns
 # ---------------------------------------------------------------------------
+# Leading list marker: numbered ("1. ", "12. ") OR bullet ("- ", "* ", "+ ").
+# Applied as an optional prefix so bare imperatives still match.
+_LIST_MARKER = r"(?:\d+\.\s*|[-*+]\s+)?"
+
 _RE_ACTIONABLE_LINES = re.compile(
-    r"^(?:\d+\.\s*)?(?:Read|Run|Check|Create|Add|Remove|Move|Use|Set|"
+    r"^" + _LIST_MARKER + r"(?:Read|Run|Check|Create|Add|Remove|Move|Use|Set|"
     r"Install|Configure|Deploy|Test|Verify|Build|Start|Stop|Open|Save|"
     r"Copy|Delete|Write|Edit|Update|Generate|Execute|Validate|Parse|"
     r"Extract|Transform|Import|Export|Send|Fetch|Call|Return|"
@@ -90,7 +94,7 @@ _RE_AMBIGUOUS_PRONOUN = re.compile(
     r"^\s*(It|This|That)\s+(is|does|will|can|should|has|was|means)\b"
 )
 _RE_RUN_PATTERN = re.compile(
-    r"^\s*(?:\d+\.\s*)?(?:Run|Execute|Install|Configure)\s+(.+)", re.IGNORECASE
+    r"^\s*" + _LIST_MARKER + r"(?:Run|Execute|Install|Configure)\s+(.+)", re.IGNORECASE
 )
 _RE_CONCEPTUAL = re.compile(
     r"(?i)(baseline|all\s+\d+|VERIFY|evolution|"
@@ -198,7 +202,7 @@ _RE_SEC_BOUNDARY_VIOLATION = re.compile(
 # Diff patterns
 # ---------------------------------------------------------------------------
 _RE_DIFF_SIGNAL = re.compile(
-    r"^(?:\d+\.\s*)?(?:Read|Run|Check|Create|Add|Remove|Move|Use|Set|"
+    r"^" + _LIST_MARKER + r"(?:Read|Run|Check|Create|Add|Remove|Move|Use|Set|"
     r"Install|Configure|Deploy|Test|Verify|Build|Start|Stop|Open|Save|"
     r"Copy|Delete|Write|Edit|Update|Generate|Execute|Validate|Parse|"
     r"Extract|Transform|Import|Export|Send|Fetch|Call|Return)\b",
@@ -218,7 +222,7 @@ _RE_DIFF_NOISE = re.compile(
 # Coherence patterns
 # ---------------------------------------------------------------------------
 _RE_IMPERATIVE_INSTRUCTION = re.compile(
-    r"^\s*(?:\d+\.\s*)?(?:Run|Create|Add|Check|Remove|Move|Use|Set|Install|"
+    r"^\s*" + _LIST_MARKER + r"(?:Run|Create|Add|Check|Remove|Move|Use|Set|Install|"
     r"Configure|Deploy|Test|Verify|Build|Start|Stop|Open|Save|Copy|Delete|"
     r"Write|Edit|Update|Generate|Execute|Validate|Parse|Extract|Transform|"
     r"Import|Export|Send|Fetch|Call|Return)\b(.+)",
