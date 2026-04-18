@@ -19,7 +19,7 @@ schliff score path/to/SKILL.md
 
 ```text
 $ schliff score demo/bad-skill/SKILL.md
-schliff v7.1.0
+schliff v7.1.1
 
   structure      ███████░░░   70/100  fair
   efficiency     ████░░░░░░   35/100  poor
@@ -146,7 +146,7 @@ schliff verify path/to/SKILL.md --min-score 75 --regression
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/Zandereins/schliff
-    rev: v7.1.0
+    rev: v7.1.1
     hooks:
       - id: schliff-verify
         args: ['--min-score', '75']
