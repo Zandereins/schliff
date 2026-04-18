@@ -49,6 +49,12 @@ schliff v7.1.0
 
 ---
 
+## Seen in the wild
+
+A root `CLAUDE.md` written for [`modelcontextprotocol/servers`](https://github.com/modelcontextprotocol/servers/pull/3733) (Anthropic's official MCP reference repo) merged to main on April 17th, 2026. Running schliff on it returned **59.2/100 at 40% weight coverage** — a useful measurement of where the file actually needed work and where the scorer was structurally unfair for a project-root document. [Full walkthrough →](https://fpaul.dev/writing/scoring-my-own-mcp-contribution/)
+
+---
+
 ## What the data says
 
 > We scored 120 public instruction files across 60 source repos. **Mean grade: D. 59% below C.** Adding one companion eval suite lifts the mean **+22 points**.
