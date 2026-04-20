@@ -21,11 +21,8 @@ import score_skill as scorer
 import skill_mesh
 
 from scoring.formats import detect_format
-from shared import estimate_token_cost
+from shared import EXCLUDED_DIRS, estimate_token_cost
 from terminal_art import score_to_grade, grade_colored
-
-# Directories to skip during instruction file discovery
-_EXCLUDED_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__"}
 
 # Filenames to match (lowercase) for instruction file discovery
 _INSTRUCTION_FILENAMES = {"claude.md", ".cursorrules", "agents.md"}
@@ -45,7 +42,7 @@ def discover_instruction_files(root_dir: str) -> list[dict]:
     results: list[dict] = []
     for dirpath, dirs, files in os.walk(root_dir):
         # Skip excluded directories in-place
-        dirs[:] = [d for d in dirs if d not in _EXCLUDED_DIRS]
+        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
         for fname in files:
             if fname.lower() in _INSTRUCTION_FILENAMES:
                 full_path = os.path.join(dirpath, fname)
