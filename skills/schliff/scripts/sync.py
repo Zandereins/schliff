@@ -13,17 +13,11 @@ from difflib import SequenceMatcher
 from typing import Dict, List, Tuple
 
 # Import from shared (same directory)
-from shared import read_skill_safe, strip_frontmatter
+from shared import EXCLUDED_DIRS, read_skill_safe, strip_frontmatter
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-# Directories to skip during discovery (common non-source dirs)
-_EXCLUDED_DIRS: frozenset[str] = frozenset({
-    ".git", "node_modules", "venv", ".venv",
-    "__pycache__", ".tox", "dist", "build", ".eggs",
-})
 
 # Basename → format mapping (all comparisons are case-insensitive)
 _INSTRUCTION_FILES: dict[str, str] = {
@@ -95,7 +89,7 @@ def discover_all_instruction_files(repo_root: str) -> List[Dict]:
     Returns a sorted list of dicts:
         {"path": str, "format": str, "relative_path": str}
 
-    Directories in ``_EXCLUDED_DIRS`` are pruned in-place so
+    Directories in ``EXCLUDED_DIRS`` are pruned in-place so
     ``os.walk`` never descends into them.
     """
     root = os.path.abspath(repo_root)
@@ -105,7 +99,7 @@ def discover_all_instruction_files(repo_root: str) -> List[Dict]:
         # Prune excluded directories in-place (modifying dirnames[:])
         dirnames[:] = [
             d for d in dirnames
-            if d not in _EXCLUDED_DIRS
+            if d not in EXCLUDED_DIRS
         ]
 
         for fname in filenames:

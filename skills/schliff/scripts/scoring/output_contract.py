@@ -10,70 +10,21 @@ import re
 from shared import read_skill_safe
 
 # ---------------------------------------------------------------------------
-# Pattern imports — primary source is patterns.system_prompt (built in
-# parallel). If it doesn't exist yet, fall back to inline definitions.
+# Pattern imports — canonical source is patterns.system_prompt (+ base).
 # ---------------------------------------------------------------------------
-try:
-    from scoring.patterns.system_prompt import (
-        _RE_SP_CODE_BLOCK_REGION,
-        _RE_SP_ERROR_RESPONSE,
-        _RE_SP_EXAMPLE_OUTPUT,
-        _RE_SP_FORBIDDEN_CONTENT,
-        _RE_SP_FORMAT_SPEC,
-        _RE_SP_LENGTH_CONSTRAINT,
-        _RE_SP_REQUIRED_FIELDS,
-        _RE_SP_RESPONSE_STRUCTURE,
-        _RE_SP_SCHEMA_DEF,
-        _RE_SP_TONE_VOICE,
-        _RE_SP_VALIDATION_INSTRUCTION,
-    )
-except ImportError:
-    # Inline fallback — mirrors the spec exactly.
-    _RE_SP_FORMAT_SPEC = re.compile(
-        r"(?i)(respond (in|with|as)|format (as|your)|output (as|in|format)"
-        r"|return (JSON|XML|YAML|markdown|plain text|HTML|CSV))"
-    )
-    _RE_SP_LENGTH_CONSTRAINT = re.compile(
-        r"(?i)(max(imum)?\s+\d+\s+(words?|tokens?|sentences?|characters?"
-        r"|paragraphs?|lines?)"
-        r"|keep.{0,20}(short|brief|concise|under \d+)"
-        r"|limit.{0,20}(to \d+|length))"
-    )
-    _RE_SP_TONE_VOICE = re.compile(
-        r"(?i)(tone:|voice:|style:|speak (as|like)|write (in|with) a"
-        r"|formal|informal|professional|friendly|technical|casual|authoritative)"
-    )
-    _RE_SP_SCHEMA_DEF = re.compile(
-        r'(?i)("type":\s*"|fields?:|properties:|required:|schema:)'
-    )
-    _RE_SP_REQUIRED_FIELDS = re.compile(
-        r"(?i)(must include|required fields?"
-        r"|always include|every response (must|should) (have|contain|include))"
-    )
-    _RE_SP_FORBIDDEN_CONTENT = re.compile(
-        r"(?i)(never (include|mention|output|say|generate|reveal)"
-        r"|do not (include|mention|output|reveal|disclose)"
-        r"|forbidden:|prohibited:|exclude:)"
-    )
-    _RE_SP_RESPONSE_STRUCTURE = re.compile(
-        r"(?i)(first[,.]|then[,.]|finally[,.]|step \d"
-        r"|begin (with|by)|end (with|by)|start (with|by)"
-        r"|your response should (start|begin|end))"
-    )
-    _RE_SP_ERROR_RESPONSE = re.compile(
-        r"(?i)(if .{0,40}(error|fail|unknown|unclear|can'?t|unable)"
-        r"|when .{0,30}(error|fail)"
-        r"|error (response|format|message)|on (error|failure))"
-    )
-    _RE_SP_VALIDATION_INSTRUCTION = re.compile(
-        r"(?i)(verify|validate|check|ensure|confirm)"
-        r".{0,30}(before (respond|return|output)|your (response|output|answer))"
-    )
-    _RE_SP_EXAMPLE_OUTPUT = re.compile(
-        r"(?i)(example (output|response)|sample (output|response)"
-        r"|here'?s what .{0,20}(look|should)|expected (output|response))"
-    )
-    _RE_SP_CODE_BLOCK_REGION = re.compile(r"```[\s\S]*?```")
+from scoring.patterns.base import _RE_CODE_BLOCK_REGION as _RE_SP_CODE_BLOCK_REGION
+from scoring.patterns.system_prompt import (
+    _RE_SP_ERROR_RESPONSE,
+    _RE_SP_EXAMPLE_OUTPUT,
+    _RE_SP_FORBIDDEN_CONTENT,
+    _RE_SP_FORMAT_SPEC,
+    _RE_SP_LENGTH_CONSTRAINT,
+    _RE_SP_REQUIRED_FIELDS,
+    _RE_SP_RESPONSE_STRUCTURE,
+    _RE_SP_SCHEMA_DEF,
+    _RE_SP_TONE_VOICE,
+    _RE_SP_VALIDATION_INSTRUCTION,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -138,14 +89,13 @@ def _count_schema_fields(text: str) -> int:
 # ---------------------------------------------------------------------------
 
 def score_output_contract(
-    skill_path: str, content: str | None = None, **kw: object,
+    skill_path: str, content: str | None = None,
 ) -> dict:
     """Score the output contract definition of a system prompt.
 
     Args:
         skill_path: Path to the system prompt file.
         content: Raw content string (optional, avoids re-reading file).
-        **kw: Additional keyword arguments (forward compat).
 
     Returns:
         dict with keys: score (int 0-100), issues (list[str]),
