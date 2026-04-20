@@ -58,7 +58,11 @@ def test_edge_case_without_category_field_does_not_crash():
 
 
 def test_edge_case_category_as_integer_does_not_crash():
-    """A non-string category value (int) must not crash .startswith() logic."""
+    """A non-string category value (int) must not crash .startswith() logic.
+
+    HOST-004: the scorer must robustly ignore non-string category entries so
+    malformed user-authored eval-suites cannot wedge `schliff score`.
+    """
     suite = {
         "edge_cases": [
             {
@@ -68,16 +72,18 @@ def test_edge_case_category_as_integer_does_not_crash():
             }
         ]
     }
-    # score_edges must either skip the bad entry gracefully or raise a
-    # well-typed error. Current implementation treats falsy/empty as missing.
-    # An int is truthy and will crash on .startswith(). We accept either:
-    # - a clean dict result (implementation handles it), or
-    # - a TypeError/AttributeError (documented failure mode).
-    try:
-        result = score_edges("dummy.md", suite)
-        assert isinstance(result, dict)
-    except (TypeError, AttributeError):
-        pytest.skip("score_edges does not coerce non-string category (documented)")
+    # Must not raise. The non-string category is skipped, so it counts as
+    # no known-category coverage.
+    result = score_edges("dummy.md", suite)
+    assert isinstance(result, dict)
+    assert isinstance(result["score"], int)
+    # 42 is not a string, so it never entered the category set -> no
+    # known-category coverage credited.
+    assert result["details"]["known_categories_covered"] == []
+    assert "no_known_categories" in result["issues"]
+    # Sorted categories list must be JSON-serializable (no TypeError from
+    # comparing int and str).
+    assert isinstance(result["details"]["categories"], list)
 
 
 # ---------------------------------------------------------------------------
