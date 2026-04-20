@@ -12,75 +12,21 @@ import re
 from shared import read_skill_safe
 
 # ---------------------------------------------------------------------------
-# Pattern imports — primary source is patterns.system_prompt (built in
-# parallel). If it doesn't exist yet, fall back to inline definitions.
+# Pattern imports — canonical source is patterns.system_prompt (+ base).
 # ---------------------------------------------------------------------------
-try:
-    from scoring.patterns.system_prompt import (
-        _RE_SP_AMBIGUITY_HANDLING,
-        _RE_SP_CODE_BLOCK_REGION,
-        _RE_SP_EDGE_CASES,
-        _RE_SP_EMPTY_INPUT,
-        _RE_SP_ERROR_HANDLING,
-        _RE_SP_GRACEFUL_DEGRADE,
-        _RE_SP_LANGUAGE_LOCALE,
-        _RE_SP_MULTI_TURN,
-        _RE_SP_NONOBVIOUS_EXAMPLE,
-        _RE_SP_OFF_TOPIC,
-        _RE_SP_RATE_LIMIT,
-    )
-except ImportError:
-    # Inline fallback — mirrors the spec exactly.
-    _RE_SP_ERROR_HANDLING = re.compile(
-        r"(?i)(if .{0,30}(error|fail|invalid|wrong|broken|missing)"
-        r"|when .{0,20}(error|fail)"
-        r"|error (handling|response|behavior))"
-    )
-    _RE_SP_EDGE_CASES = re.compile(
-        r"(?i)(edge case|corner case|special case|exception"
-        r"|unusual (input|case|situation)"
-        r"|if (the|an?) (input|request|query) is (empty|blank|missing|malformed))"
-    )
-    _RE_SP_AMBIGUITY_HANDLING = re.compile(
-        r"(?i)(if (unclear|ambiguous|vague|confusing|uncertain)"
-        r"|when (you'?re?|the (intent|meaning) is) (unsure|unclear|not sure|uncertain)"
-        r"|ask (for|the user for) clarification)"
-    )
-    _RE_SP_OFF_TOPIC = re.compile(
-        r"(?i)(off.?topic|out of scope|unrelated (question|request|topic)"
-        r"|not (within|in) (your|the) (scope|domain)"
-        r"|if (the user|someone) asks? (about|for) .{0,30}(unrelated|outside))"
-    )
-    _RE_SP_MULTI_TURN = re.compile(
-        r"(?i)(follow.?up|conversation (history|context)"
-        r"|previous (message|turn|question)"
-        r"|referring (back|to earlier)|maintain context"
-        r"|remember (earlier|previous|the))"
-    )
-    _RE_SP_LANGUAGE_LOCALE = re.compile(
-        r"(?i)(language:|respond in \w+"
-        r"|if .{0,20}(another|different|foreign) language"
-        r"|locale|translation|multilingual|english only)"
-    )
-    _RE_SP_EMPTY_INPUT = re.compile(
-        r"(?i)(empty (input|message|query|request)"
-        r"|blank (input|message)|null"
-        r"|no (input|message|content) (provided|given|received)"
-        r"|if .{0,20}(nothing|empty))"
-    )
-    _RE_SP_RATE_LIMIT = re.compile(
-        r"(?i)(rate limit|too many (requests?|calls?)"
-        r"|throttl|quota|if .{0,30}(exceed|limit|cap))"
-    )
-    _RE_SP_GRACEFUL_DEGRADE = re.compile(
-        r"(?i)(graceful(ly)?\s+(fail|degrad|handle)"
-        r"|best effort|partial (response|result)"
-        r"|if .{0,30}(can'?t fully|unable to complete|partial))"
-    )
-    _RE_SP_NONOBVIOUS_EXAMPLE = re.compile(
-        r"(?i)(example|e\.g\.)"
-    )
-    _RE_SP_CODE_BLOCK_REGION = re.compile(r"```[\s\S]*?```")
+from scoring.patterns.base import _RE_CODE_BLOCK_REGION as _RE_SP_CODE_BLOCK_REGION
+from scoring.patterns.system_prompt import (
+    _RE_SP_AMBIGUITY_HANDLING,
+    _RE_SP_EDGE_CASES,
+    _RE_SP_EMPTY_INPUT,
+    _RE_SP_ERROR_HANDLING,
+    _RE_SP_GRACEFUL_DEGRADE,
+    _RE_SP_LANGUAGE_LOCALE,
+    _RE_SP_MULTI_TURN,
+    _RE_SP_NONOBVIOUS_EXAMPLE,
+    _RE_SP_OFF_TOPIC,
+    _RE_SP_RATE_LIMIT,
+)
 
 
 # ---------------------------------------------------------------------------
