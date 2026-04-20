@@ -41,17 +41,28 @@ class TestContentHash:
 
 class TestGradeFromScore:
     def test_grades(self):
+        # Aligned with terminal_art.score_to_grade — single source of truth.
         assert grade_from_score(95.0) == "S"
         assert grade_from_score(85.0) == "A"
         assert grade_from_score(75.0) == "B"
         assert grade_from_score(65.0) == "C"
         assert grade_from_score(50.0) == "D"
-        assert grade_from_score(49.9) == "F"
+        # 49.9 now lands in the E band (35-49), not F (REG-001 fix).
+        assert grade_from_score(49.9) == "E"
+        assert grade_from_score(35.0) == "E"
+        assert grade_from_score(42.0) == "E"
+        assert grade_from_score(34.9) == "F"
 
     def test_boundary(self):
         assert grade_from_score(94.9) == "A"
         assert grade_from_score(100.0) == "S"
         assert grade_from_score(0.0) == "F"
+
+    def test_matches_terminal_art(self):
+        """grade_from_score must match terminal_art.score_to_grade exactly."""
+        from terminal_art import score_to_grade
+        for s in [-10, 0, 20, 34.9, 35, 42, 49.9, 50, 64, 65, 74, 75, 84, 85, 94, 95, 100, 110]:
+            assert grade_from_score(s) == score_to_grade(s), f"divergence at {s}"
 
 class TestScoreToThreshold:
     def test_grade_strings(self):
@@ -113,6 +124,11 @@ class TestGradeEdgeCases:
 
     def test_score_above_100(self):
         assert grade_from_score(105) == "S"
+
+    def test_e_band(self):
+        """Scores 35-49 map to E (REG-001: aligned with terminal_art)."""
+        assert grade_from_score(35) == "E"
+        assert grade_from_score(49) == "E"
 
 class TestScoreToThresholdEdgeCases:
     def test_lowercase_grades(self):
