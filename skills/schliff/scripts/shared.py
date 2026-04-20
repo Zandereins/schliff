@@ -39,6 +39,13 @@ VALID_DIMENSIONS = {
     "security",
 }
 
+# Directories to skip during discovery (common non-source dirs).
+# Shared by sync.py, doctor.py, and any future tree walkers.
+EXCLUDED_DIRS = frozenset({
+    ".git", "node_modules", ".venv", "venv", "__pycache__",
+    ".tox", "dist", "build", ".eggs",
+})
+
 # --- Regex for description extraction ---
 _RE_DESC_BLOCK = re.compile(
     r"^description:\s*[>|]-?\s*\n((?:[ \t]+.+\n)*)", re.MULTILINE
