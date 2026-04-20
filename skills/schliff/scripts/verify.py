@@ -22,6 +22,8 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from terminal_art import score_to_grade
+
 # History file: one JSON object per line
 _DEFAULT_HISTORY = ".schliff/history.jsonl"
 _DEFAULT_MIN_SCORE = 75.0
@@ -53,26 +55,11 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
 
     return {
         "composite": composite["score"],
-        "grade": _score_to_grade(composite["score"]),
+        "grade": score_to_grade(composite["score"]),
         "dimensions": {k: v["score"] for k, v in scores.items()},
         "warnings": composite["warnings"],
         "score_type": composite.get("score_type", "structural"),
     }
-
-
-def _score_to_grade(score: float) -> str:
-    """Map score to grade letter."""
-    if score >= 95:
-        return "S"
-    if score >= 85:
-        return "A"
-    if score >= 75:
-        return "B"
-    if score >= 65:
-        return "C"
-    if score >= 50:
-        return "D"
-    return "F"
 
 
 def load_last_score(skill_path: str, history_path: str = _DEFAULT_HISTORY) -> Optional[float]:
