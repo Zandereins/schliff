@@ -113,14 +113,13 @@ def _count_nonobvious_examples(text: str) -> int:
 # ---------------------------------------------------------------------------
 
 def score_completeness(
-    skill_path: str, content: str | None = None, **kw: object,
+    skill_path: str, content: str | None = None,
 ) -> dict:
     """Score the completeness of a system prompt.
 
     Args:
         skill_path: Path to the system prompt file.
         content: Raw content string (optional, avoids re-reading file).
-        **kw: Additional keyword arguments (forward compat).
 
     Returns:
         dict with keys: score (int 0-100), issues (list[str]),
