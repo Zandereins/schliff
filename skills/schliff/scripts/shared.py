@@ -452,6 +452,14 @@ def validate_command_safety(cmd: str) -> tuple[bool, str]:
 
     Returns (is_safe, reason). Always checks blocklist + metacharacters,
     even for allowlisted prefixes. Allowlist is necessary but not sufficient.
+
+    NOTE: Currently not invoked by any runtime code path. Every
+    ``subprocess.run(...)`` call in this codebase uses the list-form with
+    hardcoded arguments, so there is no user-supplied command string to
+    validate. This function is a reserved guardrail for future features
+    that may execute user-supplied commands (e.g., custom eval-suite
+    runners, plug-in scorers). Do not delete without adding a replacement
+    for those future code paths. See CONTRIBUTING.md.
     """
     cmd_stripped = cmd.strip()
     if not cmd_stripped:

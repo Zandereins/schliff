@@ -101,7 +101,7 @@ All tests must pass before submitting a PR.
 
 ## Security
 
-- Use `shared.validate_command_safety()` before executing any user-supplied commands
+- Use `shared.validate_command_safety()` before executing any user-supplied commands (currently reserved, not yet wired — see shared.py docstring)
 - Use `shared.validate_regex_complexity()` before any user-supplied regex
 - Use `shared.read_skill_safe()` for all file reads (enforces 1MB size limit)
 - Never execute commands from eval-suite content without validation
