@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0"]
+requires = ["setuptools>=68.0,<81"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -42,9 +42,22 @@ Changelog = "https://github.com/Zandereins/schliff/blob/main/CHANGELOG.md"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["skills*"]
+exclude = ["skills*.tests", "skills*.tests.*", "tests", "tests.*"]
 
 [tool.setuptools.package-data]
 "skills" = ["**/*.md", "**/*.json", "**/*.sh", "**/*.js", "**/*.yml"]
+
+[tool.setuptools.exclude-package-data]
+"*" = [
+    "tests/**",
+    "tests/**/*",
+    "**/tests/**",
+    "**/tests/**/*",
+    "**/test_*.py",
+    "**/test-*.sh",
+    "scripts/test-integration.sh",
+    "scripts/test-self.sh",
+]
 
 [tool.ruff]
 target-version = "py39"
