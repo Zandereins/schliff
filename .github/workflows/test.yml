@@ -156,6 +156,7 @@ jobs:
           elif [ "$(echo "$SCORE >= 75" | bc -l)" -eq 1 ]; then GRADE="B";
           elif [ "$(echo "$SCORE >= 65" | bc -l)" -eq 1 ]; then GRADE="C";
           elif [ "$(echo "$SCORE >= 50" | bc -l)" -eq 1 ]; then GRADE="D";
+          elif [ "$(echo "$SCORE >= 35" | bc -l)" -eq 1 ]; then GRADE="E";
           else GRADE="F"; fi
           echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
 
