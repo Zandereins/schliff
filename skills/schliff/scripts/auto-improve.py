@@ -43,32 +43,11 @@ import score_skill as scorer
 import text_gradient as gradient_mod
 from shared import load_eval_suite
 
-# Optional imports — use underscore aliases where available
-_MISSING_MODULES: list[tuple[str, str]] = []
-
-try:
-    import achievements as achievements_mod
-except ImportError as e:
-    achievements_mod = None
-    _MISSING_MODULES.append(("achievements", str(e)))
-
-try:
-    import episodic_store
-except ImportError as e:
-    episodic_store = None
-    _MISSING_MODULES.append(("episodic_store", str(e)))
-
-try:
-    import meta_report
-except ImportError as e:
-    meta_report = None
-    _MISSING_MODULES.append(("meta_report", str(e)))
-
-try:
-    import parallel_runner
-except ImportError as e:
-    parallel_runner = None
-    _MISSING_MODULES.append(("parallel_runner", str(e)))
+# Sibling modules — same directory, no external deps, always importable.
+import achievements as achievements_mod
+import episodic_store
+import meta_report
+import parallel_runner
 
 
 # --- State Management ---
@@ -270,9 +249,6 @@ def _should_stop(state: list[dict], current_score: dict) -> tuple[bool, str]:
 
 def _should_trigger_parallel(state: list[dict], current_score: dict) -> bool:
     """Check if parallel branching should be triggered."""
-    if parallel_runner is None:
-        return False
-
     # Count consecutive discards at end of state
     consecutive_discards = 0
     for entry in reversed(state):
@@ -342,26 +318,25 @@ def run_auto_improve(
     if verbose:
         print(f"Baseline: {baseline['composite']}/100 ({baseline['measured']} dims)", file=sys.stderr)
 
-    # Recall relevant episodes if available
-    if episodic_store and not dry_run:
+    # Recall relevant episodes
+    if not dry_run:
         episodes = episodic_store.recall(f"improve skill {Path(skill_path).parent.name}", top_k=3)
         if episodes and verbose:
             print(f"Recalled {len(episodes)} relevant past episodes", file=sys.stderr)
 
-    # Predict best strategy if available
+    # Predict best strategy
     predicted_strategies = None
-    if meta_report:
-        try:
-            prediction = meta_report.predict_best_strategy(
-                baseline["dimensions"],
-                skill_domain=Path(skill_path).parent.name,
-            )
-            if prediction.get("available") and prediction.get("predictions"):
-                predicted_strategies = [p["strategy"] for p in prediction["predictions"]]
-                if verbose:
-                    print(f"Predicted best strategies: {predicted_strategies[:3]}", file=sys.stderr)
-        except Exception as e:
-            print(f"Warning: strategy prediction failed: {e}", file=sys.stderr)
+    try:
+        prediction = meta_report.predict_best_strategy(
+            baseline["dimensions"],
+            skill_domain=Path(skill_path).parent.name,
+        )
+        if prediction.get("available") and prediction.get("predictions"):
+            predicted_strategies = [p["strategy"] for p in prediction["predictions"]]
+            if verbose:
+                print(f"Predicted best strategies: {predicted_strategies[:3]}", file=sys.stderr)
+    except Exception as e:
+        print(f"Warning: strategy prediction failed: {e}", file=sys.stderr)
 
     _loop_start = time.monotonic()
     current_score = baseline
@@ -537,7 +512,7 @@ def run_auto_improve(
         state.append(entry)
 
         # Emit episode for cross-session learning
-        if episodic_store and not dry_run:
+        if not dry_run:
             try:
                 episodic_store.store_episode(
                     skill=Path(skill_path).parent.name,
@@ -585,10 +560,6 @@ def main():
     # Resume is implicit: state is loaded from auto-improve-state.jsonl if it exists
     args = parser.parse_args()
 
-    if _MISSING_MODULES:
-        for mod_name, mod_err in _MISSING_MODULES:
-            print(f"Warning: {mod_name} unavailable: {mod_err}", file=sys.stderr)
-
     if not Path(args.skill_path).exists():
         print(f"Error: {args.skill_path} not found", file=sys.stderr)
         sys.exit(1)
@@ -622,7 +593,7 @@ def main():
             print(f"  (dry run \u2014 no changes written)")
 
         # Check and display achievements
-        if achievements_mod and not summary['dry_run']:
+        if not summary['dry_run']:
             try:
                 skill_content = Path(summary['skill_path']).read_text(encoding="utf-8")
                 _name_m = re.search(r"^name:\s*(.+?)$", skill_content, re.MULTILINE)
