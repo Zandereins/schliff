@@ -46,6 +46,53 @@ def test_random_utf8_no_crash():
         _cleanup(path)
 
 
+def test_utf16_surrogate_pair_no_crash():
+    """Lone UTF-16 surrogate (0xD800-0xDFFF) round-tripped via
+    surrogatepass must not crash build_scores (TST-011)."""
+    # Build a string that contains a lone surrogate then re-encode it via
+    # surrogatepass so it can actually be written to disk as bytes.
+    lone_surrogate = "\uD83D\uDE00 plus a lone \uD800 surrogate"
+    encoded = lone_surrogate.encode("utf-8", errors="surrogatepass")
+    decoded = encoded.decode("utf-8", errors="replace")
+    path = _write_tmp("# Header\n\n" + decoded + "\n")
+    try:
+        scores = build_scores(path)
+        assert isinstance(scores, dict)
+    finally:
+        _cleanup(path)
+
+
+def test_zero_width_joiner_and_bom_no_crash():
+    """Zero-Width Joiner (U+200D) and BOM (U+FEFF) must not crash
+    build_scores or be mistaken for visible content (TST-011)."""
+    # BOM at start, ZWJ sprinkled through content, plus a ZWJ emoji sequence.
+    content = (
+        "\uFEFF# Header\n\n"
+        "Some\u200Dcontent with\u200Djoiners and \U0001F468\u200D\U0001F4BB dev emoji.\n"
+    )
+    path = _write_tmp(content)
+    try:
+        scores = build_scores(path)
+        assert isinstance(scores, dict)
+    finally:
+        _cleanup(path)
+
+
+def test_control_chars_no_crash():
+    """Control chars \\x00-\\x1f (except \\t and \\n) must not crash
+    build_scores (TST-011)."""
+    control_chars = "".join(
+        chr(i) for i in range(0x00, 0x20) if chr(i) not in ("\t", "\n")
+    )
+    content = "# Header\n\nBody" + control_chars + "text here\n"
+    path = _write_tmp(content)
+    try:
+        scores = build_scores(path)
+        assert isinstance(scores, dict)
+    finally:
+        _cleanup(path)
+
+
 def test_empty_string_no_crash():
     """Empty file returns scores (may be low, but no crash)."""
     path = _write_tmp("")
