@@ -60,6 +60,11 @@ def score_edges(skill_path: str, eval_suite: Optional[dict]) -> dict:
     found_categories = set()
     for ec in edge_cases:
         cat = ec.get("category", "")
+        # Defensive: eval-suites are user-authored JSON; non-string category
+        # values (ints, nulls, lists) must not crash the scorer. Coerce to str
+        # and skip anything that collapses to empty.
+        if not isinstance(cat, str):
+            continue
         if cat:
             found_categories.add(cat)
 
