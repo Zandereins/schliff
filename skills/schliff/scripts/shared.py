@@ -88,6 +88,8 @@ def read_skill_safe(skill_path: str) -> str:
         return _file_cache[key]
     if not p.exists():
         raise FileNotFoundError(f"Skill file not found: {skill_path}")
+    if p.is_dir():
+        raise ValueError(f"Skill path is a directory, not a file: {skill_path}")
     content = p.read_text(encoding="utf-8", errors="replace")
     if len(content) > MAX_SKILL_SIZE:
         raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
