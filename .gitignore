@@ -27,6 +27,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# Claude Code session artifacts (hooks spawn agents in worktrees here)
+.claude/worktree-*.json
+.claude/worktrees/
+
 # Test artifacts
 .coverage
 .coverage.*
