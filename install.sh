@@ -15,7 +15,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION=$(grep -E '^version\s*=' "${SCRIPT_DIR}/pyproject.toml" 2>/dev/null | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+VERSION=$(grep -E '^version[[:space:]]*=' "${SCRIPT_DIR}/pyproject.toml" 2>/dev/null | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 : "${VERSION:=unknown}"
 SKILLS_SRC="$SCRIPT_DIR/skills/schliff"
 COMMANDS_SRC="$SCRIPT_DIR/commands/schliff"
