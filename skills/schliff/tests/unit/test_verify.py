@@ -92,7 +92,7 @@ class TestScoreSkill:
 
     def test_returns_grade(self, good_skill):
         result = verify_mod._score_skill(good_skill)
-        assert result["grade"] in ("S", "A", "B", "C", "D", "F")
+        assert result["grade"] in ("S", "A", "B", "C", "D", "E", "F")
 
     def test_returns_dimensions(self, good_skill):
         result = verify_mod._score_skill(good_skill)
@@ -107,18 +107,21 @@ class TestScoreSkill:
 
 
 # ---------------------------------------------------------------------------
-# _score_to_grade
+# score_to_grade (imported from terminal_art)
 # ---------------------------------------------------------------------------
 
 class TestScoreToGrade:
-    def test_grades(self):
-        assert verify_mod._score_to_grade(100) == "S"
-        assert verify_mod._score_to_grade(95) == "S"
-        assert verify_mod._score_to_grade(90) == "A"
-        assert verify_mod._score_to_grade(80) == "B"
-        assert verify_mod._score_to_grade(70) == "C"
-        assert verify_mod._score_to_grade(55) == "D"
-        assert verify_mod._score_to_grade(30) == "F"
+    def test_grades_via_verify(self):
+        # verify.py re-exports terminal_art.score_to_grade; spot-check
+        # that _score_skill's grade field maps through consistently.
+        from terminal_art import score_to_grade
+        assert score_to_grade(100) == "S"
+        assert score_to_grade(95) == "S"
+        assert score_to_grade(90) == "A"
+        assert score_to_grade(80) == "B"
+        assert score_to_grade(70) == "C"
+        assert score_to_grade(55) == "D"
+        assert score_to_grade(30) == "F"
 
 
 # ---------------------------------------------------------------------------

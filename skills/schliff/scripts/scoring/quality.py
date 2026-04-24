@@ -15,6 +15,21 @@ from typing import Optional
 from scoring.coherence import score_coherence
 
 
+def _assertion_dicts(tc: dict) -> list:
+    """Return only dict-typed assertions from tc['assertions'].
+
+    Returns [] if tc is not a dict, tc['assertions'] is missing, or
+    tc['assertions'] is not a list. Malformed non-dict items in the list are
+    silently filtered. Defensive because eval-suites are user-authored JSON.
+    """
+    if not isinstance(tc, dict):
+        return []
+    asserts = tc.get("assertions", [])
+    if not isinstance(asserts, list):
+        return []
+    return [a for a in asserts if isinstance(a, dict)]
+
+
 def score_quality(skill_path: str, eval_suite: Optional[dict]) -> dict:
     """Score eval suite quality — static analysis of test case coverage.
 
@@ -31,6 +46,10 @@ def score_quality(skill_path: str, eval_suite: Optional[dict]) -> dict:
         return {"score": -1, "issues": ["no_eval_suite_test_cases"], "details": {}}
 
     test_cases = eval_suite["test_cases"]
+    if not isinstance(test_cases, list):
+        return {"score": -1, "issues": ["invalid_test_cases_type"], "details": {}}
+    # Normalize: only dict test-cases survive. Malformed items silently skipped.
+    test_cases = [tc for tc in test_cases if isinstance(tc, dict)]
     if not test_cases:
         return {"score": -1, "issues": ["empty_test_cases"], "details": {}}
 
@@ -40,8 +59,7 @@ def score_quality(skill_path: str, eval_suite: Optional[dict]) -> dict:
     # Count test cases with well-formed assertions (type + value present)
     well_formed = []
     for tc in test_cases:
-        assertions = tc.get("assertions", [])
-        wf = [a for a in assertions if a.get("type") and a.get("value")]
+        wf = [a for a in _assertion_dicts(tc) if a.get("type") and a.get("value")]
         if wf:
             well_formed.append(tc)
 
@@ -56,7 +74,7 @@ def score_quality(skill_path: str, eval_suite: Optional[dict]) -> dict:
     # 2. Assertions cover multiple types (25 pts)
     assertion_types = set()
     for tc in test_cases:
-        for a in tc.get("assertions", []):
+        for a in _assertion_dicts(tc):
             if a.get("type"):
                 assertion_types.add(a["type"])
 
@@ -100,7 +118,7 @@ def score_quality(skill_path: str, eval_suite: Optional[dict]) -> dict:
     total_assertions = 0
     described_assertions = 0
     for tc in test_cases:
-        for a in tc.get("assertions", []):
+        for a in _assertion_dicts(tc):
             total_assertions += 1
             if a.get("description"):
                 described_assertions += 1

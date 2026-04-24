@@ -25,24 +25,11 @@ CORS_HEADERS = {
 }
 
 
-def _score_to_grade(score: float) -> str:
-    if score >= 95:
-        return "S"
-    if score >= 85:
-        return "A"
-    if score >= 75:
-        return "B"
-    if score >= 65:
-        return "C"
-    if score >= 50:
-        return "D"
-    return "F"
-
-
 def _run_scoring(content: str, filename: str) -> dict:
     """Write content to a temp file, run schliff scoring, return result dict."""
     from skills.schliff.scripts.shared import build_scores
     from skills.schliff.scripts.scoring.composite import compute_composite
+    from skills.schliff.scripts.terminal_art import score_to_grade
 
     tmp_dir = tempfile.mkdtemp()
     # Use only the basename to prevent path traversal
@@ -56,7 +43,7 @@ def _run_scoring(content: str, filename: str) -> dict:
         scores = build_scores(skill_path, eval_suite=None, include_runtime=False)
         composite = compute_composite(scores)
 
-        grade = _score_to_grade(composite["score"])
+        grade = score_to_grade(composite["score"])
 
         return {
             "composite_score": composite["score"],

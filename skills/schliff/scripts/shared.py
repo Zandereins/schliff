@@ -39,6 +39,13 @@ VALID_DIMENSIONS = {
     "security",
 }
 
+# Directories to skip during discovery (common non-source dirs).
+# Shared by sync.py, doctor.py, and any future tree walkers.
+EXCLUDED_DIRS = frozenset({
+    ".git", "node_modules", ".venv", "venv", "__pycache__",
+    ".tox", "dist", "build", ".eggs",
+})
+
 # --- Regex for description extraction ---
 _RE_DESC_BLOCK = re.compile(
     r"^description:\s*[>|]-?\s*\n((?:[ \t]+.+\n)*)", re.MULTILINE
@@ -81,6 +88,8 @@ def read_skill_safe(skill_path: str) -> str:
         return _file_cache[key]
     if not p.exists():
         raise FileNotFoundError(f"Skill file not found: {skill_path}")
+    if p.is_dir():
+        raise ValueError(f"Skill path is a directory, not a file: {skill_path}")
     content = p.read_text(encoding="utf-8", errors="replace")
     if len(content) > MAX_SKILL_SIZE:
         raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
@@ -445,6 +454,14 @@ def validate_command_safety(cmd: str) -> tuple[bool, str]:
 
     Returns (is_safe, reason). Always checks blocklist + metacharacters,
     even for allowlisted prefixes. Allowlist is necessary but not sufficient.
+
+    NOTE: Currently not invoked by any runtime code path. Every
+    ``subprocess.run(...)`` call in this codebase uses the list-form with
+    hardcoded arguments, so there is no user-supplied command string to
+    validate. This function is a reserved guardrail for future features
+    that may execute user-supplied commands (e.g., custom eval-suite
+    runners, plug-in scorers). Do not delete without adding a replacement
+    for those future code paths. See CONTRIBUTING.md.
     """
     cmd_stripped = cmd.strip()
     if not cmd_stripped:

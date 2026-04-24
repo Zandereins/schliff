@@ -26,7 +26,12 @@ def score_triggers(skill_path: str, eval_suite: Optional[dict]) -> dict:
     3. Handles negation in description ("do NOT use for X")
     4. Requires higher threshold for positive triggers
     """
-    if not eval_suite or "triggers" not in eval_suite or not eval_suite["triggers"]:
+    if not eval_suite or "triggers" not in eval_suite:
+        return {"score": -1, "issues": ["no_trigger_eval_suite"], "details": {}}
+    triggers = eval_suite["triggers"]
+    # Defensive: eval-suites are user-authored JSON; a non-list 'triggers'
+    # (int, bool, string, dict) must not crash iteration below.
+    if not isinstance(triggers, list) or not triggers:
         return {"score": -1, "issues": ["no_trigger_eval_suite"], "details": {}}
 
     try:
@@ -53,18 +58,18 @@ def score_triggers(skill_path: str, eval_suite: Optional[dict]) -> dict:
 
     # Build IDF-like weights: terms that appear in fewer triggers are more discriminative
     term_doc_freq = Counter()
-    for trigger in eval_suite["triggers"]:
+    for trigger in triggers:
         prompt_terms = set(_tokenize_meaningful(trigger.get("prompt", "")))
         for t in prompt_terms:
             term_doc_freq[t] += 1
 
-    num_triggers = len(eval_suite["triggers"])
+    num_triggers = len(triggers)
 
     correct = 0
     total = 0
     details_per_trigger = []
 
-    for trigger in eval_suite["triggers"]:
+    for trigger in triggers:
         prompt = trigger.get("prompt", "")
         expected = trigger.get("should_trigger", True)
         total += 1

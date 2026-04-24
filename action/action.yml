@@ -27,7 +27,7 @@ outputs:
     description: 'Composite score (0-100)'
     value: ${{ steps.score.outputs.composite }}
   grade:
-    description: 'Grade letter (S/A/B/C/D/F)'
+    description: 'Grade letter (S/A/B/C/D/E/F)'
     value: ${{ steps.score.outputs.grade }}
   result_b64:
     description: 'Full JSON score result (base64 encoded)'
@@ -82,11 +82,12 @@ runs:
         COMPOSITE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])")
         echo "composite=$COMPOSITE" >> "$GITHUB_OUTPUT"
 
+        # Delegate grade mapping to Schliff's terminal_art.score_to_grade so
+        # thresholds (incl. the E band 35-49) stay aligned with `schliff verify`.
         GRADE=$(SCORE_VAL="$COMPOSITE" python3 -c "
         import os
-        s = float(os.environ['SCORE_VAL'])
-        g = 'S' if s >= 95 else 'A' if s >= 85 else 'B' if s >= 75 else 'C' if s >= 65 else 'D' if s >= 50 else 'F'
-        print(g)
+        from skills.schliff.scripts.terminal_art import score_to_grade
+        print(score_to_grade(float(os.environ['SCORE_VAL'])))
         ")
         echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
 
