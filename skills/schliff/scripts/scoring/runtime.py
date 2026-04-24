@@ -43,11 +43,24 @@ def score_runtime(skill_path: str, eval_suite: Optional[dict] = None,
     if not eval_suite or "test_cases" not in eval_suite:
         return {"score": -1, "issues": ["no_eval_suite_for_runtime"], "details": {}}
 
+    test_cases = eval_suite["test_cases"]
+    # Defensive: eval-suites are user-authored JSON; non-list test_cases must
+    # not crash iteration below.
+    if not isinstance(test_cases, list):
+        return {"score": -1, "issues": ["no_eval_suite_for_runtime"], "details": {}}
+
     # Find test cases with response_* assertions
     runtime_cases = []
-    for tc in eval_suite["test_cases"]:
+    for tc in test_cases:
+        if not isinstance(tc, dict):
+            continue
         assertions = tc.get("assertions", [])
-        runtime_asserts = [a for a in assertions if a.get("type", "").startswith("response_")]
+        if not isinstance(assertions, list):
+            continue
+        runtime_asserts = [
+            a for a in assertions
+            if isinstance(a, dict) and a.get("type", "").startswith("response_")
+        ]
         if runtime_asserts:
             runtime_cases.append({"tc": tc, "assertions": runtime_asserts})
 
