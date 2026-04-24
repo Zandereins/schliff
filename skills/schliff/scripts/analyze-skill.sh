@@ -59,7 +59,7 @@ else
 fi
 
 # --- Check 3: name field (10 pts) ---
-if echo "$CONTENT" | grep -qE "^name:\s*\S+"; then
+if echo "$CONTENT" | grep -qE "^name:[[:space:]]*[^[:space:]]+"; then
   SCORE=$((SCORE + 10))
 else
   ISSUES+=("missing_name_field")
@@ -109,7 +109,7 @@ fi
 # --- Check 6: Has real examples (10 pts) ---
 # Count REAL examples: input/output pairs, "Example N:", "e.g.", numbered examples
 # Code blocks are counted separately and weighted lower (they support examples but aren't examples alone)
-REAL_EXAMPLES=$(echo "$CONTENT" | grep -ciE '(example\s*[0-9:#]|input.*output|e\.g\.|for instance|for example)' || true)
+REAL_EXAMPLES=$(echo "$CONTENT" | grep -ciE '(example[[:space:]]*[0-9:#]|input.*output|e\.g\.|for instance|for example)' || true)
 CODE_BLOCKS=$(echo "$CONTENT" | grep -c '```' || true)
 CODE_BLOCK_PAIRS=$((CODE_BLOCKS / 2))
 # Real examples count fully, code block pairs count as 1/3 each

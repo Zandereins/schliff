@@ -3,6 +3,78 @@
 All notable changes to Schliff are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [7.2.0] - 2026-04-24
+
+### Security
+- **Prompt-injection hardening in `schliff evolve`**: user-authored skill
+  content is wrapped in explicit XML tags with a per-call random nonce
+  before being passed to LLM prompts. Earlier versions fed raw content
+  into the meta-prompt, letting a crafted SKILL.md inject directives.
+  A sanitizer rejects XML-tag injection attempts and an explicit
+  `<user_content>…</user_content>` boundary isolates user input.
+- **CLI error-handling with no traceback leaks**: `schliff score` on a
+  directory or oversized file no longer leaks a raw Python traceback.
+  `read_skill_safe` rejects directories explicitly with a clear
+  `ValueError`; `cli.main()` wraps handler dispatch in one
+  `(OSError, ValueError)` try/except that renders a short `Error: …`
+  line on stderr and exits 1.
+
+### Fixed
+- **Scoring robustness across all dimensions**: all five scorers that
+  consume user-authored eval-suite JSON (`edges`, `triggers`, `quality`,
+  `runtime`, `coherence`) now guard their list-valued fields with
+  `isinstance(…, list)` checks. Pre-fix, a truthy non-list
+  (`{"edge_cases": 42}`, `{"triggers": "abc"}`) crashed the scorer with
+  `TypeError` from `len()` or `AttributeError` from `.get()` on a string
+  character. Post-fix each scorer returns its standard sentinel (score
+  −1 / bonus 0) on malformed input; inner `assertions` and `test_case`
+  items are filtered via `_assertion_dicts` helpers.
+- **`score_edges` category guard**: malformed `category` entries (ints,
+  nulls, lists) no longer crash `.startswith()` during known-category
+  coverage.
+- **`install.sh` and `analyze-skill.sh` POSIX portability**: replaced
+  GNU-only `\s` / `\S` in `grep -E` patterns with POSIX character classes
+  `[[:space:]]` / `[^[:space:]]`. On older macOS (classic BSD grep),
+  the installer previously printed "Schliff v unknown" and `analyze-skill.sh`
+  missed name / example detection.
+- **Score-to-grade consistency**: playground, evolve, GitHub Action, and
+  CI badges now share the canonical E-band (35–49) from
+  `terminal_art.score_to_grade`; previously each surface drifted.
+
+### Changed
+- **E-band grade now emitted in badge/CI output.** Consumers that parse
+  a grade field with a closed set of `{S, A, B, C, D, F}` must now accept
+  `E` as well. **Breaking for JSON consumers** that did exhaustive grade
+  switching; non-breaking for score-based consumers.
+- **`install.sh` reads VERSION from `pyproject.toml`** at install time
+  instead of carrying a hard-coded literal. Release process simplified
+  accordingly in `RELEASING.md`.
+- **EXCLUDED_DIRS centralized** in `shared.py`; `doctor` and related
+  scanners share one canonical list.
+- **Scorer signatures cleaned up**: unused `**kw` parameters and dead
+  `ImportError` fallbacks removed from several scoring / pattern modules.
+- **`verify` uses `terminal_art.score_to_grade`** instead of a local
+  duplicate, keeping grade mapping in one place.
+
+### Added
+- **`RELEASING.md` pre-release checklist** documents the full release
+  procedure (version bump, CHANGELOG draft, tag, publish, badge cache-bust).
+- **Cross-platform CI expansion**: GitHub Actions matrix covers Python
+  3.9–3.13 on ubuntu-latest and adds a dedicated `test-macos` job gating
+  badge generation / report publishing.
+- **~100 new regression tests** covering non-list eval-suite fields, CLI
+  error-handling paths, BSD-grep portability of shipped shell scripts,
+  prompt-injection sanitization, UTF edge cases, runtime enabled path,
+  and `score_edges` error branches.
+- **`setuptools` upper bound pinned** in `pyproject.toml` to avoid build
+  breakage from future major releases; test files excluded from the wheel.
+
+### Test coverage
+- Total: 1017 → 1117 (+100) / 0 skipped / 0 failed
+- New files: `test_scoring_type_guards.py`, `test_cli_error_handling.py`,
+  `test_install_version.py`; expanded `test_scoring_edges_malformed.py`
+  and new `test_evolve_prompt_injection.py` / `test_evolve_sanitize.py`.
+
 ## [7.1.1] - 2026-04-18
 
 ### Fixed

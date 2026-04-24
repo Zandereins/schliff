@@ -6,6 +6,8 @@ import hashlib
 import re
 from dataclasses import dataclass, field
 
+from terminal_art import score_to_grade
+
 # ---------------------------------------------------------------------------
 # Content utilities
 # ---------------------------------------------------------------------------
@@ -35,18 +37,13 @@ def content_hash(content: str) -> str:
 
 
 def grade_from_score(score: float) -> str:
-    """Convert numeric score to letter grade."""
-    if score >= 95:
-        return "S"
-    if score >= 85:
-        return "A"
-    if score >= 75:
-        return "B"
-    if score >= 65:
-        return "C"
-    if score >= 50:
-        return "D"
-    return "F"
+    """Convert numeric score to letter grade.
+
+    Thin alias over :func:`terminal_art.score_to_grade` so evolve-summary
+    output always matches `schliff verify` (single source of truth for
+    thresholds, including the E band 35-49). REG-001.
+    """
+    return score_to_grade(score)
 
 
 _GRADE_THRESHOLDS: dict[str, float] = {
@@ -55,6 +52,7 @@ _GRADE_THRESHOLDS: dict[str, float] = {
     "B": 75.0,
     "C": 65.0,
     "D": 50.0,
+    "E": 35.0,
 }
 
 
