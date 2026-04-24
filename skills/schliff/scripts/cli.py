@@ -909,7 +909,14 @@ def main():
 
     handler = commands.get(args.command)
     if handler:
-        handler(args)
+        try:
+            handler(args)
+        except (OSError, ValueError) as exc:
+            # Catch-all for user-input errors that leak out of any cmd_*
+            # handler (e.g. passing a directory to `score`, oversized files,
+            # unreadable paths). Present a short message, no traceback.
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
     else:
         parser.print_help()
 
