@@ -28,6 +28,8 @@ def score_edges(skill_path: str, eval_suite: Optional[dict]) -> dict:
         return {"score": -1, "issues": ["no_eval_suite_edge_cases"], "details": {}}
 
     edge_cases = eval_suite["edge_cases"]
+    if not isinstance(edge_cases, list):
+        return {"score": -1, "issues": ["invalid_edge_cases_type"], "details": {}}
     if not edge_cases:
         return {"score": -1, "issues": ["empty_edge_cases"], "details": {}}
 

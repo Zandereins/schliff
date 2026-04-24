@@ -11,6 +11,21 @@ from nlp import STOPWORDS, stem as _stem, RE_WORD_TOKEN as _RE_WORD_TOKEN
 from scoring.patterns import _RE_IMPERATIVE_INSTRUCTION
 
 
+def _assertion_dicts(tc: dict) -> list:
+    """Return only dict-typed assertions from tc['assertions'].
+
+    Returns [] if tc is not a dict, tc['assertions'] is missing, or
+    tc['assertions'] is not a list. Defensive: eval-suites are user-authored
+    JSON.
+    """
+    if not isinstance(tc, dict):
+        return []
+    asserts = tc.get("assertions", [])
+    if not isinstance(asserts, list):
+        return []
+    return [a for a in asserts if isinstance(a, dict)]
+
+
 def score_coherence(skill_path: str, eval_suite: Optional[dict]) -> dict:
     """Check instruction-assertion alignment as a static correctness proxy.
 
@@ -46,10 +61,13 @@ def score_coherence(skill_path: str, eval_suite: Optional[dict]) -> dict:
 
     # 2. Extract assertion values from test_cases
     assertion_topics = set()
-    for tc in eval_suite["test_cases"]:
-        for assertion in tc.get("assertions", []):
+    test_cases = eval_suite["test_cases"]
+    if not isinstance(test_cases, list):
+        return {"bonus": 0, "details": {"reason": "invalid_test_cases_type"}}
+    for tc in test_cases:
+        for assertion in _assertion_dicts(tc):
             value = assertion.get("value", "")
-            if value:
+            if isinstance(value, str) and value:
                 words = _RE_WORD_TOKEN.findall(value.lower())
                 for w in words:
                     if w not in STOPWORDS and len(w) >= 4:
