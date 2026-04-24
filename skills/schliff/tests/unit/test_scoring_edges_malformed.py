@@ -161,6 +161,70 @@ def test_assertions_empty_list_does_not_crash():
     assert "no_edge_assertions" in result["issues"]
 
 
+def test_assertions_as_integer_does_not_crash():
+    """UR-002: a truthy non-list 'assertions' (e.g. int 42) must not crash
+    the scorer with TypeError from len(). Adjacent bug-class to HOST-004
+    category-guard — same pattern in sibling code path.
+
+    Pre-fix: ``ec.get("assertions") and len(ec["assertions"]) > 0`` calls
+    ``len(42)`` which raises TypeError and crashes ``schliff score``.
+    Post-fix: non-list assertions skipped, treated as missing.
+    """
+    suite = {
+        "edge_cases": [
+            {
+                "category": "minimal_input",
+                "expected_behavior": "graceful",
+                "assertions": 42,  # malformed — int instead of list
+            }
+        ]
+    }
+    # Must not raise TypeError.
+    result = score_edges("dummy.md", suite)
+    assert isinstance(result, dict)
+    assert result["details"]["with_assertions"] == 0
+    assert "no_edge_assertions" in result["issues"]
+
+
+def test_assertions_as_bool_does_not_crash():
+    """UR-002 sibling case: bool True is truthy AND has no len() -> must
+    be treated as malformed, not credited as present."""
+    suite = {
+        "edge_cases": [
+            {
+                "category": "minimal_input",
+                "expected_behavior": "graceful",
+                "assertions": True,  # malformed — bool instead of list
+            }
+        ]
+    }
+    result = score_edges("dummy.md", suite)
+    assert isinstance(result, dict)
+    assert result["details"]["with_assertions"] == 0
+    assert "no_edge_assertions" in result["issues"]
+
+
+def test_assertions_as_string_does_not_crash():
+    """UR-002 sibling: a non-empty string has len() (so no TypeError), but
+    it is still malformed input — the scorer must not credit it as a list
+    of assertions. Guard must check type, not just truthiness + len()."""
+    suite = {
+        "edge_cases": [
+            {
+                "category": "minimal_input",
+                "expected_behavior": "graceful",
+                "assertions": "not-a-list",  # malformed — string instead of list
+            }
+        ]
+    }
+    result = score_edges("dummy.md", suite)
+    assert isinstance(result, dict)
+    # String has len()>0 so pre-fix this "accidentally works" but wrong;
+    # post-fix isinstance(..., list) guard rejects it.
+    assert result["details"]["with_assertions"] == 0
+    assert "no_edge_assertions" in result["issues"]
+
+
 # ---------------------------------------------------------------------------
 # Count breakpoints (lines 38-45)
 # ---------------------------------------------------------------------------

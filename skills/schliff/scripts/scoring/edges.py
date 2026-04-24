@@ -97,9 +97,12 @@ def score_edges(skill_path: str, eval_suite: Optional[dict]) -> dict:
         issues.append("no_expected_behaviors")
 
     # 4. All edge cases have assertions (20 pts)
+    # Defensive: eval-suites are user-authored JSON; a non-list 'assertions'
+    # (int, bool, string, dict) must not crash len(). Guard with isinstance
+    # analog to the 'category' guard above. See UR-002.
     with_assertions = sum(
         1 for ec in edge_cases
-        if ec.get("assertions") and len(ec["assertions"]) > 0
+        if isinstance(ec.get("assertions"), list) and len(ec["assertions"]) > 0
     )
     if with_assertions == len(edge_cases):
         score += 20
