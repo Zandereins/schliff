@@ -191,6 +191,8 @@ class TestCalibratedWeightsLoading:
 
     def test_mtime_cache_invalidation_reloads_file(self, tmp_path, monkeypatch):
         """Updating the calibrated file on disk must trigger a cache reload."""
+        import os
+
         calib_dir = tmp_path / ".schliff" / "meta"
         calib_dir.mkdir(parents=True)
         calib_file = calib_dir / "calibrated-weights.json"
@@ -200,23 +202,34 @@ class TestCalibratedWeightsLoading:
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
         _reset_calibrated_cache()
 
+        # Polarize inputs so the two weight sets produce clearly different
+        # composites: structure=100 favours the first weight set,
+        # efficiency=0 is penalized by the second.
         scores = _base_scores()
         scores["structure"] = _score(100)
+        scores["efficiency"] = _score(0)
         result_v1 = compute_composite(scores)
 
-        # Overwrite with weights that heavily favour efficiency (score=0)
-        import time
-        time.sleep(0.01)  # ensure mtime differs
+        # Overwrite with weights that heavily favour efficiency and bump mtime
+        # deterministically — avoids time.sleep flakiness on filesystems with
+        # coarse mtime granularity (HFS+, some network FS).
+        old_mtime = calib_file.stat().st_mtime
         calib_file.write_text(
             json.dumps({"efficiency": 100.0, "structure": 0.01}), encoding="utf-8"
         )
-        # Touch mtime by re-stating (write already did)
+        new_mtime = old_mtime + 2.0
+        os.utime(calib_file, (new_mtime, new_mtime))
+
         result_v2 = compute_composite(scores)
 
-        # After reload, efficiency (score=70 in base) dominates; score may differ
-        # We only assert no crash and valid result
         assert "score" in result_v2
         assert isinstance(result_v2["score"], float)
+        # The load-bearing assertion: the cache must have reloaded, so the
+        # second composite differs materially from the first given these
+        # polarized inputs + swapped weights.
+        assert abs(result_v1["score"] - result_v2["score"]) > 1.0, (
+            f"Cache did not reload: v1={result_v1['score']} v2={result_v2['score']}"
+        )
         _reset_calibrated_cache()
 
 
@@ -228,12 +241,22 @@ class TestClarityAutoInjection:
     """clarity must be injected with weight 0.05 when present and no custom_weights."""
 
     def test_clarity_dimension_is_measured_when_present(self):
-        """clarity in scores dict must appear in measured_dimensions with no custom weights."""
+        """clarity in scores dict must appear in both measured_dimensions
+        count and confidence_notes when no custom weights are supplied.
+        Both conditions are load-bearing; an earlier OR-join allowed either
+        to pass alone, missing regressions in the other.
+        """
         scores = _base_scores()
         scores["clarity"] = _score(90)
         result = compute_composite(scores)
-        assert "clarity" in result.get("confidence_notes", {}) or \
-               result["measured_dimensions"] > len(_base_scores())
+        assert "clarity" in result.get("confidence_notes", {}), (
+            f"clarity missing from confidence_notes: "
+            f"{sorted(result.get('confidence_notes', {}).keys())}"
+        )
+        assert result["measured_dimensions"] == len(_base_scores()) + 1, (
+            f"measured_dimensions did not increment for clarity: "
+            f"got {result['measured_dimensions']}, expected {len(_base_scores()) + 1}"
+        )
 
     def test_clarity_raises_composite_when_high(self):
         """Adding clarity with score=100 must not lower the composite vs. no clarity."""
