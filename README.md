@@ -5,7 +5,7 @@ Your AI instructions are silently degrading. Schliff catches it.
 Deterministic quality scoring for CLAUDE.md, SKILL.md, .cursorrules, AGENTS.md, and system prompts. No LLM, no API key — same input, same score. Python 3.9+, **zero core dependencies** (optional `schliff[evolve]` adds litellm for the evolution loop).
 
 <p align="left">
-  <a href="https://pypi.org/project/schliff/"><img alt="PyPI" src="https://img.shields.io/pypi/v/schliff?style=flat-square&color=F59E0B&label=version&v=7.1.1"></a>
+  <a href="https://pypi.org/project/schliff/"><img alt="PyPI" src="https://img.shields.io/pypi/v/schliff?style=flat-square&color=F59E0B&label=version&v=7.2.0"></a>
   <a href="https://pypi.org/project/schliff/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/schliff?style=flat-square"></a>
   <a href="https://pypi.org/project/schliff/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/schliff?style=flat-square"></a>
   <a href=".github/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json&style=flat-square"></a>
