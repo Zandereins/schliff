@@ -136,7 +136,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Tests badge
-        uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483 # v1.7.0
+        uses: schneegans/dynamic-badges-action@0e50b8bad39e7e1afd3e4e9c2b7dd145fad07501 # v1.8.0
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: 130bb61237b5b9b1536718e6a2296d4a
@@ -161,7 +161,7 @@ jobs:
           echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
 
       - name: Score badge
-        uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483 # v1.7.0
+        uses: schneegans/dynamic-badges-action@0e50b8bad39e7e1afd3e4e9c2b7dd145fad07501 # v1.8.0
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: 130bb61237b5b9b1536718e6a2296d4a
