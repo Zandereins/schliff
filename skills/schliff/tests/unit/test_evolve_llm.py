@@ -29,7 +29,12 @@ class TestResolveModel:
         result = resolve_model(provider="custom-provider")
         assert result == "custom-provider/default"
         captured = capsys.readouterr()
-        assert "Warning" in captured.err or "Unknown" in captured.err or result == "custom-provider/default"
+        # Dropped the tautological `result == "custom-provider/default"` OR-clause
+        # (always True from the assert above) so a regression that silently
+        # suppresses the warning actually fails this test.
+        assert "Warning" in captured.err or "Unknown" in captured.err, (
+            f"Expected a warning on stderr for unknown provider, got: {captured.err!r}"
+        )
 
     @patch.dict(os.environ, {"OLLAMA_HOST": "http://localhost:11434"}, clear=False)
     def test_auto_detect_ollama(self):
