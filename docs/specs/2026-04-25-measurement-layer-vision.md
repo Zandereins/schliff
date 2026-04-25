@@ -13,7 +13,7 @@
 | Field | Value |
 |---|---|
 | Spec ID | `2026-04-25-measurement-layer-vision` |
-| Status | v0.2 — reviewer conditions integrated, ready for human merge approval |
+| Status | v0.3 — Round-2 reviewer conditions integrated (4 fresh agents: spec-quality / red-team / simplify-2 / cross-coherence), ready for merge |
 | Owner | @Zandereins |
 | Reviewers complete | Architecture (GREEN-WITH-CONDITIONS, 4), Security (GREEN-WITH-CONDITIONS, 6), Market-validation (GREEN-WITH-CONDITIONS, 3+), Simplify (GREEN-WITH-CONDITIONS, structural) — see §14 for verdict summaries |
 | Effective date | After human merge approval. Re-trigger agent review on any v0.3+ revision. |
@@ -40,7 +40,7 @@ AI software has three measurable layers, and none are systematically instrumente
 
 | Layer | What it is | Who measures it today |
 |---|---|---|
-| **Source** | The artifacts a human authors that direct an agent: SKILL.md, CLAUDE.md, system prompts, .cursorrules | Almost no one. Schliff is alone here. |
+| **Source** | The artifacts a human authors that direct an agent: SKILL.md, CLAUDE.md, system prompts, .cursorrules | Almost no one measures these deterministically. General-purpose linters (ESLint, Pylint, Cursor's built-ins) cover code; instruction-file-specific deterministic scoring is Schliff's wedge. |
 | **Output** | What the agent actually produces in response to inputs: text, tool calls, code | Promptfoo (20.5k★), DeepEval (15k★), Inspect (Anthropic), Braintrust (commercial). All ship deterministic-assertion paths but their flagship UX and marketing centres on LLM-as-judge. |
 | **System** | How agents behave together over a trace: emergent loops, prompt-injection cascades, off-topic drift, tool misuse | LangSmith / LangFuse (25k★) store traces but do not analyze them deterministically; no one ships pattern-detection as a library |
 
@@ -61,7 +61,7 @@ Schliff's deterministic-first ideology, validated on 7-dimension source scoring,
 
 Operating principles that follow from the vision:
 
-1. **Deterministic-first.** Same input → same output, every machine, every run. LLM-judges are an explicitly opt-in fallback when no deterministic rule applies. This is the wedge that no competitor matches in actual library shipping.
+1. **Deterministic-first.** Same input → same output, every machine, every run. LLM-judges are an explicitly opt-in fallback when no deterministic rule applies. This is the first library-first deterministic implementation of a pattern competitors recommend in docs but do not default to in tooling; whether it becomes *canonical* depends on adoption, not naming.
 2. **Library-first, CLI-second.** v7's CLI-only surface limited adoption. v8 onwards: `from schliff import score, evaluate, observe` is the canonical surface; the CLI becomes a thin wrapper.
 3. **Composable, not closed.** Schliff sits *under* Promptfoo / DeepEval / LangSmith / LangFuse (as a quality gate), not next to them. Adapters import their formats, run deterministic checks first, hand back to them.
 4. **Anti-gaming as a first-class property.** Every metric Schliff emits is checked against inflate-the-number patterns (keyword stuffing, padding, repetition). A defensible CI gate is one developers cannot trivially trick.
@@ -86,7 +86,7 @@ Star counts as of 2026-04-25 (verified by market-validation reviewer):
 | **awesome-claude-code** | 40.9k★ | Discovery | Curated list | Yes — Schliff is *listed*, not competing |
 | **Anthropic Skills SDK** (announced 2025-12, see §11 R1) | n/a | Source | Reference impl + creator plugin (Mar 2026) | Schliff stays the *reference quality bar* if Anthropic ships a quality-scorer; Schliff becomes Anthropic-SDK-adapter if not |
 
-**Key insight:** every cell that says "Yes" represents a distribution channel where Schliff gets pulled into other tools' tech stacks. That is how a measurement-layer wins — not by displacing players, by being plumbed into them. The "deterministic-first" wedge is reinforced (not weakened) by market-validation: every competitor's docs already recommend this pattern. Schliff is the library that finally ships it as a first-class default.
+**Key insight:** every cell marked "Yes" is a *potential* distribution channel where Schliff could get pulled into other tools' tech stacks — actualization depends on the target project's competitive incentives and the friction of integration. That is how a measurement-layer wins — not by displacing players, by being plumbed into them when the integration cost is lower than the in-house build cost. The "deterministic-first" wedge is reinforced (not weakened) by market-validation: every competitor's docs already recommend this pattern. Schliff is the library that finally ships it as a first-class default.
 
 ---
 
@@ -219,7 +219,7 @@ Signing keys MUST NOT live in `.schliff/keys/` or any filesystem path that a mal
 
 | Quarter | Säule | Concrete deliverables | Confidence |
 |---|---|---|---|
-| Q2 2026 (now → end of June) | Säule 1 + v7.2.1 hotpatch | Library API public, Phase-0 security (`allowed_root`), system-prompt scoring shipped, hotpatch (Q1–Q5 + IMP-006/007) shipped | HIGH (existing v8 plan + hotpatch list are concrete) |
+| Q2 2026 (now → end of June) | Säule 1 + v7.2.1 hotpatch | Library API public, Phase-0 security (`allowed_root`), system-prompt scoring shipped, hotpatch (Q1–Q5 + IMP-006/007) shipped | MEDIUM-HIGH (concrete plans exist, but HIGH applies only after v7.2.1 hotpatch ships and validates the scope estimate against actual velocity) |
 | Q3 2026 (Jul-Sep) | Säule 2 begins, Säule 4 first move | Promptfoo-yaml adapter + cost-report MVP; VS Code extension MVP; outreach to Promptfoo maintainers begins; corpus study (OQ3) executed before marketing claims finalize | MEDIUM (depends on Säule 1 being clean) |
 | Q4 2026 (Oct-Dec) | Säule 3 MVP, Säule 4 ongoing | Three trace-pattern detectors, LangSmith adapter, benchmark site beta-public; OpenTelemetry-AI alignment evaluated (per R11) | MEDIUM-LOW (Säule 3 is novel territory; corpus needed for false-positive baselining) |
 | 2027 | Säulen 2/3 polish + Säule 5 | DeepEval adapter, full pattern library, GDPR-compliance-mode v0.1, third-party legal review of Säule 5 | LOW (too far out for honest estimation) |
@@ -326,7 +326,7 @@ Each entry: decision, alternatives considered, why-this-one, what-would-flip-it.
 - Alternatives: (a) compete head-on with Promptfoo for output-eval, (b) merge into agnix as a quality module, (c) become a hosted SaaS
 - Chosen: (d) measurement layer used by all of the above
 - Why: avoids 3 unwinnable head-on fights; Datadog precedent shows the category is a viable scaling path; matches existing deterministic-first ideology
-- Flip if: Anthropic ships a free official skill-quality SDK with the same API, eliminating the wedge. Then re-position as their preferred engine, or shut down core.
+- Flip if: Anthropic ships a free official skill-quality SDK with the same deterministic-first API AND market evidence shows users prefer the official version over Schliff (≥ 80% adoption inside 12 months of Anthropic's launch). Response then aligns with R1 mitigation: re-position as adapter / reference implementation under the official SDK; only consider retirement of the core if Schliff's deterministic-first differentiation no longer holds (e.g., Anthropic's official tool ships the same engine and supersedes Schliff's MIT advantage).
 
 **ADR-002 — Library-first, CLI-second.**
 - Alternatives: (a) keep CLI as primary; (b) ship CLI + library at parity; (c) deprecate CLI
@@ -420,5 +420,6 @@ OQ7 (test infrastructure) and OQ8 (burn-rate) from v0.1 deferred to per-Säule r
 |---|---|---|---|
 | 0.1 | 2026-04-25 | Claude (drafted on Franz's brief) | Initial draft, dispatched to 4 reviewer-agents |
 | 0.2 | 2026-04-25 | Claude (post-review) | Integrated all conditions from architecture / security / market-validation / simplify reviewers. New: Principles 8 + 9, R11–R14, OQ9, Säule 5 Key Management subsection. Updated: §3 LLM-judge framing softened, §5 star counts current as of 2026-04-25 + LangFuse added, §6.1 calibrated-weights documented, §6.4 leaderboard scoped as quality-bar-not-marketplace. Merged: R3+R5 → R3, R6+R10 → R6, §15+§16 → §15. §14 reviewer verdicts populated. |
+| 0.3 | 2026-04-25 | Claude (Round-2 post-review) | Round-2 review by 4 fresh agents (spec-quality / executability, adversarial red-team, simplify v0.2 fresh pass, cross-coherence + smartest-next-step). All GREEN-WITH-CONDITIONS, 0 BLOCKER. **One genuine contradiction fixed:** ADR-001 flip condition aligned with R1 mitigation (was "shut down core" vs "stay reference impl" — now consistent: re-position as adapter/reference impl, retire only if differentiation collapses). **Four too-optimistic claims softened** per red-team: §3 "Schliff is alone" → "deterministically alone in instruction-files" (general linters cover code), §4 Principle 1 "canonical" → "first library-first impl, canonicality earned by adoption", §5 distribution-channel "Yes" → "potential Yes contingent on competitive incentives", §7 Q2 confidence HIGH → MEDIUM-HIGH (HIGH only after hotpatch ships). Simplify-2's bigger cuts (§14 compression to 4 lines, §6.5 Key Management move) NOT taken — current §14 size is already moderate, Key Management content is load-bearing for security clarity. |
 
 Future revisions: bump version, log the change, re-trigger the reviewer-agent pass on any v0.X+1 substantive revision (corrections-only edits do not require re-review).
