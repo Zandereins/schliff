@@ -45,3 +45,7 @@ The practitioner-mainstream evidence converged decisively against the upfront pl
 - Shankar et al., "Who Validates the Validators?" UIST 2024 §5.2.1 (n=16) and §7.3.1 (criteria drift) — https://arxiv.org/abs/2404.12272
 - ADR-0001 — `docs/adr/0001-failure-mode-first-scoping.md`
 - v8.0 Product Completion Spec — `docs/specs/2026-04-27-v8-product-completion.md`
+
+## Addendum (2026-04-28, Day 1) — Phase-0 starter set revised + tier-stratified reliability
+
+The "Phase 0 starter set: 30 items (Anthropic 13 + Rezvani 17)" is superseded by the stratified familiar-core + representative-probe corpus (see ADR-0001 Day-1 addendum). Labelling protocol is otherwise unchanged: binary pass/fail + mandatory written critique, solo benevolent dictator, iterative growth to 100-150. **New:** the critique field tags each item by tier (`familiar` / `probe`) so Phase-P3 reliability reporting (ADR-0005) can stratify TPR/TNR/κ by tier — a pooled metric could hide a familiar-high / probe-low generalization gap (Hamel-lens finding: a judge calibrated only on the 99th-percentile familiar tail may pass its gate yet not generalize to the messy production distribution).

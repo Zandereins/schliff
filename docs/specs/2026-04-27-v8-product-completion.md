@@ -55,7 +55,7 @@ The original plan defined 7 LLM-judge dimensions before observing data. **This w
 
 **Revised approach (ADR-0001):**
 
-- Days 1–3: Franz reads **30 SKILL.md** from corpus v1 (Husain's 30–50 minimum for theoretical saturation; reduced from initial 50 to fit Franz-budget per Reviewer-1 finding). Open-coded failure notes. Cluster into taxonomy.
+- Days 1–3: Franz reads a **stratified familiar-core + representative mini-probe** corpus — Anthropic + Karpathy + superpowers + dogfood (familiar, high-confidence labels), plus messy community probe skills from `docs/launch/corpus/` (representativeness), **saturation-driven** (Husain's 30–50 is for heterogeneous traces; SKILL.md is homogeneous and saturates earlier — revised Day-1 after 6-agent evaluation, see ADR-0001 addendum). Open-coded failure notes. Cluster into taxonomy.
 - LLM-Judge dimensions emerge from this taxonomy, not pre-definition.
 - Deterministic Linter (existing **7 default dimensions, 1 opt-in `security`**) continues to score structure.
 - LLM-Judge targets what the linter CANNOT see — semantic coherence, contextual appropriateness, disambiguation, output_contract↔description consistency.
@@ -104,20 +104,20 @@ The original plan defined 7 LLM-judge dimensions before observing data. **This w
 | Day | Franz | Subagents (parallel, max 5) | Output |
 |---|---|---|---|
 | **0 today** | Greenlight + spec/ADR review | Spec + 7 ADRs scaffolding (this commit) | Plan-Artefakte committed |
-| **1 Mon** | 10 skills open-coded (~10–15 min/skill) | Korpus-Cloner pin SHAs + pre-annotate | 10 skills coded |
-| **2 Tue** | 20 skills open-coded (30 total) | Live-clusterer aggregates notes → taxonomy draft | 30 skills coded |
-| **3 Wed** | Failure-modes → emergent LLM-Judge dims; **sub-reviewer pass** confirms "beyond linter" | 4 parallel: scaffold lib-api, judge-harness, corpus-runner, fix-receipt schema | **KILL-GATE 1** |
-| **4 Thu** | Holdout labelling Batch-1 (25 items) | 3 worktrees: WT-foundation, WT-judge, WT-autoloop; **F1 interface-frozen EOD** (signatures + F3 types ready) | 3 worktrees with v0 |
-| **5 Fri** | Holdout Batch-2 (25 → 50 total) | TDD-builder per worktree + security-review on lib-api; **F1 implementation-frozen EOD** | trunk-v8 ready |
-| **6 Sat** | Judge iteration v0→v1 + 5-disagreement spot-check | Judge runs full holdout; reports TPR/TNR per dim with **Wilson 95% CI** | Judge v1 |
-| **7 Sun** | Judge v1→v3 (Hamel-style 3 iterations); sub-reviewer pass on intermediate metrics | Goodhart guards finalized: semantic-floor + Pareto + cycle-detect + content-padding guards | **EARLY WARNING**: TPR trending ≥80% across last-3 iters on N=50; if not → escalate dim-scope review |
-| **8 Mon** | Holdout grow to 100 + re-grade pass (criteria drift) | Auto-Loop ↔ lib-api wiring; advisor-mode UX | Auto-Loop end-to-end on 1 skill; **KILL-GATE 2 (HARD)**: TPR ≥85% with Wilson CI lower-bound ≥80% on N=100, κ ≥ 0.7 per dim, **sub-reviewer pass** confirms statistical validity |
-| **9 Tue** | Architecture review (1h) + corpus-run kickoff | **KORPUS-RUN**: 100 skills × auto-improve loop, 20-fold parallel, ~30–60 min wall | Korpus-Run dataset |
-| **10 Wed** | Outlier triage on 10–15 unexpected cases (shrink-fallback if 60+: see §11) | 5 parallel case-study writers per top-improved skill | 5 case studies draft |
-| **11 Thu** | Outlier-fix re-run + holdout re-grade | Per-dim reliability report + Cohen's κ compute | **KILL-GATE 3**: ≥3 positive case studies + **sub-reviewer pass** on no-Goodhart-attack-escaped |
-| **12 Fri** | README + methodology doc review | Simplify-pass + security-review + code-reviewer all worktrees | trunk-v8 release-ready |
-| **13 Sat** | Release v8.0 + first public posts | Vision-Spec ADR-pointer addendum, CHANGELOG, badge bust | **v8.0 LIVE** |
-| **14 Sun** | Buffer / Schlaf | — | — |
+| **1 Tue** | 10 skills open-coded (~10–15 min/skill) | Korpus-Cloner pin SHAs + pre-annotate | 10 skills coded |
+| **2 Wed** | 20 skills open-coded (30 total) | Live-clusterer aggregates notes → taxonomy draft | 30 skills coded |
+| **3 Thu** | Failure-modes → emergent LLM-Judge dims; **sub-reviewer pass** confirms "beyond linter" | 4 parallel: scaffold lib-api, judge-harness, corpus-runner, fix-receipt schema | **KILL-GATE 1** |
+| **4 Fri** | Holdout labelling Batch-1 (25 items) | 3 worktrees: WT-foundation, WT-judge, WT-autoloop; **F1 interface-frozen EOD** (signatures + F3 types ready) | 3 worktrees with v0 |
+| **5 Sat** | Holdout Batch-2 (25 → 50 total) | TDD-builder per worktree + security-review on lib-api; **F1 implementation-frozen EOD** | trunk-v8 ready |
+| **6 Sun** | Judge iteration v0→v1 + 5-disagreement spot-check | Judge runs full holdout; reports TPR/TNR per dim with **Wilson 95% CI** | Judge v1 |
+| **7 Mon** | Judge v1→v3 (Hamel-style 3 iterations); sub-reviewer pass on intermediate metrics | Goodhart guards finalized: semantic-floor + Pareto + cycle-detect + content-padding guards | **EARLY WARNING**: TPR trending ≥80% across last-3 iters on N=50; if not → escalate dim-scope review |
+| **8 Tue** | Holdout grow to 100 + re-grade pass (criteria drift) | Auto-Loop ↔ lib-api wiring; advisor-mode UX | Auto-Loop end-to-end on 1 skill; **KILL-GATE 2 (HARD)**: TPR ≥85% with Wilson CI lower-bound ≥80% on N=100, κ ≥ 0.7 per dim, **sub-reviewer pass** confirms statistical validity |
+| **9 Wed** | Architecture review (1h) + corpus-run kickoff | **KORPUS-RUN**: 100 skills × auto-improve loop, 20-fold parallel, ~30–60 min wall | Korpus-Run dataset |
+| **10 Thu** | Outlier triage on 10–15 unexpected cases (shrink-fallback if 60+: see §11) | 5 parallel case-study writers per top-improved skill | 5 case studies draft |
+| **11 Fri** | Outlier-fix re-run + holdout re-grade | Per-dim reliability report + Cohen's κ compute | **KILL-GATE 3**: ≥3 positive case studies + **sub-reviewer pass** on no-Goodhart-attack-escaped |
+| **12 Sat** | README + methodology doc review | Simplify-pass + security-review + code-reviewer all worktrees | trunk-v8 release-ready |
+| **13 Sun** | Release v8.0 + first public posts | Vision-Spec ADR-pointer addendum, CHANGELOG, badge bust | **v8.0 LIVE** |
+| **14 Mon** | Buffer / Schlaf | — | — |
 
 ## 6. Multi-Worktree Topology
 
@@ -177,6 +177,8 @@ Concrete numbers from Goodhart-Researcher Agent + Manheim/Garrabrant 2018 + Kwa 
 | **Total v1** | — | **~191** | — | |
 
 **Excluded:** Composio (864 skills) — license unclear (no LICENSE file), deferred to v8.1. See ADR-0003.
+
+**Phase-0 reading-corpus note (2026-04-28 addendum):** the *benchmark* corpus above (P2) is distinct from the *Phase-0 failure-mode reading* corpus, which was revised on Day 1 to a stratified familiar-core (Anthropic + Karpathy + obra/superpowers MIT + dogfood) + representative mini-probe (messy community skills from `docs/launch/corpus/`). Rezvani is dropped from Phase-0 reading; its inclusion in this *benchmark* corpus is under B1 review (note: at pinned SHA `f567c61d` Rezvani has no `.claude/skills/` dir and yields ~239 skills, not 108 — see `benchmarks/corpus/v1/README.md` Known discrepancies). See ADR-0001 Day-1 addendum.
 
 ## 10. Risk Register Top 9
 

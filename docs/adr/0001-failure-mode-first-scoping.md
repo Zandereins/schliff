@@ -63,3 +63,14 @@ The deterministic linter's existing dimensions remain untouched. The LLM-Judge l
 - Schliff Vision Spec v0.3 — `docs/specs/2026-04-25-measurement-layer-vision.md`
 - v8.0 Product Completion Spec — `docs/specs/2026-04-27-v8-product-completion.md`
 - Sparring-round meta-finding (2026-04-27): "Premature Formalisation" — discussed in this conversation; key insight that solo-maintainer eval engineering must lean toward less ceremony, more data, faster loops.
+
+## Addendum (2026-04-28, Day 1) — Phase-0 corpus revised to stratified familiar-core + mini-probe
+
+The Phase-0 reading sample defined above ("30 SKILL.md = Anthropic 13 + Rezvani 17, balanced") was revised on Day 1 after a 6-agent research evaluation (Karpathy / Hamel-Maven / linter-coverage / ecosystem / dimension-hypothesis / positioning lenses):
+
+- **Rezvani dropped from Phase-0 reading.** The sole labeller of record (ADR-0002) lacks domain context on the Rezvani community skills (finance/compliance/PM) → low-confidence open-coding. Rezvani's role in the v8.0 *benchmark* corpus (spec §9) is a separate question, deferred to P2/B1.
+- **Familiar-core added superpowers + Karpathy.** Anthropic (Apache-2.0 examples) + Karpathy `karpathy-guidelines` (analyze-only pending license) + obra/superpowers (MIT, maintainer uses daily) + Schliff dogfood. Famous, cleanly-licensed, high-confidence-labelable, strongest world-value case studies.
+- **Representative mini-probe added.** Real messy community skills from the existing scored 120-file corpus (`docs/launch/corpus/`), filtered to maintainer-judgeable domains, to restore the representativeness all-familiar sacrifices (Hamel's non-negotiable: eval data must represent production input — corpus mean composite 61.7, 59% below grade C).
+- **N is saturation-driven, not fixed at 30.** Husain's 30-50 is for heterogeneous traces; SKILL.md is homogeneous and should saturate earlier.
+
+Full rationale in `docs/research/2026-04-28-skill-failure-modes.md` (Day-1 Scope Decision).
