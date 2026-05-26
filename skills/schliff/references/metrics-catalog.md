@@ -169,10 +169,10 @@ total = (
 )
 ```
 
-Dimensions that return `-1` (unmeasured) are excluded and the remaining
-weights are renormalized. The scorer reports **weight coverage** — the
-fraction of total weight actually measured — and warns when coverage is
-below 50%.
+Dimensions that return `-1` (unmeasured) are uncredited — the composite
+divides by the full canonical weight sum, so the score ceiling equals
+coverage. The scorer reports **coverage** — the fraction of total weight
+actually measured — and warns when coverage is below 50%.
 
 **Quality tiers (with sufficient coverage):**
 - 90+ Excellent — production-ready, community-shareable
