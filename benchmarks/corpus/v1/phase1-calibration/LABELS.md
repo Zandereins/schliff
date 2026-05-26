@@ -24,25 +24,27 @@ Can a triggered agent concretely verify it succeeded, or is success unverifiable
 
 | Specimen | Path | Intent | Tier | Evidence (pre-extracted) | PASS/FAIL | Critique |
 |---|---|---|---|---|---|---|
-| 01 webapp-testing | phase0 01 | fail-anchor | familiar | "find a customized solution is *absolutely necessary*" — uncheckable threshold | | |
-| 02 canvas-design | phase0 02 | fail-anchor | familiar | "museum quality / looks like it took countless hours" as the operative criteria | | |
-| 03 brand-guidelines | phase0 03 | fail-anchor | familiar | "smart color selection based on background" — no contrast rule defined | | |
-| 05 karpathy-guidelines | phase0 05 | fail-anchor (`#reflexivity`) | familiar | §4 demands verifiable criteria yet §2 "would a senior engineer say this is overcomplicated?" / "200→50" are unverifiable | | |
-| 07 systematic-debugging | phase0 07 | fail-anchor | familiar | "95% vs 40%", "15-30 min vs 2-3 hrs" — precise numbers sourced only to "debugging sessions" | | |
-| c3 doc-coauthoring | ./c3 | **PASS-control** | familiar | Stage-3 "Reader Testing with a fresh Claude" = concrete checkable success loop | | |
+| 01 webapp-testing | phase0 01 | fail-anchor | familiar | "find a customized solution is *absolutely necessary*" — uncheckable threshold | **FAIL** | No checkable success signal; "absolutely necessary" is an unverifiable judgment gate — the agent can't know when the bar is met. |
+| 02 canvas-design | phase0 02 | fail-anchor | familiar | "museum quality / looks like it took countless hours" as the operative criteria | **FAIL** | Success defined entirely by aesthetic vibes; nothing a downstream model can self-verify. |
+| 03 brand-guidelines | phase0 03 | fail-anchor → **PASS** (Franz override) | familiar | "smart color selection based on background" — no contrast rule defined | **PASS** | Override of scribe's FAIL-mild: the lone vague phrase is minor; brand-guidelines' real failure is capability_fidelity (A), not success-criteria. Keeps B's boundary tight — B is NOT a catch-all for any vagueness. (Franz to refine wording.) |
+| 05 karpathy-guidelines | phase0 05 | fail-anchor (`#reflexivity`) | familiar | §4 demands verifiable criteria yet §2 "would a senior engineer say this is overcomplicated?" / "200→50" are unverifiable | **FAIL** | Reflexive: preaches verifiable success criteria while its own tests ("senior engineer", "200→50") are themselves unverifiable. |
+| 07 systematic-debugging | phase0 07 | fail-anchor | familiar | "95% vs 40%", "15-30 min vs 2-3 hrs" — precise numbers sourced only to "debugging sessions" | **FAIL** | Unsourced false precision presented as fact; not a checkable success signal (and the model relays it downstream stripped of the hedge). |
+| c3 doc-coauthoring | ./c3 | **PASS-control** | familiar | Stage-3 "Reader Testing with a fresh Claude" = concrete checkable success loop | **PASS** | Confirmed PASS-control: gives a concrete, runnable success check (fresh-Claude reader test) the agent can actually execute. |
 
-## C — `assumption_completeness`
-Are prerequisites/tools/env/prior-state stated (with a fallback), or silently assumed? *(Scope to the unstated-assumption core, disjoint from `composability`'s declares-a-dependency check.)*
+## C — `assumption_completeness` · criterion LOCKED 2026-05-26 (5-expert + 3-member closing council)
+**Criterion (DISCLOSURE, not provisionability):** FAIL iff the documented happy path relies on a consequential precondition (external package/binary, account, credential, paid service, runtime) that is NOT disclosed in the skill text at/before first use. Named/paid/external-but-disclosed = PASS. Harness-contract tools (file-I/O, Bash, Read, Write) need no disclosure. Provisionability/runtime-success → B's concern; declared sibling-skill handoffs → composability's concern.
 
-| Specimen | Path | Intent | Tier | Evidence (pre-extracted) | PASS/FAIL | Critique |
+| Specimen | Path | Intent | Tier | Evidence | PASS/FAIL | Critique |
 |---|---|---|---|---|---|---|
-| 01 webapp-testing | phase0 01 | fail-anchor | familiar | assumes Playwright + browser binaries; `playwright install chromium` never stated, no fallback | | |
-| 03 brand-guidelines | phase0 03 | fail-anchor | familiar | "Applied via python-pptx" silently scopes to `.pptx` while claiming "any artifact" | | |
-| 04 internal-comms | phase0 04 | fail-anchor (`#owner-coupled`) | familiar | first-person "formats **my company** likes" — absent owner's prefs as universal | | |
-| 06 brainstorming | phase0 06 | fail-anchor | familiar | "terminal state is invoking writing-plans" assumes sibling skill installed, no degraded path | | |
-| c5 voice-skill | ./c5 | fail (mid-band) | probe | assumes external pip pkg + Vapi account + purchased phone number (~$2/mo) as prior state | | |
-| c6 raindrop | ./c6 | fail (mid-band) | probe | uses `scripts/raindrop.sh`, existence never stated, no fallback; assumes `~/.zshrc.local` | | |
-| c2 claude-api | ./c2 | **PASS-control** | familiar | explicitly surfaces+gates assumptions ("scan for non-Anthropic markers… stop"; "Never guess… WebFetch the repo") | | |
+| 01 webapp-testing | phase0 01 | fail-anchor | familiar | Playwright + browser binary (`playwright install chromium`) never stated; happy path runs `p.chromium.launch()` | **FAIL** | Consequential runtime precondition undisclosed (silence); fresh-agent happy path throws with no stated fallback. |
+| c6 raindrop | ./c6 | fail-anchor | probe | instructs `./scripts/raindrop.sh` as primary interface; VERIFIED the script does NOT ship (only SKILL.md + metadata.json) | **FAIL** | Relies on a script neither shipped nor disclosed as something to obtain. (Distinct from c5: there the install IS stated.) |
+| c2 claude-api | ./c2 | PASS-control | familiar | WebFetch surfaced+gated as fallback; API key downstream-of-artifact; bundled reference files | **PASS** | Consequential deps disclosed/gated; WebFetch gated-with-fallback, key downstream of the produced artifact, not a happy-path precondition. PASS-control holds. |
+| 03 brand-guidelines | phase0 03 | (was fail-anchor) | familiar | font dep gated w/ fallback ("No font installation required" / "falls back to Arial/Georgia"); python-pptx ambient in sandbox | **PASS** | No undisclosed precondition. The ".pptx vs any artifact" gap is an A-overclaim (capability_fidelity), not C. |
+| 04 internal-comms | phase0 04 | (was fail-anchor) | familiar | all 4 `examples/*.md` present + explicit "ask for clarification" fallback | **PASS** | Self-contained; deps bundled + disclosed. Owner-coupled wording is portability/scope, not an undisclosed precondition. |
+| ~~06 brainstorming~~ | phase0 06 | **EXCLUDED from v0** | familiar | mandatory `writing-plans` sibling-skill handoff | — | EXCLUDED → composability turf (declared sibling-skill edge), disjoint from C. |
+| ~~c5 voice-skill~~ | ./c5 | **EXCLUDED from v0** | probe | Vapi deps disclosed in `## Requirements`; `pip install claude-code-voice` (step-1) not in Requirements | — | EXCLUDED → criterion-pinning fixture. Label split 2:1 (Evals/Harness PASS — install is step-1-disclosed, unresolvability=B; Skeptic FAIL — pkg absent from Requirements). Resolve in rubric annex, not v0. |
+
+**v0 C-anchors (clean): 01 FAIL · c6 FAIL · c2 PASS · 03 PASS · 04 PASS** (2F / 3P). ⚠ **Measurement guardrail (council-certified):** only 2 clean FAILs → **NO κ/TNR reported until Batch-2 adds ≥4 more FAILs**; until then judge-vs-human per-item agreement is a directional smoke test only.
 
 ## A — `capability_fidelity` ⚠ PROBATIONARY
 Formally-clean skill whose description/Features claim a capability the body does NOT deliver. *(Lead with `#capability-overclaim`; empty-body/missing-procedure cases are linter territory, NOT this dim.)*
