@@ -114,6 +114,69 @@ def test_system_prompt_keeps_security_in_headline():
     assert r_sec100["weight_coverage"] == 1.0 and r_sec0["weight_coverage"] == 1.0
 
 
+def test_spread_keyword_stuffing_penalized(tmp_path):
+    """Spread keyword stuffing (one term repeated across many distinct lines) must be
+    caught as low-information padding by the MEASURED efficiency dimension, so it
+    lowers the composite. (Triggers is uncredited without an eval suite, so a penalty
+    there cannot move the composite — it must land in a measured dim.)"""
+    from scoring import score_efficiency
+    stuffed = tmp_path / "stuffed.md"
+    body = "\n".join(f"Deployment step {i}: run the deployment." for i in range(40))
+    stuffed.write_text(
+        f"---\nname: x\ndescription: deployment tool.\n---\n# X\n## Steps\n{body}\n",
+        encoding="utf-8")
+    result = score_efficiency(str(stuffed))
+    assert result["score"] < 80, f"keyword stuffing not penalized: {result['score']}"
+    assert any("keyword_stuffing" in str(i) for i in result["issues"])
+
+
+def test_clean_body_not_stuffing_penalized(tmp_path):
+    """Negative control: a domain-focused skill that legitimately repeats its subject
+    term ~9 times across 60+ varied prose tokens must NOT be flagged as stuffed,
+    so the penalty does not regress real-world skills.
+
+    This fixture deliberately exceeds _STUFF_MIN_PROSE_TOKENS (40) so the threshold
+    logic actually runs — the original fixture (~36 meaningful tokens) short-circuited
+    before reaching the dominance check, making the test vacuous.
+    """
+    from scoring import score_efficiency
+    clean = tmp_path / "clean.md"
+    # Body has ~86 meaningful tokens; "deployment" appears 9 times (10.5% dominance),
+    # which is below the 12% _STUFF_DOMINANCE threshold — must NOT trigger stuffing.
+    body = (
+        "A deployment skill that guides teams through safe rollout practices. "
+        "Before starting a deployment, verify the target environment is healthy "
+        "and all tests have passed. Each deployment should begin with smoke checks "
+        "against a staging replica. If the deployment fails its smoke checks, roll "
+        "back automatically and record the cause in the incident log. Stagger rollout "
+        "across availability zones so that a single bad deployment cannot bring down "
+        "the entire fleet. Document the deployment window in your team calendar, notify "
+        "the on-call engineer before you begin, and keep the deployment log for "
+        "compliance audit. A canary deployment reduces blast radius by routing a "
+        "fraction of traffic first, then widens once metrics look stable. Monitor "
+        "error rates closely after each deployment and compare them with the baseline "
+        "from last week before declaring success."
+    )
+    clean.write_text(
+        f"---\nname: deploy\ndescription: Use when rolling out a new version safely.\n---\n"
+        f"# Deploy\n## When to use\nUse before releasing to production.\n"
+        f"## Steps\n{body}\n",
+        encoding="utf-8")
+    result = score_efficiency(str(clean))
+    assert not any("keyword_stuffing" in str(i) for i in result["issues"]), \
+        f"clean body wrongly flagged: {result['issues']}"
+    assert result["score"] >= 70, \
+        f"legitimate domain skill scored too low: {result['score']}"
+
+
+def test_anti_gaming_benchmark_gate():
+    import subprocess
+    repo = Path(__file__).resolve().parents[4]  # unit→tests→schliff→skills→repo root
+    proc = subprocess.run(["/usr/bin/python3", "benchmarks/anti-gaming/run.py"],
+                          cwd=str(repo), capture_output=True, text=True)
+    assert proc.returncode == 0, f"anti-gaming separation failed:\n{proc.stdout}"
+
+
 def test_evolve_score_file_matches_cli(tmp_path):
     """evolve._score_file must return the same headline composite as the CLI path."""
     import importlib
