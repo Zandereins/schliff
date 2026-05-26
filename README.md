@@ -196,7 +196,7 @@ Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) 
 | | autoresearch | Schliff |
 |---|---|---|
 | **Target** | ML training scripts | AI instruction files |
-| **Patches** | 100% LLM | 60-70% deterministic, 30-40% LLM |
+| **Patches** | 100% LLM | ~32% deterministic, rest LLM |
 | **Scoring** | 1 metric | 7 dimensions + optional runtime |
 | **Anti-gaming** | None | 6 detection vectors |
 | **Dependencies** | ML frameworks | Python 3.9+ stdlib only (core) |
@@ -263,7 +263,7 @@ flowchart TB
     end
 ```
 
-60-70% of patches follow deterministic rules. The LLM handles structural reorganization, example generation, edge case synthesis.
+~32% of patches are applied deterministically (confidence=high, single-edit effort); the rest fall back to the LLM. The LLM handles structural reorganization, example generation, edge case synthesis. (source: `scripts/measure_patch_ratio.py`)
 
 </details>
 
