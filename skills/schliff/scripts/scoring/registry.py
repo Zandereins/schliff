@@ -66,6 +66,29 @@ FORMAT_ALIASES: dict[str, str] = {
 # Opt-in dimensions — not included in default scoring runs
 OPT_IN_SCORERS: frozenset[str] = frozenset({"runtime", "security"})
 
+# Dimensions excluded from the HEADLINE composite per format (reported as separate signals
+# instead of being folded into the headline number). For the skill.md family, security is an
+# opt-in side signal (weight 0.05, off by default). For system_prompt, security is a CORE
+# scored dimension (weight 0.15) and MUST remain in the headline. runtime is never in the
+# headline (it has no profile weight and is an opt-in side signal).
+_HEADLINE_EXCLUDED_INSTRUCTION = frozenset({"security", "runtime"})
+HEADLINE_EXCLUDED: dict[str, frozenset] = {
+    "skill.md": _HEADLINE_EXCLUDED_INSTRUCTION,
+    "claude.md": _HEADLINE_EXCLUDED_INSTRUCTION,
+    "cursorrules": _HEADLINE_EXCLUDED_INSTRUCTION,
+    "agents.md": _HEADLINE_EXCLUDED_INSTRUCTION,
+    "system_prompt": frozenset({"runtime"}),  # security is a core system_prompt dimension
+}
+
+
+def get_headline_excluded(fmt: str) -> frozenset:
+    """Return the dims excluded from the headline composite for a format (resolves aliases).
+
+    Falls back to the instruction-file exclusion set for unknown formats.
+    """
+    resolved = FORMAT_ALIASES.get(fmt, fmt)
+    return HEADLINE_EXCLUDED.get(resolved, _HEADLINE_EXCLUDED_INSTRUCTION)
+
 
 # ---------------------------------------------------------------------------
 # Public API
