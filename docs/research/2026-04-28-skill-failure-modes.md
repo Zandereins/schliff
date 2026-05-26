@@ -47,6 +47,8 @@ Phase-0 corpus = **stratified familiar-core + representative mini-probe**, satur
 
 Rows 1-10 = Day-1 confirmed reading set. Rows 11+ = reserve (read Day-2 if saturation not reached). `band:probe` = real messy community skill (representativeness injection).
 
+> **Composite scale note (2026-05-26):** the per-row composites below are **old-scale** (pre-PR #41, captured at coding time). PR #41 switched the composite to a full-denominator scale (no-eval-suite ceiling ≈ coverage×100) → these all land ~25–33 now and no longer separate quality (coverage-dominated). Current authoritative values: `benchmarks/corpus/v1/phase1-calibration/MANIFEST.md`. The binary failure-mode taxonomy is unaffected — it is orthogonal to the composite.
+
 > **Durable source (2026-05-22):** the 10 source SKILL.md are snapshotted reboot-proof at `benchmarks/corpus/v1/phase0-snapshot/` (see `MANIFEST.md` there for origin paths, sha256, and bundle-presence). The `/tmp` and plugin-cache paths in the table below are the *original* locations; re-code and verify against the snapshot.
 
 | #  | Source       | Skill name           | Local path · composite · band | Read-date | Note-tag |
