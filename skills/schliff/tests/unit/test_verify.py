@@ -201,17 +201,109 @@ class TestHistory:
 # run_verify — threshold checks
 # ---------------------------------------------------------------------------
 
+@pytest.fixture
+def weak_no_eval_skill(tmp_path):
+    """A no-eval-suite skill whose measured dimensions are mediocre.
+
+    Same coverage as good_skill (no eval suite → ~0.42), but lower per-measured
+    quality, so it should fail effective_min = 75 * coverage while the good skill
+    passes. Used to prove coverage-awareness discriminates on quality, not coverage.
+    """
+    content = '''---
+name: weak
+description: A skill.
+---
+
+# Weak
+
+Stuff.
+'''
+    weak_dir = tmp_path / "weak"
+    weak_dir.mkdir()
+    skill_path = weak_dir / "SKILL.md"
+    skill_path.write_text(content, encoding="utf-8")
+    return str(skill_path)
+
+
+@pytest.fixture
+def eval_suite_full():
+    """A minimal eval suite that lifts coverage toward ~1.0.
+
+    Providing an eval suite credits the triggers/quality/edges dimensions, so
+    weight_coverage approaches 1.0 and the skill is judged against ~full min_score.
+    """
+    return {
+        "skill_name": "test-skill",
+        "triggers": [
+            {"id": "pos-1", "prompt": "Run automated quality checks on a skill file and verify scoring.", "should_trigger": True, "category": "positive"},
+            {"id": "pos-2", "prompt": "Verify the skill quality scoring produces expected results.", "should_trigger": True, "category": "positive"},
+            {"id": "neg-1", "prompt": "Create a brand new skill from scratch.", "should_trigger": False, "category": "negative"},
+        ],
+        "test_cases": [
+            {"id": "tc-1", "prompt": "Run a quality check on a skill file.",
+             "assertions": [{"type": "contains", "value": "score"}, {"type": "not_contains", "value": "TODO"}]},
+            {"id": "tc-2", "prompt": "Review the dimension breakdown for a skill.",
+             "assertions": [{"type": "contains", "value": "dimension"}]},
+            {"id": "tc-3", "prompt": "Fix a weak dimension in a skill.",
+             "assertions": [{"type": "contains", "value": "fix"}]},
+        ],
+        "edge_cases": [
+            {"id": "ec-1", "prompt": "The SKILL.md file is missing entirely.",
+             "expected_behavior": "Return exit code 2.",
+             "assertions": [{"type": "contains", "value": "exit code 2"}]},
+            {"id": "ec-2", "prompt": "Scoring crashes mid-run.",
+             "expected_behavior": "Log the error and return exit code 2.",
+             "assertions": [{"type": "contains", "value": "error"}]},
+        ],
+    }
+
+
 class TestRunVerifyThreshold:
     def test_good_skill_passes_default(self, good_skill, history_file):
-        # Structural-only score (no eval suite → triggers/quality/edges uncredited)
-        # caps the good skill near coverage (~0.42 → composite ~33). Threshold set
-        # to 30 to exercise the PASS path under the unified full-denominator model.
+        # Coverage-aware: a strong no-eval-suite skill (composite ~33, coverage ~0.42)
+        # clears effective_min = 75 * 0.42 ≈ 31.5, so the DEFAULT threshold is now
+        # reachable without an eval suite.
         verdict = verify_mod.run_verify(
-            good_skill, min_score=30.0, history_path=history_file,
+            good_skill, history_path=history_file,
         )
         assert verdict["exit_code"] == 0
         assert verdict["passed_threshold"] is True
         assert "PASS" in verdict["message"]
+
+    def test_coverage_aware_good_no_eval_suite_passes_default(self, good_skill, history_file):
+        """Strong no-eval-suite skill PASSES the default (75) via coverage scaling."""
+        verdict = verify_mod.run_verify(
+            good_skill, history_path=history_file,  # default min_score = 75.0
+        )
+        assert verdict["min_score"] == 75.0
+        # Coverage is below 1.0 (no eval suite) so effective_min is scaled down.
+        assert 0 < verdict["coverage"] < 1.0
+        assert verdict["effective_min"] == pytest.approx(75.0 * verdict["coverage"])
+        assert verdict["composite"] >= verdict["effective_min"]
+        assert verdict["exit_code"] == 0
+        assert verdict["passed_threshold"] is True
+
+    def test_coverage_aware_weak_no_eval_suite_fails_default(self, weak_no_eval_skill, history_file):
+        """Mediocre no-eval-suite skill FAILS the default despite coverage scaling."""
+        verdict = verify_mod.run_verify(
+            weak_no_eval_skill, history_path=history_file,  # default min_score = 75.0
+        )
+        assert 0 < verdict["coverage"] < 1.0
+        assert verdict["effective_min"] == pytest.approx(75.0 * verdict["coverage"])
+        assert verdict["composite"] < verdict["effective_min"]
+        assert verdict["exit_code"] == 1
+        assert verdict["passed_threshold"] is False
+        assert "FAIL" in verdict["message"]
+
+    def test_coverage_aware_eval_suite_judged_against_full(self, good_skill, eval_suite_full, history_file):
+        """An eval-suite skill has higher coverage → judged against ~full min_score."""
+        verdict = verify_mod.run_verify(
+            good_skill, history_path=history_file, eval_suite=eval_suite_full,
+        )
+        # Adding an eval suite raises coverage above the no-eval-suite baseline (~0.42).
+        no_eval = verify_mod.run_verify(good_skill, history_path=history_file)
+        assert verdict["coverage"] > no_eval["coverage"]
+        assert verdict["effective_min"] == pytest.approx(75.0 * verdict["coverage"])
 
     def test_bad_skill_fails_high_threshold(self, bad_skill, history_file):
         verdict = verify_mod.run_verify(
@@ -229,8 +321,9 @@ class TestRunVerifyThreshold:
         assert verdict["min_score"] == 99.0
 
     def test_records_history_on_pass(self, good_skill, history_file):
+        # Passes the default threshold via coverage scaling and records history.
         verify_mod.run_verify(
-            good_skill, min_score=40.0, history_path=history_file,
+            good_skill, history_path=history_file,
         )
         assert Path(history_file).exists()
         content = Path(history_file).read_text(encoding="utf-8").strip()
@@ -249,10 +342,10 @@ class TestRunVerifyThreshold:
 
 class TestRunVerifyRegression:
     def test_no_previous_score_passes(self, good_skill, history_file):
-        # 30.0 threshold clears the structural-only good skill (~33) under the
-        # unified full-denominator model (no eval suite measured here).
+        # Default threshold (75.0) is now reachable for a strong no-eval-suite
+        # skill via coverage scaling (effective_min = 75 * ~0.42 ≈ 31.5 < ~33).
         verdict = verify_mod.run_verify(
-            good_skill, min_score=30.0, check_regression=True,
+            good_skill, check_regression=True,
             history_path=history_file,
         )
         assert verdict["exit_code"] == 0
@@ -266,8 +359,9 @@ class TestRunVerifyRegression:
             {"composite": 10.0, "grade": "F", "dimensions": {}},
             history_file,
         )
+        # Default threshold cleared via coverage scaling, then improvement detected.
         verdict = verify_mod.run_verify(
-            good_skill, min_score=30.0, check_regression=True,
+            good_skill, check_regression=True,
             history_path=history_file,
         )
         assert verdict["exit_code"] == 0
@@ -282,8 +376,9 @@ class TestRunVerifyRegression:
             {"composite": 999.0, "grade": "S", "dimensions": {}},
             history_file,
         )
+        # Default threshold cleared via coverage scaling so the regression gate runs.
         verdict = verify_mod.run_verify(
-            good_skill, min_score=30.0, check_regression=True,
+            good_skill, check_regression=True,
             history_path=history_file,
         )
         assert verdict["exit_code"] == 1
@@ -297,8 +392,10 @@ class TestRunVerifyRegression:
             {"composite": 999.0, "grade": "S", "dimensions": {}},
             history_file,
         )
+        # Default threshold cleared via coverage scaling; without --regression
+        # the seeded score drop must be ignored.
         verdict = verify_mod.run_verify(
-            good_skill, min_score=30.0, check_regression=False,
+            good_skill, check_regression=False,
             history_path=history_file,
         )
         # Without --regression, score drop doesn't matter
@@ -364,7 +461,8 @@ class TestVerdictStructure:
         )
         expected_keys = {
             "skill_path", "composite", "grade", "dimensions",
-            "min_score", "passed_threshold", "exit_code", "message",
+            "min_score", "coverage", "effective_min",
+            "passed_threshold", "exit_code", "message",
             "previous_score", "delta", "regression",
         }
         assert set(verdict.keys()) == expected_keys
