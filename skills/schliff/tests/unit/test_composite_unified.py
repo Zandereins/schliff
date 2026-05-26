@@ -191,3 +191,10 @@ def test_evolve_score_file_matches_cli(tmp_path):
     _, evolve_composite = engine._score_file(str(skill))
     cli_composite = compute_composite(build_scores(str(skill)))["score"]  # CLI: no security
     assert evolve_composite == cli_composite
+
+
+def test_default_run_reports_seven_of_seven():
+    full = {d: {"score": 90} for d in
+            ["structure", "triggers", "quality", "edges", "efficiency", "composability", "clarity"]}
+    r = compute_composite(full)
+    assert r["measured_dimensions"] == 7 and r["total_dimensions"] == 7
