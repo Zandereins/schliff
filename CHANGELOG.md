@@ -3,6 +3,23 @@
 All notable changes to Schliff are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- **BREAKING (scoring):** Composite is now computed over a single canonical 7-dimension basis
+  with a full denominator — unmeasured dimensions are uncredited (not silently renormalized away).
+  Scores for skills without an eval suite are lower and now reflect coverage. This unifies the
+  `score`/`doctor`/`bench` and `evolve` paths (one number per file) and closes the anti-gaming gap
+  where a gamed skill could match a clean one at composite level. Security is reported as a separate
+  signal/gate, no longer folded into the headline. CI thresholds (`fail if score<N`) may need
+  re-tuning. See `docs/superpowers/specs/2026-05-26-audit-followups-design.md`.
+- Anti-gaming: added a spread-keyword-stuffing penalty (efficiency dimension) and a composite
+  separation gate (`benchmarks/anti-gaming`) asserting every gamed skill scores below a clean control.
+- `verify` is now coverage-aware: the pass threshold scales with measured coverage
+  (effective_min = min_score × coverage), so skills without an eval suite are judged against a
+  structural bar instead of the unreachable full default. Adding an eval suite raises the bar to
+  the full surface.
+
 ## [7.2.0] - 2026-04-24
 
 ### Security

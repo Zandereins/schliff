@@ -3,7 +3,7 @@ name: schliff
 description: >
   Deterministic skill linter and scoring engine for Claude Code — the Ruff for
   SKILL.md files. 7-dimension structural scoring (structure, triggers, quality,
-  edges, efficiency, composability, clarity) with anti-gaming detection, 60-70%
+  edges, efficiency, composability, clarity) with anti-gaming detection, ~32%
   rule-based patches, and cross-session episodic memory. An autoresearch loop
   that measures first, then fixes — not the other way around. Use for linting,
   scoring, and autonomously improving any Claude Code skill: trigger accuracy,
