@@ -15,6 +15,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   re-tuning. See `docs/superpowers/specs/2026-05-26-audit-followups-design.md`.
 - Anti-gaming: added a spread-keyword-stuffing penalty (efficiency dimension) and a composite
   separation gate (`benchmarks/anti-gaming`) asserting every gamed skill scores below a clean control.
+- `verify` is now coverage-aware: the pass threshold scales with measured coverage
+  (effective_min = min_score × coverage), so skills without an eval suite are judged against a
+  structural bar instead of the unreachable full default. Adding an eval suite raises the bar to
+  the full surface.
 
 ## [7.2.0] - 2026-04-24
 

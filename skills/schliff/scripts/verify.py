@@ -59,6 +59,7 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
         "dimensions": {k: v["score"] for k, v in scores.items()},
         "warnings": composite["warnings"],
         "score_type": composite.get("score_type", "structural"),
+        "weight_coverage": composite.get("weight_coverage", 0.0),
     }
 
 
@@ -146,6 +147,7 @@ def run_verify(
     _error_verdict = {
         "skill_path": skill_path, "composite": 0.0, "grade": "F",
         "dimensions": {}, "min_score": min_score,
+        "coverage": 0.0, "effective_min": min_score,
         "passed_threshold": False, "exit_code": 2, "message": "",
         "previous_score": None, "delta": None, "regression": False,
     }
@@ -162,13 +164,28 @@ def run_verify(
     composite = result["composite"]
     grade = result["grade"]
 
+    # Coverage-aware threshold: a skill without an eval suite has unmeasured
+    # dimensions, so its composite is capped at its weight coverage. Scaling the
+    # threshold by coverage judges the per-measured-dimension quality
+    # (composite / coverage) against min_score. An eval-suite skill reaches
+    # coverage→1.0 and is held to the full min_score across all dimensions.
+    coverage = float(result.get("weight_coverage", 0.0))
+    if coverage <= 0:
+        # No measured dimensions — nothing to credit. Keep the full bar so we
+        # never pass an unscoreable skill (and never divide by zero downstream).
+        effective_min = min_score
+    else:
+        effective_min = round(min_score * coverage, 1)
+
     verdict: dict = {
         "skill_path": skill_path,
         "composite": composite,
         "grade": grade,
         "dimensions": result["dimensions"],
         "min_score": min_score,
-        "passed_threshold": composite >= min_score,
+        "coverage": coverage,
+        "effective_min": effective_min,
+        "passed_threshold": composite >= effective_min,
         "exit_code": 0,
         "message": "",
         "previous_score": None,
@@ -176,11 +193,12 @@ def run_verify(
         "regression": False,
     }
 
-    # Threshold check
-    if composite < min_score:
+    # Threshold check (coverage-aware)
+    if composite < effective_min:
         verdict["exit_code"] = 1
         verdict["message"] = (
-            f"FAIL: {composite}/100 [{grade}] < minimum {min_score}"
+            f"FAIL: {composite}/100 [{grade}] < effective minimum {effective_min} "
+            f"(min {min_score} x coverage {coverage:.0%})"
         )
         # Still record history even on failure
         append_history(skill_path, result, history_path)
@@ -210,7 +228,10 @@ def run_verify(
                 f"PASS: {composite}/100 [{grade}] (no previous score)"
             )
     else:
-        verdict["message"] = f"PASS: {composite}/100 [{grade}] >= {min_score}"
+        verdict["message"] = (
+            f"PASS: {composite}/100 [{grade}] >= effective minimum {effective_min} "
+            f"(min {min_score} x coverage {coverage:.0%})"
+        )
 
     # Record to history
     append_history(skill_path, result, history_path)
