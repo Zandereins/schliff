@@ -511,9 +511,13 @@ class TestRegressionGoodSkillPinned:
     def test_composite_exact(self, tmp_path):
         path = _write(tmp_path, _GOOD_SKILL_CONTENT)
         result = _score_all(path)
-        # Updated from 79.1 after registry weight unification
-        assert result["score"] == 79.0, (
-            f"good_skill composite regression: expected 79.0, got {result['score']}"
+        # Re-baselined for the unified full-denominator composite (2026-05-26).
+        # _score_all measures only structure/efficiency/composability/clarity — with
+        # no eval suite, triggers/quality/edges are uncredited → coverage 0.42, so the
+        # ceiling is ~42. Verified: 95*(.15/.95)+100*(.10/.95)+30*(.10/.95)+87*(.05/.95)
+        # = 33.3. Was 79.0 under the old renormalized (coverage-divided) scale.
+        assert result["score"] == 33.3, (
+            f"good_skill composite regression: expected 33.3, got {result['score']}"
         )
 
 
@@ -552,13 +556,17 @@ class TestRegressionBadSkillPinned:
     def test_composite_exact(self, tmp_path):
         path = _write(tmp_path, _BAD_SKILL_CONTENT)
         result = _score_all(path)
-        assert result["score"] == 39.9, (
-            f"bad_skill composite regression: expected 39.9, got {result['score']}"
+        # Re-baselined for the unified full-denominator composite (2026-05-26).
+        # 33*(.15/.95)+40*(.10/.95)+20*(.10/.95)+100*(.05/.95) = 16.8 at coverage 0.42.
+        # Was 39.9 under the old renormalized scale. Still below good_skill (33.3) —
+        # ordering preserved.
+        assert result["score"] == 16.8, (
+            f"bad_skill composite regression: expected 16.8, got {result['score']}"
         )
 
 
 class TestRegressionRealSkillMd:
-    """Schliff's own SKILL.md composite must stay within 99.0 ± 1.5."""
+    """Schliff's own SKILL.md structural-only composite must stay within 41.3 ± 1.5."""
 
     SKILL_MD_PATH = str(
         Path(__file__).resolve().parent.parent.parent / "SKILL.md"
@@ -566,10 +574,14 @@ class TestRegressionRealSkillMd:
 
     def test_composite_within_tolerance(self):
         result = _score_all(self.SKILL_MD_PATH)
-        # Measured 2026-03-25: composite after quality coherence + efficiency
-        # word compression + composability handoff fix = 99.0.
-        # Tolerance 1.5 guards against regressions.
-        expected = 99.0
+        # Re-baselined 2026-05-26 for the unified full-denominator composite.
+        # _score_all is structural-only (structure/efficiency/composability/clarity);
+        # with no eval suite triggers/quality/edges are uncredited → coverage 0.42.
+        # In-repo dims (structure 100, efficiency 92, composability 100, clarity 100):
+        # 100*(.15/.95)+92*(.10/.95)+100*(.10/.95)+100*(.05/.95) = 41.3.
+        # The full score WITH an eval suite (all 7 dims) is ~99; this structural-only
+        # path now reflects coverage rather than renormalizing the gap away.
+        expected = 41.3
         tolerance = 1.5
         assert abs(result["score"] - expected) <= tolerance, (
             f"SKILL.md composite regression: expected {expected} ±{tolerance}, "
@@ -621,29 +633,35 @@ class TestCompositeWeightMath:
             f"All dims at 0 should give composite 0.0, got {result['score']}"
         )
 
-    def test_only_structure_measured_gives_100(self):
-        """When only structure is in the scores dict (others absent), composite = 100.0.
+    def test_only_structure_measured_gives_its_weight(self):
+        """Full-denominator: only structure measured at 100 → composite = its canonical weight.
 
-        Normalization: composite = (100 * w_structure) / w_structure = 100.0
+        Under the unified model unmeasured dims are UNCREDITED (not renormalized away),
+        so a lone structure=100 contributes only its canonical weight:
+            composite = 100 * (0.15 / 0.95) ≈ 15.8
+        The old "gives 100" was the renormalization artifact this change removes.
         """
         scores = {"structure": {"score": 100, "issues": [], "details": {}}}
         result = compute_composite(scores)
-        assert result["score"] == 100.0, (
-            f"Single measured dimension at 100 should normalize to 100.0, got {result['score']}"
+        assert result["score"] == pytest.approx(100.0 * (0.15 / 0.95), abs=0.2), (
+            f"Lone structure=100 should contribute only its canonical weight "
+            f"(~15.8), got {result['score']}"
         )
-        assert result["weight_coverage"] == pytest.approx(0.15, abs=0.01)
+        assert result["weight_coverage"] == pytest.approx(0.15 / 0.95, abs=0.01)
 
     def test_structure_100_others_0_gives_structure_weight_times_100(self):
-        """Structure=100 with all others=0 (all weighted dims measured) = structure_weight * 100.
+        """Structure=100 with all others=0 → structure's CANONICAL weight * 100.
 
-        Default structure weight = 0.15, all dims measured, weight_sum = 1.0.
-        composite = (100 * 0.15) / 1.0 = 15.0
+        Security is excluded from the headline basis, so the canonical basis is the
+        7 non-security dims renormalized to 1.0 → structure's weight = 0.15/0.95 ≈ 0.158.
+        All 7 canonical dims are measured (coverage 1.0); only structure is non-zero:
+            composite = 100 * (0.15 / 0.95) ≈ 15.8
         """
         scores = _make_score_dict({d: 0 for d in _ALL_WEIGHTED_DIMS})
         scores["structure"]["score"] = 100
         result = compute_composite(scores)
-        assert result["score"] == 15.0, (
-            f"structure=100, rest=0 → expected 15.0 (0.15 * 100), got {result['score']}"
+        assert result["score"] == pytest.approx(100.0 * (0.15 / 0.95), abs=0.2), (
+            f"structure=100, rest=0 → expected ~15.8 (0.15/0.95 * 100), got {result['score']}"
         )
 
     def test_all_weighted_at_100_with_extra_dims_still_gives_100(self):
@@ -662,10 +680,14 @@ class TestCompositeWeightMath:
         assert result["weight_coverage"] == pytest.approx(1.0, abs=1e-6)
 
     def test_weight_coverage_single_dim_matches_that_dims_weight(self):
-        """Measuring only structure → weight_coverage = structure's weight (0.15)."""
+        """Measuring only structure → weight_coverage = structure's CANONICAL weight.
+
+        Security is excluded from the headline basis, so the 7 non-security dims are
+        renormalized to 1.0 and structure's canonical weight is 0.15/0.95 ≈ 0.158.
+        """
         scores = {"structure": {"score": 50, "issues": [], "details": {}}}
         result = compute_composite(scores)
-        assert result["weight_coverage"] == pytest.approx(0.15, abs=0.01)
+        assert result["weight_coverage"] == pytest.approx(0.15 / 0.95, abs=0.01)
 
     def test_composite_score_is_always_float(self):
         """compute_composite must always return a float, never an int or None."""

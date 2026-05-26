@@ -159,7 +159,14 @@ class TestGoldenGoodSkill:
     def test_composite_high(self, tmp_path):
         path = _write_skill(tmp_path, GOOD_SKILL)
         result = _score_all(path)
-        assert result["score"] >= 70, f"Composite should be >=70, got {result['score']}"
+        # Unified full-denominator model: _score_all measures only 4 of 7 canonical
+        # dims (no eval suite → triggers/quality/edges uncredited), so coverage is
+        # 0.42 and the structural-only composite is ~33.3. The "high" intent is now
+        # expressed relative to the bad skill (see ordering test) and to its own
+        # ceiling — it must clear the 30 mark and stay near the 0.42 coverage cap.
+        assert 30 <= result["score"] <= 42, (
+            f"Good skill structural-only composite should be ~33 (30-42 band), got {result['score']}"
+        )
 
 
 class TestGoldenBadSkill:
@@ -192,9 +199,10 @@ class TestGoldenBadSkill:
     def test_composite_low(self, tmp_path):
         path = _write_skill(tmp_path, BAD_SKILL)
         result = _score_all(path)
-        # Golden value shifted from 45 to ~40 after registry weight unification
-        # (clarity 0.05, security 0.05 now explicit; runtime removed from defaults)
-        _assert_score_in_range(result["score"], 40, tolerance=5, label="bad_composite")
+        # Re-baselined for the unified full-denominator composite (2026-05-26):
+        # 33*(.15/.95)+40*(.10/.95)+20*(.10/.95)+100*(.05/.95) = 16.8 at coverage 0.42.
+        # Stays well below the good skill (~33.3) — ordering preserved.
+        _assert_score_in_range(result["score"], 16.8, tolerance=2, label="bad_composite")
 
 
 class TestGoldenMediumSkill:
@@ -225,20 +233,49 @@ class TestGoldenMediumSkill:
     def test_composite_medium(self, tmp_path):
         path = _write_skill(tmp_path, MEDIUM_SKILL)
         result = _score_all(path)
-        assert 50 <= result["score"] <= 90, f"Composite should be 50-90, got {result['score']}"
+        # Unified full-denominator model, structural-only (no eval suite → coverage 0.42).
+        # Verified ~32.8. Sits between bad (~16.8) and good (~33.3) — ordering preserved.
+        assert 25 <= result["score"] <= 38, (
+            f"Medium skill structural-only composite should be ~33 (25-38 band), got {result['score']}"
+        )
+
+
+class TestGoldenOrdering:
+    """Composite scores must respect strict ordering: good > medium > bad."""
+
+    def test_good_gt_medium_gt_bad(self, tmp_path):
+        good_dir = tmp_path / "good"
+        good_dir.mkdir()
+        medium_dir = tmp_path / "medium"
+        medium_dir.mkdir()
+        bad_dir = tmp_path / "bad"
+        bad_dir.mkdir()
+
+        good_composite = _score_all(_write_skill(good_dir, GOOD_SKILL))["score"]
+        medium_composite = _score_all(_write_skill(medium_dir, MEDIUM_SKILL))["score"]
+        bad_composite = _score_all(_write_skill(bad_dir, BAD_SKILL))["score"]
+
+        assert good_composite > medium_composite > bad_composite, (
+            f"Ordering violated: good={good_composite:.2f}, "
+            f"medium={medium_composite:.2f}, bad={bad_composite:.2f}. "
+            f"Expected good > medium > bad (strict)."
+        )
 
 
 class TestGoldenSelfScore:
     """Schliff's own SKILL.md should maintain S-grade."""
 
     def test_self_score_structural_high(self):
-        """Schliff's SKILL.md structural-only score must be >= 80."""
+        """Schliff's SKILL.md structural-only composite under the unified model (~38.9)."""
         skill_path = str(Path(__file__).resolve().parent.parent.parent / "SKILL.md")
         result = _score_all(skill_path)
-        # Note: without eval-suite, triggers/quality/edges are excluded.
-        # Full score with eval-suite is ~90+. Structural-only is lower.
-        assert result["score"] >= 80, (
-            f"Self-score regression! Expected >=80, got {result['score']}"
+        # Unified full-denominator model: without an eval suite, triggers/quality/edges
+        # are uncredited (not renormalized away), so coverage is 0.42 and the
+        # structural-only ceiling is ~42. Verified ~38.9 — near the coverage cap, which
+        # is the strongest a no-eval-suite skill can score. The full score WITH an eval
+        # suite (all 7 dims) is ~99.
+        assert result["score"] >= 36, (
+            f"Self-score regression! Expected >=36 (structural-only, ~38.9), got {result['score']}"
         )
 
     def test_self_structure_perfect(self):

@@ -203,8 +203,11 @@ class TestHistory:
 
 class TestRunVerifyThreshold:
     def test_good_skill_passes_default(self, good_skill, history_file):
+        # Structural-only score (no eval suite → triggers/quality/edges uncredited)
+        # caps the good skill near coverage (~0.42 → composite ~33). Threshold set
+        # to 30 to exercise the PASS path under the unified full-denominator model.
         verdict = verify_mod.run_verify(
-            good_skill, min_score=40.0, history_path=history_file,
+            good_skill, min_score=30.0, history_path=history_file,
         )
         assert verdict["exit_code"] == 0
         assert verdict["passed_threshold"] is True
@@ -246,8 +249,10 @@ class TestRunVerifyThreshold:
 
 class TestRunVerifyRegression:
     def test_no_previous_score_passes(self, good_skill, history_file):
+        # 30.0 threshold clears the structural-only good skill (~33) under the
+        # unified full-denominator model (no eval suite measured here).
         verdict = verify_mod.run_verify(
-            good_skill, min_score=40.0, check_regression=True,
+            good_skill, min_score=30.0, check_regression=True,
             history_path=history_file,
         )
         assert verdict["exit_code"] == 0
@@ -262,7 +267,7 @@ class TestRunVerifyRegression:
             history_file,
         )
         verdict = verify_mod.run_verify(
-            good_skill, min_score=40.0, check_regression=True,
+            good_skill, min_score=30.0, check_regression=True,
             history_path=history_file,
         )
         assert verdict["exit_code"] == 0
@@ -278,7 +283,7 @@ class TestRunVerifyRegression:
             history_file,
         )
         verdict = verify_mod.run_verify(
-            good_skill, min_score=40.0, check_regression=True,
+            good_skill, min_score=30.0, check_regression=True,
             history_path=history_file,
         )
         assert verdict["exit_code"] == 1
@@ -293,7 +298,7 @@ class TestRunVerifyRegression:
             history_file,
         )
         verdict = verify_mod.run_verify(
-            good_skill, min_score=40.0, check_regression=False,
+            good_skill, min_score=30.0, check_regression=False,
             history_path=history_file,
         )
         # Without --regression, score drop doesn't matter
