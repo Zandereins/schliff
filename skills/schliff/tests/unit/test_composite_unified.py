@@ -95,3 +95,20 @@ def test_unification_cli_equals_evolve():
     cli_path = compute_composite(dict(dims))                       # 7 dims (CLI)
     evolve_path = compute_composite({**dims, "security": {"score": 55}})  # +security (evolve)
     assert cli_path["score"] == evolve_path["score"], "dual-scale: CLI != evolve"
+
+
+def test_system_prompt_keeps_security_in_headline():
+    """For system_prompt, security is a CORE dim (weight 0.15) and must stay in the headline;
+    coverage must reflect it (not falsely report 1.0 when security is unmeasured)."""
+    # All system_prompt dims measured EXCEPT security -> coverage < 1.0 (security weight not credited)
+    sp = {d: {"score": 100} for d in
+          ["structure_prompt", "output_contract", "efficiency", "clarity", "composability", "completeness"]}
+    r = compute_composite(sp, fmt="system_prompt")
+    assert r["weight_coverage"] < 1.0, "system_prompt security weight wrongly excluded from basis"
+    # And when security IS measured, it participates in the headline: security=0 must score
+    # strictly below security=100 (it's in the basis, not a side signal). Both reach full
+    # coverage, so the headline delta is the proof that security is folded into the number.
+    r_sec0 = compute_composite({**sp, "security": {"score": 0}}, fmt="system_prompt")
+    r_sec100 = compute_composite({**sp, "security": {"score": 100}}, fmt="system_prompt")
+    assert r_sec0["score"] < r_sec100["score"], "security must move the system_prompt headline"
+    assert r_sec100["weight_coverage"] == 1.0 and r_sec0["weight_coverage"] == 1.0
