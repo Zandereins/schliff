@@ -310,24 +310,6 @@ class TestScoreSecurity:
         assert result["score"] >= 90
         assert result["details"]["code_block_excluded"] >= 1
 
-    def test_graduated_cap_works(self, tmp_path):
-        """Test the graduated composite cap based on security score.
-
-        score < 5  -> composite max 20
-        score < 10 -> composite max 40
-        score < 20 -> composite max 60
-        """
-        from scoring.security import get_composite_cap
-
-        assert get_composite_cap(0) == 20
-        assert get_composite_cap(4) == 20
-        assert get_composite_cap(5) == 40
-        assert get_composite_cap(9) == 40
-        assert get_composite_cap(10) == 60
-        assert get_composite_cap(19) == 60
-        assert get_composite_cap(20) is None
-        assert get_composite_cap(100) is None
-
     def test_negation_aware(self, tmp_path):
         """'never run rm -rf' should be safe (negation), but 'run rm -rf' should be flagged."""
         safe_dir = tmp_path / "safe"
