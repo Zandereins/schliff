@@ -4,7 +4,7 @@
 Drives the entire improvement loop without a Claude session:
   baseline score → gradient → top-3 exploration → score → keep best/revert → log → repeat
 
-60-70% of gradients are deterministic (frontmatter fixes, noise removal, TODO cleanup).
+~32% of gradients are deterministic (measured by measure_patch_ratio.py: confidence=high, single-edit effort).
 These are applied directly. Medium/low-confidence changes fall back to claude -p.
 
 Usage:

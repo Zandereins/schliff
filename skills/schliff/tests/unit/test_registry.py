@@ -106,15 +106,26 @@ class TestRegistryAlignment:
         assert "security" in scores
 
     def test_composite_uses_registry_weights(self):
-        """compute_composite() weights come from the registry — no hardcoded fallbacks."""
+        """compute_composite() weights come from the registry — no hardcoded fallbacks.
+
+        Security is in the registry weight profile but is EXCLUDED from the headline
+        composite basis (reported as a separate signal), so the canonical basis is the
+        7 non-security dims. With every canonical dim measured the coverage is exactly
+        1.0 and there are no unmeasured headline dims.
+        """
         from scoring.composite import compute_composite
+        from scoring.registry import get_headline_excluded
 
         registry_weights = get_weights("skill.md")
+        excluded = get_headline_excluded("skill.md")
+        canonical_count = len([d for d in registry_weights if d not in excluded])
         scores = {dim: {"score": 50, "issues": [], "details": {}} for dim in registry_weights}
         result = compute_composite(scores)
 
-        # All registry-weighted dimensions should be measured
-        assert result["measured_dimensions"] == len(registry_weights)
+        # All canonical (non-security) registry-weighted dimensions are measured;
+        # security flows to signals, not the headline composite.
+        assert result["measured_dimensions"] == canonical_count
+        assert "security" in result["signals"]
         assert len(result["unmeasured"]) == 0
         assert abs(result["weight_coverage"] - 1.0) < 1e-6
 

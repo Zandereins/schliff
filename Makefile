@@ -1,4 +1,4 @@
-.PHONY: test test-self test-proof test-all score lint install install-dev clean help
+.PHONY: test test-unit test-self test-proof test-all score lint install install-dev clean help
 
 SKILL_DIR := skills/schliff
 
@@ -6,7 +6,10 @@ help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-test: ## Run integration tests (99+ tests)
+test-unit: ## Run the pytest unit suite (1100+ tests)
+	/usr/bin/python3 -m pytest skills/schliff/tests -q
+
+test: test-unit ## Run unit tests (pytest) then integration tests
 	cd $(SKILL_DIR) && bash scripts/test-integration.sh --no-runtime-auto
 
 test-self: ## Run self-tests (20 tests)

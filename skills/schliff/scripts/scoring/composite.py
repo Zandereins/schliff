@@ -13,6 +13,10 @@ _calibrated_weights_mtime: float = 0.0
 _calibrated_weights_path: str = ""
 
 
+# Security is a separate advisory gate, never folded into the headline composite.
+SECURITY_GATE = 70
+
+
 def _load_calibrated_weights() -> Optional[dict]:
     """Load auto-calibrated weights from ~/.schliff/meta/calibrated-weights.json.
 
@@ -50,6 +54,13 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
                       fmt: Optional[str] = None) -> dict:
     """Compute weighted composite score with confidence indicator.
 
+    Uses a full-denominator model: unmeasured dims are uncredited (contribute 0
+    but stay in the basis), so a skill's score ceiling equals its coverage. The
+    canonical headline basis is format-aware via get_headline_excluded — for the
+    skill.md family security+runtime are excluded, for system_prompt only runtime
+    is (security is a core 0.15 dim that stays in the headline). Security and
+    runtime are also reported as separate signals in `signals`/`security`.
+
     Returns both the score and metadata about how many dimensions
     were actually measured, so users know how trustworthy the number is.
 
@@ -61,79 +72,80 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
         fmt: Optional format identifier. When provided, weights are loaded
             from the scorer registry. Defaults to "skill.md" weights.
     """
-    from scoring.registry import get_weights
+    from scoring.registry import get_weights, get_headline_excluded
 
     weights = get_weights(fmt if fmt is not None else "skill.md")
+    explicit = set(custom_weights or {})
 
-    # Apply custom weights if provided (highest priority)
-    # Custom weights OVERRIDE defaults for specified keys but keep unspecified dimensions.
-    # When custom_weights are active, opt-in dimensions (security, clarity) are excluded
-    # unless the user explicitly includes them in custom_weights.
     if custom_weights:
-        # When custom weights are provided, only keep dimensions that the user
-        # explicitly included. Dimensions not in custom_weights but present in
-        # the registry defaults are kept (they form the baseline). However,
-        # "supplementary" dimensions (clarity, security) that were traditionally
-        # handled specially are excluded unless explicitly in custom_weights.
         _SUPPLEMENTARY = {"clarity", "security"}
         for dim in list(weights):
             if dim in _SUPPLEMENTARY and dim not in custom_weights:
                 del weights[dim]
-        # Reject negative weights
         for k, v in custom_weights.items():
             if k in weights and isinstance(v, (int, float)) and math.isfinite(v) and v >= 0:
                 weights[k] = v
-        # Normalize all weights to sum to 1.0
-        total_w = sum(weights.values())
-        if total_w > 0:
-            weights = {k: v / total_w for k, v in weights.items()}
     else:
-        # Try auto-calibrated weights (second priority)
         calibrated = _load_calibrated_weights()
         if calibrated:
-            calibrated_filtered = {k: v for k, v in calibrated.items() if k in weights}
-            if calibrated_filtered:
-                for k, v in calibrated_filtered.items():
+            for k, v in calibrated.items():
+                if k in weights:
                     weights[k] = v
-                total_w = sum(weights.values())
-                if total_w > 0:
-                    weights = {k: v / total_w for k, v in weights.items()}
 
+    # Canonical headline basis: format-aware. Dims excluded per get_headline_excluded are NEVER
+    # folded into the headline composite unless the caller explicitly weighted them via
+    # custom_weights. For skill.md family, security+runtime are excluded (security is an opt-in
+    # 0.05 side signal). For system_prompt, security is a CORE 0.15 dim and stays in the headline;
+    # only runtime is excluded. This is the single basis used by every entrypoint -> no dual-scale.
+    excluded = get_headline_excluded(fmt if fmt is not None else "skill.md")
+    canonical = {d: w for d, w in weights.items()
+                 if d not in excluded or d in explicit}
+    basis = sum(canonical.values())
+    if basis > 0:
+        canonical = {d: w / basis for d, w in canonical.items()}  # renormalize to 1.0
+
+    # Full-denominator aggregation: unmeasured dims are UNCREDITED (contribute 0), not dropped.
+    # composite = Σ(score·weight over measured) / Σ(all canonical weight == 1.0)
+    # => a skill's ceiling equals its coverage until the missing dims are verified.
     total = 0.0
-    weight_sum = 0.0
+    measured_w = 0.0
     measured = []
     unmeasured = []
-
-    for dim, weight in weights.items():
+    for dim, weight in canonical.items():
         s = scores.get(dim, {}).get("score", -1)
         if s >= 0:
             total += s * weight
-            weight_sum += weight
+            measured_w += weight
             measured.append(dim)
         else:
             unmeasured.append(dim)
 
-    composite = round(total / weight_sum, 1) if weight_sum > 0 else 0.0
-
-    # Confidence: what fraction of total weight is actually measured
-    confidence = round(weight_sum, 2)
+    composite = round(total, 1)            # divisor is 1.0 (full canonical basis)
+    coverage = round(measured_w, 2)
     measured_count = len(measured)
-    total_count = len(weights)
+    total_count = len(canonical)
 
     warnings = []
-    # Only warn about non-opt-in unmeasured dimensions (runtime, security are opt-in)
-    from scoring.registry import OPT_IN_SCORERS
-    warn_unmeasured = [d for d in unmeasured if d not in OPT_IN_SCORERS]
-    if warn_unmeasured:
+    if basis == 0:
+        warnings.append("No weighted dimensions to score.")
+    elif unmeasured:
         prefix = "Only " if measured_count <= 2 else ""
-        suffix = " Score is unreliable —" if measured_count <= 2 else ""
         warnings.append(
             f"{prefix}{measured_count}/{total_count} dimensions measured "
-            f"(weight coverage: {confidence:.0%}).{suffix} "
-            f"{'u' if measured_count <= 2 else 'U'}nmeasured: {', '.join(warn_unmeasured)}"
+            f"(coverage {coverage:.0%}). Unverified dimensions are uncredited — "
+            f"score ceiling is {coverage:.0%}. Unmeasured: {', '.join(unmeasured)}"
         )
 
-    # Confidence notes: explain what each dimension can and cannot tell you
+    # Security/runtime: reported as SEPARATE signals, never in the headline composite.
+    signals = {}
+    for opt in ("security", "runtime"):
+        sv = scores.get(opt, {}).get("score", -1)
+        if sv is not None and sv >= 0:
+            signals[opt] = ({
+                "score": sv,
+                "status": "pass" if sv >= SECURITY_GATE else "flag",
+            } if opt == "security" else {"score": sv})
+
     confidence_notes = {
         "structure": "Measures file organization (frontmatter, headers, length, references). "
                      "Cannot assess whether instructions are correct or effective.",
@@ -149,12 +161,9 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
                          "Cannot verify the skill works correctly alongside other skills.",
         "clarity": "Measures contradiction, vague reference, and ambiguity patterns. "
                    "Cannot assess whether instructions are clear to Claude in practice.",
-        "security": "Measures security anti-patterns (hardcoded secrets, injection vectors, "
-                     "unsafe operations). Cannot assess runtime security posture.",
     }
 
-    # Determine score type based on what was measured
-    has_runtime = "runtime" in measured
+    has_runtime = "runtime" in signals
     score_type = "structural+runtime" if has_runtime else "structural"
 
     return {
@@ -162,8 +171,10 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
         "score_type": score_type,
         "measured_dimensions": measured_count,
         "total_dimensions": total_count,
-        "weight_coverage": confidence,
+        "weight_coverage": coverage,
         "unmeasured": unmeasured,
         "warnings": warnings,
+        "signals": signals,
+        "security": signals.get("security", {}),
         "confidence_notes": {k: v for k, v in confidence_notes.items() if k in measured},
     }

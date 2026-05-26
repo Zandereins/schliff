@@ -786,7 +786,7 @@ Du arbeitest in Worktree ../schliff-phase-2 auf Branch schliff-v8/phase-2-evolut
 
 Das ist Schliff's "Karpathy-Moment": schliff evolve verbessert Instruction Files autonom.
 Geschlossener Loop den KEIN anderes Tool hat:
-  Deterministisch scoren -> Deterministisch patchen (60-70%, $0) -> LLM verbessern -> Deterministisch verifizieren
+  Deterministisch scoren -> Deterministisch patchen (~32%, $0) -> LLM verbessern -> Deterministisch verifizieren
 
 WICHTIG:
 - LiteLLM ist OPTIONAL: pip install schliff[evolve]

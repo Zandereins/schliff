@@ -342,8 +342,16 @@ class TestMinusOneExclusion:
         result = compute_composite(scores)
         assert result["score"] == 0.0
 
-    def test_single_measured_dim_drives_composite(self):
-        """With one measured dimension its score must equal the composite (weight coverage=1)."""
+    def test_single_measured_dim_contributes_only_its_weight(self):
+        """Full-denominator model: one measured dim is UNCREDITED on the rest.
+
+        Only structure (canonical weight 0.15/0.95 ≈ 0.158) is measured; the other
+        six canonical dims are unmeasured and uncredited. The composite is therefore
+        the dim's score scaled by its canonical weight, NOT the raw dim score —
+        the old renormalize-to-coverage semantics are gone.
+            composite = 77 * (0.15 / 0.95) ≈ 12.2
+            weight_coverage = 0.15 / 0.95 ≈ 0.158
+        """
         scores = {
             "structure": _score(77),
             "triggers": {"score": -1, "issues": [], "details": {}},
@@ -353,7 +361,8 @@ class TestMinusOneExclusion:
             "composability": {"score": -1, "issues": [], "details": {}},
         }
         result = compute_composite(scores)
-        assert result["score"] == pytest.approx(77.0, abs=0.2)
+        assert result["score"] == pytest.approx(77.0 * (0.15 / 0.95), abs=0.2)
+        assert result["weight_coverage"] == pytest.approx(0.15 / 0.95, abs=0.01)
 
 
 # ---------------------------------------------------------------------------
