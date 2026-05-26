@@ -501,6 +501,9 @@ class TestComputeComposite:
         assert result["score"] == 0 or result["measured_dimensions"] == 0
 
     def test_perfect_scores(self):
+        # Six canonical dims at 100; clarity (canonical weight 0.05/0.95) is
+        # unmeasured and uncredited under the full-denominator model, so the
+        # ceiling is 0.90/0.95 * 100 ≈ 94.7, NOT 100. (Add clarity=100 to reach 100.)
         scores = {
             "structure": {"score": 100},
             "triggers": {"score": 100},
@@ -510,7 +513,7 @@ class TestComputeComposite:
             "edges": {"score": 100},
         }
         result = compute_composite(scores)
-        assert result["score"] >= 95
+        assert result["score"] == pytest.approx(0.90 / 0.95 * 100, abs=0.2)
 
     def test_clarity_dimension_present_weights_sum_to_one(self):
         scores = {
