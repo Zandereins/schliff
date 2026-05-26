@@ -151,7 +151,7 @@ def test_separation_gamed_below_clean():
     under the no-eval-suite condition (the common case)."""
     from scoring import (score_structure, score_triggers, score_quality, score_edges,
                          score_efficiency, score_composability, score_clarity)
-    bench_skills = Path(__file__).resolve().parents[3] / "benchmarks" / "anti-gaming" / "skills"
+    bench_skills = Path(__file__).resolve().parents[4] / "benchmarks" / "anti-gaming" / "skills"
 
     def composite_of(path):
         s = {
@@ -461,7 +461,7 @@ Create the wrapper test inside `test_composite_unified.py`:
 ```python
 def test_anti_gaming_benchmark_gate():
     import subprocess
-    repo = Path(__file__).resolve().parents[3]
+    repo = Path(__file__).resolve().parents[4]  # unit→tests→schliff→skills→repo root
     proc = subprocess.run(["/usr/bin/python3", "benchmarks/anti-gaming/run.py"],
                           cwd=str(repo), capture_output=True, text=True)
     assert proc.returncode == 0, f"anti-gaming separation failed:\n{proc.stdout}"
@@ -735,7 +735,7 @@ import json
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]  # unit→tests→schliff→skills→repo root
 
 
 def _pyproject_version() -> str:
