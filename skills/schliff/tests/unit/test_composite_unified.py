@@ -112,3 +112,19 @@ def test_system_prompt_keeps_security_in_headline():
     r_sec100 = compute_composite({**sp, "security": {"score": 100}}, fmt="system_prompt")
     assert r_sec0["score"] < r_sec100["score"], "security must move the system_prompt headline"
     assert r_sec100["weight_coverage"] == 1.0 and r_sec0["weight_coverage"] == 1.0
+
+
+def test_evolve_score_file_matches_cli(tmp_path):
+    """evolve._score_file must return the same headline composite as the CLI path."""
+    import importlib
+    skill = tmp_path / "SKILL.md"
+    skill.write_text(
+        "---\nname: demo\ndescription: Use when demoing the evolve scoring path for parity tests.\n---\n"
+        "# Demo\n## When to use\nUse for parity testing.\n## Steps\n1. Do the thing.\n",
+        encoding="utf-8",
+    )
+    engine = importlib.import_module("evolve.engine")
+    from shared import build_scores
+    _, evolve_composite = engine._score_file(str(skill))
+    cli_composite = compute_composite(build_scores(str(skill)))["score"]  # CLI: no security
+    assert evolve_composite == cli_composite
