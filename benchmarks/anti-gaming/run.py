@@ -75,7 +75,17 @@ BENCHMARKS = [
         "gaming_vector": "No scope boundaries, handoffs, or error behavior",
         "detection": "10 sub-checks: scope, state, I/O, handoffs, errors, etc.",
     },
+    {
+        "file": "sophisticated-gamer.md",
+        "target_dimension": "efficiency",
+        "gaming_vector": "Structurally complete + all composability boilerplate, "
+                         "but one keyword stuffed ~26% of body (spread across lines)",
+        "detection": "Spread-keyword-stuffing density penalty + full-denominator "
+                     "(triggers/quality/edges uncredited with no eval suite)",
+    },
 ]
+
+CLEAN_CONTROL = "clean-reference.md"
 
 
 def score_skill(skill_path: str) -> dict:
@@ -193,18 +203,30 @@ def format_markdown(results: list[dict]) -> str:
 
 def main():
     use_json = "--json" in sys.argv
-
     results = run_benchmarks()
 
-    if use_json:
-        # Serialize, filtering out non-serializable details
-        output = []
+    clean_path = str(_SKILLS_DIR / CLEAN_CONTROL)
+    clean_composite = score_skill(clean_path)["composite"] if Path(clean_path).exists() else None
+
+    violations = []
+    if clean_composite is not None:
         for r in results:
-            entry = {k: v for k, v in r.items() if k != "target_details"}
-            output.append(entry)
-        print(json.dumps(output, indent=2))
+            if "composite" in r and r["composite"] >= clean_composite:
+                violations.append((r["file"], r["composite"]))
+
+    if use_json:
+        output = [{k: v for k, v in r.items() if k != "target_details"} for r in results]
+        print(json.dumps({"clean_composite": clean_composite,
+                          "violations": violations, "results": output}, indent=2))
     else:
         print(format_markdown(results))
+        print(f"\nClean control composite: {clean_composite}")
+        if violations:
+            print("SEPARATION FAILURES (gamed >= clean):")
+            for f, c in violations:
+                print(f"  {f}: {c}")
+
+    sys.exit(1 if violations else 0)
 
 
 if __name__ == "__main__":

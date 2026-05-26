@@ -3,13 +3,42 @@
 Measures how much useful, actionable content the skill delivers
 relative to its total size. Penalizes bloat, rewards conciseness.
 """
+from collections import Counter
+
 from shared import read_skill_safe, strip_frontmatter
+from nlp import RE_WORD_TOKEN, STOPWORDS
 from scoring.patterns import (
     _RE_ACTIONABLE_LINES, _RE_REAL_EXAMPLES, _RE_WHY_COUNT,
     _RE_VERIFICATION_CMDS, _RE_HEDGING, _RE_FILLER_PHRASES,
     _RE_OBVIOUS_INSTRUCTIONS, _RE_SCOPE_BOUNDARY,
     _RE_CODE_BLOCK_REGION,
 )
+
+# Anti-gaming: spread keyword stuffing. A body that repeats one meaningful term far
+# beyond what natural prose requires is low-information padding even when it is spread
+# across many distinct lines (so repeated_lines misses it). We count the EXCESS
+# occurrences of any over-used term as noise. Thresholds are deliberately lax so a
+# genuinely domain-focused skill (which repeats its subject a handful of times) is
+# untouched; only pathological domination is penalized.
+_STUFF_MIN_PROSE_TOKENS = 40   # need enough prose to judge term frequency
+_STUFF_DOMINANCE = 0.12        # a term exceeding 12% of meaningful prose tokens is over-used
+_STUFF_MIN_COUNT = 8           # ...and occurs at least this many times
+
+
+def _spread_stuffing_noise(prose: str) -> tuple[int, list[str]]:
+    """Return (excess-repetition noise, issues) for over-used meaningful terms in prose."""
+    tokens = [w for w in RE_WORD_TOKEN.findall(prose.lower()) if w not in STOPWORDS]
+    n = len(tokens)
+    if n < _STUFF_MIN_PROSE_TOKENS:
+        return 0, []
+    allowed = max(_STUFF_MIN_COUNT, int(_STUFF_DOMINANCE * n))
+    noise = 0
+    issues: list[str] = []
+    for term, count in Counter(tokens).most_common(3):
+        if count >= _STUFF_MIN_COUNT and count > allowed:
+            noise += count - allowed
+            issues.append(f"keyword_stuffing:{term}:{count}_of_{n}")
+    return noise, issues
 
 
 def score_efficiency(skill_path: str) -> dict:
@@ -92,6 +121,9 @@ def score_efficiency(skill_path: str) -> dict:
         line_counts[key] = line_counts.get(key, 0) + 1
     repeated_lines = sum(count - 1 for count in line_counts.values() if count >= 3)
 
+    # Spread keyword stuffing: over-used meaningful terms across distinct lines.
+    stuffing_noise, stuffing_issues = _spread_stuffing_noise(prose_content)
+
     # Empty/near-empty lines ratio
     empty_lines = sum(1 for line in lines if not line.strip())
     empty_ratio = empty_lines / max(total_lines, 1)
@@ -110,7 +142,8 @@ def score_efficiency(skill_path: str) -> dict:
         hedge_count * 3 +
         filler_phrases * 2 +
         obvious_instructions * 2 +
-        repeated_lines * 2           # Repeated identical lines are padding
+        repeated_lines * 2 +         # Repeated identical lines are padding
+        stuffing_noise * 2           # Over-used keywords spread across lines are padding
     )
 
     # Density = signal per 100 words, penalized by noise
@@ -154,6 +187,7 @@ def score_efficiency(skill_path: str) -> dict:
         issues.append(f"verbose:{total_words}_words")
     if repeated_lines > 3:
         issues.append(f"repeated_lines:{repeated_lines}")
+    issues.extend(stuffing_issues)
 
     return {
         "score": int(min(100, max(0, score))),
@@ -170,5 +204,6 @@ def score_efficiency(skill_path: str) -> dict:
             "hedge_count": hedge_count,
             "filler_phrases": filler_phrases,
             "repeated_lines": repeated_lines,
+            "stuffing_noise": stuffing_noise,
         }
     }

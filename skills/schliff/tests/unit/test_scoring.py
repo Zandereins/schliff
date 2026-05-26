@@ -934,7 +934,13 @@ class TestDensityCurve:
         actionable = "\n".join(
             [f"Run process step {i} now." for i in range(5)]
         )
-        padding = ("word " * 95).strip()
+        # Varied prose padding (not a single repeated token) to dilute density to ~5
+        # without tripping the spread-keyword-stuffing detector — real low-density prose
+        # uses many distinct words, it does not repeat one word 95 times.
+        vocab = ("the quick brown context fox jumps over a lazy summary while many "
+                 "distinct tokens fill out this paragraph with varied prose padding "
+                 "content here and there across several plausible sentences").split()
+        padding = " ".join(vocab[i % len(vocab)] for i in range(95))
         body = f"{actionable}\n{padding}"
         content = f"---\nname: mid-density\ndescription: mid density\n---\n\n{body}\n"
         p = tmp_path / "SKILL.md"
