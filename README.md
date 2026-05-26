@@ -26,8 +26,8 @@ schliff v7.2.0
   composability  ███░░░░░░░   30/100  poor
   clarity        █████████░   90/100  great
 
-  Structural Score  ███████████░░░░░░░░░  53.8/100  [D]
-  ⚠ 4/8 dimensions measured (weight coverage: 40%). Unmeasured: triggers, quality, edges
+  Structural Score  █████░░░░░░░░░░░░░░░  22.6/100  [F]
+  ⚠ 4/7 dimensions measured (coverage 42%). Unverified dimensions are uncredited — score ceiling is 42%. Unmeasured: triggers, quality, edges
   → 13 deterministic fixes available. Run `/schliff:auto` in Claude Code to apply.
 
   Tokens: 378 / 1,000 (ok)
@@ -51,7 +51,7 @@ schliff v7.2.0
 
 ## Seen in the wild
 
-A root `CLAUDE.md` written for [`modelcontextprotocol/servers`](https://github.com/modelcontextprotocol/servers/pull/3733) (Anthropic's official MCP reference repo) merged to main on April 17th, 2026. Running schliff on it returned **59.2/100 at 40% weight coverage** — a useful measurement of where the file actually needed work and where the scorer was structurally unfair for a project-root document. [Full walkthrough →](https://fpaul.dev/writing/scoring-my-own-mcp-contribution/)
+A root `CLAUDE.md` written for [`modelcontextprotocol/servers`](https://github.com/modelcontextprotocol/servers/pull/3733) (Anthropic's official MCP reference repo) merged to main on April 17th, 2026. Running schliff on it returned **59.2/100 at 40% weight coverage** (pre-v8 scale; full-denominator scoring would place this lower) — a useful measurement of where the file actually needed work and where the scorer was structurally unfair for a project-root document. [Full walkthrough →](https://fpaul.dev/writing/scoring-my-own-mcp-contribution/)
 
 ---
 
@@ -196,7 +196,7 @@ Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) 
 | | autoresearch | Schliff |
 |---|---|---|
 | **Target** | ML training scripts | AI instruction files |
-| **Patches** | 100% LLM | 60-70% deterministic, 30-40% LLM |
+| **Patches** | 100% LLM | ~32% deterministic, rest LLM |
 | **Scoring** | 1 metric | 7 dimensions + optional runtime |
 | **Anti-gaming** | None | 6 detection vectors |
 | **Dependencies** | ML frameworks | Python 3.9+ stdlib only (core) |
@@ -263,7 +263,7 @@ flowchart TB
     end
 ```
 
-60-70% of patches follow deterministic rules. The LLM handles structural reorganization, example generation, edge case synthesis.
+~32% of patches are applied deterministically (confidence=high, single-edit effort); the rest fall back to the LLM. The LLM handles structural reorganization, example generation, edge case synthesis. (source: `scripts/measure_patch_ratio.py`)
 
 </details>
 

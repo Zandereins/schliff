@@ -226,14 +226,3 @@ def score_security(skill_path: str) -> dict:
             "negation_excluded": negation_excluded,
         },
     }
-
-
-def get_composite_cap(security_score: int) -> int | None:
-    """Return composite score cap based on security score, or None if no cap."""
-    if security_score < 5:
-        return 20
-    if security_score < 10:
-        return 40
-    if security_score < 20:
-        return 60
-    return None

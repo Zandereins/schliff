@@ -76,7 +76,7 @@ Key behaviors:
 
 ### text-gradient.py — The Fixer
 
-Identifies specific improvements with predicted score deltas. Generates deterministic patches (frontmatter insertions, noise removal, scope boundary additions) and context-aware patches (meaningful descriptions instead of TODOs). ~60-70% of all fixes are fully deterministic.
+Identifies specific improvements with predicted score deltas. Generates deterministic patches (frontmatter insertions, noise removal, scope boundary additions) and context-aware patches (meaningful descriptions instead of TODOs). ~32% of patches are applied deterministically (confidence=high, single-edit effort); the rest fall back to the LLM. (source: `scripts/measure_patch_ratio.py`)
 
 ### dashboard.py — Health Dashboard
 

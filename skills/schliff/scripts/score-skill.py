@@ -147,7 +147,7 @@ def main():
         tc = composite_result['total_dimensions']
         wc = composite_result['weight_coverage']
         if mc < tc:
-            print(f"  [{mc}/{tc} dimensions measured, {wc:.0%} weight coverage]")
+            print(f"  [{mc}/{tc} dimensions measured, {wc:.0%} coverage]")
 
         print(f"{'='*60}")
         for dim, data in scores.items():

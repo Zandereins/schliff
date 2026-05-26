@@ -501,6 +501,9 @@ class TestComputeComposite:
         assert result["score"] == 0 or result["measured_dimensions"] == 0
 
     def test_perfect_scores(self):
+        # Six canonical dims at 100; clarity (canonical weight 0.05/0.95) is
+        # unmeasured and uncredited under the full-denominator model, so the
+        # ceiling is 0.90/0.95 * 100 ≈ 94.7, NOT 100. (Add clarity=100 to reach 100.)
         scores = {
             "structure": {"score": 100},
             "triggers": {"score": 100},
@@ -510,7 +513,7 @@ class TestComputeComposite:
             "edges": {"score": 100},
         }
         result = compute_composite(scores)
-        assert result["score"] >= 95
+        assert result["score"] == pytest.approx(0.90 / 0.95 * 100, abs=0.2)
 
     def test_clarity_dimension_present_weights_sum_to_one(self):
         scores = {
@@ -934,7 +937,13 @@ class TestDensityCurve:
         actionable = "\n".join(
             [f"Run process step {i} now." for i in range(5)]
         )
-        padding = ("word " * 95).strip()
+        # Varied prose padding (not a single repeated token) to dilute density to ~5
+        # without tripping the spread-keyword-stuffing detector — real low-density prose
+        # uses many distinct words, it does not repeat one word 95 times.
+        vocab = ("the quick brown context fox jumps over a lazy summary while many "
+                 "distinct tokens fill out this paragraph with varied prose padding "
+                 "content here and there across several plausible sentences").split()
+        padding = " ".join(vocab[i % len(vocab)] for i in range(95))
         body = f"{actionable}\n{padding}"
         content = f"---\nname: mid-density\ndescription: mid density\n---\n\n{body}\n"
         p = tmp_path / "SKILL.md"
