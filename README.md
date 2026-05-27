@@ -13,9 +13,24 @@ Deterministic quality scoring for CLAUDE.md, SKILL.md, .cursorrules, AGENTS.md, 
 </p>
 
 ```bash
-pip install schliff
-schliff score path/to/SKILL.md
+# In Claude Code — installs the skill + slash commands
+/plugin marketplace add Zandereins/schliff
+/plugin install schliff@schliff
 ```
+
+Quick alternative — just the skill, via the [open skills registry](https://github.com/vercel-labs/skills):
+
+```bash
+npx skills add Zandereins/schliff
+```
+
+Or the Python CLI, for CI / pre-commit:
+
+```bash
+pip install schliff
+```
+
+Then `schliff score path/to/SKILL.md` — on the bundled demo skill:
 
 ```text
 $ schliff score demo/bad-skill/SKILL.md
@@ -27,7 +42,7 @@ schliff v7.2.0
   clarity        █████████░   90/100  great
 
   Structural Score  █████░░░░░░░░░░░░░░░  22.6/100  [F]
-  ⚠ 4/7 dimensions measured (coverage 42%). Unverified dimensions are uncredited — score ceiling is 42%. Unmeasured: triggers, quality, edges
+  ℹ Scored 4/7 dimensions — the score can't exceed 42% until the rest are measured. Run /schliff:init to add an eval suite and score: triggers, quality, edges.
   → 13 deterministic fixes available. Run `/schliff:auto` in Claude Code to apply.
 
   Tokens: 378 / 1,000 (ok)
