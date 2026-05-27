@@ -13,6 +13,22 @@ from scoring.patterns import (
 )
 
 
+def _ref_resolves(ref: str, skill_dir: Path) -> bool:
+    """A referenced resource path resolves if it exists relative to the skill
+    directory (canonical self-contained skill) OR relative to an enclosing
+    plugin/repo root. The latter covers the common monorepo/plugin layout where
+    skills share a single root-level ``references/`` directory — without it the
+    linter false-flags valid references as missing. Only widens resolution, so
+    it can never miss a genuinely-absent file."""
+    if (skill_dir / ref).exists():
+        return True
+    for anc in skill_dir.parents:
+        if (anc / ".claude-plugin").is_dir() or (anc / ".git").exists():
+            if (anc / ref).exists():
+                return True
+    return False
+
+
 def score_structure(skill_path: str) -> dict:
     """Score structural quality of a skill file.
 
@@ -105,18 +121,18 @@ def _score_structure_inline(skill_path: str) -> dict:
     elif hedge_count <= 2:
         score += 3
 
-    # Referenced files exist
+    # Referenced files exist (resolved skill-local OR against a plugin/repo root)
     refs = set(_RE_REFS.findall(content))
     if not refs:
         # No references declared — neutral score (not rewarded, not penalized)
         score += 5
     else:
-        missing = [r for r in refs if not (skill_dir / r).exists()]
+        missing = sorted(r for r in refs if not _ref_resolves(r, skill_dir))
         if not missing:
-            # All declared references exist — reward completeness
+            # All declared references resolve — reward completeness
             score += 10
         else:
-            # Some references missing — partial credit
+            # Some references resolve in no valid location — partial credit
             score += 5
             issues.append(f"missing_refs: {missing}")
 
