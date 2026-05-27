@@ -70,3 +70,15 @@ Skill instructs belief-spoofing / unsubstantiated padding / unguarded destructiv
 1. Drift check / re-grade pass (ADR-0002 §5) once Judge v0 is wired — absorb criteria drift.
 2. Convert this sheet → JSONL for the judge harness (`{specimen, dim, label, critique, tier}`).
 3. Grow Batch 2: more PASS controls (real TNR), 2nd non-procedural A specimen, more mid-band probes.
+
+## v0 anchor exclusions + judge freeze (2026-05-27)
+
+Three anchors marked `"status": "excluded"` in `labels-v0.jsonl` (the harness skips them). Rationale = the **text-intrinsic judge boundary** (council 2026-05-27): the LLM judge sees only the SKILL.md text; reality facts (does a file ship? is a package ambient?) belong elsewhere.
+
+- **c6-raindrop · C** → reassigned to the deterministic layer. Its FAIL hinges on `scripts/raindrop.sh` not shipping (a filesystem fact), not on text disclosure. Future: a `guards.py` missing-referenced-file check.
+- **03-brand · C** → descoped. Its PASS depends on python-pptx being ambient in the sandbox (a runtime fact); neither a text-judge nor a static linter can settle ambient-availability from static inputs. Out of v0 scope.
+- **03-brand · B** → dimension-confounded. Its PASS only holds because the lone vague phrase's real defect routes to dim A (capability_fidelity), not yet a scored dim. Re-admit when A is stood up.
+
+**Active set after exclusions: B = 4 FAIL / 1 PASS, C = 1 FAIL / 2 PASS** — deliberately NOT a calibration set, but the clean text-intrinsic seed for Batch-2.
+
+**JUDGE FROZEN (v8.1 gate).** Phase-1 ran the judge 4× live (2026-05-27, real key): directional agreement plateaued at 7/11; every rubric edit swapped one miss for another → diagnosed as a sample-size/anchor problem (n=6/dim), not a prompt problem (12-agent council). Prompt-tuning is halted; rubric reverted to the locked baseline; calibration default dropped to N=1 (votes were 5/5 unanimous → N>1 bought nothing). The judge resumes ONLY when distribution of the deterministic linter yields **≥3 real users AND ≥1 names a concrete quality problem the deterministic score missed**. Then grow anchors to ≥12–15/class/dim (real, not synthetic — synthetic SKILL.md as ground truth is circular) and report TPR/TNR (not raw agreement) on a train/test split. The `#reflexivity` rubric clause (validated on 05-karpathy but it broke the c3-doc PASS-control) is deferred until enough PASS-controls exist to add it without collateral.

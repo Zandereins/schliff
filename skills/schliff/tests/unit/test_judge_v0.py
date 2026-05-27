@@ -32,7 +32,7 @@ def test_run_mock_smoke(tmp_path):
     assert rc == 0
 
     res = [json.loads(line) for line in out.read_text().splitlines() if line.strip()]
-    assert len(res) == 11  # 6 B + 5 C clean anchors
+    assert len(res) == 8  # 5 B + 3 C active (3 anchors excluded via status=excluded; see labels-v0.jsonl)
     for r in res:
         assert r["judge"] in ("PASS", "FAIL")
         assert r["human"] in ("PASS", "FAIL")

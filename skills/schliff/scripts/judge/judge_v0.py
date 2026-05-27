@@ -58,11 +58,19 @@ DIM_ALIASES = {"B": "verifiable_success", "C": "assumption_completeness"}
 
 
 def load_labels(path: Path) -> list[dict]:
-    rows = []
+    """Load anchors, skipping any marked status=excluded (see exclude_reason in the file)."""
+    rows, excluded = [], 0
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if line:
-            rows.append(json.loads(line))
+        if not line:
+            continue
+        row = json.loads(line)
+        if row.get("status") == "excluded":
+            excluded += 1
+            continue
+        rows.append(row)
+    if excluded:
+        print(f"({excluded} anchors excluded — see exclude_reason in {path.name})", file=sys.stderr)
     return rows
 
 
@@ -167,7 +175,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Judge v0 smoke test (B+C dims).")
     ap.add_argument("--labels", required=True, type=Path)
     ap.add_argument("--model", default=MODEL_DEFAULT)
-    ap.add_argument("--n", type=int, default=5, help="self-consistency samples (plurality)")
+    ap.add_argument("--n", type=int, default=1, help="self-consistency samples (plurality); "
+                    "N=1 default for calibration — Phase-1 votes were 5/5 unanimous, so N>1 buys "
+                    "no variance reduction until probe-tier specimens actually split. Raise then.")
     ap.add_argument("--temp", type=float, default=0.3)
     ap.add_argument("--mock", action="store_true", help="no API; test harness plumbing")
     ap.add_argument("--out", type=Path, default=Path(__file__).with_name("judge_v0_results.jsonl"))
