@@ -129,11 +129,11 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     if basis == 0:
         warnings.append("No weighted dimensions to score.")
     elif unmeasured:
-        prefix = "Only " if measured_count <= 2 else ""
         warnings.append(
-            f"{prefix}{measured_count}/{total_count} dimensions measured "
-            f"(coverage {coverage:.0%}). Unverified dimensions are uncredited — "
-            f"score ceiling is {coverage:.0%}. Unmeasured: {', '.join(unmeasured)}"
+            f"Scored {measured_count}/{total_count} dimensions — the score "
+            f"can't exceed {coverage:.0%} until the rest are measured. "
+            f"Run /schliff:init to add an eval suite and score: "
+            f"{', '.join(unmeasured)}."
         )
 
     # Security/runtime: reported as SEPARATE signals, never in the headline composite.
