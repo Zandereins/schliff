@@ -1,3 +1,18 @@
+"""Community leaderboard submission endpoint.
+
+TRUST MODEL: submissions are UNVERIFIED and community-supplied. The scores in a
+submission are whatever the client POSTed — this endpoint does NOT re-run the
+scoring engine, so a caller can claim any (valid-range) score. Every stored
+entry is therefore tagged `"verified": false`, and consumers must treat the
+leaderboard as untrusted, self-reported data, not as an authoritative ranking.
+
+There is NO per-IP/per-caller rate limiting in this function: serverless
+invocations share no state across cold starts, so a real cross-request limit
+cannot live here. Flood/abuse protection must be configured at the Vercel
+Firewall level (dashboard / `vercel firewall` CLI / REST API) — see the
+deploy-side checklist. Storage is also ephemeral /tmp (see DATA_DIR note below).
+"""
+
 from http.server import BaseHTTPRequestHandler
 import json
 import os
@@ -129,7 +144,8 @@ class handler(BaseHTTPRequestHandler):
             if content_length < 0 or content_length > MAX_BODY_BYTES:
                 self._send_json(413, {"error": "request body too large"})
                 return
-            raw = self.rfile.read(content_length)
+            # Never read more than the cap even if Content-Length lies.
+            raw = self.rfile.read(min(content_length, MAX_BODY_BYTES))
             body = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             self._send_json(400, {"error": "invalid JSON body"})
@@ -153,6 +169,10 @@ class handler(BaseHTTPRequestHandler):
             "dimensions": {k: float(v) for k, v in body["dimensions"].items()},
             "version": body["version"],
             "submitted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            # Client-supplied, not re-scored by the server. Always false for
+            # POSTed entries so consumers can distinguish self-reported scores
+            # from any future server-verified ones.
+            "verified": False,
         }
 
         try:
@@ -176,4 +196,4 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(500, {"error": "internal storage error"})
             return
 
-        self._send_json(200, {"ok": True, "updated": updated})
+        self._send_json(200, {"ok": True, "updated": updated, "verified": False})

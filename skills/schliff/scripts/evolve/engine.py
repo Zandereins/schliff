@@ -43,11 +43,19 @@ def _atomic_write(path: str, content: str) -> None:
 
 
 def _score_file(skill_path: str, fmt: Optional[str] = None) -> tuple[dict, float]:
-    """Score a file and return (dim_scores, composite_score)."""
-    from scoring.composite import compute_composite
-    from shared import build_scores
+    """Score a file and return (dim_scores, composite_score).
 
-    scores = build_scores(skill_path, include_security=True, fmt=fmt)
+    Auto-discovers the skill's eval suite (same as the `score` CLI) so the
+    evolution loop's accept/reject composite reflects ALL measurable dimensions,
+    not just the eval-suite-independent ones. Without this, a skill that ships an
+    eval suite is optimized against a coverage-only composite that ignores
+    triggers/quality/edges, diverging from `schliff score`.
+    """
+    from scoring.composite import compute_composite
+    from shared import build_scores, load_eval_suite
+
+    scores = build_scores(skill_path, eval_suite=load_eval_suite(skill_path),
+                          include_security=True, fmt=fmt)
     composite = compute_composite(scores, fmt=fmt)
     return scores, composite["score"]
 
