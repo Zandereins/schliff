@@ -42,6 +42,26 @@ SEED_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "submissions.j
 _CONTROL_CHARS = set(range(0x00, 0x20)) - {0x0A, 0x0D, 0x09}  # allow \n \r \t
 _BIDI_CHARS = {0x200E, 0x200F, 0x202A, 0x202B, 0x202C, 0x202D, 0x202E, 0x2066, 0x2067, 0x2068, 0x2069}
 
+# --- scoring-model epoch -----------------------------------------------------
+# v8.0 introduced the full-denominator composite (PR #41/#42): a breaking scale
+# change. A v8+ composite is capped at the skill's coverage and is NOT comparable
+# to a v7-and-earlier renormalized composite, so the two must never share a
+# ranking. Each entry is stamped with its epoch (derived from the submitted
+# schliff version); query.py ranks within a single epoch. Keep this helper in
+# sync with the copy in query.py (serverless functions are independent files).
+CURRENT_SCORE_MODEL = 2  # full-denominator (schliff >= 8.0)
+
+
+def _score_model_for(version: str) -> int:
+    """Map a schliff version string to its scoring-model epoch (2 = full-denominator
+    for >=8.0, 1 = legacy renormalized for earlier). Unparseable -> 1 (conservative:
+    an unknown version never pollutes the current-scale ranking)."""
+    try:
+        major = int(str(version).lstrip("vV").split(".")[0])
+    except (ValueError, AttributeError, IndexError):
+        return 1
+    return 2 if major >= 8 else 1
+
 
 def _has_unsafe_chars(s: str) -> bool:
     """Reject strings with control or bidirectional override characters."""
@@ -168,6 +188,9 @@ class handler(BaseHTTPRequestHandler):
             "grade": body["grade"],
             "dimensions": {k: float(v) for k, v in body["dimensions"].items()},
             "version": body["version"],
+            # Scoring-model epoch derived from the submitted version, so this
+            # entry only ever ranks against same-scale composites.
+            "score_model": _score_model_for(body["version"]),
             "submitted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             # Client-supplied, not re-scored by the server. Always false for
             # POSTed entries so consumers can distinguish self-reported scores
@@ -196,4 +219,5 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(500, {"error": "internal storage error"})
             return
 
-        self._send_json(200, {"ok": True, "updated": updated, "verified": False})
+        self._send_json(200, {"ok": True, "updated": updated, "verified": False,
+                              "score_model": entry["score_model"]})
