@@ -1,12 +1,19 @@
 """Deterministic safety/gating guards for the LLM-judge layer.
 
+STATUS: staged for the v8.1 judge harness — NOT yet wired into any live scoring
+path. The judge is frozen (see judge/judge_v0.py); these helpers are designed to be
+consulted by it when it resumes, NOT by the shipping deterministic linter /
+`schliff score`. Their only current caller is the test suite. "default-on" below
+describes the intended behavior inside the judge harness once wired, not behavior
+on any user-facing score today.
+
 These are NOT scored dimensions and carry no weight in the composite. They are
-cheap, deterministic, default-on helpers the judge harness consults:
+cheap, deterministic helpers:
 
 - ``detect_destructive_commands`` — raises a human-review FLAG when an unguarded
   destructive/irreversible system command appears (e.g. ``echo b > /proc/sysrq-trigger``,
-  grub ``mem=`` edits, ``rm -rf /``). Runs by DEFAULT — unlike the opt-in
-  ``security`` score, which also code-block-excludes such commands as "examples".
+  grub ``mem=`` edits, ``rm -rf /``). Default-on within the judge harness (once wired)
+  — unlike the opt-in ``security`` score, which also code-block-excludes such commands as "examples".
   That exclusion is exactly why the highest-blast-radius Phase-0 failure
   (skill 09 ``algorithms``) would be silently missed on a default run. A flag,
   not a penalty — asymmetric toward safety (a false flag costs one human glance).

@@ -14,7 +14,9 @@ Design (spec §8 / ADR-0002/0006):
   - leave-one-out few-shots: an item is judged using the OTHER labelled items of its
     dim as anchors, so no specimen ever judges itself
   - rubric+anchors live in a cached system block; reproducibility via prompt SHA + JSONL log
-  - gating invariant: never judge an artifact below the linter-completeness floor
+  - gating invariant (design constraint for the v8.1 resume; the frozen v0 smoke
+    harness does NOT yet enforce it): never judge an artifact below the linter
+    completeness floor — see scoring/guards.py:judge_floor
 
 Run (needs ANTHROPIC_API_KEY + `pip install anthropic`):
     python3 judge_v0.py --labels ../../benchmarks/corpus/v1/phase1-calibration/labels-v0.jsonl

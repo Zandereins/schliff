@@ -77,6 +77,9 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     weights = get_weights(fmt if fmt is not None else "skill.md")
     explicit = set(custom_weights or {})
 
+    # Stage 1: apply weight OVERRIDES (custom or auto-calibrated) RAW — do NOT renormalize
+    # here. The canonical basis (Stage 2, below) is the single normalization point, applied
+    # after dimension exclusion; renormalizing now would double-normalize and shift scores.
     if custom_weights:
         _SUPPLEMENTARY = {"clarity", "security"}
         for dim in list(weights):
@@ -92,7 +95,8 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
                 if k in weights:
                     weights[k] = v
 
-    # Canonical headline basis: format-aware. Dims excluded per get_headline_excluded are NEVER
+    # Stage 2 — canonical headline basis (the single normalization point): format-aware. Dims
+    # excluded per get_headline_excluded are NEVER
     # folded into the headline composite unless the caller explicitly weighted them via
     # custom_weights. For skill.md family, security+runtime are excluded (security is an opt-in
     # 0.05 side signal). For system_prompt, security is a CORE 0.15 dim and stays in the headline;
@@ -104,9 +108,10 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     if basis > 0:
         canonical = {d: w / basis for d, w in canonical.items()}  # renormalize to 1.0
 
-    # Full-denominator aggregation: unmeasured dims are UNCREDITED (contribute 0), not dropped.
-    # composite = Σ(score·weight over measured) / Σ(all canonical weight == 1.0)
-    # => a skill's ceiling equals its coverage until the missing dims are verified.
+    # Full-denominator aggregation. canonical weights already sum to 1.0 (Stage 2 renorm),
+    # so the composite is simply Σ(score·weight) over MEASURED dims — there is no separate
+    # division step. Unmeasured dims contribute 0 and are never added back, so a skill's
+    # ceiling equals its coverage until the missing dims are verified.
     total = 0.0
     measured_w = 0.0
     measured = []
@@ -120,7 +125,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
         else:
             unmeasured.append(dim)
 
-    composite = round(total, 1)            # divisor is 1.0 (full canonical basis)
+    composite = round(total, 1)            # canonical weights sum to 1.0, so total IS the composite
     coverage = round(measured_w, 2)
     measured_count = len(measured)
     total_count = len(canonical)

@@ -19,12 +19,28 @@ def _ref_resolves(ref: str, skill_dir: Path) -> bool:
     plugin/repo root. The latter covers the common monorepo/plugin layout where
     skills share a single root-level ``references/`` directory — without it the
     linter false-flags valid references as missing. Only widens resolution, so
-    it can never miss a genuinely-absent file."""
-    if (skill_dir / ref).exists():
+    it can never miss a genuinely-absent file.
+
+    Security: a ref is confined to its base directory. Any ``..`` segment is
+    rejected outright and every candidate must resolve back inside its base, so a
+    crafted ref like ``references/../../../etc/passwd`` cannot turn the linter into
+    a filesystem existence oracle when an untrusted SKILL.md is scored locally."""
+    if ".." in Path(ref).parts:
+        return False
+
+    def _within(base: Path) -> bool:
+        try:
+            base_r = base.resolve()
+            cand = (base_r / ref).resolve()
+        except OSError:
+            return False
+        return cand.is_relative_to(base_r) and cand.exists()
+
+    if _within(skill_dir):
         return True
     for anc in skill_dir.parents:
         if (anc / ".claude-plugin").is_dir() or (anc / ".git").exists():
-            if (anc / ref).exists():
+            if _within(anc):
                 return True
     return False
 

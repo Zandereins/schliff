@@ -231,6 +231,31 @@ class TestScoreStructure:
         assert missing, "genuinely missing ref must still be flagged"
         assert "references/patterns.md" in missing[0], missing[0]
 
+    def test_ref_with_parent_traversal_is_confined(self, tmp_path):
+        """Security: a ref containing '..' is rejected, so the linter cannot be used
+        as a filesystem existence oracle — even when the traversed-to file really
+        exists outside the skill/plugin tree (would resolve True under the old code)."""
+        skill_dir = tmp_path / "skills" / "foo"
+        skill_dir.mkdir(parents=True)
+        # A real file OUTSIDE the tree that a traversal ref would reach unconfined.
+        secret = tmp_path.parent / "schliff_traversal_probe.md"
+        secret.write_text("secret")
+        try:
+            body = (
+                "---\nname: trav-skill\n"
+                "description: A skill referencing a traversal path to probe confinement.\n---\n\n"
+                "# Trav\n\nUse this thing. "
+                "See references/../../../../schliff_traversal_probe.md for stuff.\n\n"
+                "## Steps\n1. Do it.\n2. Verify it.\n"
+            )
+            f = skill_dir / "SKILL.md"
+            f.write_text(body)
+            result = score_structure(str(f))
+            missing = [i for i in result["issues"] if "missing_refs" in i]
+            assert missing, "traversal ref must be treated as unresolved (confinement), not silently resolved"
+        finally:
+            secret.unlink(missing_ok=True)
+
     def test_no_refs_gives_five_points_not_ten(self, tmp_path):
         """No reference declarations → +5 pts (neutral), not +10 (reward).
 
