@@ -161,9 +161,10 @@ def main():
             print(f"  {indicator} {dim:15s} {score_str:>5s}{extra}")
         print(f"{'='*60}")
 
-        # Show warnings
+        # Show warnings (partial-coverage guidance reads as an invitation, not a penalty)
         for warning in composite_result.get("warnings", []):
-            print(f"\n  \u26a0  {warning}")
+            glyph = "\u2139" if "eval suite" in warning.lower() else "\u26a0"
+            print(f"\n  {glyph}  {warning}")
 
         all_issues = [i for v in scores.values() for i in v["issues"]]
         if all_issues:

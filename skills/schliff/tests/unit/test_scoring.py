@@ -186,6 +186,76 @@ class TestScoreStructure:
         assert result["score"] == 0
         assert "empty_skill_body" in result["issues"]
 
+    # --- referenced-file resolution (Session-C hardening) ---
+    _REF_BODY = (
+        "---\nname: ref-skill\n"
+        "description: A skill used to test referenced-file resolution across layouts.\n---\n\n"
+        "# Ref Skill\n\nUse this when you need the thing. "
+        "See references/patterns.md for detailed patterns.\n\n"
+        "## Steps\n1. Do the thing.\n2. Verify the thing.\n"
+    )
+
+    def test_refs_resolve_at_plugin_root(self, tmp_path):
+        """Plugin-monorepo layout: refs resolve against a shared root references/ dir,
+        not just a skill-local one. Must NOT be flagged missing (Addy-style repo)."""
+        (tmp_path / ".claude-plugin").mkdir()
+        (tmp_path / "references").mkdir()
+        (tmp_path / "references" / "patterns.md").write_text("# patterns\n")
+        skill_dir = tmp_path / "skills" / "foo"
+        skill_dir.mkdir(parents=True)
+        f = skill_dir / "SKILL.md"
+        f.write_text(self._REF_BODY)
+        result = score_structure(str(f))
+        assert not any("missing_refs" in i for i in result["issues"]), result["issues"]
+
+    def test_refs_resolve_skill_local(self, tmp_path):
+        """Canonical self-contained skill: skill-local references/ still resolves."""
+        skill_dir = tmp_path / "skills" / "foo"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "references").mkdir()
+        (skill_dir / "references" / "patterns.md").write_text("# patterns\n")
+        f = skill_dir / "SKILL.md"
+        f.write_text(self._REF_BODY)
+        result = score_structure(str(f))
+        assert not any("missing_refs" in i for i in result["issues"]), result["issues"]
+
+    def test_genuinely_missing_ref_flagged_with_full_path(self, tmp_path):
+        """A ref that exists in no valid location is still flagged — and the issue
+        names the full file path, not the bare 'references' prefix (regex fix)."""
+        skill_dir = tmp_path / "skills" / "bar"
+        skill_dir.mkdir(parents=True)
+        f = skill_dir / "SKILL.md"
+        f.write_text(self._REF_BODY)
+        result = score_structure(str(f))
+        missing = [i for i in result["issues"] if "missing_refs" in i]
+        assert missing, "genuinely missing ref must still be flagged"
+        assert "references/patterns.md" in missing[0], missing[0]
+
+    def test_ref_with_parent_traversal_is_confined(self, tmp_path):
+        """Security: a ref containing '..' is rejected, so the linter cannot be used
+        as a filesystem existence oracle — even when the traversed-to file really
+        exists outside the skill/plugin tree (would resolve True under the old code)."""
+        skill_dir = tmp_path / "skills" / "foo"
+        skill_dir.mkdir(parents=True)
+        # A real file OUTSIDE the tree that a traversal ref would reach unconfined.
+        secret = tmp_path.parent / "schliff_traversal_probe.md"
+        secret.write_text("secret")
+        try:
+            body = (
+                "---\nname: trav-skill\n"
+                "description: A skill referencing a traversal path to probe confinement.\n---\n\n"
+                "# Trav\n\nUse this thing. "
+                "See references/../../../../schliff_traversal_probe.md for stuff.\n\n"
+                "## Steps\n1. Do it.\n2. Verify it.\n"
+            )
+            f = skill_dir / "SKILL.md"
+            f.write_text(body)
+            result = score_structure(str(f))
+            missing = [i for i in result["issues"] if "missing_refs" in i]
+            assert missing, "traversal ref must be treated as unresolved (confinement), not silently resolved"
+        finally:
+            secret.unlink(missing_ok=True)
+
     def test_no_refs_gives_five_points_not_ten(self, tmp_path):
         """No reference declarations → +5 pts (neutral), not +10 (reward).
 

@@ -1,5 +1,5 @@
 ---
-name: mesh
+name: schliff:mesh
 description: Scan all installed skills for trigger overlap, broken handoffs, and scope collisions
 ---
 

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Zandereins/schliff/benchmarks/corpus/v1/manifest.schema.json",
+  "title": "Schliff Korpus v1 Manifest Row",
+  "description": "Per-row entry in benchmarks/corpus/v1/manifest.jsonl. Day 0 rows are source-level; Day 1 rows expand to per-skill granularity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_repo",
+    "source_sha",
+    "source_url",
+    "license",
+    "included_in_v1",
+    "file_type"
+  ],
+  "properties": {
+    "source_repo": {
+      "type": "string",
+      "description": "Upstream repo identifier (e.g. 'anthropics/skills') or 'synthetic-variations'.",
+      "minLength": 1
+    },
+    "source_sha": {
+      "type": "string",
+      "description": "Pinned commit SHA, branch@HEAD reference, or 'n/a' for synthetic.",
+      "minLength": 1
+    },
+    "source_url": {
+      "type": "string",
+      "description": "Canonical GitHub tree URL at the pinned SHA, or 'n/a' for synthetic."
+    },
+    "skill_relpath": {
+      "type": "string",
+      "description": "Path within the source repo to a single SKILL.md (populated Day 1)."
+    },
+    "skill_local_path": {
+      "type": "string",
+      "description": "Local mirror path under benchmarks/corpus/v1/ (populated Day 1)."
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX-style identifier, 'NOASSERTION' for mixed/unclear, or 'n/a' for synthetic.",
+      "examples": ["MIT", "Apache-2.0", "NOASSERTION", "n/a"]
+    },
+    "included_in_v1": {
+      "type": "boolean",
+      "description": "True if this row contributes to Korpus v1; false for catalogued exclusions."
+    },
+    "include_reason": {
+      "type": "string",
+      "description": "Why this entry is in the corpus (license posture, coverage rationale)."
+    },
+    "exclude_reason": {
+      "type": "string",
+      "description": "Why this entry is excluded (license risk, scope, dedup, etc.)."
+    },
+    "file_type": {
+      "type": "string",
+      "enum": ["skill_collection", "synthetic", "single_skill"],
+      "description": "Granularity of this row."
+    },
+    "expected_skill_md_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Expected SKILL.md count after Day 1 enumeration; sanity check for ingestion."
+    },
+    "subpath_filter": {
+      "type": "string",
+      "description": "Subdirectory filter applied during ingestion (e.g. '.claude/skills/')."
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Glob patterns excluded from ingestion (e.g. '*.docx')."
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"included_in_v1": {"const": false}}},
+      "then": {"required": ["exclude_reason"]}
+    },
+    {
+      "if": {"properties": {"included_in_v1": {"const": true}}},
+      "then": {"required": ["include_reason"]}
+    }
+  ]
+}

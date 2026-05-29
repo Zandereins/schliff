@@ -38,7 +38,9 @@ _RE_FRONTMATTER_DESC = re.compile(r"^description:", re.MULTILINE)
 _RE_REAL_EXAMPLES = re.compile(
     r"(?i)(example\s*[0-9:#]|input.*output|e\.g\.|for instance|for example)"
 )
-_RE_REFS = re.compile(r"(references|scripts|templates)/[\w./-]+")
+# Non-capturing group so findall() yields the FULL referenced path
+# (e.g. "references/patterns.md"), not just the bare resource-dir prefix.
+_RE_REFS = re.compile(r"(?:references|scripts|templates)/[\w./-]+")
 _RE_SECTION_HEADER = re.compile(r"^##\s")
 
 # --- Composability patterns (SKILL.md-specific) ---

@@ -9,6 +9,7 @@ schliff-report.md
 schliff-workspace/
 .schliff-eval/
 .schliff/
+judge_v0_results.jsonl
 
 # Python
 __pycache__/
