@@ -45,6 +45,42 @@ def _load_submissions():
     return []
 
 
+# --- scoring-model epoch (keep in sync with submit.py) -----------------------
+# v8.0's full-denominator composite (PR #41/#42) is a breaking scale change, so
+# v7-and-earlier composites must never co-rank with v8+ ones. Entries are stamped
+# with an epoch at submit time; legacy/seed rows predate the field and are
+# backfilled here from their version string.
+CURRENT_SCORE_MODEL = 2  # full-denominator (schliff >= 8.0)
+
+
+def _score_model_for(version: str) -> int:
+    """Map a schliff version string to its scoring-model epoch (2 = full-denominator
+    for >=8.0, 1 = legacy renormalized for earlier). Unparseable -> 1 (conservative:
+    an unknown version never pollutes the current-scale ranking)."""
+    try:
+        major = int(str(version).lstrip("vV").split(".")[0])
+    except (ValueError, AttributeError, IndexError):
+        return 1
+    return 2 if major >= 8 else 1
+
+
+def _resolve_score_model(entries, requested):
+    """Backfill score_model on every entry, then select the active epoch and keep
+    only its entries — so a single ranking never mixes incomparable scales.
+
+    Active epoch = ``requested`` when given, else the latest epoch that has data
+    (within-scale and never an empty default view). Returns
+    ``(filtered_entries, active_model, models_available_desc)``."""
+    for e in entries:
+        e.setdefault("score_model", _score_model_for(e.get("version", "")))
+    models_available = sorted({e["score_model"] for e in entries}, reverse=True)
+    if requested is not None:
+        active = requested
+    else:
+        active = models_available[0] if models_available else CURRENT_SCORE_MODEL
+    return [e for e in entries if e.get("score_model") == active], active, models_available
+
+
 def _sort_key(entry, sort_field):
     if sort_field == "date":
         return entry.get("submitted_at", "")
@@ -125,12 +161,25 @@ class handler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": f"invalid format(s): {', '.join(sorted(invalid))}"})
                 return
 
+        # --- score_model selection (optional; default = latest epoch present) ---
+        sm_raw = first("score_model")
+        requested_model = None
+        if sm_raw is not None:
+            try:
+                requested_model = int(sm_raw)
+            except ValueError:
+                self._send_json(400, {"error": "score_model must be an integer"})
+                return
+
         try:
             entries = _load_submissions()
         except Exception as exc:
             print(f"Storage error: {type(exc).__name__}: {exc}", file=sys.stderr)
             self._send_json(500, {"error": "internal storage error"})
             return
+
+        # --- keep a single, comparable scoring-model epoch (no mixed scales) ---
+        entries, active_model, models_available = _resolve_score_model(entries, requested_model)
 
         # --- filter ---
         if grade_filter:
@@ -154,6 +203,11 @@ class handler(BaseHTTPRequestHandler):
             "total": total,
             "limit": limit,
             "offset": offset,
+            # Active scoring-model epoch for this ranking + the epochs that have
+            # data, so the client can offer a scale switch. v7-and-earlier (1) and
+            # v8+ full-denominator (2) composites are never mixed in one ranking.
+            "score_model": active_model,
+            "score_models_available": models_available,
             # Leaderboard data is community self-reported and not server-verified.
             "unverified": True,
         })
