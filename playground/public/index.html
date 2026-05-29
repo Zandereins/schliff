@@ -388,6 +388,16 @@
   .grade-C { background: rgba(210,153,34,0.15); color: var(--yellow); border: 1px solid rgba(210,153,34,0.3); }
   .grade-D { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
   .grade-F { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+  /* Partial coverage (no eval suite): not a failing grade — incomplete measurement. */
+  .grade-partial { background: rgba(88,166,255,0.12); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); font-size: 14px; letter-spacing: 0.5px; }
+
+  .score-subnote {
+    margin: 12px auto 0;
+    max-width: 440px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
 
   /* Dimensions */
   .dimensions {
@@ -946,6 +956,15 @@ Instructions go here..." spellcheck="false"></textarea>
     var warnings = data.warnings || [];
     var scoreColor = setColor(score);
 
+    // Partial coverage: a skill scored without an eval suite cannot measure
+    // triggers/quality/edges, so the full-denominator composite is capped at its
+    // coverage. That is incomplete measurement, NOT a failing grade — reframe the
+    // headline so a structurally-excellent skill isn't shown a red "F".
+    var measured = data.measured_dimensions != null ? data.measured_dimensions : null;
+    var total = data.total_dimensions != null ? data.total_dimensions : null;
+    var partial = (measured != null && total != null && total > 0 && measured < total);
+    if (partial) scoreColor = 'var(--accent)';
+
     resultsContainer.textContent = '';
 
     // Score card
@@ -954,7 +973,7 @@ Instructions go here..." spellcheck="false"></textarea>
 
     var label = document.createElement('div');
     label.className = 'score-label';
-    label.textContent = 'Composite Score';
+    label.textContent = partial ? 'Structural Score' : 'Composite Score';
 
     var valueEl = document.createElement('div');
     valueEl.className = 'score-value';
@@ -964,13 +983,26 @@ Instructions go here..." spellcheck="false"></textarea>
 
     var badgeWrap = document.createElement('div');
     var badge = document.createElement('span');
-    badge.className = 'grade-badge grade-' + grade;
-    badge.textContent = grade;
+    if (partial) {
+      badge.className = 'grade-badge grade-partial';
+      badge.textContent = measured + '/' + total + ' dims measured';
+    } else {
+      badge.className = 'grade-badge grade-' + grade;
+      badge.textContent = grade;
+    }
     badgeWrap.appendChild(badge);
 
     card.appendChild(label);
     card.appendChild(valueEl);
     card.appendChild(badgeWrap);
+
+    if (partial) {
+      var subnote = document.createElement('div');
+      subnote.className = 'score-subnote';
+      subnote.textContent = 'Structural dimensions only — ' + measured + ' of ' + total +
+        ' measured. Triggers, quality, and edges need an eval suite; add one to unlock the full composite. The structural dimensions below are scored in full.';
+      card.appendChild(subnote);
+    }
     resultsContainer.appendChild(card);
 
     // Dimensions

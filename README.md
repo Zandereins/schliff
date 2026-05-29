@@ -13,24 +13,41 @@ Deterministic quality scoring for CLAUDE.md, SKILL.md, .cursorrules, AGENTS.md, 
 </p>
 
 ```bash
-pip install schliff
-schliff score path/to/SKILL.md
+# In Claude Code — installs the skill + slash commands
+/plugin marketplace add Zandereins/schliff
+/plugin install schliff@schliff
 ```
 
+Quick alternative — just the skill, via the [open skills registry](https://github.com/vercel-labs/skills):
+
+```bash
+npx skills add Zandereins/schliff
+```
+
+Or the Python CLI, for CI / pre-commit:
+
+```bash
+pip install schliff
+```
+
+Then run `schliff demo` for an instant self-contained example (works on any install), or `schliff score path/to/SKILL.md` on your own file:
+
 ```text
-$ schliff score demo/bad-skill/SKILL.md
+$ schliff demo
 schliff v7.2.0
 
-  structure      ███████░░░   70/100  fair
+  structure      ████████░░   78/100  good
   efficiency     ████░░░░░░   35/100  poor
-  composability  ███░░░░░░░   30/100  poor
-  clarity        █████████░   90/100  great
+  composability  ██░░░░░░░░   20/100  poor
+  clarity        ██████████  100/100  perfect
 
-  Structural Score  █████░░░░░░░░░░░░░░░  22.6/100  [F]
-  ⚠ 4/7 dimensions measured (coverage 42%). Unverified dimensions are uncredited — score ceiling is 42%. Unmeasured: triggers, quality, edges
-  → 13 deterministic fixes available. Run `/schliff:auto` in Claude Code to apply.
+  Structural Score  █████░░░░░░░░░░░░░░░  23.4/100  [F]
+  ℹ Scored 4/7 dimensions — the score can't exceed 42% until the rest are measured. Run /schliff:init to add an eval suite and score: triggers, quality, edges.
+  → 7 deterministic fixes available. Run `/schliff:auto` in Claude Code to apply.
 
-  Tokens: 378 / 1,000 (ok)
+  Tokens: 100 / 1,000 (ok)
+
+  This is a deliberately bad skill. Try schliff on your own skills!
 ```
 
 ---
@@ -41,9 +58,8 @@ schliff v7.2.0
 
 | Skill | Score | Rounds | Author |
 |-------|-------|--------|--------|
-| agent-review-panel | 75 [C] → 85.6 [A] | 2 | [@wan-huiyan](https://github.com/wan-huiyan) |
-| shieldclaw (OpenClaw) | 68 [C] → 94.6 [A] | 1 | [@Zandereins](https://github.com/Zandereins) |
-| demo bad-skill | 54 [D] → 98.3 [S] | 18 auto | [@Zandereins](https://github.com/Zandereins) |
+| agent-review-panel | 75 [B] → 85.6 [A] | 2 | [@wan-huiyan](https://github.com/wan-huiyan) |
+| shieldclaw (OpenClaw) | 68.3 [C] → 94.6 [A] | 1 | [@Zandereins](https://github.com/Zandereins) |
 
 **Score yours:** `schliff score path/to/SKILL.md` — [share what you find](https://github.com/Zandereins/schliff/issues/new?template=share_results.md)
 
@@ -101,12 +117,12 @@ schliff doctor                           # scan all installed skills
 $ schliff suggest demo/bad-skill/SKILL.md
 TOP FIXES (estimated impact):
  1. [ ~25] Create eval-suite.json with trigger test cases (should_trigger: true/false prompts)
- 2. [  ~8] Create eval-suite.json with 3+ test cases, each with typed assertions
+ 2. [  ~8] Create eval-suite.json with 3+ test cases, each with typed assertions (contains, pattern, excludes, format)
  3. [  +2] Add 'description: <what this skill does and when to use it>' to frontmatter
  4. [  +2] Add handoff points: 'Then use X skill for...', 'If Y, instead use Z skill'
- 5. [  +2] Add 'Use this skill when...' + 'Do NOT use for...' scope sections
+ 5. [  +2] Add 'Use this skill when...' (positive scope) AND 'Do NOT use for...' (negative scope) sections
 
-Current: 53.8 [D]  →  Estimated after fixes: ~91.8 [A]
+Current: 22.6 [F]  →  Estimated after fixes: ~60.6 [D]
 ```
 
 ---
@@ -263,7 +279,7 @@ flowchart TB
     end
 ```
 
-~32% of patches are applied deterministically (confidence=high, single-edit effort); the rest fall back to the LLM. The LLM handles structural reorganization, example generation, edge case synthesis. (source: `scripts/measure_patch_ratio.py`)
+~32% of patches are applied deterministically (confidence=high, single-edit effort); the rest fall back to the LLM. The LLM handles structural reorganization, example generation, edge case synthesis. (source: `skills/schliff/scripts/measure_patch_ratio.py`)
 
 </details>
 

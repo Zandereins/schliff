@@ -13,6 +13,38 @@ from scoring.patterns import (
 )
 
 
+def _ref_resolves(ref: str, skill_dir: Path) -> bool:
+    """A referenced resource path resolves if it exists relative to the skill
+    directory (canonical self-contained skill) OR relative to an enclosing
+    plugin/repo root. The latter covers the common monorepo/plugin layout where
+    skills share a single root-level ``references/`` directory — without it the
+    linter false-flags valid references as missing. Only widens resolution, so
+    it can never miss a genuinely-absent file.
+
+    Security: a ref is confined to its base directory. Any ``..`` segment is
+    rejected outright and every candidate must resolve back inside its base, so a
+    crafted ref like ``references/../../../etc/passwd`` cannot turn the linter into
+    a filesystem existence oracle when an untrusted SKILL.md is scored locally."""
+    if ".." in Path(ref).parts:
+        return False
+
+    def _within(base: Path) -> bool:
+        try:
+            base_r = base.resolve()
+            cand = (base_r / ref).resolve()
+        except OSError:
+            return False
+        return cand.is_relative_to(base_r) and cand.exists()
+
+    if _within(skill_dir):
+        return True
+    for anc in skill_dir.parents:
+        if (anc / ".claude-plugin").is_dir() or (anc / ".git").exists():
+            if _within(anc):
+                return True
+    return False
+
+
 def score_structure(skill_path: str) -> dict:
     """Score structural quality of a skill file.
 
@@ -105,18 +137,18 @@ def _score_structure_inline(skill_path: str) -> dict:
     elif hedge_count <= 2:
         score += 3
 
-    # Referenced files exist
+    # Referenced files exist (resolved skill-local OR against a plugin/repo root)
     refs = set(_RE_REFS.findall(content))
     if not refs:
         # No references declared — neutral score (not rewarded, not penalized)
         score += 5
     else:
-        missing = [r for r in refs if not (skill_dir / r).exists()]
+        missing = sorted(r for r in refs if not _ref_resolves(r, skill_dir))
         if not missing:
-            # All declared references exist — reward completeness
+            # All declared references resolve — reward completeness
             score += 10
         else:
-            # Some references missing — partial credit
+            # Some references resolve in no valid location — partial credit
             score += 5
             issues.append(f"missing_refs: {missing}")
 

@@ -336,9 +336,13 @@ def format_score_display(
         warn_prefix = f"\x1b[33m\u26a0{RESET}" if is_color_tty() else "\u26a0"
         lines.append(f"  {warn_prefix} {n} contradiction{'s' if n != 1 else ''} detected (score-inflation blocked)")
 
-    # Composite warnings (unmeasured dimensions, low confidence)
+    # Composite guidance (partial coverage = invitation, not a penalty) + low-confidence warnings
     for w in composite.get("warnings", []):
-        if "unmeasured" in w.lower() or "unreliable" in w.lower():
+        wl = w.lower()
+        if "eval suite" in wl:
+            info_prefix = f"\x1b[36m\u2139{RESET}" if is_color_tty() else "\u2139"
+            lines.append(f"  {info_prefix} {w}")
+        elif "unreliable" in wl:
             warn_prefix = f"\x1b[33m\u26a0{RESET}" if is_color_tty() else "\u26a0"
             lines.append(f"  {warn_prefix} {w}")
 

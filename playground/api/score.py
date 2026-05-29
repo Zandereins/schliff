@@ -3,7 +3,12 @@
 Accepts skill markdown content via POST, runs the schliff scoring engine,
 and returns the full score result as JSON.
 
-Rate limiting: handled by Vercel WAF in production — not implemented here.
+Rate limiting is NOT possible in this stateless serverless function (no shared
+state survives between invocations / cold starts). Cross-request rate limiting
+must be configured at the Vercel Firewall level (dashboard / `vercel firewall`
+CLI / REST API) — see web/leaderboard/vercel.json comment and the deploy docs.
+This handler only enforces a hard per-request input cap to bound the compute
+cost of a single scoring run.
 """
 
 import json
@@ -12,11 +17,23 @@ import re
 import tempfile
 from http.server import BaseHTTPRequestHandler
 
+# Hard cap on the raw request body (bounds bytes read off the socket).
 MAX_CONTENT_SIZE = 500 * 1024  # 500 KB
+# Hard cap on the actual skill text handed to the scoring engine. This is the
+# real compute-cost bound: the engine's work scales with this string's length,
+# so it must be enforced on the decoded value, not just the (spoofable)
+# Content-Length header.
+MAX_SKILL_CHARS = 256 * 1024  # 256 KB of text
 
 # Only alphanumeric, hyphens, underscores, dots — no path separators
 _SAFE_FILENAME_RE = re.compile(r"^[a-zA-Z0-9_\-]+\.md$")
 
+# CORS: `*` is intentional and acceptable here. This is a stateless, read-only
+# scorer that uses no cookies, no Authorization header, and no credentials, so
+# there is no cross-origin session to steal — the same-origin policy protects
+# nothing that this endpoint exposes. `*` lets third-party tools call the public
+# scorer directly. Abuse is bounded by the input caps above and by the Vercel
+# Firewall rate limit (configured out-of-repo; see module docstring).
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
@@ -103,8 +120,11 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": "Empty request body"})
             return
 
+        # Read at most MAX_CONTENT_SIZE bytes regardless of the declared
+        # Content-Length, so a lying header cannot make us buffer more.
+        read_len = min(content_length, MAX_CONTENT_SIZE)
         try:
-            raw_body = self.rfile.read(content_length)
+            raw_body = self.rfile.read(read_len)
             body = json.loads(raw_body)
         except (json.JSONDecodeError, ValueError) as exc:
             self._send_json(400, {"error": "Invalid JSON", "detail": str(exc)})
@@ -119,6 +139,16 @@ class handler(BaseHTTPRequestHandler):
 
         if not content or not isinstance(content, str):
             self._send_json(400, {"error": "Missing or invalid 'content' field"})
+            return
+
+        # Hard cap the text actually scored. This is the compute-cost bound;
+        # the byte-level Content-Length check above is not sufficient because a
+        # JSON-escaped or multibyte payload can decode to far more characters.
+        if len(content) > MAX_SKILL_CHARS:
+            self._send_json(413, {
+                "error": "Content too large",
+                "detail": f"'content' must be at most {MAX_SKILL_CHARS // 1024} KB of text",
+            })
             return
 
         if not isinstance(filename, str) or not _SAFE_FILENAME_RE.match(filename):

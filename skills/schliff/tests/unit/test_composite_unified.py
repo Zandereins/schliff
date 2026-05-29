@@ -35,6 +35,21 @@ def test_full_denominator_uncredits_unmeasured():
     assert result["total_dimensions"] == 7  # security excluded from headline
 
 
+def test_partial_coverage_warning_is_an_invitation():
+    # First-run UX: an eval-suite-less skill must read as guidance, not punishment.
+    measured = _scores(structure=95, efficiency=90, composability=88, clarity=100)
+    result = compute_composite(measured)
+    assert result["warnings"], "partial coverage must surface guidance"
+    w = result["warnings"][0]
+    # Actionable + names the path the renderer keys on for the info glyph.
+    assert "/schliff:init" in w and "eval suite" in w.lower()
+    # No punitive vocabulary that frames a missing eval suite as failure.
+    for banned in ("uncredited", "ceiling", "Only ", "Unverified"):
+        assert banned not in w, f"punitive wording leaked back in: {banned!r}"
+    # Still honest about the cap (the number, once).
+    assert f"{result['weight_coverage']:.0%}" in w
+
+
 def test_full_coverage_unaffected():
     # All 7 dims measured and perfect -> 100 (full denominator == full coverage).
     full = _scores(structure=100, triggers=100, quality=100, edges=100,

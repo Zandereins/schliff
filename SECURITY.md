@@ -15,15 +15,15 @@ We will acknowledge receipt within 48 hours and provide a fix timeline within 7 
 Schliff processes skill files (SKILL.md) and eval suites (JSON). Security considerations:
 
 - **File size limits**: Skill files are capped at 1 MB to prevent resource exhaustion
-- **Path traversal**: Reference path resolution blocks `..` sequences
+- **Path traversal**: Reference path resolution blocks `..` sequences and rejects symlinks
 - **Regex safety**: Runtime evaluator uses timeout-protected regex matching
-- **No network access**: All scoring is local — no data leaves your machine
-- **No code execution**: Schliff reads and scores files, it does not execute skill content
+- **Local by default**: The core scoring engine is fully local — same input, same score, no data leaves your machine and no skill content is executed.
+- **Opt-in features that DO use the network or a subprocess** (off by default): `score --url` fetches over HTTPS from an allowlisted set of hosts; `evolve` and `judge` send skill content to an LLM provider you configure; `report --gist` uploads to GitHub; the opt-in `--runtime` dimension invokes the local `claude` CLI. API keys are read from the environment only, never stored.
 
 ## Supported Versions
 
 | Version | Supported |
 |---------|-----------|
-| 6.x     | Yes (current) |
-| 5.x     | Security fixes only |
-| < 5.0   | No        |
+| 7.x     | Yes (current) |
+| 6.x     | Security fixes only |
+| < 6.0   | No        |

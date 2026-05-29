@@ -1,3 +1,12 @@
+"""Community leaderboard query endpoint.
+
+TRUST MODEL: entries are UNVERIFIED, community self-reported scores (the submit
+endpoint stores client-supplied values without re-scoring). Responses carry a
+top-level `"unverified": true` flag and each entry carries `"verified"` so
+clients can render an appropriate "community-submitted, not verified" notice.
+Read-only; CORS handled in vercel.json.
+"""
+
 from http.server import BaseHTTPRequestHandler
 import json
 import os
@@ -135,9 +144,16 @@ class handler(BaseHTTPRequestHandler):
         total = len(entries)
         page = entries[offset: offset + limit]
 
+        # Ensure every returned entry advertises its verification status, even
+        # legacy/seed rows written before the field existed.
+        for e in page:
+            e.setdefault("verified", False)
+
         self._send_json(200, {
             "entries": page,
             "total": total,
             "limit": limit,
             "offset": offset,
+            # Leaderboard data is community self-reported and not server-verified.
+            "unverified": True,
         })

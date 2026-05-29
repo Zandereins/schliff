@@ -1,18 +1,30 @@
 {
-  "schema_version": "1.0",
-  "name": "Schliff",
-  "slug": "schliff",
-  "tagline": "Improve your Claude Code skills automatically — measurable quality, overnight iteration",
-  "description": "Takes any Claude Code skill as input and iteratively improves it with measurable metrics across 6 dimensions: structure, trigger accuracy, output quality, edge-case coverage, token efficiency, and composability. The agent-assisted loop makes one atomic change per iteration, keeps improvements, auto-reverts regressions, and logs everything. Based on Karpathy's autoresearch loop pattern. Requires: python3, bash, git.",
-  "categories": ["productivity", "developer-tools"],
-  "author": {
-    "name": "Zandereins",
-    "github": "https://github.com/Zandereins"
+  "name": "schliff",
+  "owner": {
+    "name": "Zandereins"
   },
-  "repository": "https://github.com/Zandereins/schliff",
-  "license": "MIT",
-  "keywords": [
-    "autoresearch", "skill-improvement", "autonomous-agent",
-    "claude-code", "evaluation", "meta-skill", "karpathy-loop"
+  "description": "Deterministic skill linter and scoring engine for Claude Code — the Ruff for SKILL.md files.",
+  "plugins": [
+    {
+      "name": "schliff",
+      "source": "./",
+      "description": "Deterministic 7-dimension structural scoring (structure, triggers, quality, edges, efficiency, composability, clarity) with anti-gaming detection, rule-based patches, and cross-session episodic memory. Measures first, then fixes — not the other way around.",
+      "author": {
+        "name": "Zandereins"
+      },
+      "homepage": "https://github.com/Zandereins/schliff",
+      "repository": "https://github.com/Zandereins/schliff",
+      "license": "MIT",
+      "category": "developer-tools",
+      "keywords": [
+        "skill-linter",
+        "scoring",
+        "evaluation",
+        "claude-code",
+        "skill-quality",
+        "static-analysis",
+        "meta-skill"
+      ]
+    }
   ]
 }

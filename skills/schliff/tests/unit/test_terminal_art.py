@@ -264,13 +264,16 @@ class TestFormatScoreDisplay:
         output = format_score_display(_make_scores(), _make_composite())
         assert "Structural Score" in output
 
-    def test_shows_unmeasured_warning(self, monkeypatch):
+    def test_shows_coverage_invitation(self, monkeypatch):
         monkeypatch.setenv("NO_COLOR", "1")
+        msg = ("Scored 4/7 dimensions — the score can't exceed 50% until the rest "
+               "are measured. Run /schliff:init to add an eval suite and score: triggers.")
         output = format_score_display(
-            _make_scores(),
-            _make_composite(warnings=["4/8 dimensions measured. Unmeasured: triggers"]),
+            _make_scores(), _make_composite(warnings=[msg]),
         )
-        assert "Unmeasured" in output
+        # Renders the guidance with the info glyph (invitation), not the warning glyph.
+        assert "/schliff:init" in output
+        assert "ℹ" in output and "⚠" not in output
 
     def test_single_contradiction_grammar(self, monkeypatch):
         monkeypatch.setenv("NO_COLOR", "1")
