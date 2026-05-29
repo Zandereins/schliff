@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.0.0] - 2026-05-29
+
+### Added
+- Failure-mode-first AI-Eval foundation: sprint spec + 7 ADRs, Phase-0 open-coded failure-mode
+  taxonomy (10 snapshotted skills), Phase-1 calibration scaffold.
+- Deterministic judge guards (`scoring/guards.py`): destructive-command, gating-invariant
+  (linter-completeness floor), and mixed-script detectors — staged for the v8.1 judge harness, not
+  wired into the live linter; they carry no composite weight.
+- Judge v0 smoke-test harness (`judge/judge_v0.py`, optional `[judge]` extra): pinned model,
+  structured output, mock-testable. Calibration is FROZEN as v8.1 backlog (4 live runs plateaued at
+  directional 7/11; resumes only when distribution yields real users + a concrete quality miss).
+- GitHub Action (`action/action.yml`) to score skills as a CI / PR quality gate.
+- Plugin-marketplace install: schema-valid `.claude-plugin/marketplace.json`
+  (`/plugin marketplace add Zandereins/schliff`) plus `npx skills add` support.
+- Leaderboard scoring-model epoch versioning: v7-scale and v8-scale composites never co-rank;
+  `?score_model=N` selects a scale (default = the latest epoch present).
+
 ### Changed
 - **BREAKING (scoring):** Composite is now computed over a single canonical 7-dimension basis
   with a full denominator — unmeasured dimensions are uncredited (not silently renormalized away).
@@ -19,6 +36,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   (effective_min = min_score × coverage), so skills without an eval suite are judged against a
   structural bar instead of the unreachable full default. Adding an eval suite raises the bar to
   the full surface.
+- Cold-start UX: the partial-coverage message reads as an invitation (ℹ "add an eval suite to score
+  the rest"), not a scold (⚠ "uncredited / ceiling").
+- README leads with native install (`/plugin marketplace add`, `npx skills add`); pip demoted to CLI/CI.
+
+### Fixed
+- `missing_refs` (structure): referenced files resolve skill-local OR against an enclosing
+  plugin/.git root (fixes false-positives on plugin-monorepo layouts), with full paths in the
+  message; plus path-traversal confinement (reject `..`, resolve-confine) so an untrusted SKILL.md
+  cannot probe the filesystem.
+- `evolve._score_file` auto-discovers the eval suite, matching `schliff score`.
+- Public playground reframes a partial-coverage result as a "Structural Score" with a neutral
+  coverage chip instead of a red failing grade (no second scale introduced).
+- Public endpoints: hard cap on decoded skill text (compute-DoS bound) + read-cap vs a lying
+  Content-Length; leaderboard responses tagged `verified:false` / `unverified:true`.
+- `commands/schliff/mesh.md` registered as `/mesh` instead of `/schliff:mesh`.
+
+### Security
+- Pre-launch audit (3 parallel lenses + Hydra closing council): removed tracked internal docs that
+  contradicted the pitch; SECURITY.md version table + network/exec claims scoped to the zero-dep core.
 
 ## [7.2.0] - 2026-04-24
 
