@@ -89,9 +89,14 @@ _GUARD_RE = re.compile(
 
 
 def _is_guarded(content: str, match_start: int) -> bool:
-    """True if a negation/warning sits on the match line or within the 3 preceding
-    content lines (blank lines and ``` fence markers are skipped — warnings commonly
-    sit above a code fence, not on the command line itself)."""
+    """True if a negation/warning sits on the match line or on the single
+    immediately-preceding content line (blank lines and ``` fence markers are
+    skipped — warnings commonly sit just above a code fence, not on the command
+    line itself).
+
+    The window is intentionally ONE content line, not a rolling multi-line
+    window: a guard must directly precede the command it covers, so a single
+    unrelated warning cannot mask every destructive command below it."""
     line_start = content.rfind("\n", 0, match_start) + 1
     preceding = content[:line_start].rstrip("\n").split("\n") if line_start else []
     window_lines: list[str] = []
@@ -100,8 +105,7 @@ def _is_guarded(content: str, match_start: int) -> bool:
         if not stripped or stripped.startswith("```"):
             continue
         window_lines.append(ln)
-        if len(window_lines) >= 3:
-            break
+        break
     window_lines.append(_line_at(content, match_start))
     return bool(_GUARD_RE.search(" ".join(window_lines)))
 

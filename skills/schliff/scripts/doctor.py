@@ -139,6 +139,8 @@ def run_doctor(
         instruction_files = discover_instruction_files(scan_root)
         return {
             "skills_found": 0,
+            "scored": 0,
+            "failed": 0,
             "healthy": 0,
             "needs_work": 0,
             "no_eval_suite": 0,
@@ -155,6 +157,7 @@ def run_doctor(
     healthy = 0
     needs_work = 0
     no_eval = 0
+    failed = 0
 
     for skill in skills:
         path = skill["path"]
@@ -163,6 +166,7 @@ def run_doctor(
         try:
             score_result = _score_single_skill(path)
         except Exception as e:
+            failed += 1
             results.append({
                 "name": name,
                 "path": path,
@@ -202,6 +206,8 @@ def run_doctor(
         summary_parts.append(f"{needs_work} need work")
     if no_eval:
         summary_parts.append(f"{no_eval} missing eval suite")
+    if failed:
+        summary_parts.append(f"{failed} failed to score")
     if mesh_issues:
         summary_parts.append(f"{len(mesh_issues)} mesh issues")
 
@@ -221,7 +227,10 @@ def run_doctor(
                     continue
                 refs = drift_mod.extract_references(content)
                 if refs:
-                    findings = drift_mod.validate_references(refs, repo_root)
+                    # References in an instruction file are conventionally
+                    # relative to that file's own directory, not the repo root.
+                    base_dir = os.path.dirname(ifile["path"]) or repo_root
+                    findings = drift_mod.validate_references(refs, base_dir)
                     missing = [f for f in findings if f["status"] == "missing"]
                     if missing:
                         drift_findings.extend(
@@ -234,7 +243,9 @@ def run_doctor(
         summary_parts.append(f"{len(drift_findings)} stale references")
 
     return {
-        "skills_found": len(results),
+        "skills_found": len(results) - failed,
+        "scored": len(results) - failed,
+        "failed": failed,
         "healthy": healthy,
         "needs_work": needs_work,
         "no_eval_suite": no_eval,
@@ -287,13 +298,17 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
 
         name = r["name"][:24]
         score = r["composite"]
-        grade = grade_colored(r["grade"])
+        # Right-align the Grade column on its VISIBLE width ([X] == 3 cols);
+        # padding must live outside any ANSI color wrap so colored output stays
+        # aligned with the (uncolored) header.
+        grade_pad = " " * max(0, 6 - len(f"[{r['grade']}]"))
+        grade = grade_pad + grade_colored(r["grade"])
         dims = f"{r['measured']}/{r['total_dims']}"
         tokens = r.get("tokens", 0)
         issues = r["issue_count"]
         action = r["action"][:35]
 
-        lines.append(f"  {name:<25s} {score:>5.0f} {grade:>6s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
+        lines.append(f"  {name:<25s} {score:>5.0f} {grade:s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
 
         if verbose and r.get("issues"):
             for issue in r["issues"][:5]:  # Cap at 5 to avoid flooding

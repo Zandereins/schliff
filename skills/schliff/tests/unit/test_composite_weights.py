@@ -102,6 +102,8 @@ class TestCustomWeightsOverride:
             encoding="utf-8",
         )
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        # Calibration is opt-in (deterministic-by-default); enable it explicitly.
+        monkeypatch.setenv("SCHLIFF_CALIBRATED_WEIGHTS", "1")
         _reset_calibrated_cache()
 
         scores = _base_scores()
@@ -136,6 +138,7 @@ class TestCalibratedWeightsLoading:
             encoding="utf-8",
         )
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        monkeypatch.setenv("SCHLIFF_CALIBRATED_WEIGHTS", "1")
         _reset_calibrated_cache()
 
         scores = _base_scores()
@@ -144,6 +147,7 @@ class TestCalibratedWeightsLoading:
         result = compute_composite(scores)
         # structure=100 dominates -> composite must be near 100
         assert result["score"] >= 85.0
+        assert result["weight_source"] == "calibrated"
         _reset_calibrated_cache()
 
     def test_malformed_json_falls_back_to_defaults(self, tmp_path, monkeypatch):
@@ -200,6 +204,7 @@ class TestCalibratedWeightsLoading:
             json.dumps({"structure": 1.0, "efficiency": 0.01}), encoding="utf-8"
         )
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        monkeypatch.setenv("SCHLIFF_CALIBRATED_WEIGHTS", "1")
         _reset_calibrated_cache()
 
         # Polarize inputs so the two weight sets produce clearly different

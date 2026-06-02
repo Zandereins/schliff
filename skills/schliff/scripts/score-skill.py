@@ -127,13 +127,12 @@ def main():
     if args.diff:
         diff_analysis = score_diff(args.skill_path, args.diff_ref)
         result["diff_analysis"] = diff_analysis
-        # Wire explain_score_change into diff output
-        # Use current scores as "new" and zeros as "old" placeholder
-        # (real old scores would come from previous run's JSON)
-        current_scores = {k: v["score"] for k, v in scores.items() if v["score"] >= 0}
-        explanations = explain_score_change({}, current_scores, diff_analysis)
-        if explanations:
-            result["score_explanations"] = explanations
+        # NOTE: per-dimension score_explanations are intentionally not emitted
+        # here. explain_score_change requires the previous run's per-dimension
+        # scores as old_scores; with an empty {} baseline every measured
+        # dimension fabricates a "0 -> N" delta that is pure noise. Until a real
+        # baseline source (prior --json output / history) is wired in, emit only
+        # diff_analysis, which is the real git-derived signal/noise signal.
 
     if args.json:
         print(json.dumps(result, indent=2))

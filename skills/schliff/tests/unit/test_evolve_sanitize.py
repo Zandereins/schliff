@@ -145,3 +145,49 @@ class TestRedactException:
         result = redact_exception(exc)
         assert "sk-ant-" not in result
         assert "REDACTED" in result
+
+
+class TestGenericCredentialCatcher:
+    """Regression tests for the generic assignment catcher (ReDoS + false positives).
+
+    The earlier `[a-z0-9_]*` prefix caused catastrophic backtracking and over-redaction.
+    """
+
+    def test_no_catastrophic_backtracking_on_alnum_blob(self):
+        # A 100KB benign alphanumeric run with no completing assignment must not hang.
+        import time
+        large = "ABCdef0123456789" * 6250  # 100KB
+        start = time.time()
+        out = redact_secrets(large)
+        elapsed = time.time() - start
+        assert elapsed < 1.0, f"redaction took {elapsed:.2f}s — possible ReDoS"
+        assert "REDACTED" not in out
+
+    def test_no_backtracking_on_repeated_keyword(self):
+        import time
+        start = time.time()
+        redact_secrets("token" * 20000)
+        assert time.time() - start < 1.0
+
+    def test_prose_ending_in_key_not_redacted(self):
+        # "turkey", "monkey", "primary key:" must NOT be treated as credentials.
+        for text in (
+            "turkey=substantialvalue1234567890",
+            "monkey: abcdefghij1234567",
+            "The primary key: columnidentifierxyz",
+            "the key insight: rememberthisalways",
+        ):
+            assert "REDACTED" not in redact_secrets(text), text
+
+    def test_real_credentials_still_redacted(self):
+        for text in (
+            "db_password = 'hunter2hunter2hunter2'",
+            "api_key: AbCdEf0123456789xyzExtra",
+            "client_secret=abcdef0123456789ABCDEF",
+        ):
+            assert "REDACTED" in redact_secrets(text), text
+
+    def test_quote_stays_balanced(self):
+        out = redact_secrets("my_api_key = 'aBcDeF0123456789xyz'")
+        assert out.count("'") % 2 == 0
+        assert "REDACTED" in out

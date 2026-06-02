@@ -3,8 +3,10 @@
 Returns both the score and metadata about how many dimensions
 were actually measured, so users know how trustworthy the number is.
 """
+import hashlib
 import json
 import math
+import os
 from typing import Optional
 from pathlib import Path
 
@@ -50,6 +52,28 @@ def _load_calibrated_weights() -> Optional[dict]:
     return None
 
 
+def _calibration_enabled() -> bool:
+    """Whether ambient auto-calibrated weights may override the canonical defaults.
+
+    Calibration is OFF by default so that the headline composite is deterministic and
+    reproducible across machines (verify/badge/leaderboard must use canonical registry
+    weights). It is opt-in via SCHLIFF_CALIBRATED_WEIGHTS=1 (or true/yes/on).
+    """
+    return os.environ.get("SCHLIFF_CALIBRATED_WEIGHTS", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _weights_fingerprint(weights: dict) -> str:
+    """Stable short hash of the canonical weight vector, for provenance stamping."""
+    canonical = json.dumps(
+        {k: round(float(v), 6) for k, v in sorted(weights.items())},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+
+
 def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
                       fmt: Optional[str] = None) -> dict:
     """Compute weighted composite score with confidence indicator.
@@ -77,10 +101,16 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     weights = get_weights(fmt if fmt is not None else "skill.md")
     explicit = set(custom_weights or {})
 
+    # Provenance: the headline composite must be reproducible across machines, so
+    # "default" (canonical registry weights) is the deterministic baseline. Calibration
+    # is an explicit opt-in (see _calibration_enabled); custom_weights are caller-supplied.
+    weight_source = "default"
+
     # Stage 1: apply weight OVERRIDES (custom or auto-calibrated) RAW — do NOT renormalize
     # here. The canonical basis (Stage 2, below) is the single normalization point, applied
     # after dimension exclusion; renormalizing now would double-normalize and shift scores.
     if custom_weights:
+        weight_source = "custom"
         _SUPPLEMENTARY = {"clarity", "security"}
         for dim in list(weights):
             if dim in _SUPPLEMENTARY and dim not in custom_weights:
@@ -88,9 +118,13 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
         for k, v in custom_weights.items():
             if k in weights and isinstance(v, (int, float)) and math.isfinite(v) and v >= 0:
                 weights[k] = v
-    else:
+    elif _calibration_enabled():
+        # Opt-in only: ambient calibrated weights are a per-machine, mutable score-model
+        # mutation. Applying them by default makes the same skill score differently across
+        # machines, so the canonical default is used unless SCHLIFF_CALIBRATED_WEIGHTS is set.
         calibrated = _load_calibrated_weights()
         if calibrated:
+            weight_source = "calibrated"
             for k, v in calibrated.items():
                 if k in weights:
                     weights[k] = v
@@ -118,7 +152,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     unmeasured = []
     for dim, weight in canonical.items():
         s = scores.get(dim, {}).get("score", -1)
-        if s >= 0:
+        if isinstance(s, (int, float)) and not isinstance(s, bool) and math.isfinite(s) and s >= 0:
             total += s * weight
             measured_w += weight
             measured.append(dim)
@@ -145,7 +179,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     signals = {}
     for opt in ("security", "runtime"):
         sv = scores.get(opt, {}).get("score", -1)
-        if sv is not None and sv >= 0:
+        if isinstance(sv, (int, float)) and not isinstance(sv, bool) and math.isfinite(sv) and sv >= 0:
             signals[opt] = ({
                 "score": sv,
                 "status": "pass" if sv >= SECURITY_GATE else "flag",
@@ -171,6 +205,13 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     has_runtime = "runtime" in signals
     score_type = "structural+runtime" if has_runtime else "structural"
 
+    if weight_source == "calibrated":
+        warnings.append(
+            "Non-canonical weights in effect (weight_source=calibrated via "
+            "SCHLIFF_CALIBRATED_WEIGHTS); this score is not comparable to default-weight "
+            "scores from verify/badge/leaderboard."
+        )
+
     return {
         "score": composite,
         "score_type": score_type,
@@ -181,5 +222,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
         "warnings": warnings,
         "signals": signals,
         "security": signals.get("security", {}),
+        "weight_source": weight_source,
+        "weights_hash": _weights_fingerprint(canonical),
         "confidence_notes": {k: v for k, v in confidence_notes.items() if k in measured},
     }

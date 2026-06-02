@@ -64,10 +64,27 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
 
 
 def load_last_score(skill_path: str, history_path: str = _DEFAULT_HISTORY) -> Optional[float]:
-    """Load the most recent score for a skill from history.
+    """Load the most recent composite score for a skill from history.
 
     Reads the file backwards (last line first) to find the latest entry
     matching the given skill path. Returns None if no history exists.
+    """
+    entry = load_last_entry(skill_path, history_path)
+    if entry is None:
+        return None
+    return entry[0]
+
+
+def load_last_entry(
+    skill_path: str, history_path: str = _DEFAULT_HISTORY
+) -> Optional[tuple]:
+    """Load the latest (composite, weight_coverage) for a skill from history.
+
+    Returns a (composite, coverage) tuple, where coverage is None for legacy
+    entries written before weight_coverage was recorded. Returns None if no
+    matching history exists. Comparing coverage-normalized scores lets the
+    regression gate judge per-measured-dimension quality rather than raw
+    composites, which are capped at each run's weight coverage.
     """
     hp = Path(history_path)
     if not hp.exists():
@@ -93,7 +110,9 @@ def load_last_score(skill_path: str, history_path: str = _DEFAULT_HISTORY) -> Op
                 continue
             entry_path = entry.get("skill_path", "")
             if str(Path(entry_path).resolve()) == norm_path:
-                return float(val)
+                cov = entry.get("weight_coverage")
+                cov = float(cov) if cov is not None else None
+                return (float(val), cov)
         except (json.JSONDecodeError, ValueError, TypeError, OSError):
             continue
     return None
@@ -117,6 +136,7 @@ def append_history(
         "composite": result["composite"],
         "grade": result["grade"],
         "dimensions": result["dimensions"],
+        "weight_coverage": result.get("weight_coverage"),
     }
 
     line = json.dumps(entry, separators=(",", ":")) + "\n"
@@ -206,10 +226,22 @@ def run_verify(
 
     # Regression check
     if check_regression:
-        previous = load_last_score(skill_path, history_path)
+        prev_entry = load_last_entry(skill_path, history_path)
+        previous = prev_entry[0] if prev_entry is not None else None
         verdict["previous_score"] = previous
         if previous is not None:
-            delta = round(composite - previous, 1)
+            # Raw composites are capped at each run's weight coverage, so a run
+            # with a different eval-suite-presence regime is not comparable to a
+            # prior raw composite. Compare per-measured-dimension quality
+            # (composite / coverage) when both coverages are known; fall back to
+            # raw deltas for legacy entries lacking a recorded coverage.
+            prev_coverage = prev_entry[1]
+            if prev_coverage is not None and prev_coverage > 0 and coverage > 0:
+                norm_current = composite / coverage
+                norm_previous = previous / prev_coverage
+                delta = round(norm_current - norm_previous, 1)
+            else:
+                delta = round(composite - previous, 1)
             verdict["delta"] = delta
             if delta < 0:
                 verdict["regression"] = True

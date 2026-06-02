@@ -150,7 +150,13 @@ def run(labels_path: Path, model: str, n: int, temp: float, mock: bool, out_path
 
         votes = [judge_once(system, skill_text) for _ in range(n)]
         labels = [v[0] for v in votes]
-        plurality = collections.Counter(labels).most_common(1)[0][0]
+        # Deterministic plurality: on a tie, default to the conservative label (FAIL)
+        # so an even/split vote does not flip PASS<->FAIL with API sample arrival order.
+        counts = collections.Counter(labels).most_common()
+        if len(counts) > 1 and counts[0][1] == counts[1][1]:
+            plurality = "FAIL"
+        else:
+            plurality = counts[0][0]
         agree = plurality == r["label"]
         results.append({
             "specimen": r["specimen"], "dim": dim, "tier": r.get("tier"),

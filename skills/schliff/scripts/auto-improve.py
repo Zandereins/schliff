@@ -149,6 +149,30 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
     }
 
 
+def _score_content(
+    content: str, skill_path: str, eval_suite: Optional[dict] = None
+) -> dict:
+    """Score in-memory content without mutating the real skill file.
+
+    Used by --dry-run: the scorers read from disk by path, so we write the
+    candidate content to a sibling temp file (same directory, so eval-suite /
+    sibling lookups still resolve), score it, then remove it. Returns the same
+    shape as _score_skill.
+    """
+    tmp_path = Path(skill_path).with_suffix(".dryrun.tmp")
+    try:
+        tmp_path.write_text(content, encoding="utf-8")
+        scorer.invalidate_cache(str(tmp_path))
+        result = _score_skill(str(tmp_path), eval_suite)
+    finally:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        scorer.invalidate_cache(str(tmp_path))
+    return result
+
+
 # --- ROI Stopping ---
 
 def _has_dimension_regression(
@@ -418,9 +442,17 @@ def run_auto_improve(
                     print("  Patch had no effect — skipping", file=sys.stderr)
                 continue
 
-            # Score after patch
-            scorer.invalidate_cache(skill_path)
-            new_score = _score_skill(skill_path, eval_suite)
+            # Score after patch. In dry-run the patch is NOT written to disk
+            # (apply_patches returns new_content instead), so re-reading the
+            # file would re-score the unmodified baseline and yield delta 0.
+            # Score the in-memory candidate content instead.
+            if dry_run:
+                new_score = _score_content(
+                    result["new_content"], skill_path, eval_suite
+                )
+            else:
+                scorer.invalidate_cache(skill_path)
+                new_score = _score_skill(skill_path, eval_suite)
             delta = round(new_score["composite"] - current_score["composite"], 1)
 
             if verbose and explore_width > 1:

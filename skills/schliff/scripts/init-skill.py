@@ -21,6 +21,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -610,7 +611,11 @@ def build_eval_suite(skill_path: str) -> dict:
         )
         sys.exit(1)
 
-    content = p.read_text(encoding="utf-8")
+    try:
+        content = p.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError) as exc:
+        print(f"Error: could not read {skill_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     fm = parse_frontmatter(content)
     name = fm["name"] or p.parent.name or "unknown-skill"
@@ -822,14 +827,19 @@ def main() -> None:
         default=None,
         help="Output path for eval-suite.json (default: same directory as SKILL.md)",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite an existing eval-suite.json (default: abort if it exists)",
+    )
 
     args = parser.parse_args()
 
     # Auto-discovery: find SKILL.md if no path given
     if args.skill_path is None:
         candidates = [Path("./SKILL.md")]
-        # Search parent dirs up to depth 2
-        for p in Path(".").glob("**/SKILL.md"):
+        # Search descendant dirs up to depth 4 (sorted for deterministic selection)
+        for p in sorted(Path(".").glob("**/SKILL.md")):
             if p not in candidates and len(p.parts) <= 4:
                 candidates.append(p)
         found = None
@@ -854,19 +864,43 @@ def main() -> None:
         skill_dir = Path(skill_path).parent
         eval_suite_path = str(skill_dir / "eval-suite.json")
 
+    suite_json = json.dumps(suite, indent=2, ensure_ascii=False)
+
     # Write unless dry-run
     if not args.dry_run:
-        try:
-            Path(eval_suite_path).write_text(
-                json.dumps(suite, indent=2, ensure_ascii=False),
-                encoding="utf-8",
+        if Path(eval_suite_path).exists() and not args.force:
+            print(
+                f"Error: {eval_suite_path} already exists; "
+                f"pass --force to overwrite or --output to write elsewhere.",
+                file=sys.stderr,
             )
+            sys.exit(1)
+        try:
+            Path(eval_suite_path).write_text(suite_json, encoding="utf-8")
         except OSError as exc:
             print(f"Error: could not write eval-suite.json: {exc}", file=sys.stderr)
             sys.exit(1)
 
-    # Run baseline (always, even on dry-run, so the user gets a score)
-    baseline = run_baseline(skill_path, eval_suite_path)
+    # Run baseline (always, even on dry-run, so the user gets a score).
+    # On dry-run the suite is not written to eval_suite_path, so score it
+    # against a temp copy of the generated suite — otherwise the scorer would
+    # auto-discover (or miss) a sibling suite and report trigger/quality/edge
+    # dims as n/a, not reflecting what init just generated.
+    if args.dry_run:
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", prefix="schliff-eval-", delete=False, encoding="utf-8"
+        )
+        try:
+            tmp.write(suite_json)
+            tmp.close()
+            baseline = run_baseline(skill_path, tmp.name)
+        finally:
+            try:
+                Path(tmp.name).unlink()
+            except OSError:
+                pass
+    else:
+        baseline = run_baseline(skill_path, eval_suite_path)
 
     # Output
     tc = _trigger_counts(suite)

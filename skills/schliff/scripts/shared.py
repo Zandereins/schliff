@@ -77,11 +77,13 @@ def read_skill_safe(skill_path: str) -> str:
     """Read a skill file with size limit enforcement and caching.
 
     Reads first, then checks size (avoids TOCTOU race condition).
-    Rejects symlinks to prevent reading arbitrary files via crafted paths.
+    Symlinks are resolved (via Path.resolve) and the real target is validated
+    to be a regular file. Skill files are commonly symlinked by dotfile
+    managers (stow/chezmoi), ``claude --worktree`` setups, and shared
+    ``~/.claude/skills`` layouts, so they are followed rather than rejected;
+    the resolved target must still be an existing, non-directory regular file.
     """
     raw = Path(skill_path)
-    if raw.is_symlink():
-        raise ValueError(f"Skill path is a symlink (rejected): {skill_path}")
     p = raw.resolve()
     key = str(p)
     if key in _file_cache:
@@ -90,6 +92,8 @@ def read_skill_safe(skill_path: str) -> str:
         raise FileNotFoundError(f"Skill file not found: {skill_path}")
     if p.is_dir():
         raise ValueError(f"Skill path is a directory, not a file: {skill_path}")
+    if not p.is_file():
+        raise ValueError(f"Skill path is not a regular file: {skill_path}")
     content = p.read_text(encoding="utf-8", errors="replace")
     if len(content) > MAX_SKILL_SIZE:
         raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")

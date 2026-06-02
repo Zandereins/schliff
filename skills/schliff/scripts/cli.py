@@ -45,10 +45,17 @@ def _load_eval_suite_from_args(args: argparse.Namespace) -> "dict | None":
             print(f"Error: eval-suite exceeds {MAX_SKILL_SIZE} byte size limit", file=sys.stderr)
             sys.exit(1)
         try:
-            return json.loads(eval_path.read_text(encoding="utf-8"))
+            suite = json.loads(eval_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
             print(f"Error: malformed eval-suite: {e}", file=sys.stderr)
             sys.exit(1)
+        if not isinstance(suite, dict):
+            print(
+                "Error: eval-suite must be a JSON object with triggers/quality/edges keys",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        return suite
     skill_path = getattr(args, "skill_path", None)
     if skill_path:
         return load_eval_suite(skill_path)
@@ -120,7 +127,10 @@ def cmd_score(args: argparse.Namespace) -> None:
             from scoring.formats import detect_format
             detected_fmt = detect_format(skill_path)
 
-        composite = compute_composite(scores, fmt=effective_fmt)
+        # Weights must match the dimensions actually scored: pass the resolved
+        # format (not effective_fmt, which is None for auto-detected formats) so
+        # non-skill.md families (e.g. system_prompt) are weighted correctly.
+        composite = compute_composite(scores, fmt=detected_fmt)
 
         # Token budget check — reuse cached content from shared.read_skill_safe
         from scoring.formats import estimate_tokens, check_token_budget
@@ -250,6 +260,12 @@ def cmd_verify(args: argparse.Namespace) -> None:
         except json.JSONDecodeError as e:
             print(f"Error: malformed eval-suite: {e}", file=sys.stderr)
             sys.exit(2)
+        if not isinstance(eval_suite, dict):
+            print(
+                "Error: eval-suite must be a JSON object with triggers/quality/edges keys",
+                file=sys.stderr,
+            )
+            sys.exit(2)
     else:
         eval_suite = load_eval_suite(args.skill_path)
 
@@ -305,9 +321,11 @@ def cmd_badge(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     eval_suite = _load_eval_suite_from_args(args)
-    scores = build_scores(args.skill_path, eval_suite)
+    from scoring.formats import detect_format
+    detected_fmt = detect_format(args.skill_path)
+    scores = build_scores(args.skill_path, eval_suite, fmt=detected_fmt)
 
-    composite = compute_composite(scores)
+    composite = compute_composite(scores, fmt=detected_fmt)
     score = composite["score"]
     grade = score_to_grade(score)
 
@@ -387,8 +405,10 @@ def cmd_diff(args: argparse.Namespace) -> None:
 
     # Score current version
     eval_suite = _load_eval_suite_from_args(args)
-    new_scores = build_scores(skill_path, eval_suite)
-    new_composite = compute_composite(new_scores)
+    from scoring.formats import detect_format
+    detected_fmt = detect_format(skill_path)
+    new_scores = build_scores(skill_path, eval_suite, fmt=detected_fmt)
+    new_composite = compute_composite(new_scores, fmt=detected_fmt)
 
     # Reconstruct old version via git show
     try:
@@ -434,8 +454,10 @@ def cmd_diff(args: argparse.Namespace) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         old_path = str(Path(tmpdir) / "SKILL.md")
         Path(old_path).write_text(old_content.stdout, encoding="utf-8")
-        old_scores = build_scores(old_path, eval_suite)
-        old_composite = compute_composite(old_scores)
+        # Use the same resolved format as the current version so both composites
+        # are weighted consistently (the temp file is always named SKILL.md).
+        old_scores = build_scores(old_path, eval_suite, fmt=detected_fmt)
+        old_composite = compute_composite(old_scores, fmt=detected_fmt)
 
     # Diff analysis (signal/noise classification) — use resolved path
     diff_analysis = score_diff(abs_skill, ref)
@@ -501,11 +523,15 @@ def cmd_compare(args: argparse.Namespace) -> None:
 
     eval_suite = _load_eval_suite_from_args(args)
 
-    scores_a = build_scores(path_a, eval_suite)
-    scores_b = build_scores(path_b, eval_suite)
+    from scoring.formats import detect_format
+    fmt_a = detect_format(path_a)
+    fmt_b = detect_format(path_b)
 
-    composite_a = compute_composite(scores_a)
-    composite_b = compute_composite(scores_b)
+    scores_a = build_scores(path_a, eval_suite, fmt=fmt_a)
+    scores_b = build_scores(path_b, eval_suite, fmt=fmt_b)
+
+    composite_a = compute_composite(scores_a, fmt=fmt_a)
+    composite_b = compute_composite(scores_b, fmt=fmt_b)
 
     score_a = composite_a["score"]
     score_b = composite_b["score"]
@@ -602,8 +628,10 @@ def cmd_suggest(args: argparse.Namespace) -> None:
     top_n = max(1, args.top)
 
     # Compute current score
-    scores = build_scores(args.skill_path, eval_suite, include_runtime=True)
-    composite = compute_composite(scores)
+    from scoring.formats import detect_format
+    detected_fmt = detect_format(args.skill_path)
+    scores = build_scores(args.skill_path, eval_suite, include_runtime=True, fmt=detected_fmt)
+    composite = compute_composite(scores, fmt=detected_fmt)
     current_score = composite["score"]
     current_grade = score_to_grade(current_score)
 
@@ -681,14 +709,14 @@ def cmd_report(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     eval_suite = _load_eval_suite_from_args(args)
-    scores = build_scores(args.skill_path, eval_suite, include_runtime=True)
-    composite = compute_composite(scores)
+    from scoring.formats import detect_format, check_token_budget
+    detected_fmt = detect_format(args.skill_path)
+    scores = build_scores(args.skill_path, eval_suite, include_runtime=True, fmt=detected_fmt)
+    composite = compute_composite(scores, fmt=detected_fmt)
     grade = score_to_grade(composite["score"])
 
     # Token budget for report — reuse cached content from shared.read_skill_safe
-    from scoring.formats import detect_format, check_token_budget
     from shared import read_skill_safe
-    detected_fmt = detect_format(args.skill_path)
     try:
         skill_content = read_skill_safe(args.skill_path)
     except (OSError, ValueError) as exc:
