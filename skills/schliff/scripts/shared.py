@@ -65,8 +65,7 @@ def strip_frontmatter(content: str) -> str:
     # leaks into the body, perturbing body-sensitive dimensions (composability,
     # efficiency) and breaking BOM-invariant scoring. Mirrors the same fix in
     # security._extract_frontmatter and structure.py.
-    if content[:1] == "﻿":
-        content = content[1:]
+    content = content.lstrip("﻿")
     if content.startswith("---"):
         end = content.find("---", 3)
         if end >= 4:
@@ -102,14 +101,16 @@ def read_skill_safe(skill_path: str) -> str:
     if not p.is_file():
         raise ValueError(f"Skill path is not a regular file: {skill_path}")
     content = p.read_text(encoding="utf-8", errors="replace")
-    # Strip a single leading UTF-8 BOM (U+FEFF) once, at the read boundary, so no
-    # downstream scorer ever sees it. A leading BOM is an invisible encoding
+    # Strip ALL leading UTF-8 BOMs (U+FEFF) once, at the read boundary, so no
+    # downstream scorer ever sees one. A leading BOM is an invisible encoding
     # artifact; left in place it defeats every `startswith("---")` frontmatter
     # check (structure, composability, efficiency, security-domain), making the
-    # same file score differently with/without a BOM — a determinism break. This
-    # is the root-cause fix; per-scorer strips remain as defense for direct callers.
-    if content[:1] == "﻿":
-        content = content[1:]
+    # same file score differently with/without a BOM — a determinism break. We
+    # lstrip rather than strip a single char so a (degenerate) multi-BOM prefix
+    # collapses to body too, and any residual U+FEFF is genuinely mid-content
+    # where the obfuscation detector still flags it. Root-cause fix; per-scorer
+    # strips remain as defense for direct callers.
+    content = content.lstrip("﻿")
     if len(content) > MAX_SKILL_SIZE:
         raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
     if len(_file_cache) >= MAX_CACHE_ENTRIES:

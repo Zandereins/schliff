@@ -149,6 +149,25 @@ class TestHistory:
         loaded = verify_mod.load_last_score(good_skill, history_file)
         assert loaded == 85.0
 
+    def test_regression_skipped_across_weight_regimes(self, good_skill, history_file):
+        """If the prior history entry used a different weight model, the regression
+        gate must SKIP (not silently fail) — and never compare across regimes."""
+        # Seed a prior 'calibrated' entry (different regime from a canonical verify run).
+        seeded = {
+            "composite": 95.0, "grade": "A", "dimensions": {},
+            "weight_coverage": 1.0, "weight_source": "calibrated", "weights_hash": "deadbeef0000",
+        }
+        verify_mod.append_history(good_skill, seeded, history_file)
+
+        verdict = verify_mod.run_verify(
+            good_skill, min_score=40.0, history_path=history_file,
+            check_regression=True,
+        )
+        assert verdict["weight_source"] == "default"  # verify is always canonical
+        assert "different weight model" in verdict["message"]
+        assert verdict["exit_code"] == 0
+        assert verdict["regression"] is False
+
     def test_different_skills_isolated(self, tmp_path, history_file):
         skill_a = tmp_path / "a" / "SKILL.md"
         skill_b = tmp_path / "b" / "SKILL.md"

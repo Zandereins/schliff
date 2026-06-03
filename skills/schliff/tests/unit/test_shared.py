@@ -300,3 +300,15 @@ class TestLeadingBOM:
         b = read_skill_safe(str(bom))
         assert not b.startswith("﻿")
         assert a == b
+
+    def test_read_skill_safe_strips_multiple_leading_boms(self, tmp_path):
+        """A degenerate multi-BOM prefix must collapse to body too (no residual
+        FEFF surviving at the boundary)."""
+        nobom = tmp_path / "nobom.md"
+        double = tmp_path / "double.md"
+        nobom.write_text(self._BODY, encoding="utf-8")
+        double.write_bytes(b"\xef\xbb\xbf\xef\xbb\xbf" + self._BODY.encode("utf-8"))
+        invalidate_cache(str(nobom))
+        invalidate_cache(str(double))
+        assert read_skill_safe(str(double)) == read_skill_safe(str(nobom))
+        assert "﻿" not in read_skill_safe(str(double))

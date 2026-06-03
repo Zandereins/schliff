@@ -183,6 +183,8 @@ def run_verify(
         "coverage": 0.0, "effective_min": min_score,
         "passed_threshold": False, "exit_code": 2, "message": "",
         "previous_score": None, "delta": None, "regression": False,
+        # Uniform key set with the normal verdict (provenance is N/A on an error path).
+        "weight_source": "default", "weights_hash": None,
     }
 
     if not Path(skill_path).exists():
@@ -247,6 +249,11 @@ def run_verify(
         verdict["previous_score"] = previous
         # Never regress-gate across scoring regimes: a prior score produced under a
         # different weight model (e.g. calibrated) is not comparable to this run.
+        # Invariant: no in-tree writer ever records a non-"default" entry — verify
+        # (the only append_history caller) always scores canonically, and the sole
+        # use_calibrated=True caller (cmd_score) never writes history. So in practice
+        # prev_source == cur_source == "default" and this skip is dormant; it exists
+        # to defend against externally-injected calibrated entries.
         prev_source = prev_entry[2] if prev_entry is not None and len(prev_entry) > 2 else "default"
         cur_source = result.get("weight_source", "default")
         if previous is not None and prev_source != cur_source:

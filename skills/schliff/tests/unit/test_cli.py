@@ -196,3 +196,44 @@ def test_score_format_invalid_choice(skill_file):
     """--format with an invalid choice exits non-zero."""
     result = _run_cli("score", "--format", "invalid_format", skill_file)
     assert result.returncode != 0
+
+
+class TestCanonicalUnderCalibrationFlag:
+    """badge and verify (cross-comparison surfaces) must IGNORE SCHLIFF_CALIBRATED_WEIGHTS.
+
+    Regression lock for the defect where the env flag flipped a CI pass/fail and the
+    public badge grade (PR #46 runtime-verification finding).
+    """
+
+    def _run(self, args, home, calibrated):
+        import os
+        env = dict(os.environ, HOME=str(home))
+        env.pop("SCHLIFF_CALIBRATED_WEIGHTS", None)
+        if calibrated:
+            env["SCHLIFF_CALIBRATED_WEIGHTS"] = "1"
+        return subprocess.run(
+            [sys.executable, CLI_PATH, *args],
+            capture_output=True, text=True, timeout=30, env=env,
+        )
+
+    @pytest.fixture
+    def home_with_calib(self, tmp_path):
+        meta = tmp_path / ".schliff" / "meta"
+        meta.mkdir(parents=True)
+        (meta / "calibrated-weights.json").write_text(
+            json.dumps({"structure": 100.0, "efficiency": 0.01, "composability": 0.01}),
+            encoding="utf-8",
+        )
+        return tmp_path
+
+    def test_badge_ignores_env_flag(self, skill_file, home_with_calib):
+        off = self._run(["badge", skill_file], home_with_calib, False)
+        on = self._run(["badge", skill_file], home_with_calib, True)
+        assert off.returncode == 0 and on.returncode == 0
+        assert off.stdout == on.stdout, "badge grade changed under SCHLIFF_CALIBRATED_WEIGHTS"
+
+    def test_verify_ignores_env_flag(self, skill_file, home_with_calib):
+        args = ["verify", skill_file, "--min-score", "70"]
+        off = self._run(args, home_with_calib, False)
+        on = self._run(args, home_with_calib, True)
+        assert off.returncode == on.returncode, "verify pass/fail flipped under the env flag"

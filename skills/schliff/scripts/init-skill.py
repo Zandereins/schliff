@@ -617,6 +617,11 @@ def build_eval_suite(skill_path: str) -> dict:
         print(f"Error: could not read {skill_path}: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    # This entrypoint reads directly (not via read_skill_safe), so strip a leading
+    # BOM here too — otherwise the ^--- frontmatter anchor fails and the generated
+    # baseline eval suite loses name/description/triggers for a BOM-prefixed skill.
+    content = content.lstrip("﻿")
+
     fm = parse_frontmatter(content)
     name = fm["name"] or p.parent.name or "unknown-skill"
     desc = fm["description"] or ""
