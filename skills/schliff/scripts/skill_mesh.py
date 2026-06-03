@@ -100,6 +100,9 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
                 "content": content,
             })
 
+    # Sort by resolved path for deterministic ordering across machines/OSes
+    # (rglob traversal order is filesystem-dependent and not stable).
+    skills.sort(key=lambda s: s["path"])
     return skills
 
 
@@ -389,9 +392,15 @@ def detect_broken_handoffs(skills: list[dict]) -> list[dict]:
             # Only consider base skill name from slash commands (skip subcommands)
             if ":" in ref:
                 base = ref.split(":")[0]
-                # Skip self-references via slash commands
-                if base != skill["name"].lower():
-                    refs.add(base)
+            else:
+                base = ref
+            # Skip self-references via slash commands
+            if base == skill["name"].lower():
+                continue
+            # Skip refs that are too short or too generic
+            if len(base) < 3 or base.isdigit() or base in _false_positives:
+                continue
+            refs.add(base)
 
         # Check each reference against name table
         for ref in refs:
@@ -402,12 +411,19 @@ def detect_broken_handoffs(skills: list[dict]) -> list[dict]:
             if ref in name_table:
                 continue  # Valid reference
 
-            # Fuzzy match
+            # Fuzzy match — collect all candidates within edit distance, then
+            # pick deterministically (smallest distance, then lexicographic name)
+            # so the suggestion does not depend on dict insertion order.
             suggestion = None
+            best_key = None
             for known_name in name_table:
-                if _levenshtein_distance(ref, known_name) <= 2:
-                    suggestion = name_table[known_name]["name"]
-                    break
+                dist = _levenshtein_distance(ref, known_name)
+                if dist <= 2:
+                    candidate_name = name_table[known_name]["name"]
+                    key = (dist, candidate_name)
+                    if best_key is None or key < best_key:
+                        best_key = key
+                        suggestion = candidate_name
 
             issues.append({
                 "type": "broken_handoff",

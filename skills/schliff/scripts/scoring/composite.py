@@ -3,8 +3,10 @@
 Returns both the score and metadata about how many dimensions
 were actually measured, so users know how trustworthy the number is.
 """
+import hashlib
 import json
 import math
+import os
 from typing import Optional
 from pathlib import Path
 
@@ -50,8 +52,30 @@ def _load_calibrated_weights() -> Optional[dict]:
     return None
 
 
+def _calibration_enabled() -> bool:
+    """Whether ambient auto-calibrated weights may override the canonical defaults.
+
+    Calibration is OFF by default so that the headline composite is deterministic and
+    reproducible across machines (verify/badge/leaderboard must use canonical registry
+    weights). It is opt-in via SCHLIFF_CALIBRATED_WEIGHTS=1 (or true/yes/on).
+    """
+    return os.environ.get("SCHLIFF_CALIBRATED_WEIGHTS", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _weights_fingerprint(weights: dict) -> str:
+    """Stable short hash of the canonical weight vector, for provenance stamping."""
+    canonical = json.dumps(
+        {k: round(float(v), 6) for k, v in sorted(weights.items())},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+
+
 def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
-                      fmt: Optional[str] = None) -> dict:
+                      fmt: Optional[str] = None, use_calibrated: bool = False) -> dict:
     """Compute weighted composite score with confidence indicator.
 
     Uses a full-denominator model: unmeasured dims are uncredited (contribute 0
@@ -71,16 +95,27 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
             {"structure": 0.3, "triggers": 0.4, "efficiency": 0.3}
         fmt: Optional format identifier. When provided, weights are loaded
             from the scorer registry. Defaults to "skill.md" weights.
+        use_calibrated: Opt-in to ambient per-machine calibrated weights (still
+            additionally gated by SCHLIFF_CALIBRATED_WEIGHTS). Default False so
+            canonical registry weights are used. Cross-comparison consumers
+            (verify CI gate, badge, leaderboard) MUST leave this False to stay
+            reproducible; only the interactive `score` command opts in.
     """
     from scoring.registry import get_weights, get_headline_excluded
 
     weights = get_weights(fmt if fmt is not None else "skill.md")
     explicit = set(custom_weights or {})
 
+    # Provenance: the headline composite must be reproducible across machines, so
+    # "default" (canonical registry weights) is the deterministic baseline. Calibration
+    # is an explicit opt-in (see _calibration_enabled); custom_weights are caller-supplied.
+    weight_source = "default"
+
     # Stage 1: apply weight OVERRIDES (custom or auto-calibrated) RAW — do NOT renormalize
     # here. The canonical basis (Stage 2, below) is the single normalization point, applied
     # after dimension exclusion; renormalizing now would double-normalize and shift scores.
     if custom_weights:
+        weight_source = "custom"
         _SUPPLEMENTARY = {"clarity", "security"}
         for dim in list(weights):
             if dim in _SUPPLEMENTARY and dim not in custom_weights:
@@ -88,9 +123,15 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
         for k, v in custom_weights.items():
             if k in weights and isinstance(v, (int, float)) and math.isfinite(v) and v >= 0:
                 weights[k] = v
-    else:
+    elif use_calibrated and _calibration_enabled():
+        # Opt-in only, and ONLY for callers that explicitly pass use_calibrated=True
+        # (the interactive `score` command). Ambient calibrated weights are a
+        # per-machine, mutable score-model mutation; applying them anywhere a score is
+        # compared across machines (verify gate, badge, leaderboard) would make the
+        # decision depend on a process env var, so those callers keep the default.
         calibrated = _load_calibrated_weights()
         if calibrated:
+            weight_source = "calibrated"
             for k, v in calibrated.items():
                 if k in weights:
                     weights[k] = v
@@ -118,7 +159,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     unmeasured = []
     for dim, weight in canonical.items():
         s = scores.get(dim, {}).get("score", -1)
-        if s >= 0:
+        if isinstance(s, (int, float)) and not isinstance(s, bool) and math.isfinite(s) and s >= 0:
             total += s * weight
             measured_w += weight
             measured.append(dim)
@@ -145,7 +186,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     signals = {}
     for opt in ("security", "runtime"):
         sv = scores.get(opt, {}).get("score", -1)
-        if sv is not None and sv >= 0:
+        if isinstance(sv, (int, float)) and not isinstance(sv, bool) and math.isfinite(sv) and sv >= 0:
             signals[opt] = ({
                 "score": sv,
                 "status": "pass" if sv >= SECURITY_GATE else "flag",
@@ -171,6 +212,13 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     has_runtime = "runtime" in signals
     score_type = "structural+runtime" if has_runtime else "structural"
 
+    if weight_source == "calibrated":
+        warnings.append(
+            "Non-canonical weights in effect (weight_source=calibrated via "
+            "SCHLIFF_CALIBRATED_WEIGHTS); this score is not comparable to default-weight "
+            "scores from verify/badge/leaderboard."
+        )
+
     return {
         "score": composite,
         "score_type": score_type,
@@ -181,5 +229,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
         "warnings": warnings,
         "signals": signals,
         "security": signals.get("security", {}),
+        "weight_source": weight_source,
+        "weights_hash": _weights_fingerprint(canonical),
         "confidence_notes": {k: v for k, v in confidence_notes.items() if k in measured},
     }

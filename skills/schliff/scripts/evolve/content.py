@@ -15,16 +15,19 @@ from terminal_art import score_to_grade
 def extract_markdown_content(llm_response: str) -> str:
     """Extract content from ```markdown fences in LLM output.
 
-    Handles nested code fences by requiring the closing fence to be at line start.
+    Uses a GREEDY body so the body extends to the LAST line-anchored closing
+    fence rather than the first. SKILL.md content routinely embeds its own
+    fenced code blocks (```python, ```bash, ```json); a non-greedy match would
+    stop at the first internal fence and silently drop the rest of the file.
     If no fences found, return the raw response stripped.
     """
-    # Try markdown/md fences first — closing fence must be at start of line
-    pattern = r"```(?:markdown|md)\s*\n(.*?)^```\s*$"
+    # Try markdown/md fences first — body is greedy up to the LAST closing fence
+    pattern = r"```(?:markdown|md)\s*\n(.*)\n```\s*$"
     match = re.search(pattern, llm_response, re.DOTALL | re.MULTILINE)
     if match:
         return match.group(1).strip()
-    # Generic fences — closing fence at start of line
-    generic = r"^```\s*\n(.*?)^```\s*$"
+    # Generic fences — body is greedy up to the LAST closing fence
+    generic = r"^```\s*\n(.*)\n```\s*$"
     match = re.search(generic, llm_response, re.DOTALL | re.MULTILINE)
     if match:
         return match.group(1).strip()

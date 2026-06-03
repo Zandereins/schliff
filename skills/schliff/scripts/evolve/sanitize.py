@@ -22,6 +22,29 @@ _SECRET_PATTERNS = [
     (re.compile(r'xox[bporas]-[a-zA-Z0-9-]+'), '[REDACTED:slack-token]'),
     (re.compile(r'Bearer\s+[a-zA-Z0-9._-]{20,}'), '[REDACTED:bearer-token]'),
     (re.compile(r'-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----'), '[REDACTED:private-key]'),
+    (re.compile(r'AIza[a-zA-Z0-9_-]{35}'), '[REDACTED:google-api-key]'),
+    (re.compile(r'eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'), '[REDACTED:jwt]'),
+    # Generic assignment catcher — keep last so vendor-specific patterns win.
+    # Matches keyword-bearing identifiers (e.g. AWS_SECRET_ACCESS_KEY, db_password,
+    # client_secret) followed by a := assignment and a high-entropy value.
+    #
+    # The identifier prefix is bounded ({0,40}) so a long alphanumeric run that
+    # never completes a match cannot drive catastrophic backtracking (ReDoS); the
+    # value is length-capped ({16,200}) for the same reason. Group 1 captures the
+    # name + separator + optional OPENING quote so the replacement preserves them
+    # (no unbalanced quote) and redacts only the secret value. The bare "key"
+    # alternative is deliberately excluded so prose like "primary key:", "turkey=",
+    # or "monkey:" is not falsely redacted — vendor names use api_key/access_key.
+    (re.compile(
+        r'(?i)('
+        r'\b[a-z0-9_]{0,40}'
+        r'(?:client[_-]?secret|secret|password|passwd|api[_-]?key|access[_-]?key|auth[_-]?token|token)'
+        r'["\']?'          # optional closing quote on the key (JSON/quoted-key form)
+        r'\s*[:=]\s*'
+        r'["\']?'          # optional opening quote on the value
+        r')'
+        r'[a-zA-Z0-9/+=_-]{16,200}'),
+     r'\1[REDACTED:credential]'),
 ]
 
 

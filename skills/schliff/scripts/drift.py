@@ -200,8 +200,8 @@ def validate_references(
         line = ref_entry["line"]
 
         if ref_type == "path":
-            full_path = os.path.normpath(os.path.join(repo_root, str(ref)))
             repo_abs = os.path.realpath(repo_root)
+            full_path = os.path.realpath(os.path.join(repo_abs, str(ref)))
             if not full_path.startswith(repo_abs + os.sep) and full_path != repo_abs:
                 findings.append({
                     "ref": ref,

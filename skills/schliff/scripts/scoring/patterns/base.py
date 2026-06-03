@@ -168,8 +168,13 @@ _RE_SEC_BASE64_CMD = re.compile(
     r"eval\s*\(\s*atob\s*\()",
     re.IGNORECASE,
 )
+# Zero-width / invisible characters used to hide content. A single U+FEFF at
+# offset 0 is a UTF-8 byte-order mark (encoding metadata, common from
+# Windows/Notepad editors), not embedded obfuscation, so it is excluded via the
+# `(?<!\A)` lookbehind \u2014 only a BOM that appears mid-content is flagged. The
+# other zero-width chars are never legitimate metadata and are matched anywhere.
 _RE_SEC_ZERO_WIDTH = re.compile(
-    r"[\u200b\u200c\u200d\ufeff\u2060]",
+    r"[\u200b\u200c\u200d\u2060]|(?<!\A)\ufeff",
 )
 _RE_SEC_HEX_ESCAPE = re.compile(
     r"(?:\\x[0-9a-fA-F]{2}){4,}",

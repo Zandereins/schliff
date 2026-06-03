@@ -124,7 +124,22 @@ def score_runtime(skill_path: str, eval_suite: Optional[dict] = None,
             "response_length": len(response),
         })
 
-    score = int((passed / total) * 100) if total > 0 else 0
+    # No runtime work was actually run (e.g. every selected case had an empty
+    # prompt). Treat as skip (-1), matching the other no-work paths above,
+    # rather than 0 which composite reads as a hard runtime failure.
+    if total == 0:
+        return {
+            "score": -1,
+            "issues": ["no_runnable_runtime_cases"],
+            "details": {
+                "passed": 0,
+                "total": 0,
+                "cases_run": len(per_case),
+                "per_case": per_case,
+            },
+        }
+
+    score = int((passed / total) * 100)
     return {
         "score": score,
         "issues": [] if score >= 70 else [f"runtime_pass_rate_low:{passed}/{total}"],

@@ -306,16 +306,23 @@ def run_evolution(config: EvolutionConfig,
                     )
 
                 # Prompt-aware token estimation: includes both prompt and content
-                estimated = int((len(user_prompt.split()) + len(best_content.split())) * 1.3 + 800)
+                prompt_estimate = int((len(user_prompt.split()) + len(best_content.split())) * 1.3)
+                estimated = prompt_estimate + 800
                 if not budget.can_afford(estimated):
                     break
 
                 gen_num += 1
 
+                # Bound output to the remaining budget so a single admitted call
+                # cannot overspend: the actual generation never exceeds the headroom
+                # left after the (estimated) prompt tokens are accounted for.
+                output_cap = max(256, min(4096, budget.remaining - prompt_estimate))
+
                 # Call LLM
                 llm_result = call_llm(
                     SYSTEM_PROMPT, user_prompt, model,
                     temperature=temperature,
+                    max_tokens=output_cap,
                     completion_fn=completion_fn,
                 )
 

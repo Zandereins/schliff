@@ -51,6 +51,9 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
         "runtime": score_runtime(skill_path, eval_suite, enabled=False),
     }
 
+    # The CI gate is a cross-machine comparison surface: never opt into ambient
+    # calibrated weights here (use_calibrated defaults False), so the pass/fail
+    # decision is reproducible and cannot be flipped by an env var.
     composite = compute_composite(scores)
 
     return {
@@ -60,14 +63,34 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
         "warnings": composite["warnings"],
         "score_type": composite.get("score_type", "structural"),
         "weight_coverage": composite.get("weight_coverage", 0.0),
+        "weight_source": composite.get("weight_source", "default"),
+        "weights_hash": composite.get("weights_hash"),
     }
 
 
 def load_last_score(skill_path: str, history_path: str = _DEFAULT_HISTORY) -> Optional[float]:
-    """Load the most recent score for a skill from history.
+    """Load the most recent composite score for a skill from history.
 
     Reads the file backwards (last line first) to find the latest entry
     matching the given skill path. Returns None if no history exists.
+    """
+    entry = load_last_entry(skill_path, history_path)
+    if entry is None:
+        return None
+    return entry[0]
+
+
+def load_last_entry(
+    skill_path: str, history_path: str = _DEFAULT_HISTORY
+) -> Optional[tuple]:
+    """Load the latest (composite, weight_coverage, weight_source) for a skill.
+
+    Returns a (composite, coverage, weight_source) tuple, where coverage is None
+    for legacy entries written before weight_coverage was recorded and
+    weight_source defaults to "default" for entries written before provenance
+    stamping. Returns None if no matching history exists. Comparing
+    coverage-normalized scores lets the regression gate judge per-measured-dimension
+    quality rather than raw composites, which are capped at each run's coverage.
     """
     hp = Path(history_path)
     if not hp.exists():
@@ -93,7 +116,12 @@ def load_last_score(skill_path: str, history_path: str = _DEFAULT_HISTORY) -> Op
                 continue
             entry_path = entry.get("skill_path", "")
             if str(Path(entry_path).resolve()) == norm_path:
-                return float(val)
+                cov = entry.get("weight_coverage")
+                cov = float(cov) if cov is not None else None
+                # weight_source defaults to "default" for legacy entries written
+                # before provenance stamping (they were always canonical).
+                wsrc = entry.get("weight_source", "default")
+                return (float(val), cov, wsrc)
         except (json.JSONDecodeError, ValueError, TypeError, OSError):
             continue
     return None
@@ -117,6 +145,11 @@ def append_history(
         "composite": result["composite"],
         "grade": result["grade"],
         "dimensions": result["dimensions"],
+        "weight_coverage": result.get("weight_coverage"),
+        # Record the scoring regime so the regression/leaderboard channel never
+        # co-ranks scores produced under different weight models.
+        "weight_source": result.get("weight_source", "default"),
+        "weights_hash": result.get("weights_hash"),
     }
 
     line = json.dumps(entry, separators=(",", ":")) + "\n"
@@ -150,6 +183,8 @@ def run_verify(
         "coverage": 0.0, "effective_min": min_score,
         "passed_threshold": False, "exit_code": 2, "message": "",
         "previous_score": None, "delta": None, "regression": False,
+        # Uniform key set with the normal verdict (provenance is N/A on an error path).
+        "weight_source": "default", "weights_hash": None,
     }
 
     if not Path(skill_path).exists():
@@ -191,6 +226,9 @@ def run_verify(
         "previous_score": None,
         "delta": None,
         "regression": False,
+        # Provenance so CI consumers can confirm the gate used canonical weights.
+        "weight_source": result.get("weight_source", "default"),
+        "weights_hash": result.get("weights_hash"),
     }
 
     # Threshold check (coverage-aware)
@@ -206,10 +244,38 @@ def run_verify(
 
     # Regression check
     if check_regression:
-        previous = load_last_score(skill_path, history_path)
+        prev_entry = load_last_entry(skill_path, history_path)
+        previous = prev_entry[0] if prev_entry is not None else None
         verdict["previous_score"] = previous
+        # Never regress-gate across scoring regimes: a prior score produced under a
+        # different weight model (e.g. calibrated) is not comparable to this run.
+        # Invariant: no in-tree writer ever records a non-"default" entry — verify
+        # (the only append_history caller) always scores canonically, and the sole
+        # use_calibrated=True caller (cmd_score) never writes history. So in practice
+        # prev_source == cur_source == "default" and this skip is dormant; it exists
+        # to defend against externally-injected calibrated entries.
+        prev_source = prev_entry[2] if prev_entry is not None and len(prev_entry) > 2 else "default"
+        cur_source = result.get("weight_source", "default")
+        if previous is not None and prev_source != cur_source:
+            verdict["message"] = (
+                f"PASS: baseline used a different weight model "
+                f"({prev_source} -> {cur_source}); regression check skipped [{grade}]"
+            )
+            append_history(skill_path, result, history_path)
+            return verdict
         if previous is not None:
-            delta = round(composite - previous, 1)
+            # Raw composites are capped at each run's weight coverage, so a run
+            # with a different eval-suite-presence regime is not comparable to a
+            # prior raw composite. Compare per-measured-dimension quality
+            # (composite / coverage) when both coverages are known; fall back to
+            # raw deltas for legacy entries lacking a recorded coverage.
+            prev_coverage = prev_entry[1]
+            if prev_coverage is not None and prev_coverage > 0 and coverage > 0:
+                norm_current = composite / coverage
+                norm_previous = previous / prev_coverage
+                delta = round(norm_current - norm_previous, 1)
+            else:
+                delta = round(composite - previous, 1)
             verdict["delta"] = delta
             if delta < 0:
                 verdict["regression"] = True

@@ -58,7 +58,7 @@ _META_DESC_KEYWORDS = re.compile(
     r"CVE|OWASP|exploit|threat|malware)\b"
 )
 _META_NAME_KEYWORDS = re.compile(
-    r"(?i)(security|vuln|shield|guard|sentinel)"
+    r"(?i)(?:^|[-_ ])(security|vuln|shield|guard|sentinel)(?:[-_ ]|$)"
 )
 
 # ---------------------------------------------------------------------------
@@ -76,6 +76,12 @@ _NEGATION_RE = re.compile(
 
 def _extract_frontmatter(content: str) -> str:
     """Return raw YAML frontmatter string (without delimiters), or ''."""
+    # A leading UTF-8 BOM (U+FEFF) is an invisible encoding artifact, not content.
+    # Without stripping it, the bare startswith("---") check fails on a BOM'd file,
+    # silently flipping _is_security_domain to False and swinging the composite by
+    # ~45 points on an invisible byte — a determinism break for security skills.
+    if content[:1] == "﻿":
+        content = content[1:]
     if content.startswith("---"):
         end = content.find("---", 3)
         if end >= 4:
@@ -89,19 +95,30 @@ def _is_security_domain(content: str) -> bool:
     if not fm:
         return False
 
-    # Check description field
-    desc_match = re.search(r"(?m)^description:.*?(?=^\S|\Z)", fm, re.DOTALL)
-    if desc_match and _META_DESC_KEYWORDS.search(desc_match.group()):
-        return True
-
-    # Check metadata.domain: security
+    # Check metadata.domain: security — explicit, authoritative signal.
     if re.search(r"(?m)domain:\s*security", fm, re.IGNORECASE):
         return True
 
-    # Check name field
+    # Check name field — security-named skills are a strong corroborating signal.
     name_match = re.search(r"(?m)^name:\s*(.+)", fm)
-    if name_match and _META_NAME_KEYWORDS.search(name_match.group(1)):
+    name_is_security = bool(
+        name_match and _META_NAME_KEYWORDS.search(name_match.group(1))
+    )
+    if name_is_security:
         return True
+
+    # Check description field. A single incidental keyword (e.g. "threat models
+    # are out of scope") is not enough — require corroboration to avoid granting
+    # a 90% penalty discount to non-security skills. Two or more DISTINCT
+    # meta-keywords in the description qualify as security-domain content.
+    desc_match = re.search(r"(?m)^description:.*?(?=^\S|\Z)", fm, re.DOTALL)
+    if desc_match:
+        hits = {
+            m.group(1).lower()
+            for m in _META_DESC_KEYWORDS.finditer(desc_match.group())
+        }
+        if len(hits) >= 2:
+            return True
 
     return False
 
