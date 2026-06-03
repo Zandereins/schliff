@@ -13,11 +13,12 @@ Firewall level (dashboard / `vercel firewall` CLI / REST API) — see the
 deploy-side checklist. Storage is also ephemeral /tmp (see DATA_DIR note below).
 """
 
-from http.server import BaseHTTPRequestHandler
 import json
 import os
 import sys
+import unicodedata
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
 MAX_BODY_BYTES = 64 * 1024  # 64 KB
@@ -41,6 +42,11 @@ SEED_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "submissions.j
 # Control characters that could cause visual spoofing
 _CONTROL_CHARS = set(range(0x00, 0x20)) - {0x0A, 0x0D, 0x09}  # allow \n \r \t
 _BIDI_CHARS = {0x200E, 0x200F, 0x202A, 0x202B, 0x202C, 0x202D, 0x202E, 0x2066, 0x2067, 0x2068, 0x2069}
+# Zero-width / invisible characters. Visually undetectable, so they let an
+# attacker create homograph entries that pass validation but compare unequal in
+# the (repo_url, skill_name) dedup key — e.g. "my-skill" vs "my​skill" —
+# polluting the leaderboard with duplicate-looking rows. Reject them outright.
+_INVISIBLE_CHARS = {0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF, 0x061C}
 
 # --- scoring-model epoch -----------------------------------------------------
 # v8.0 introduced the full-denominator composite (PR #41/#42): a breaking scale
@@ -64,8 +70,11 @@ def _score_model_for(version: str) -> int:
 
 
 def _has_unsafe_chars(s: str) -> bool:
-    """Reject strings with control or bidirectional override characters."""
-    return any(ord(c) in _CONTROL_CHARS or ord(c) in _BIDI_CHARS for c in s)
+    """Reject strings with control, bidi-override, or invisible characters."""
+    return any(
+        ord(c) in _CONTROL_CHARS or ord(c) in _BIDI_CHARS or ord(c) in _INVISIBLE_CHARS
+        for c in s
+    )
 
 
 def _validate(body):
@@ -174,6 +183,13 @@ class handler(BaseHTTPRequestHandler):
         if not isinstance(body, dict):
             self._send_json(400, {"error": "request body must be a JSON object"})
             return
+
+        # Canonicalize text fields (NFKC) so compatibility homographs collapse to
+        # one form before validation, dedup, and storage. Combined with the
+        # invisible-char rejection in _validate, this keeps the dedup key stable.
+        for _field in ("skill_name", "repo_url"):
+            if isinstance(body.get(_field), str):
+                body[_field] = unicodedata.normalize("NFKC", body[_field])
 
         error = _validate(body)
         if error:
