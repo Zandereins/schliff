@@ -1,10 +1,17 @@
 # Vercel Deploy + Firewall Runbook (playground & leaderboard)
 
-> Status as of 2026-05-29: **no Schliff project exists on Vercel** (team
-> `zaneins-projects` has only `project-beat` and `franz-site`). This is a
-> from-scratch deploy. **Set the Firewall rate limits BEFORE you announce the
-> URLs** — the endpoints have only per-request input caps in code; cross-request
-> rate limiting can only live at the Vercel Firewall (no `vercel.json` field for it).
+> Status as of 2026-06-03: **DEPLOYED**. Both projects are live and public in
+> team `zaneins-projects`:
+> - Playground: https://schliff-playground.vercel.app (`POST /api/score`)
+> - Leaderboard: https://schliff-leaderboard.vercel.app (`GET /api/query`, `POST /api/submit`)
+>
+> Firewall rate limits are published and verified (see §3/§4). Production is
+> public by default; Deployment Protection only gated preview deployments. The
+> sections below are kept as the canonical procedure for re-deploys / new envs.
+>
+> Original note (pre-deploy): the endpoints have only per-request input caps in
+> code; cross-request rate limiting can only live at the Vercel Firewall (no
+> `vercel.json` field for it) — **set it BEFORE announcing the URLs**.
 
 There are **two independent apps**, each its own Vercel project:
 
@@ -70,15 +77,28 @@ Dashboard path: **Project → Firewall → Configure → Add Rule → Rate Limit
 by IP, set the window/limit above, action = Deny (429). Toggle **Bot Protection**
 on in the same Firewall view.
 
-CLI alternative (verify exact flags against `vercel firewall --help`; the CLI
-surface changes):
+CLI (verified 2026-06-03 — the firewall CLI is draft→publish; run from each
+project's linked directory so the right project is targeted):
 
 ```bash
-vercel firewall rules add --project schliff-playground \
-  --condition 'path eq /api/score' --rate-limit '60/60s/ip' --action deny
-vercel firewall rules add --project schliff-leaderboard \
-  --condition 'path eq /api/submit' --rate-limit '10/60s/ip' --action deny
+# from playground/ (linked to schliff-playground)
+vercel firewall rules add "rl-api-score" --scope zaneins-projects --yes \
+  --action rate_limit --rate-limit-requests 60 --rate-limit-window 60 \
+  --rate-limit-keys ip --rate-limit-action deny \
+  --condition '{"type":"path","op":"pre","value":"/api/score"}'
+vercel firewall publish --scope zaneins-projects --yes
+
+# from web/leaderboard/ (linked to schliff-leaderboard)
+vercel firewall rules add "rl-api-submit" --scope zaneins-projects --yes \
+  --action rate_limit --rate-limit-requests 10 --rate-limit-window 60 \
+  --rate-limit-keys ip --rate-limit-action deny \
+  --condition '{"type":"path","op":"pre","value":"/api/submit"}'
+vercel firewall publish --scope zaneins-projects --yes
 ```
+
+> Plan limit (observed): this plan allows **one rate-limit rule per project** —
+> a second (e.g. the optional `/api/query` cap) is rejected with "Rate limiting
+> is not available for this plan". The two required rules above are within limit.
 
 > Why these numbers: `/api/score` runs the scoring engine per request (CPU-bound,
 > input already capped at 256 KB of text in code) → 60/min/IP is generous for a
@@ -89,12 +109,14 @@ vercel firewall rules add --project schliff-leaderboard \
 ## 4. Verify the gate is live
 
 ```bash
-# should start returning 429 after the limit within a 60s window
-for i in $(seq 1 70); do curl -s -o /dev/null -w "%{http_code}\n" \
-  -X POST https://<playground-domain>/api/score \
+for i in $(seq 1 75); do curl -s -o /dev/null -w "%{http_code}\n" \
+  -X POST https://schliff-playground.vercel.app/api/score \
   -H 'Content-Type: application/json' -d '{"content":"# test\n","filename":"SKILL.md"}'; done | sort | uniq -c
-# expect a mix of 200 then 429
+# verified 2026-06-03: 60x 200 then 15x 403
 ```
+
+> Note: the `deny` action returns **403 Forbidden**, not 429. Both mean blocked;
+> if you specifically want 429, use a `rate_limit`/challenge action instead.
 
 ## 5. Persistence (leaderboard) — known limitation
 
