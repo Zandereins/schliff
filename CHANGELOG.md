@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.1.0] - 2026-06-03
+
 ### Added
 - Multi-agent correctness/security/determinism hardening (PR #46): calibrated weights gated
   behind `SCHLIFF_CALIBRATED_WEIGHTS` (off by default) so `verify`/`badge`/leaderboard stay
@@ -435,7 +437,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.0.0...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.1.0...HEAD
+[8.1.0]: https://github.com/Zandereins/schliff/compare/v8.0.0...v8.1.0
 [8.0.0]: https://github.com/Zandereins/schliff/compare/v7.2.0...v8.0.0
 [7.2.0]: https://github.com/Zandereins/schliff/compare/v7.1.1...v7.2.0
 [7.1.1]: https://github.com/Zandereins/schliff/compare/v7.1.0...v7.1.1
