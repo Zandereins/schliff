@@ -12,7 +12,65 @@ concurrency:
   cancel-in-progress: false  # don't kill in-flight publishes
 
 jobs:
+  # Gate: re-run the test suite against the exact release ref before any
+  # artifact is built or published. A release can be cut from an arbitrary
+  # tag/commit, so we cannot rely solely on a previously-green PR.
+  test-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Install pytest
+        run: pip install "pytest>=8,<9"
+
+      - name: Run unit tests
+        working-directory: skills/schliff
+        run: python3 -m pytest tests/unit/ -q
+
+      - name: Run integration tests
+        working-directory: skills/schliff
+        run: |
+          set +e
+          OUTPUT=$(bash scripts/test-integration.sh --no-runtime-auto 2>&1)
+          rc=$?
+          set -e
+          echo "$OUTPUT"
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::test-integration.sh exited with code $rc"
+            exit 1
+          fi
+          if ! echo "$OUTPUT" | grep -qP 'Results:\s*[0-9]+\s*passed,\s*[0-9]+\s*failed'; then
+            echo "::error::Results summary line not found — test script did not complete"
+            exit 1
+          fi
+          PASSED=$(echo "$OUTPUT" | grep -oP 'Results:\s*\K[0-9]+(?=\s*passed)')
+          FAILED=$(echo "$OUTPUT" | grep -oP 'Results:\s*[0-9]+\s*passed,\s*\K[0-9]+(?=\s*failed)')
+          if [ "$((PASSED + FAILED))" -eq 0 ]; then
+            echo "::error::No integration tests ran (0 passed, 0 failed)"
+            exit 1
+          fi
+          if [ "$FAILED" -gt 0 ]; then exit 1; fi
+
+      - name: Run self-tests
+        working-directory: skills/schliff
+        run: bash scripts/test-self.sh
+
+      - name: Run proof test
+        working-directory: skills/schliff
+        run: bash tests/proof/test-proof.sh
+
   publish:
+    needs: [test-gate]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -24,15 +82,28 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: '3.9'
+          # Pure-Python wheel is interpreter-agnostic; build on a current,
+          # supported interpreter (3.9 is EOL as of 2025-10-31).
+          # requires-python in pyproject.toml is unchanged.
+          python-version: '3.12'
 
       - name: Install build tools
-        run: pip install "build==1.2.2"
+        run: pip install "build==1.2.2" "twine==6.1.0"
 
       - name: Build package
         run: python -m build
 
+      - name: Check built artifacts
+        run: twine check dist/*
+
+      - name: Smoke-test built wheel
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install dist/*.whl
+          # Verify the published import surface and the console-script entry point resolve.
+          /tmp/smoke/bin/python -c "import skills.schliff; from skills.schliff.scripts.cli import main; print('import ok')"
+
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
         with:
           verbose: true

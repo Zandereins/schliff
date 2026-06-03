@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.1.0] - 2026-06-03
+
+### Added
+- Multi-agent correctness/security/determinism hardening (PR #46): calibrated weights gated
+  behind `SCHLIFF_CALIBRATED_WEIGHTS` (off by default) so `verify`/`badge`/leaderboard stay
+  reproducible; `weight_source`/`weights_hash` provenance; BOM-invariant scoring at the read
+  boundary; ReDoS-safe secret redaction; format-aware composite weighting across the CLI.
+- CI lint gate: `ruff` now runs and gates in GitHub Actions (baseline cleaned to zero findings).
+- Community-health files: `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) and an
+  issue-template `config.yml`. Top-level `--version`/`-V` flag.
+
+### Changed
+- README + `docs/` redesign: accurate full-denominator composite model (replaces the previously
+  inverted description in `SCORING.md`), correct dimension/weight tables, single-sourced version,
+  current architecture with diagrams. Web playground/leaderboard corrected to the canonical model
+  (removed a non-existent dimension, fixed repository links, hardened CSP).
+- Packaging: CLI version is single-sourced via `importlib.metadata` (no more hardcoded drift).
+- Performance: `doctor` single tree-walk, O(n) header lookup in `structure`, cached regexes/MinHash.
+
+### Removed
+- Internal launch corpus and marketing drafts from the public tree (regenerable via
+  `skills/schliff/scripts/launch/`); untracked local tooling artifacts.
+
 ## [8.0.0] - 2026-05-29
 
 ### Added
@@ -413,3 +436,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 - Initial release — 6-dimension scoring, eval runner, progress tracking
+
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.1.0...HEAD
+[8.1.0]: https://github.com/Zandereins/schliff/compare/v8.0.0...v8.1.0
+[8.0.0]: https://github.com/Zandereins/schliff/compare/v7.2.0...v8.0.0
+[7.2.0]: https://github.com/Zandereins/schliff/compare/v7.1.1...v7.2.0
+[7.1.1]: https://github.com/Zandereins/schliff/compare/v7.1.0...v7.1.1
+[7.1.0]: https://github.com/Zandereins/schliff/compare/v7.0.0...v7.1.0
+[7.0.0]: https://github.com/Zandereins/schliff/compare/v6.3.0...v7.0.0
+[6.3.0]: https://github.com/Zandereins/schliff/compare/v6.2.0...v6.3.0
+[6.2.0]: https://github.com/Zandereins/schliff/compare/v6.1.0...v6.2.0
+[6.1.0]: https://github.com/Zandereins/schliff/compare/v6.0.0...v6.1.0
+[6.0.0]: https://github.com/Zandereins/schliff/compare/v5.1.1...v6.0.0

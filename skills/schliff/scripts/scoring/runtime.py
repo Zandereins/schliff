@@ -10,7 +10,8 @@ import re
 import subprocess
 from typing import Optional
 
-from shared import regex_search_safe as _regex_search_safe, read_skill_safe
+from shared import read_skill_safe
+from shared import regex_search_safe as _regex_search_safe
 
 
 def score_runtime(skill_path: str, eval_suite: Optional[dict] = None,

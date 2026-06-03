@@ -20,35 +20,30 @@ Stopping conditions:
 from __future__ import annotations
 
 import argparse
-import copy
 import json
-import os
 import re
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
-
+from typing import Optional
 
 SCRIPT_DIR = Path(__file__).parent
 
 # Import terminal_art for grade system
-from terminal_art import score_to_grade, grade_colored, progress_bar, sparkline
+# Sibling modules — same directory, no external deps, always importable.
+import achievements as achievements_mod  # noqa: E402
+import episodic_store  # noqa: E402
+import meta_report  # noqa: E402
+import parallel_runner  # noqa: E402
 
 # --- Imports from sibling modules ---
-
 # Use underscore aliases for clean imports (wrapper modules for hyphenated originals)
-import score_skill as scorer
-import text_gradient as gradient_mod
-from shared import load_eval_suite
+import score_skill as scorer  # noqa: E402
+import text_gradient as gradient_mod  # noqa: E402
+from terminal_art import grade_colored, progress_bar, score_to_grade, sparkline  # noqa: E402
 
-# Sibling modules — same directory, no external deps, always importable.
-import achievements as achievements_mod
-import episodic_store
-import meta_report
-import parallel_runner
-
+from shared import load_eval_suite  # noqa: E402
 
 # --- State Management ---
 
@@ -240,7 +235,7 @@ def _should_stop(state: list[dict], current_score: dict) -> tuple[bool, str]:
     # Stop if all measurable dims >= 90
     measurable = {k: v for k, v in dims.items() if isinstance(v, (int, float)) and v >= 0}
     if measurable and all(v >= 90 for v in measurable.values()):
-        return True, f"all dimensions >= 90"
+        return True, "all dimensions >= 90"
 
     # EMA-based plateau detection: EMA ROI < 0.1 for 5 consecutive steps
     qualifying = [e for e in state if e.get("status") in ("keep", "discard", "error")]
@@ -319,7 +314,7 @@ def run_auto_improve(
 
     # Baseline score
     if verbose:
-        print(f"Scoring baseline...", file=sys.stderr)
+        print("Scoring baseline...", file=sys.stderr)
 
     # Clear scorer cache for fresh reads
     scorer.invalidate_cache(skill_path)
@@ -610,7 +605,7 @@ def main():
         mins, secs = divmod(int(elapsed), 60)
         time_str = f"{mins}m{secs:02d}s" if mins else f"{secs}s"
 
-        print(f"\n  Schliff Auto-Improve Complete")
+        print("\n  Schliff Auto-Improve Complete")
         print(f"  {'─' * 50}")
         sc = summary['final_composite']
         bar = progress_bar(sc, 20)
@@ -622,7 +617,7 @@ def main():
             print(f"  Trend:  {summary['sparkline']}  ({summary['baseline_composite']:.0f} \u2192 {sc:.0f})")
         print(f"  Stop:   {summary['stop_reason']}")
         if summary['dry_run']:
-            print(f"  (dry run \u2014 no changes written)")
+            print("  (dry run \u2014 no changes written)")
 
         # Check and display achievements
         if not summary['dry_run']:

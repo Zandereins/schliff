@@ -15,13 +15,11 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from shared import load_jsonl_safe
-
 
 META_DIR_DEFAULT = Path.home() / ".schliff" / "meta"
 

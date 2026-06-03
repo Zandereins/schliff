@@ -12,14 +12,23 @@ Static analysis checks (no runtime needed), 10 checks × 10 pts each:
 - Namespace/prefix isolation (10 pts)
 - Version/compat notes (10 pts)
 """
-from shared import read_skill_safe, strip_frontmatter
 from scoring.patterns import (
-    _RE_POSITIVE_SCOPE, _RE_NEGATIVE_SCOPE, _RE_GLOBAL_STATE,
-    _RE_INPUT_SPEC, _RE_OUTPUT_SPEC, _RE_HANDOFF, _RE_WHEN_NOT,
-    _RE_HARD_REQUIREMENTS, _RE_ALTERNATIVES,
-    _RE_ERROR_BEHAVIOR, _RE_IDEMPOTENCY, _RE_DEPENDENCY_DECL,
-    _RE_NAMESPACE_ISOLATION, _RE_VERSION_COMPAT,
+    _RE_ALTERNATIVES,
+    _RE_DEPENDENCY_DECL,
+    _RE_ERROR_BEHAVIOR,
+    _RE_GLOBAL_STATE,
+    _RE_HANDOFF,
+    _RE_HARD_REQUIREMENTS,
+    _RE_IDEMPOTENCY,
+    _RE_INPUT_SPEC,
+    _RE_NAMESPACE_ISOLATION,
+    _RE_NEGATIVE_SCOPE,
+    _RE_OUTPUT_SPEC,
+    _RE_POSITIVE_SCOPE,
+    _RE_VERSION_COMPAT,
+    _RE_WHEN_NOT,
 )
+from shared import read_skill_safe, strip_frontmatter
 
 
 def score_composability(skill_path: str) -> dict:

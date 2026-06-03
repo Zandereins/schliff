@@ -15,11 +15,11 @@ Options:
 """
 
 import json
+import math
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime
-import math
 
 from shared import load_jsonl_safe
 
@@ -724,7 +724,6 @@ class ProgressAnalyzer:
         """
         try:
             # Import episodic store (sibling module)
-            import importlib
             import episodic_store as store_mod
         except Exception:
             return 0

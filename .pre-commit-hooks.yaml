@@ -6,3 +6,4 @@
   types: [markdown]
   files: 'SKILL\.md$'
   args: ['--min-score', '75']
+  minimum_pre_commit_version: '3.2.0'

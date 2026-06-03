@@ -25,10 +25,9 @@ from collections import Counter, defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from nlp import tokenize_meaningful
-
 
 EPISODES_PATH = Path.home() / ".schliff" / "meta" / "episodes.jsonl"
 MAX_EPISODES = 10_000

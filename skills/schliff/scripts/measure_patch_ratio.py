@@ -6,6 +6,7 @@ A patch is auto-applied deterministically iff text_gradient.py's apply gate acce
 Everything else falls back to the LLM. This script parses the gradient catalog statically.
 """
 from __future__ import annotations
+
 import ast
 import json
 from pathlib import Path

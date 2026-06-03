@@ -1,6 +1,17 @@
 # Internal drafts and marketing (not for public repo)
 docs/specs/show-hn-draft.md
+docs/specs/viral-growth-*
 demo/twitter/
+docs/launch/posts/
+docs/launch/awesome-claude-code-*
+docs/specs/plans/v7.1-worktree-plan.json
+
+# Regenerable launch corpus (re-fetchable via scripts/launch/collect_corpus.py)
+# License of individual third-party files varies — not bundled under Schliff's MIT.
+docs/launch/corpus/
+
+# Personal planning/session-handoff artifacts
+.paul/
 
 # Schliff working files (generated during runs, not committed)
 schliff-results.tsv
@@ -31,6 +42,9 @@ Thumbs.db
 # Claude Code session artifacts (hooks spawn agents in worktrees here)
 .claude/worktree-*.json
 .claude/worktrees/
+# Local-only Claude Code settings (personal harness/plugin toggles)
+.claude/settings.json
+.claude/settings.local.json
 
 # Test artifacts
 .coverage

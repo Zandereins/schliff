@@ -9,7 +9,11 @@ DIRECTIONAL agreement check (n too small for kappa/TNR) used to iterate the judg
 prompt toward Hamel's >=90% alignment — NOT a published reliability number.
 
 Design (spec §8 / ADR-0002/0006):
-  - pinned model (default claude-sonnet-4-6), temp 0.3, N=5 self-consistency (plurality)
+  - pinned model (default claude-sonnet-4-6), temp 0.3, N self-consistency (plurality)
+    — N=5 is the *calibration-run* invariant (variance mitigation vs "Rating
+    Roulette", ADR-0006 §2); the shipped CLI default is N=1 for the frozen
+    Phase-1 smoke set (votes were 5/5 unanimous, so N>1 buys no variance
+    reduction until probe-tier specimens split). Pass --n 5 for a calibration run.
   - binary PASS/FAIL + critique via structured output (messages.parse + Pydantic)
   - leave-one-out few-shots: an item is judged using the OTHER labelled items of its
     dim as anchors, so no specimen ever judges itself
@@ -34,6 +38,12 @@ from pathlib import Path
 from typing import Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
+# Pinned judge model. DIVERGENCE from ADR-0006 §1 (which named Sonnet 4.5 / 4.7):
+# 4.6 is newer, same-family, and supports temperature, so the same-family rationale
+# of ADR-0006 still holds. ADR-0006's "model+date" reproducibility pin is only half
+# met here — the model string is pinned but no date/version snapshot is recorded in
+# code; the date component belongs in the (not-yet-published) methodology page. ADR
+# update to record 4.6 as the shipped pin is tracked outside this module's scope.
 MODEL_DEFAULT = "claude-sonnet-4-6"  # pinned judge model (ADR-0006 same-family); temp allowed on 4.6
 
 # Locked dimension rubrics (council 2026-05-26). Binary, disclosure-/checkability-anchored.
@@ -92,9 +102,10 @@ def build_system(dim: str, anchors: list[dict]) -> str:
 
 
 def _real_judge_factory(model: str, temp: float) -> Callable:
+    from typing import Literal
+
     import anthropic  # imported lazily so --mock works without the SDK
     from pydantic import BaseModel
-    from typing import Literal
 
     class Verdict(BaseModel):
         label: Literal["PASS", "FAIL"]
