@@ -3,6 +3,7 @@
 Checks frontmatter, length, examples, headers, progressive disclosure,
 imperative voice, referenced files, and dead content.
 """
+from bisect import bisect_right
 from pathlib import Path
 
 from shared import read_skill_safe, strip_frontmatter
@@ -108,10 +109,13 @@ def _score_structure_inline(skill_path: str) -> dict:
         issues.append("no_real_examples")
 
     # Headers — only count non-empty sections (anti-gaming)
+    # Precompute newline offsets once so each header's line number is a single
+    # bisect instead of an O(n) prefix slice+count (avoids O(headers * file-size)).
+    newline_offsets = [m for m, ch in enumerate(content) if ch == "\n"]
     all_headers = list(_RE_HEADERS.finditer(content))
     header_count = 0
     for h_match in all_headers:
-        h_line = content[:h_match.start()].count("\n")
+        h_line = bisect_right(newline_offsets, h_match.start() - 1)
         # Check next 5 lines for actual content (not blank or another header)
         has_content = False
         for j in range(h_line + 1, min(h_line + 6, len(lines))):

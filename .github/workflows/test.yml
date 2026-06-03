@@ -14,6 +14,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Lint gate for the project's own Python (dogfoods "the Ruff for SKILL.md").
+  # Runs in REPORT-ONLY mode for now: the baseline carries ~142 pre-existing
+  # ruff findings (E/F/W/I), so failing here would make CI red on unrelated
+  # legacy lint. The step prints all findings as GitHub annotations but does
+  # not fail the build. Once the baseline is cleaned (e.g. `ruff check --fix`
+  # plus the simplify sweep), flip this to a hard gate by removing the
+  # `--exit-zero` flag below. ruff is pinned for reproducibility.
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install ruff
+        run: pip install "ruff==0.15.8"
+
+      - name: Run ruff (report-only until baseline is cleaned)
+        run: ruff check --output-format=github --exit-zero skills/schliff/scripts/
+
   test:
     runs-on: ubuntu-latest
     permissions:
@@ -36,9 +61,28 @@ jobs:
       - name: Run integration tests
         working-directory: skills/schliff
         run: |
-          OUTPUT=$(bash scripts/test-integration.sh --no-runtime-auto 2>&1) || true
+          set +e
+          OUTPUT=$(bash scripts/test-integration.sh --no-runtime-auto 2>&1)
+          rc=$?
+          set -e
           echo "$OUTPUT"
-          FAILED=$(echo "$OUTPUT" | grep -oP 'Results:\s*[0-9]+\s*passed,\s*\K[0-9]+(?=\s*failed)' || echo "0")
+          # A crashed script (non-zero exit before printing the Results line)
+          # must never report green — fail on rc, on a missing Results line,
+          # or on zero tests having run.
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::test-integration.sh exited with code $rc"
+            exit 1
+          fi
+          if ! echo "$OUTPUT" | grep -qP 'Results:\s*[0-9]+\s*passed,\s*[0-9]+\s*failed'; then
+            echo "::error::Results summary line not found — test script did not complete"
+            exit 1
+          fi
+          PASSED=$(echo "$OUTPUT" | grep -oP 'Results:\s*\K[0-9]+(?=\s*passed)')
+          FAILED=$(echo "$OUTPUT" | grep -oP 'Results:\s*[0-9]+\s*passed,\s*\K[0-9]+(?=\s*failed)')
+          if [ "$((PASSED + FAILED))" -eq 0 ]; then
+            echo "::error::No integration tests ran (0 passed, 0 failed)"
+            exit 1
+          fi
           if [ "$FAILED" -gt 0 ]; then exit 1; fi
 
       - name: Run self-tests
@@ -46,7 +90,7 @@ jobs:
         run: bash scripts/test-self.sh
 
       - name: Install pytest
-        run: pip install pytest
+        run: pip install "pytest>=8,<9"
 
       - name: Run unit tests
         working-directory: skills/schliff
@@ -69,7 +113,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install pytest
-        run: pip install pytest
+        run: pip install "pytest>=8,<9"
 
       - name: Run unit tests
         working-directory: skills/schliff
@@ -99,11 +143,26 @@ jobs:
         id: integration
         working-directory: skills/schliff
         run: |
-          OUTPUT=$(bash scripts/test-integration.sh --no-runtime-auto 2>&1) || true
+          set +e
+          OUTPUT=$(bash scripts/test-integration.sh --no-runtime-auto 2>&1)
+          rc=$?
+          set -e
           echo "$OUTPUT"
-          PASSED=$(echo "$OUTPUT" | grep -oP 'Results:\s*\K[0-9]+(?=\s*passed)' || echo "0")
-          FAILED=$(echo "$OUTPUT" | grep -oP 'Results:\s*[0-9]+\s*passed,\s*\K[0-9]+(?=\s*failed)' || echo "0")
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::test-integration.sh exited with code $rc"
+            exit 1
+          fi
+          if ! echo "$OUTPUT" | grep -qP 'Results:\s*[0-9]+\s*passed,\s*[0-9]+\s*failed'; then
+            echo "::error::Results summary line not found — test script did not complete"
+            exit 1
+          fi
+          PASSED=$(echo "$OUTPUT" | grep -oP 'Results:\s*\K[0-9]+(?=\s*passed)')
+          FAILED=$(echo "$OUTPUT" | grep -oP 'Results:\s*[0-9]+\s*passed,\s*\K[0-9]+(?=\s*failed)')
           TOTAL=$((PASSED + FAILED))
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "::error::No integration tests ran (0 passed, 0 failed)"
+            exit 1
+          fi
           echo "test_passed=$PASSED" >> "$GITHUB_OUTPUT"
           echo "test_total=$TOTAL" >> "$GITHUB_OUTPUT"
           if [ "$FAILED" -gt 0 ]; then exit 1; fi

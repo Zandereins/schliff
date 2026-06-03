@@ -508,12 +508,25 @@ def generate_test_cases(name: str, desc: str = "") -> list[dict]:
     else:
         domain_prompt = f"Help me with {slug}"
 
+    # A domain-derived 'contains' value so the generated suite emits >=3 distinct
+    # assertion types (contains, excludes, pattern), reaching the top band of
+    # scoring/quality.py's "assertion type diversity" sub-dimension instead of
+    # being capped at 2 types. The value is a real domain term (likely present in
+    # the SKILL.md, so run-eval.sh's static `contains` check is meaningful) or the
+    # skill slug as a safe fallback when no domain terms were extracted.
+    contains_value = purpose["domain_terms"][0] if purpose["domain_terms"] else slug
+
     return [
         {
             "id": "tc-1",
             "prompt": domain_prompt,
             "input_files": [],
             "assertions": [
+                {
+                    "type": "contains",
+                    "value": contains_value,
+                    "description": f"Output is on-topic (mentions '{contains_value}')",
+                },
                 {
                     "type": "excludes",
                     "value": "TODO",

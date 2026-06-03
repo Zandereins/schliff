@@ -31,6 +31,24 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 
+def _resolve_version() -> str:
+    """Single source of truth for the runtime version string.
+
+    Reads from installed package metadata (importlib.metadata) so the CLI,
+    the score-display header, and the --version flag can never drift from
+    pyproject.toml. Falls back to "dev" when the package is not installed
+    (e.g. running cli.py straight from a source checkout).
+    """
+    try:
+        from importlib.metadata import version, PackageNotFoundError
+        try:
+            return version("schliff")
+        except PackageNotFoundError:
+            return "dev"
+    except ImportError:  # importlib.metadata absent (pathological env)
+        return "dev"
+
+
 def _load_eval_suite_from_args(args: argparse.Namespace) -> "dict | None":
     """Load eval suite from --eval-suite flag or auto-discover from skill dir."""
     from pathlib import Path
@@ -173,12 +191,8 @@ def cmd_score(args: argparse.Namespace) -> None:
                 print(f"Warning: could not compute fix count: {exc}", file=sys.stderr)
                 fix_count = 0
 
-            # Get version
-            try:
-                from importlib.metadata import version, PackageNotFoundError
-                ver = version("schliff")
-            except PackageNotFoundError:
-                ver = "dev"
+            # Get version (single-sourced from package metadata)
+            ver = _resolve_version()
 
             output = format_score_display(
                 scores=scores,
@@ -796,11 +810,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
 
 def cmd_version(_args: argparse.Namespace) -> None:
     """Print version string."""
-    try:
-        from importlib.metadata import version, PackageNotFoundError
-        print(f"schliff {version('schliff')}")
-    except PackageNotFoundError:
-        print("schliff dev")
+    print(f"schliff {_resolve_version()}")
 
 
 def main():
@@ -812,6 +822,12 @@ def main():
                "  schliff score SKILL.md    Score a skill\n"
                "  schliff doctor            Scan all installed skills",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version", "-V",
+        action="version",
+        version=f"schliff {_resolve_version()}",
+        help="Show version and exit",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 

@@ -169,6 +169,27 @@ def _stable_token_hash(token: str) -> int:
     return zlib.crc32(token.encode("utf-8")) & 0x7FFFFFFF
 
 
+def _minhash_coeffs(num_hashes: int, seed: int) -> list[tuple[int, int]]:
+    """Return the (a, b) MinHash coefficient table for (num_hashes, seed).
+
+    The table is fully determined by the seed, so it is identical across every
+    call. Cache it so repeated per-skill signature computation does not
+    regenerate 128 RNG pairs each time (signatures are unchanged).
+    """
+    cached = _MINHASH_COEFF_CACHE.get((num_hashes, seed))
+    if cached is None:
+        rng = random.Random(seed)
+        cached = [
+            (rng.randint(1, 2**31 - 1), rng.randint(0, 2**31 - 1))
+            for _ in range(num_hashes)
+        ]
+        _MINHASH_COEFF_CACHE[(num_hashes, seed)] = cached
+    return cached
+
+
+_MINHASH_COEFF_CACHE: dict[tuple[int, int], list[tuple[int, int]]] = {}
+
+
 def _minhash_signature(tokens: set, num_hashes: int = 128, seed: int = 42) -> list[int]:
     """Compute MinHash signature for a token set.
 
@@ -177,9 +198,8 @@ def _minhash_signature(tokens: set, num_hashes: int = 128, seed: int = 42) -> li
     """
     if not tokens:
         return [0] * num_hashes
-    rng = random.Random(seed)
-    # Generate hash function coefficients (consistent across calls via seed)
-    coeffs = [(rng.randint(1, 2**31 - 1), rng.randint(0, 2**31 - 1)) for _ in range(num_hashes)]
+    # Coefficients are consistent across calls via seed — reuse the cached table.
+    coeffs = _minhash_coeffs(num_hashes, seed)
     MOD = (1 << 31) - 1
     signature = []
     for a, b in coeffs:
@@ -701,8 +721,15 @@ def run_mesh_analysis(
     skill_dirs: list[str],
     severity_filter: Optional[str] = None,
     incremental: bool = False,
+    skills: Optional[list[dict]] = None,
 ) -> dict:
     """Run full mesh analysis.
+
+    Args:
+        skills: Pre-discovered skill dicts (path/name/description/content_hash/
+            tokens/content). When provided, skips the internal discover_skills()
+            call so a caller that already walked the tree (e.g. doctor) does not
+            re-walk and re-read every SKILL.md. Results are identical.
 
     Returns dict with: skills, issues, health, summary.
     """
@@ -713,7 +740,8 @@ def run_mesh_analysis(
             ".claude/skills",
         ]
 
-    skills = discover_skills(skill_dirs)
+    if skills is None:
+        skills = discover_skills(skill_dirs)
 
     if not skills:
         return {

@@ -1,7 +1,7 @@
 [
   {
     "skill_name": "schliff",
-    "repo_url": "https://github.com/franzundfranz/schliff",
+    "repo_url": "https://github.com/Zandereins/schliff",
     "format": "SKILL.md",
     "composite": 99.0,
     "grade": "S",
@@ -13,15 +13,14 @@
       "efficiency": 100,
       "composability": 100,
       "clarity": 100,
-      "security": 95,
-      "sync": 100
+      "security": 95
     },
-    "version": "7.0.0",
+    "version": "8.0.0",
     "submitted_at": "2026-03-25T10:00:00Z"
   },
   {
     "skill_name": "shieldclaw",
-    "repo_url": "https://github.com/example/shieldclaw",
+    "repo_url": "https://github.com/Zandereins/schliff/tree/main/docs/case-studies/shieldclaw",
     "format": "SKILL.md",
     "composite": 94.6,
     "grade": "A",
@@ -33,8 +32,7 @@
       "efficiency": 93,
       "composability": 95,
       "clarity": 96,
-      "security": 90,
-      "sync": 100
+      "security": 90
     },
     "version": "2.1.0",
     "submitted_at": "2026-03-24T15:30:00Z"

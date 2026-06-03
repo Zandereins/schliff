@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Schliff Leaderboard — Community Quality Rankings</title>
-  <meta name="description" content="How the best AI agent instruction files stack up — scored across 9 dimensions by Schliff.">
+  <meta name="description" content="How the best AI agent instruction files stack up — scored across 7 dimensions by Schliff. Community self-reported scores, not independently verified.">
   <meta property="og:title" content="Schliff Leaderboard">
-  <meta property="og:description" content="Community quality rankings for AI agent instruction files, scored across 9 dimensions.">
+  <meta property="og:description" content="Community quality rankings for AI agent instruction files, scored across 7 dimensions. Self-reported, not independently verified.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Schliff Leaderboard">
@@ -806,6 +806,35 @@
 
     .error-banner.visible { display: flex; }
 
+    /* Unverified / self-reported disclaimer */
+    .trust-banner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(245,158,11,.07);
+      border: 1px solid rgba(245,158,11,.25);
+      border-radius: var(--radius-sm);
+      margin-bottom: 16px;
+      font-size: 12.5px;
+      color: var(--grade-c);
+      line-height: 1.5;
+    }
+
+    .trust-banner.visible { display: flex; }
+
+    .trust-banner svg { flex-shrink: 0; }
+
+    /* Per-row unverified marker */
+    .unverified-dot {
+      display: inline-block;
+      margin-left: 6px;
+      font-size: 11px;
+      color: var(--grade-c);
+      cursor: help;
+      vertical-align: middle;
+    }
+
     /* ============================
        RESPONSIVE
     ============================ */
@@ -850,14 +879,14 @@
     <!-- HEADER -->
     <nav class="nav-bar" aria-label="Site navigation">
       <a href="/playground/" class="nav-link">Playground</a>
-      <a href="https://github.com/franzundfranz/schliff" class="nav-link" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/Zandereins/schliff" class="nav-link" target="_blank" rel="noopener noreferrer">GitHub</a>
     </nav>
     <header class="header">
       <div class="header-title-row">
         <div class="icon">S</div>
         <div class="header-text">
           <h1>Schliff Leaderboard</h1>
-          <p class="subtitle">How the best AI agent instruction files stack up — scored across 9 dimensions</p>
+          <p class="subtitle">How the best AI agent instruction files stack up — scored across 7 dimensions</p>
         </div>
       </div>
     </header>
@@ -889,7 +918,6 @@
               <option value="composability">Composability</option>
               <option value="clarity">Clarity</option>
               <option value="security">Security</option>
-              <option value="sync">Sync</option>
             </optgroup>
             <option value="date">Date Submitted</option>
           </select>
@@ -938,6 +966,15 @@
         <span id="stat-b-count">—</span> B-grade
       </span>
       <span class="total-count" id="total-count"></span>
+    </div>
+
+    <!-- TRUST / UNVERIFIED DISCLAIMER -->
+    <div class="trust-banner" id="trust-banner" role="note">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>Community self-reported scores &mdash; submitted via the API and not independently re-verified by Schliff.</span>
     </div>
 
     <!-- ERROR BANNER -->
@@ -992,8 +1029,9 @@
       <h2 class="submit-title" id="submit-heading">Get on the Leaderboard</h2>
       <p class="submit-desc">
         Score your AI agent instruction file and publish it to the community leaderboard.
-        Submissions are scored deterministically across 9 dimensions. Your file must be
-        publicly accessible via a GitHub repository.
+        Submissions are scored deterministically across 7 dimensions. Your file must be
+        publicly accessible via a GitHub repository. Submitted scores are self-reported
+        and not independently re-verified.
       </p>
       <div class="submit-methods">
         <div class="submit-method">
@@ -1006,13 +1044,13 @@
         </div>
       </div>
       <div class="footer-links">
-        <a class="footer-link" href="https://github.com/franzpaul/schliff" target="_blank" rel="noopener noreferrer">
+        <a class="footer-link" href="https://github.com/Zandereins/schliff" target="_blank" rel="noopener noreferrer">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
           </svg>
           GitHub Repository
         </a>
-        <a class="footer-link" href="https://github.com/franzpaul/schliff#readme" target="_blank" rel="noopener noreferrer">
+        <a class="footer-link" href="https://github.com/Zandereins/schliff#readme" target="_blank" rel="noopener noreferrer">
           Documentation
         </a>
         <span class="footer-copy">Schliff &mdash; Deterministic quality scorer for AI agent instruction files</span>
@@ -1032,19 +1070,19 @@
 
     const DIMENSION_KEYS = [
       'structure', 'triggers', 'quality', 'edges',
-      'efficiency', 'composability', 'clarity', 'security', 'sync'
+      'efficiency', 'composability', 'clarity', 'security'
     ];
 
     const DIMENSION_LABELS = {
       structure: 'Structure', triggers: 'Triggers', quality: 'Quality',
       edges: 'Edge Cases', efficiency: 'Efficiency', composability: 'Composability',
-      clarity: 'Clarity', security: 'Security', sync: 'Sync'
+      clarity: 'Clarity', security: 'Security'
     };
 
     // Cycle through accent palette for dimension bars
     const DIM_COLORS = [
       '#38bdf8', '#34d399', '#a855f7', '#f59e0b',
-      '#a78bfa', '#22d3ee', '#fb923c', '#4ade80', '#e879f9'
+      '#a78bfa', '#22d3ee', '#fb923c', '#4ade80'
     ];
 
     // ============================================================
@@ -1072,6 +1110,7 @@
     const pagination  = document.getElementById('pagination');
     const errorBanner = document.getElementById('error-banner');
     const errorText   = document.getElementById('error-text');
+    const trustBanner = document.getElementById('trust-banner');
     const totalCount  = document.getElementById('total-count');
     const statS       = document.getElementById('stat-s-count');
     const statA       = document.getElementById('stat-a-count');
@@ -1225,6 +1264,7 @@
       tableEmpty.classList.remove('visible');
       cardsEmpty.classList.remove('visible');
       errorBanner.classList.remove('visible');
+      trustBanner.classList.remove('visible');
 
       // Desktop: skeleton rows
       for (var i = 0; i < 8; i++) {
@@ -1292,6 +1332,17 @@
         var rank   = offset + idx + 1;
         var safeUrl = safeGitHubUrl(entry.repo_url);
         var name   = entry.skill_name || 'Unnamed';
+        var isUnverified = entry.verified === false;
+
+        // Small "self-reported, not verified" marker appended after a name.
+        function makeUnverifiedMarker() {
+          var m = document.createElement('span');
+          m.className = 'unverified-dot';
+          m.setAttribute('title', 'Self-reported — not independently verified');
+          m.setAttribute('aria-label', 'Self-reported, not independently verified');
+          m.appendChild(txt('• unverified'));
+          return m;
+        }
 
         // ----- TABLE ROW -----
         var tr = document.createElement('tr');
@@ -1313,6 +1364,7 @@
         } else {
           tdName.appendChild(txt(name));
         }
+        if (isUnverified) tdName.appendChild(makeUnverifiedMarker());
         tr.appendChild(tdName);
 
         // Format
@@ -1370,6 +1422,7 @@
         } else {
           cardNameEl.appendChild(txt(name));
         }
+        if (isUnverified) cardNameEl.appendChild(makeUnverifiedMarker());
         cardLeft.appendChild(cardNameEl);
         cardTop.appendChild(cardLeft);
 
@@ -1504,6 +1557,11 @@
             throw new Error('Unexpected API response shape.');
           }
           state.total = typeof data.total === 'number' ? data.total : data.entries.length;
+          // Surface the API trust flag. The backend marks all community data
+          // unverified (query.py returns top-level "unverified": true) and never
+          // re-scores client-supplied numbers, so default to showing the disclaimer
+          // unless the API explicitly says otherwise.
+          trustBanner.classList.toggle('visible', data.unverified !== false);
           renderEntries(data.entries);
           renderPagination();
           updateStats(data.entries);

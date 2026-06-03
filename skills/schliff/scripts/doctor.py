@@ -194,8 +194,10 @@ def run_doctor(
     # Sort by score ascending (worst first — they need attention)
     results.sort(key=lambda r: r.get("composite", 0))
 
-    # Run mesh analysis for cross-skill issues
-    mesh_result = skill_mesh.run_mesh_analysis(dirs, incremental=True)
+    # Run mesh analysis for cross-skill issues. Reuse the skills already
+    # discovered above so the tree is not walked and every SKILL.md is not read
+    # a second time within a single doctor run.
+    mesh_result = skill_mesh.run_mesh_analysis(dirs, incremental=True, skills=skills)
     mesh_issues = mesh_result.get("issues", [])
     mesh_health = mesh_result.get("health", {}).get("score", 100)
 
