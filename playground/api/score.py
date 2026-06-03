@@ -14,8 +14,22 @@ cost of a single scoring run.
 import json
 import os
 import re
+import sys
 import tempfile
 from http.server import BaseHTTPRequestHandler
+
+# schliff's scoring submodules import each other via a sys.path-relative pattern
+# (`from scoring.x import ...`) that requires the package's scripts/ directory to
+# be ON sys.path. The schliff CLI sets this up at startup (see cli.py's sys.path
+# hack); this serverless function bypasses the CLI, so without the same bootstrap
+# every scoring call fails with `ModuleNotFoundError: No module named 'scoring'`
+# once running against the pip-installed package (an editable install masks it
+# locally). Replicate the bootstrap once, at cold start.
+import skills.schliff.scripts as _schliff_scripts  # noqa: E402
+
+_SCRIPTS_DIR = list(_schliff_scripts.__path__)[0]
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
 
 # Hard cap on the raw request body (bounds bytes read off the socket).
 MAX_CONTENT_SIZE = 500 * 1024  # 500 KB
@@ -44,8 +58,8 @@ CORS_HEADERS = {
 
 def _run_scoring(content: str, filename: str) -> dict:
     """Write content to a temp file, run schliff scoring, return result dict."""
-    from skills.schliff.scripts.shared import build_scores
     from skills.schliff.scripts.scoring.composite import compute_composite
+    from skills.schliff.scripts.shared import build_scores
     from skills.schliff.scripts.terminal_art import score_to_grade
 
     tmp_dir = tempfile.mkdtemp()
@@ -162,7 +176,8 @@ class handler(BaseHTTPRequestHandler):
             result = _run_scoring(content, filename)
             self._send_json(200, result)
         except Exception as exc:
-            self._send_json(500, {
-                "error": "Scoring failed",
-                "detail": type(exc).__name__,
-            })
+            # Log the type server-side for debugging; do not leak internal
+            # exception names to the client (avoids handing an attacker a
+            # reconnaissance signal about the scoring internals).
+            print(f"Scoring error: {type(exc).__name__}: {exc}", file=sys.stderr)
+            self._send_json(500, {"error": "Scoring failed"})
