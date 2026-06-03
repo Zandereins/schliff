@@ -27,7 +27,7 @@ VALID_GRADES = {"S", "A", "B", "C", "D"}
 VALID_FORMATS = {"SKILL.md", ".cursorrules", "CLAUDE.md", "AGENTS.md"}
 VALID_DIMENSIONS = {
     "structure", "triggers", "quality", "edges", "efficiency",
-    "composability", "clarity", "security", "sync",
+    "composability", "clarity", "security",
 }
 
 # TODO: Replace with external storage (Vercel KV, Postgres, or Blob)
