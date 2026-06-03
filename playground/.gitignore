@@ -1,0 +1,11 @@
+# Vercel CLI link state
+.vercel
+
+# Vercel's Python builder synthesizes these locally from requirements.txt on
+# every `vercel build` / `vercel deploy`. They are BUILD OUTPUT, not source.
+# requirements.txt (schliff==8.1.0) is the single source of truth for the pin.
+# Committing them creates a second manifest that can override the pin on a
+# future build (see vercel/vercel#14041). Keep them out of git.
+# (.python-version IS tracked here on purpose — it pins the runtime to 3.12.)
+pyproject.toml
+uv.lock
