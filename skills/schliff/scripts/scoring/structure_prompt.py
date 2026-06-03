@@ -21,6 +21,24 @@ from scoring.patterns.system_prompt import (
 )
 from shared import read_skill_safe
 
+# Module-level compiled patterns (re.compile is NOT covered by re's internal
+# cache, so compiling these inline recompiled them on every score). Hoisted
+# here to match the codebase's module-level pattern discipline; behaviour and
+# scores are unchanged.
+_RE_SP_GENERIC_ROLE = re.compile(
+    r"(?i)(helpful\s+assistant|a\s+helper\b|a\s+good\s+assistant"
+    r"|a\s+nice\s+assistant|an?\s+assistant\b(?!\s+for\s+\w+))",
+)
+_RE_SP_VAGUE_CONSTRAINT = re.compile(
+    r"(?i)^(always\s+(be\s+)?(helpful|nice|good|patient|friendly|courteous|professional"
+    r"|polite|thorough|careful|accurate|positive)"
+    r"|never\s+(be\s+)?(bad|mean|rude|unhelpful|wrong))$",
+)
+_RE_SP_VAGUE_RESPOND = re.compile(
+    r"respond\s+(helpful|polite|courteous|in\s+(a\s+)?(friendly|professional"
+    r"|courteous|complete\s+sentence|kind|helpful))",
+)
+
 
 def _strip_code_blocks(text: str) -> str:
     """Remove fenced code blocks so only prose remains."""
@@ -111,11 +129,7 @@ def score_structure_prompt(
         match_end = min(len(prose), role_match.end() + 80)
         context = prose[match_start:match_end].lower()
         # Generic patterns: "helpful assistant", "a helper", "a good assistant", etc.
-        _generic_role = re.compile(
-            r"(?i)(helpful\s+assistant|a\s+helper\b|a\s+good\s+assistant"
-            r"|a\s+nice\s+assistant|an?\s+assistant\b(?!\s+for\s+\w+))",
-        )
-        if _generic_role.search(context):
+        if _RE_SP_GENERIC_ROLE.search(context):
             score += 5
             checks["role_definition"] = {"points": 5, "note": "generic_role"}
             issues.append("generic_role_definition")
@@ -143,12 +157,7 @@ def score_structure_prompt(
     constraint_matches = _RE_SP_CONSTRAINT_BLOCK.findall(prose)
     unique_constraints = _deduplicate_constraints(constraint_matches)
     # Filter: "always" or "never" followed by vague adjective is not a real constraint
-    _vague_constraint = re.compile(
-        r"(?i)^(always\s+(be\s+)?(helpful|nice|good|patient|friendly|courteous|professional"
-        r"|polite|thorough|careful|accurate|positive)"
-        r"|never\s+(be\s+)?(bad|mean|rude|unhelpful|wrong))$",
-    )
-    unique_constraints = [c for c in unique_constraints if not _vague_constraint.match(c.strip())]
+    unique_constraints = [c for c in unique_constraints if not _RE_SP_VAGUE_CONSTRAINT.match(c.strip())]
     if len(unique_constraints) >= 2:
         score += 10
         checks["constraint_block"] = {"points": 10, "unique_count": len(unique_constraints)}
@@ -172,11 +181,7 @@ def score_structure_prompt(
         fmt_ctx = prose[ctx_start:ctx_end].lower()
         # False positives: "respond helpfully", "respond in a friendly manner",
         # "respond in complete sentences" -- these are tone, not format
-        _vague_respond = re.compile(
-            r"respond\s+(helpful|polite|courteous|in\s+(a\s+)?(friendly|professional"
-            r"|courteous|complete\s+sentence|kind|helpful))",
-        )
-        if _vague_respond.search(fmt_ctx):
+        if _RE_SP_VAGUE_RESPOND.search(fmt_ctx):
             checks["output_format"] = {"points": 0, "note": "vague_format"}
             issues.append("no_output_format")
         else:

@@ -21,10 +21,10 @@ from typing import Any, Optional
 # Import scorer functions directly — no reimplementation
 SCRIPT_DIR = Path(__file__).parent
 
-import score_skill as scorer
-from shared import read_skill_safe, extract_description, strip_frontmatter
-from nlp import tokenize_meaningful
+import score_skill as scorer  # noqa: E402
 
+from nlp import tokenize_meaningful  # noqa: E402
+from shared import extract_description, read_skill_safe, strip_frontmatter  # noqa: E402
 
 # --- Effort classification ---
 EFFORT_SIMPLE = 1    # Add/remove a line or keyword
@@ -887,16 +887,16 @@ def apply_patches(skill_path: str, patches: list[dict], dry_run: bool = False) -
                     # Skip lines inside code blocks to avoid mangling examples
                     in_code_block = False
                     new_lines = []
-                    for l in lines:
-                        if l.strip().startswith("```"):
+                    for ln in lines:
+                        if ln.strip().startswith("```"):
                             in_code_block = not in_code_block
-                            new_lines.append(l)
+                            new_lines.append(ln)
                         elif in_code_block:
-                            new_lines.append(l)  # preserve code block content
+                            new_lines.append(ln)  # preserve code block content
                         elif replacement is not None:
-                            new_lines.append(compiled.sub(replacement, l))
-                        elif not compiled.search(l):
-                            new_lines.append(l)
+                            new_lines.append(compiled.sub(replacement, ln))
+                        elif not compiled.search(ln):
+                            new_lines.append(ln)
                         # else: line removed (not in code block)
                     lines = new_lines
                     applied += 1

@@ -7,8 +7,8 @@ import hashlib
 import json
 import math
 import os
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 _calibrated_weights_cache: Optional[dict] = None
 _calibrated_weights_mtime: float = 0.0
@@ -101,7 +101,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
             (verify CI gate, badge, leaderboard) MUST leave this False to stay
             reproducible; only the interactive `score` command opts in.
     """
-    from scoring.registry import get_weights, get_headline_excluded
+    from scoring.registry import get_headline_excluded, get_weights
 
     weights = get_weights(fmt if fmt is not None else "skill.md")
     explicit = set(custom_weights or {})

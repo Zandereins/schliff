@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import re
 
-from shared import read_skill_safe
-
 # ---------------------------------------------------------------------------
 # Pattern imports — canonical source is patterns.system_prompt (+ base).
 # ---------------------------------------------------------------------------
@@ -27,7 +25,7 @@ from scoring.patterns.system_prompt import (
     _RE_SP_OFF_TOPIC,
     _RE_SP_RATE_LIMIT,
 )
-
+from shared import read_skill_safe
 
 # ---------------------------------------------------------------------------
 # Helpers

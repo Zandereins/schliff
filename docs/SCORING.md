@@ -2,218 +2,284 @@
 
 How Schliff measures skill quality — and what the numbers actually mean.
 
----
-
-## Two-Tier Model: Structural vs Runtime
-
-Schliff scoring operates on two tiers:
-
-**Structural (default)** — Static analysis of the skill file and eval suite. Measures file organization, keyword coverage, assertion breadth, and information density. Runs instantly, requires no LLM invocation. This is a **lint score**, not a quality score. A skill with 99/100 structure can still fail at runtime.
-
-**Runtime (opt-in)** — Invokes Claude with test prompts from the eval suite and checks `response_*` assertions against actual output. This is the true quality gate. Enable with `--runtime` or run `/schliff:eval` with runtime assertions. Requires `claude` CLI.
-
-When runtime data is available, the composite score blends both tiers. When it is not, the score is purely structural and labeled as such.
+Schliff is deterministic: the same input always produces the same score. The
+headline composite uses the canonical registry weights, and calibration is OFF by
+default, so `verify`, `badge`, and the leaderboard are reproducible across machines.
 
 ---
 
-## The 7 Dimensions
+## What gets scored
 
-| Dimension | Weight | What It Measures | What It Does NOT Measure |
-|-----------|--------|-----------------|-------------------------|
-| **Structure** | 15% | Frontmatter (name, description), headers, examples, progressive disclosure, file length, dead content (TODO/FIXME), referenced file existence | Whether instructions are correct or effective |
-| **Trigger Accuracy** | 20% | TF-IDF keyword overlap between skill description and eval suite prompts, with stemming, synonym expansion, domain signal detection, and negation boundary handling. Reports precision and recall separately (v6.1.0+). | Actual Claude triggering behavior — that requires runtime evaluation |
-| **Eval Coverage (Quality)** | 20% | Assertion breadth (type diversity: contains, pattern, excludes, format), feature coverage (analyze, improve, report), assertion descriptions, instruction-assertion coherence | Whether following the skill produces correct output |
-| **Edge Coverage** | 15% | Edge case definitions in eval suite, category diversity (minimal input, invalid path, scale extreme, malformed input, missing deps, unicode), expected behaviors, edge assertions | Whether the skill handles edge cases correctly at runtime |
-| **Token Efficiency** | 10% | Information density (signal-to-noise ratio), actionable instructions, real examples, WHY-based reasoning, verification commands vs hedging, filler phrases, obvious instructions | Whether the content is actually useful to Claude |
-| **Composability** | 10% | 10 sub-checks: scope boundaries, global state, I/O contracts, handoff points, tool flexibility, error behavior, idempotency, dependency declarations, namespace isolation, version compatibility | Whether the skill works correctly alongside other skills |
-| **Clarity** | 5% *(default)* | Contradictions (always X vs never X), vague references ("the file" without antecedent), ambiguous pronouns (It/This/That without referent), instruction completeness (every "Run X" has a concrete command). Opt-out via `--no-clarity`. | Whether instructions are clear to Claude in practice |
-| **Runtime** *(opt-in)* | 10% | **Actual Claude behavior** — invokes Claude with test prompts, checks `response_contains`, `response_matches`, `response_excludes` assertions against real output | — |
+Schliff runs a set of **structural scorers** over an instruction file and (optionally)
+its eval suite. These are static-analysis checks — they measure file organization,
+keyword coverage, assertion breadth, information density, and so on. They run
+instantly and require no LLM invocation.
+
+A high structural score is a **lint score**, not a guarantee of runtime quality. A
+skill with a 99/100 structure can still fail when Claude actually runs it. Two
+dimensions exist specifically as separate **signals** that are never folded into the
+headline number:
+
+- **security** — an advisory gate (pass/flag at threshold 70).
+- **runtime** — opt-in, invokes Claude with eval prompts and checks `response_*`
+  assertions against real output.
+
+> The core engine is **stdlib-only** (requires Python >= 3.9). The optional `[evolve]`
+> and `[judge]` extras (litellm / anthropic) exist only for the LLM-judge smoke-test
+> and are not needed for scoring.
 
 ---
 
-## Grade Thresholds
+## The dimensions and their weights
+
+Schliff supports five formats. The **skill.md family** — `SKILL.md`, `CLAUDE.md`,
+`.cursorrules`, and `AGENTS.md` — shares one 8-scorer registry and one weight profile.
+The **system prompt** format (`system_prompt`) has its own scorer and weight set.
+
+### skill.md family
+
+Eight scorers run per file. Seven of them form the **headline composite**; `security`
+is reported as a separate signal and `runtime` is opt-in (and also a separate signal).
+
+| Dimension | Weight | Role | What it measures |
+|-----------|--------|------|------------------|
+| **structure** | 0.15 | headline | Frontmatter (name, description), headers, examples, progressive disclosure, file length, dead content, referenced-file existence |
+| **triggers** | 0.20 | headline | TF-IDF keyword overlap between description and eval prompts, with stemming, synonym expansion, domain-signal detection, negation handling; reports precision and recall |
+| **quality** | 0.20 | headline | Eval-suite coverage: assertion-type diversity, feature breadth, descriptions, instruction-assertion coherence |
+| **edges** | 0.15 | headline | Edge-case definitions in the eval suite: category diversity, expected behaviors, edge assertions |
+| **efficiency** | 0.10 | headline | Information density (signal-to-noise ratio), actionable instructions, real examples, WHY-reasoning, verification commands |
+| **composability** | 0.10 | headline | Scope boundaries, global-state assumptions, I/O contracts, handoffs, tool fallbacks, error behavior, idempotency, dependencies, namespace isolation, version notes |
+| **clarity** | 0.05 | headline | Contradictions, vague references, ambiguous pronouns, incomplete instructions |
+| **security** | 0.05 | **separate signal** | Injection / unsafe-pattern checks. **Excluded** from the skill.md-family headline; reported under `signals.security` with a pass/flag status. |
+| **runtime** | n/a | **separate signal** | Actual Claude behavior via `response_*` assertions. **No profile weight**, never in any headline composite. Opt-in. |
+
+The full registry profile lists all eight weights and sums to **1.00**. `security`
+(0.05) is in that profile but is **excluded from the headline basis** for this family,
+so the seven headline weights sum to **0.95** before normalization. Stage 2 of the
+composite (below) renormalizes those seven back to 1.0, so `security` does not contribute
+to the headline number unless a caller explicitly re-weights it via `--weights`.
+
+> **Note:** `runtime` carries **no weight in any profile**. Any claim that runtime is a
+> "10% weight" dimension is false — it is only ever a separate signal.
+
+### system_prompt format
+
+The system-prompt profile uses a different scorer set, and here **security is a core
+headline dimension** (weight 0.15) that stays in the composite — only `runtime` is
+excluded.
+
+| Dimension | Weight |
+|-----------|--------|
+| structure_prompt | 0.15 |
+| output_contract | 0.15 |
+| efficiency | 0.15 |
+| clarity | 0.15 |
+| security | 0.15 |
+| composability | 0.10 |
+| completeness | 0.15 |
+
+> The exclusion of `security` from the headline is **specific to the skill.md family**
+> (`skill.md` / `claude.md` / `cursorrules` / `agents.md`). For `system_prompt`, security
+> stays in. Both weight profiles live in `scoring/registry.py`, the single source of truth.
+
+### Format token budgets
+
+Each format carries a recommended token budget (`scoring/formats.py`):
+
+| Format | Budget (tokens) |
+|--------|-----------------|
+| skill.md | 1000 |
+| claude.md | 2000 |
+| cursorrules | 500 |
+| agents.md | 3000 |
+| system_prompt | 1500 |
+
+---
+
+## Grade scale
+
+Grades come from `terminal_art.score_to_grade` (`_GRADE_THRESHOLDS`):
 
 | Grade | Threshold | Meaning |
 |-------|-----------|---------|
 | **S** | >= 95 | Exceptional — near-perfect on measured dimensions |
-| **A** | >= 85 | Strong — minor polish opportunities remain |
+| **A** | >= 85 | Strong — minor polish remains |
 | **B** | >= 75 | Good — clear improvement paths exist |
 | **C** | >= 65 | Adequate — significant gaps in multiple dimensions |
 | **D** | >= 50 | Weak — fundamental issues need attention |
 | **E** | >= 35 | Poor — most dimensions below acceptable |
 | **F** | < 35 | Failing — major structural problems |
 
-Grades apply to both the composite score and each individual dimension. Dashboard and reports show color-coded grade badges.
+Grades apply to the composite score and to each individual dimension.
 
 ---
 
-## Composite Score Calculation
+## How the composite is computed (full-denominator model)
 
-The composite score is a **weighted average of all measured dimensions**, excluding any dimension that returns `-1` (not applicable / not measured).
+This is the part that is most often misunderstood, so read carefully.
+
+Schliff uses a **full-denominator model**. Unmeasured dimensions are **uncredited but
+stay in the basis** — they contribute 0 to the score and are *not* removed from the
+denominator. The practical consequence: **a skill's score ceiling equals its weight
+coverage.** If you can only measure dimensions worth 60% of the headline weight (e.g.
+because there is no eval suite yet), the best possible composite is 60.
+
+This is computed in two stages (`scoring/composite.py::compute_composite`):
+
+**Stage 1 — apply weight overrides (raw).** If the caller passes `--weights` (custom)
+or opts into calibrated weights, those values overwrite the registry weights *without*
+renormalizing yet. (Custom weights also drop the supplementary `clarity`/`security`
+dims unless explicitly named.)
+
+**Stage 2 — canonical headline basis (the single normalization point).** Dimensions in
+the format's *headline-excluded* set are dropped (for the skill.md family: `security`
+and `runtime`; for `system_prompt`: only `runtime`). The remaining weights are
+**renormalized to sum to 1.0**. This fixed basis is the same for every entrypoint, so
+there is no dual-scale problem.
+
+**Aggregation.** Because the canonical weights already sum to 1.0, the composite is
+simply the sum of `score × weight` over the **measured** dimensions:
 
 ```
-composite = sum(score[dim] * weight[dim] for dim in measured) / sum(weight[dim] for dim in measured)
+composite = Σ ( score[dim] × canonical_weight[dim] )   for dim in MEASURED
 ```
 
-Key behaviors:
+There is no separate division step. An unmeasured dimension simply adds 0 — its weight
+is *not* redistributed to the others. That is what makes the ceiling equal to coverage.
 
-1. **Skip unmeasured dimensions** — If a dimension returns `-1` (e.g., runtime not enabled, no eval suite), its weight is excluded from the denominator. The remaining weights are renormalized.
-2. **Weight coverage** — The scorer reports how many dimensions were actually measured and what fraction of total weight they represent. Low coverage triggers a warning.
-3. **Confidence indicator** — When only 2 or fewer dimensions are measured, the score is flagged as unreliable.
+> **This replaces the old (incorrect) renormalization model.** Earlier docs claimed that
+> an unmeasured dimension's weight was *excluded from the denominator and the remaining
+> weights renormalized across the measured dims*. That is wrong. Under the true model the
+> basis is fixed (renormalized once over the headline dims, before measurement is
+> considered), and missing dims are penalized by contributing 0 rather than being
+> dropped.
 
-### Clarity Dimension (Default)
+When dimensions are unmeasured, the result carries a warning of the form:
 
-Clarity is enabled by default since v6.0. It gets a weight of `0.05` (5%). The other dimension weights are scaled down proportionally so the total still sums to 1.0. Opt-out with `--no-clarity`.
+```
+Scored M/N dimensions — the score can't exceed COVERAGE% until the rest are
+measured. Run /schliff:init to add an eval suite and score: <missing dims>.
+```
 
-### Coherence Bonus
+`weight_coverage` (the fraction of headline weight that was actually measured) and the
+measured/total dimension counts are returned alongside the score so consumers know how
+trustworthy the number is.
 
-The coherence check cross-references imperative instructions in the skill body against assertion values in the eval suite's test cases. It computes topic overlap using stemmed keywords. The result is a bonus of 0–10 points added to the Quality dimension score (capped at 100).
+### Worked example
 
-This catches disconnects between what a skill instructs and what the eval suite actually tests.
+Take a `SKILL.md` with a frontmatter and body but **no eval suite**. Only the
+text-based dimensions can be measured; `quality` and `edges` (which need an eval suite)
+come back unmeasured.
+
+First, the headline basis is built (security + runtime excluded). The seven raw weights
+sum to 0.95, so Stage 2 renormalizes each by dividing by 0.95:
+
+| Dimension | Raw weight | Canonical weight (÷0.95) | Score | Contribution |
+|-----------|-----------|--------------------------|-------|--------------|
+| structure | 0.15 | 0.1579 | 90 | 14.21 |
+| triggers | 0.20 | 0.2105 | 80 | 16.84 |
+| quality | 0.20 | 0.2105 | *(unmeasured)* | 0 |
+| edges | 0.15 | 0.1579 | *(unmeasured)* | 0 |
+| efficiency | 0.10 | 0.1053 | 85 | 8.95 |
+| composability | 0.10 | 0.1053 | 70 | 7.37 |
+| clarity | 0.05 | 0.0526 | 95 | 5.00 |
+
+Composite = 14.21 + 16.84 + 0 + 0 + 8.95 + 7.37 + 5.00 ≈ **52.4** → grade **D**.
+
+Weight coverage = 0.1579 + 0.2105 + 0.1053 + 0.1053 + 0.0526 = **0.63**, so even with
+perfect scores on the five measured dims the ceiling would be **63**. The unmeasured
+`quality` and `edges` canonical weights (≈0.37) are *not* redistributed — they drag the
+ceiling down on purpose, signalling "add an eval suite." Running `/schliff:init` to
+generate one is the fix.
+
+Under the old (wrong) renormalization model this same skill would have renormalized only
+across the *measured* dims, scoring `52.4 / 0.63 ≈ 83` → grade **B**, hiding the missing
+coverage. The full-denominator model refuses to reward an unmeasured skill.
 
 ---
 
-## Weight Defaults
+## Calibration (opt-in, off by default)
 
-```
-structure:      0.15  (15%)
-triggers:       0.20  (20%)
-quality:        0.20  (20%)
-edges:          0.15  (15%)
-efficiency:     0.10  (10%)
-composability:  0.10  (10%)
-clarity:        0.05  ( 5%)  — auto-injected, opt-out via --no-clarity
-runtime:        0.10  (10%)  — only counted when enabled
-```
+Schliff can auto-calibrate weights from runtime data (stored at
+`~/.schliff/meta/calibrated-weights.json`), but this is **off by default** so that the
+headline composite stays deterministic and comparable across machines.
 
----
+Calibrated weights only apply when **both** of these hold:
 
-## Auto-Calibration from Runtime Data
+1. The environment variable `SCHLIFF_CALIBRATED_WEIGHTS` is set to `1`/`true`/`yes`/`on`.
+2. The caller explicitly opts in (`use_calibrated=True`) — only the interactive `score`
+   command does this.
 
-When runtime evaluation data exists, Schliff can auto-calibrate weights based on which dimensions correlate most with runtime success.
+Cross-comparison consumers (`verify` CI gate, `badge`, leaderboard) always leave
+calibration off, so their decisions never depend on a per-machine env var. When
+calibrated weights are in effect the result is stamped `weight_source=calibrated` and a
+warning notes that the score is **not comparable** to default-weight scores.
 
-Calibrated weights are stored at `~/.schliff/meta/calibrated-weights.json`. The loader validates that all values are numeric before applying them. Calibrated weights take second priority — they are used when no custom weights are provided via `--weights`.
+Weight-resolution priority:
 
-Priority order:
-1. `--weights` CLI flag (highest)
-2. `~/.schliff/meta/calibrated-weights.json` (auto-calibrated)
-3. Built-in defaults (lowest)
+1. `--weights` CLI flag (custom, highest)
+2. Calibrated weights (only under the opt-in conditions above)
+3. Canonical registry defaults (lowest — the reproducible baseline)
 
 ---
 
-## Weight Override Syntax
+## Weight override syntax
 
-Override dimension weights via the `--weights` flag:
+Override dimension weights via `--weights`:
 
 ```bash
 python score-skill.py SKILL.md --weights "triggers=0.4,structure=0.3"
 ```
 
-- Key-value pairs separated by commas
-- Values are normalized to sum to 1.0 automatically
-- Only specified dimensions are included — omitted dimensions get zero weight
-- Invalid values cause an immediate error with a clear message
-
-Examples:
-
-```bash
-# Focus on trigger accuracy and structure only
---weights "triggers=0.6,structure=0.4"
-
-# Equal weight across all dimensions
---weights "structure=1,triggers=1,quality=1,edges=1,efficiency=1,composability=1"
-
-# Heavy runtime focus
---weights "runtime=0.5,triggers=0.3,quality=0.2"
-```
+- Key-value pairs separated by commas.
+- Supplementary dims (`clarity`, `security`) are dropped from the basis unless you name
+  them explicitly.
+- The canonical basis is the single normalization point — the supplied weights are
+  renormalized to sum to 1.0 over the resulting headline dims.
+- Invalid values cause an immediate error with a clear message.
 
 ---
 
-## Dimension Details
+## Anti-gaming
 
-### Structure (15%)
+Anti-gaming detection is part of the engine, not a bolt-on. It lives in
+`scoring/guards.py` plus per-scorer logic, and it exists so a skill cannot inflate a
+dimension by, for example, padding keyword lists, stuffing trivially-passing assertions,
+or repeating near-duplicate instructions. Detected gaming patterns are discounted before
+they reach the headline.
 
-Checks file organization via inline Python analysis:
+The full-denominator model is itself an anti-gaming property: because unmeasured
+dimensions are uncredited rather than dropped, you cannot raise the composite by simply
+omitting the dimensions you would score poorly on.
 
-- Frontmatter presence and fields (name, description): 30 pts
-- File length (<=500 lines ideal): 10 pts
-- Real examples (input/output pairs, code blocks): 10 pts
-- Headers (>=3 sections): 10 pts
-- Progressive disclosure (references dir or short file): 15 pts
-- Imperative voice (no hedging language): 5 pts
-- Referenced files exist: 10 pts
-- No dead content (TODO/FIXME/placeholder, empty sections): 10 pts
+---
 
-### Trigger Accuracy (20%)
+## Security and runtime as separate signals
 
-Uses TF-IDF-inspired scoring instead of naive word overlap:
+Both `security` and `runtime` are reported under `signals` (and `security` additionally
+under the top-level `security` field), never folded into the skill.md-family headline:
 
-1. Extracts meaningful terms (4+ chars, stopwords removed)
-2. Applies suffix-stripping stemmer for morphological variants
-3. Expands via synonym table for non-morphological matches
-4. Weights rare terms higher via IDF (terms appearing in fewer triggers are more discriminative)
-5. Applies domain signal multiplier (skill context vs generic code)
-6. Handles negation boundaries from description ("do NOT use for X")
-7. Penalizes creation patterns ("from scratch", "brand new") as anti-signals for improvement tools
+- **security** — scored 0–100, with `status: "pass"` when `score >= 70` (the security
+  gate, `SECURITY_GATE = 70`) and `status: "flag"` otherwise. For `system_prompt` this
+  same scorer is *also* a core headline dimension (weight 0.15).
+- **runtime** — opt-in; runs eval prompts through Claude and reports the pass rate.
+  Degrades gracefully (skipped) when the `claude` CLI is unavailable. Has no profile
+  weight in any format.
 
-### Eval Coverage / Quality (20%)
+---
 
-Static analysis of test case quality:
+## Source-of-truth map
 
-- 3+ well-formed test cases (type + value present): 30 pts
-- Multiple assertion types covered (contains, pattern, excludes, format): 25 pts
-- Different skill features tested (analyze, improve, report): 25 pts
-- All assertions have descriptions: 20 pts
-- Coherence bonus: instruction-assertion topic overlap: up to +10 pts
+| Concern | File |
+|---------|------|
+| Canonical weights, scorer lists, headline-exclusion, aliases | `scoring/registry.py` |
+| Composite computation (full-denominator model) | `scoring/composite.py` |
+| Grade thresholds, gauges | `terminal_art.py` |
+| Format detection, normalization, token budgets | `scoring/formats.py` |
+| Anti-gaming guards | `scoring/guards.py` + per-scorer modules |
+| Valid dimension names | `shared.py` (`VALID_DIMENSIONS`) |
+| Patch-ratio measurement | `measure_patch_ratio.py` |
 
-### Edge Coverage (15%)
-
-- 5+ edge cases defined: 30 pts
-- Multiple categories covered (minimal, invalid, scale, malformed, missing, unicode): 30 pts
-- All edge cases have expected_behavior: 20 pts
-- All edge cases have assertions: 20 pts
-
-### Token Efficiency (10%)
-
-Measures information density as signal per 100 words:
-
-- **Signal**: actionable instructions (x3), real examples (x5), WHY-reasoning (x2), verification commands (x2)
-- **Noise**: hedging language (x3), filler phrases (x2), obvious instructions (x2)
-- Density mapped via sqrt curve: 0→40, 5→79, 10→95 (no step-function cliffs)
-- Actionable lines are deduplicated (near-duplicate instructions count once)
-- Penalties for excessive length without signal, too much whitespace
-- Bonuses for scope boundaries (+3) and conciseness under 300 lines (+5)
-
-### Composability (10%)
-
-Ten sub-checks at 10 pts each:
-
-1. Clear scope boundaries (positive + negative triggers)
-2. No global state assumptions
-3. Input/output contract clarity
-4. Explicit handoff points to other skills
-5. No hard tool requirements without fallbacks
-6. Error/failure behavior described
-7. Idempotency/safety statement
-8. Dependency declarations
-9. Namespace/prefix isolation
-10. Version/compatibility notes
-
-### Clarity (5%, default)
-
-Starts at 100 pts, deducts for issues:
-
-- Contradictions (always X vs never X): up to -30 pts
-- Vague references without antecedent: up to -25 pts
-- Ambiguous pronouns at sentence start: up to -20 pts
-- Incomplete instructions (Run X without concrete command): up to -25 pts
-
-Code blocks are stripped before analysis to avoid false positives from examples.
-
-### Runtime (10%, opt-in)
-
-- Runs up to 3 test cases with `response_*` assertions
-- Invokes `claude -p` with skill content prepended to test prompt
-- Checks `response_contains`, `response_matches`, `response_excludes`
-- Score = pass rate as percentage
-- Gracefully degrades to `-1` (skipped) if `claude` CLI is unavailable
+Version is single-sourced: the CLI reads it via
+`importlib.metadata.version("schliff")` (`_resolve_version` in `cli.py`), falling back
+to `dev` in a source checkout. Current release: **8.0.0**.

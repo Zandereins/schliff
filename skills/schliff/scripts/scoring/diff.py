@@ -6,7 +6,7 @@ score_efficiency() to determine net quality impact.
 import re
 import subprocess
 
-from scoring.patterns import _RE_DIFF_SIGNAL, _RE_DIFF_EXAMPLE, _RE_DIFF_NOISE
+from scoring.patterns import _RE_DIFF_EXAMPLE, _RE_DIFF_NOISE, _RE_DIFF_SIGNAL
 
 
 def score_diff(skill_path: str, diff_ref: str = "HEAD~1") -> dict:
@@ -34,8 +34,8 @@ def score_diff(skill_path: str, diff_ref: str = "HEAD~1") -> dict:
     removed_lines = [line[1:] for line in diff_text.split("\n") if line.startswith("-") and not line.startswith("---")]
 
     def classify_lines(lines: list[str]) -> dict:
-        signals = sum(1 for l in lines if _RE_DIFF_SIGNAL.search(l) or _RE_DIFF_EXAMPLE.search(l))
-        noise = sum(1 for l in lines if _RE_DIFF_NOISE.search(l))
+        signals = sum(1 for ln in lines if _RE_DIFF_SIGNAL.search(ln) or _RE_DIFF_EXAMPLE.search(ln))
+        noise = sum(1 for ln in lines if _RE_DIFF_NOISE.search(ln))
         neutral = max(0, len(lines) - signals - noise)
         return {"signal": signals, "noise": noise, "neutral": neutral, "total": len(lines)}
 

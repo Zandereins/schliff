@@ -10,11 +10,13 @@ import math
 from collections import Counter
 from typing import Optional
 
-from shared import read_skill_safe, extract_description
 from nlp import tokenize_meaningful as _tokenize_meaningful
 from scoring.patterns import (
-    _RE_NEGATION_BOUNDARIES, _RE_CREATION_PATTERNS, _has_skill_domain_signal,
+    _RE_CREATION_PATTERNS,
+    _RE_NEGATION_BOUNDARIES,
+    _has_skill_domain_signal,
 )
+from shared import extract_description, read_skill_safe
 
 
 def score_triggers(skill_path: str, eval_suite: Optional[dict]) -> dict:

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Questions & Discussions
+    url: https://github.com/Zandereins/schliff/discussions
+    about: Ask questions, share ideas, or show your scored skills here.
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/Zandereins/schliff/security/advisories/new
+    about: Please report security issues privately, not as a public issue.

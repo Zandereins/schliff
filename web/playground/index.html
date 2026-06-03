@@ -6,11 +6,11 @@
 <title>Schliff Playground — AI Agent Instruction Scorer</title>
 <meta name="description" content="Score any SKILL.md, CLAUDE.md, or .cursorrules file — instant, deterministic, free.">
 <meta property="og:title" content="Schliff Playground">
-<meta property="og:description" content="Score any AI agent instruction file across 9 dimensions — instant, deterministic, free.">
+<meta property="og:description" content="Score any AI agent instruction file across 7 dimensions — instant, deterministic, free.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Schliff Playground">
-<meta name="twitter:description" content="Score any AI agent instruction file across 9 dimensions.">
+<meta name="twitter:description" content="Score any AI agent instruction file across 7 dimensions.">
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -508,6 +508,8 @@
   .grade-B { background: #a78bfa; box-shadow: 0 0 12px rgba(167,139,250,0.4); }
   .grade-C { background: #f59e0b; box-shadow: 0 0 12px rgba(245,158,11,0.4); }
   .grade-D { background: #f87171; box-shadow: 0 0 12px rgba(248,113,113,0.4); }
+  .grade-E { background: #ef4444; box-shadow: 0 0 12px rgba(239,68,68,0.4); }
+  .grade-F { background: #dc2626; box-shadow: 0 0 12px rgba(220,38,38,0.4); }
 
   .score-meta {
     flex: 1;
@@ -674,7 +676,7 @@
     </div>
     <div class="header-actions">
       <a href="/leaderboard/" class="nav-link" style="color:var(--muted);font-size:13px;text-decoration:none;">Leaderboard</a>
-      <a href="https://github.com/franzundfranz/schliff" class="nav-link" target="_blank" rel="noopener" style="color:var(--muted);font-size:13px;text-decoration:none;">GitHub</a>
+      <a href="https://github.com/Zandereins/schliff" class="nav-link" target="_blank" rel="noopener noreferrer" style="color:var(--muted);font-size:13px;text-decoration:none;">GitHub</a>
       <button class="btn-icon" id="theme-toggle" aria-label="Toggle theme" title="Toggle dark/light mode"></button>
     </div>
   </header>
@@ -745,6 +747,10 @@
 
       <div class="results-footer" id="results-footer" style="display:none;">
         <span style="font-size:11px;color:var(--muted);" id="results-meta"></span>
+        <span style="font-size:11px;color:var(--muted);display:block;margin-top:6px;">
+          ⚠ Approximate in-browser estimate — a lightweight JS heuristic, not the full engine.
+          Run <code>schliff score</code> from the CLI for the authoritative, reproducible score.
+        </span>
       </div>
     </section>
   </main>
@@ -780,14 +786,29 @@
   var MAX_BYTES  = 50 * 1024;
   var WARN_BYTES = 40 * 1024;
 
+  // Dimensions shown in the breakdown. Order mirrors the canonical scorer registry.
+  // Security is scored and displayed as a side signal but is EXCLUDED from the
+  // headline composite (matches the engine: security is an opt-in 0.05 dim, not folded
+  // into the headline number for the SKILL.md/CLAUDE.md/.cursorrules/AGENTS.md family).
   var DIMENSIONS = [
     'Structure', 'Triggers', 'Quality', 'Edges',
-    'Efficiency', 'Composability', 'Clarity', 'Security', 'Sync',
+    'Efficiency', 'Composability', 'Clarity', 'Security',
   ];
 
+  // Dimensions that contribute to the headline composite, in registry order.
+  var HEADLINE_DIMENSIONS = [
+    'Structure', 'Triggers', 'Quality', 'Edges',
+    'Efficiency', 'Composability', 'Clarity',
+  ];
+
+  // Canonical headline weights. The registry assigns structure .15, triggers .20,
+  // quality .20, edges .15, efficiency .10, composability .10, clarity .05 (and an
+  // opt-in security .05 that is headline-excluded). The engine drops security/runtime
+  // then renormalizes the remaining 7 weights to sum to 1.0, so we use the renormalized
+  // values here to reproduce the same composite as `schliff score`.
   var WEIGHTS = {
-    Structure: 0.15, Triggers: 0.10, Quality: 0.15, Edges: 0.10,
-    Efficiency: 0.10, Composability: 0.10, Clarity: 0.15, Security: 0.10, Sync: 0.05,
+    Structure: 0.1579, Triggers: 0.2105, Quality: 0.2105, Edges: 0.1579,
+    Efficiency: 0.1053, Composability: 0.1053, Clarity: 0.0526,
   };
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -987,9 +1008,6 @@
     if (hasDoNotRules) security += 50;
     security = Math.min(100, security);
 
-    // Sync — always 100 for playground
-    var sync = 100;
-
     var scores = {
       Structure: structure,
       Triggers: triggers,
@@ -999,21 +1017,25 @@
       Composability: composability,
       Clarity: clarity,
       Security: security,
-      Sync: sync,
     };
 
+    // Headline composite excludes security (side signal), matching the engine.
     var composite = 0;
-    DIMENSIONS.forEach(function (dim) {
+    HEADLINE_DIMENSIONS.forEach(function (dim) {
       composite += scores[dim] * WEIGHTS[dim];
     });
     composite = Math.round(composite);
 
+    // Grade thresholds — canonical scale from terminal_art.score_to_grade /
+    // SCORING.md: S>=95 A>=85 B>=75 C>=65 D>=50 E>=35 F<35.
     var grade;
     if (composite >= 95)      grade = 'S';
     else if (composite >= 85) grade = 'A';
-    else if (composite >= 70) grade = 'B';
-    else if (composite >= 50) grade = 'C';
-    else                      grade = 'D';
+    else if (composite >= 75) grade = 'B';
+    else if (composite >= 65) grade = 'C';
+    else if (composite >= 50) grade = 'D';
+    else if (composite >= 35) grade = 'E';
+    else                      grade = 'F';
 
     return { scores: scores, composite: composite, grade: grade };
   }
@@ -1195,7 +1217,7 @@
       } finally {
         scoreBtn.disabled = false;
         while (scoreBtn.firstChild) scoreBtn.removeChild(scoreBtn.firstChild);
-        scoreBtn.textContent = 'Score';
+        scoreBtn.textContent = 'Score File';
         updateMeta();
       }
     }, 120);

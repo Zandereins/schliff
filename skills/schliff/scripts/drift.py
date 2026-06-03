@@ -247,7 +247,7 @@ def validate_references(
                     "type": ref_type,
                     "line": line,
                     "status": "valid",
-                    "detail": f"script defined in package.json",
+                    "detail": "script defined in package.json",
                 })
             else:
                 findings.append({
@@ -255,7 +255,7 @@ def validate_references(
                     "type": ref_type,
                     "line": line,
                     "status": "missing",
-                    "detail": f"script not in package.json",
+                    "detail": "script not in package.json",
                 })
 
         elif ref_type == "make_target":
@@ -277,7 +277,7 @@ def validate_references(
                     "type": ref_type,
                     "line": line,
                     "status": "valid",
-                    "detail": f"target defined in Makefile",
+                    "detail": "target defined in Makefile",
                 })
             else:
                 findings.append({
@@ -285,7 +285,7 @@ def validate_references(
                     "type": ref_type,
                     "line": line,
                     "status": "missing",
-                    "detail": f"target not in Makefile",
+                    "detail": "target not in Makefile",
                 })
 
     return findings

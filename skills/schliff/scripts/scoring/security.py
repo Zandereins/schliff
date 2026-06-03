@@ -8,20 +8,20 @@ from __future__ import annotations
 
 import re
 
-from shared import read_skill_safe
 from scoring.patterns import (
-    _RE_SEC_PROMPT_INJECTION,
-    _RE_SEC_INSTRUCTION_OVERRIDE,
+    _RE_CODE_BLOCK_REGION,
+    _RE_SEC_BASE64_CMD,
+    _RE_SEC_BOUNDARY_VIOLATION,
+    _RE_SEC_DANGEROUS_CMD,
     _RE_SEC_DATA_EXFIL,
     _RE_SEC_ENV_LEAK,
-    _RE_SEC_DANGEROUS_CMD,
-    _RE_SEC_BASE64_CMD,
-    _RE_SEC_ZERO_WIDTH,
     _RE_SEC_HEX_ESCAPE,
+    _RE_SEC_INSTRUCTION_OVERRIDE,
     _RE_SEC_OVERPERMISSION,
-    _RE_SEC_BOUNDARY_VIOLATION,
-    _RE_CODE_BLOCK_REGION,
+    _RE_SEC_PROMPT_INJECTION,
+    _RE_SEC_ZERO_WIDTH,
 )
+from shared import read_skill_safe
 
 # ---------------------------------------------------------------------------
 # Pattern categories: (category_name, penalty_per_match, [compiled_patterns])

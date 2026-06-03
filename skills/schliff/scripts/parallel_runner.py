@@ -20,11 +20,9 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
-
 
 SCRIPT_DIR = Path(__file__).parent
 
@@ -319,7 +317,7 @@ def run_sequential_fallback(
         # (no per-strategy selector), so the `strategy` label is informational;
         # using a real flag avoids an argparse exit-2 hard-fail.
         try:
-            apply_result = subprocess.run(
+            subprocess.run(
                 [sys.executable, str(SCRIPT_DIR / "text-gradient.py"), skill_path,
                  "--apply"],
                 capture_output=True, text=True, timeout=60,

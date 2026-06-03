@@ -5,14 +5,19 @@ relative to its total size. Penalizes bloat, rewards conciseness.
 """
 from collections import Counter
 
-from shared import read_skill_safe, strip_frontmatter
 from nlp import RE_WORD_TOKEN, STOPWORDS
 from scoring.patterns import (
-    _RE_ACTIONABLE_LINES, _RE_REAL_EXAMPLES, _RE_WHY_COUNT,
-    _RE_VERIFICATION_CMDS, _RE_HEDGING, _RE_FILLER_PHRASES,
-    _RE_OBVIOUS_INSTRUCTIONS, _RE_SCOPE_BOUNDARY,
+    _RE_ACTIONABLE_LINES,
     _RE_CODE_BLOCK_REGION,
+    _RE_FILLER_PHRASES,
+    _RE_HEDGING,
+    _RE_OBVIOUS_INSTRUCTIONS,
+    _RE_REAL_EXAMPLES,
+    _RE_SCOPE_BOUNDARY,
+    _RE_VERIFICATION_CMDS,
+    _RE_WHY_COUNT,
 )
+from shared import read_skill_safe, strip_frontmatter
 
 # Anti-gaming: spread keyword stuffing. A body that repeats one meaningful term far
 # beyond what natural prose requires is low-information padding even when it is spread

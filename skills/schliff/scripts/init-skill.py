@@ -31,7 +31,7 @@ MAX_SKILL_SIZE = 1_000_000
 SCRIPT_DIR = Path(__file__).parent
 
 # Import terminal_art for grade system and score cards
-from terminal_art import score_to_grade, grade_colored, colored_bar, is_color_tty
+from terminal_art import colored_bar, grade_colored, score_to_grade  # noqa: E402
 
 # Action verb phrases extracted from imperative sentences in descriptions
 _ACTION_VERBS = [
@@ -312,7 +312,7 @@ def generate_positive_triggers(
             "prompt": phrase if len(phrase) > 15 else f"Can you {phrase.lower()}?",
             "should_trigger": True,
             "category": "positive",
-            "notes": f"From 'Use when' clause in SKILL.md",
+            "notes": "From 'Use when' clause in SKILL.md",
         })
 
     # Tier 2: From extracted action phrases (description-derived)
@@ -379,7 +379,6 @@ def generate_negative_triggers(name: str, desc: str, content: str = "") -> list[
     Parses "do NOT use" / "NOT for" clauses from description and picks
     generic off-topic prompts from domains unrelated to the skill.
     """
-    slug = _slugify(name)
     triggers: list[dict] = []
 
     # Extract "do NOT use for X" / "NOT for X" patterns from description
@@ -466,7 +465,7 @@ def generate_edge_triggers(name: str, desc: str = "") -> list[dict]:
         },
         {
             "id": "edge-2",
-            "prompt": f"help me with this",
+            "prompt": "help me with this",
             "should_trigger": False,
             "category": "edge",
             "notes": "Too vague — no skill name or domain terms; should NOT trigger",
@@ -508,12 +507,25 @@ def generate_test_cases(name: str, desc: str = "") -> list[dict]:
     else:
         domain_prompt = f"Help me with {slug}"
 
+    # A domain-derived 'contains' value so the generated suite emits >=3 distinct
+    # assertion types (contains, excludes, pattern), reaching the top band of
+    # scoring/quality.py's "assertion type diversity" sub-dimension instead of
+    # being capped at 2 types. The value is a real domain term (likely present in
+    # the SKILL.md, so run-eval.sh's static `contains` check is meaningful) or the
+    # skill slug as a safe fallback when no domain terms were extracted.
+    contains_value = purpose["domain_terms"][0] if purpose["domain_terms"] else slug
+
     return [
         {
             "id": "tc-1",
             "prompt": domain_prompt,
             "input_files": [],
             "assertions": [
+                {
+                    "type": "contains",
+                    "value": contains_value,
+                    "description": f"Output is on-topic (mentions '{contains_value}')",
+                },
                 {
                     "type": "excludes",
                     "value": "TODO",
@@ -540,7 +552,7 @@ def generate_test_cases(name: str, desc: str = "") -> list[dict]:
         },
         {
             "id": "tc-3",
-            "prompt": f"help",
+            "prompt": "help",
             "input_files": [],
             "assertions": [
                 {
@@ -571,7 +583,7 @@ def generate_edge_cases(name: str) -> list[dict]:
         },
         {
             "id": "ec-2",
-            "prompt": f"/nonexistent/SKILL.md",
+            "prompt": "/nonexistent/SKILL.md",
             "category": "invalid_path",
             "expected_behavior": "Report that the file was not found gracefully",
             "assertions": [
@@ -909,7 +921,6 @@ def main() -> None:
 
     # Output
     tc = _trigger_counts(suite)
-    total_triggers = tc["positive"] + tc["negative"] + tc["edge"]
     assertions_total = _count_assertions(suite)
 
     if args.output_json:

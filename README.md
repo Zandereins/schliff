@@ -1,320 +1,244 @@
 # Schliff
 
-Your AI instructions are silently degrading. Schliff catches it.
+**Your AI instruction files silently degrade — and nothing catches it.** A trigger phrase rots. An edge case slips. Your `SKILL.md` balloons past its token budget. No error, no red test — just an agent that quietly gets worse.
 
-Deterministic quality scoring for CLAUDE.md, SKILL.md, .cursorrules, AGENTS.md, and system prompts. No LLM, no API key — same input, same score. Python 3.9+, **zero core dependencies** (optional `schliff[evolve]` adds litellm for the evolution loop).
+**A deterministic quality scorer for AI instruction files.** Same input, same score — every time, on every machine. Think the [Ruff](https://github.com/astral-sh/ruff) for `SKILL.md`, `CLAUDE.md`, and `AGENTS.md`. It measures the things linters miss, the same way every time, so degradation shows up as a number that drops instead of a bug you chase.
 
-<p align="left">
-  <a href="https://pypi.org/project/schliff/"><img alt="PyPI" src="https://img.shields.io/pypi/v/schliff?style=flat-square&color=F59E0B&label=version&v=8.0.0"></a>
-  <a href="https://pypi.org/project/schliff/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/schliff?style=flat-square"></a>
-  <a href="https://pypi.org/project/schliff/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/schliff?style=flat-square"></a>
-  <a href=".github/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Zandereins/130bb61237b5b9b1536718e6a2296d4a/raw/schliff-tests.json&style=flat-square"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
-</p>
+[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.1.0)](https://pypi.org/project/schliff/)
+[![Python](https://img.shields.io/pypi/pyversions/schliff)](https://pypi.org/project/schliff/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
 
-```bash
-# In Claude Code — installs the skill + slash commands
-/plugin marketplace add Zandereins/schliff
-/plugin install schliff@schliff
-```
-
-Quick alternative — just the skill, via the [open skills registry](https://github.com/vercel-labs/skills):
-
-```bash
-npx skills add Zandereins/schliff
-```
-
-Or the Python CLI, for CI / pre-commit:
+Schliff scores the instruction files that drive your AI agents — skills, system prompts, project memory — against an explicit, versioned rubric. No LLM judge in the critical path. No network. No randomness. Just a rule engine you can read, pin, and trust in CI.
 
 ```bash
 pip install schliff
+schliff score path/to/SKILL.md
 ```
 
-Then run `schliff demo` for an instant self-contained example (works on any install), or `schliff score path/to/SKILL.md` on your own file:
-
 ```text
-$ schliff demo
-schliff v7.2.0
+schliff v8.1.0
 
   structure      ████████░░   78/100  good
-  efficiency     ████░░░░░░   35/100  poor
-  composability  ██░░░░░░░░   20/100  poor
+  triggers       ███████░░░   72/100  good
+  quality        ██████░░░░   64/100  fair
+  edges          █████░░░░░   55/100  fair
+  efficiency     ████████░░   80/100  good
+  composability  ███████░░░   70/100  good
   clarity        ██████████  100/100  perfect
 
-  Structural Score  █████░░░░░░░░░░░░░░░  23.4/100  [F]
-  ℹ Scored 4/7 dimensions — the score can't exceed 42% until the rest are measured. Run /schliff:init to add an eval suite and score: triggers, quality, edges.
-  → 7 deterministic fixes available. Run `/schliff:auto` in Claude Code to apply.
+  Structural Score  ██████████████░░░░░░  71.2/100  [C]
 
-  Tokens: 100 / 1,000 (ok)
-
-  This is a deliberately bad skill. Try schliff on your own skills!
+  Tokens: 740 / 1,000 (ok)
 ```
 
----
-
-## A real optimization
-
-[@wan-huiyan](https://github.com/wan-huiyan) ran schliff on the 1,331-line SKILL.md for [agent-review-panel](https://github.com/wan-huiyan/agent-review-panel), a multi-agent code-review skill. Two optimization rounds later: **340 lines, 75% fewer tokens**, structure 65 → 100, composability 56 → 91. A/B tested on a 1,132-line document — identical review quality with a quarter of the tokens.
-
-| Skill | Score | Rounds | Author |
-|-------|-------|--------|--------|
-| agent-review-panel | 75 [B] → 85.6 [A] | 2 | [@wan-huiyan](https://github.com/wan-huiyan) |
-| shieldclaw (OpenClaw) | 68.3 [C] → 94.6 [A] | 1 | [@Zandereins](https://github.com/Zandereins) |
-
-**Score yours:** `schliff score path/to/SKILL.md` — [share what you find](https://github.com/Zandereins/schliff/issues/new?template=share_results.md)
+No model in the loop produced that number. Run it again on another laptop and you get 71.2 again. That is the whole point.
 
 ---
 
-## Seen in the wild
+## Why deterministic?
 
-A root `CLAUDE.md` written for [`modelcontextprotocol/servers`](https://github.com/modelcontextprotocol/servers/pull/3733) (Anthropic's official MCP reference repo) merged to main on April 17th, 2026. Running schliff on it returned **59.2/100 at 40% weight coverage** (pre-v8 scale; full-denominator scoring would place this lower) — a useful measurement of where the file actually needed work and where the scorer was structurally unfair for a project-root document. [Full walkthrough →](https://fpaul.dev/writing/scoring-my-own-mcp-contribution/)
+Most "AI quality" tools ask another LLM to grade your prompt. That makes the score **non-reproducible** (re-run it, get a different number), **un-auditable** (the rubric lives in a hidden prompt), and **trivially gameable** (write for the judge, not the user). A score you can't reproduce isn't a measurement — it's a vibe. You can't gate a release on a number that drifts.
 
----
+Schliff takes the opposite position:
 
-## What the data says
+- **Reproducible.** The headline composite is computed from a canonical, versioned weight registry. Calibration is **off by default**, so `verify`, `badge`, and the leaderboard return the same score on your laptop and in CI.
+- **Auditable.** Every dimension is a readable scorer in [`scripts/scoring/`](skills/schliff/scripts/scoring/). The weights are a dict you can open. There is no hidden judge prompt.
+- **Anti-gaming by design.** A dedicated guard layer ([`guards.py`](skills/schliff/scripts/scoring/guards.py)) plus per-scorer heuristics detect padding, keyword stuffing, and structure-mimicry instead of rewarding them.
+- **Zero core dependencies.** Core Schliff is stdlib-only and runs on **Python ≥ 3.9**. (Optional `[evolve]` / `[judge]` extras pull in LLM clients for an opt-in smoke-test only — never for scoring.)
 
-> We scored 120 public instruction files across 60 source repos. **Mean grade: D. 59% below C.** Adding one companion eval suite lifts the mean **+22 points**.
+Because the number is stable, it does real work:
 
-- **Composability is the real weak spot** — mean 30.4/100. Files tell agents what to do, rarely where to stop or hand off
-- **No companion eval suite in the corpus** — verified 0/60 source repos ship an `eval-suite.json`, `evals/`, or any test artifact. Three dimensions stay unmeasured, locking 45% of the score
-- **Hedging dilutes intent** — efficiency averages 52.8/100. "You might want to consider" is noise
-- **Format alone doesn't save you** — AGENTS.md averages 64.8, SKILL.md 55.4. Skipping frontmatter costs ~15 points regardless of format
+- **Diff** it across two commits to see exactly what a refactor cost or earned.
+- **Gate** a pull request on a minimum score, with a non-zero exit code below the line.
+- **Compare** two files side by side on the same rubric.
 
-[Read the full report →](docs/launch/state-of-ai-instructions.md) · [Reproduce it](scripts/launch/)
-
----
-
-## What Schliff Catches
-
-| Dimension | Weight | What it catches |
-|-----------|--------|-----------------|
-| structure | 15% | Missing frontmatter, empty headers, no examples, dead content |
-| triggers | 20% | Eval-suite trigger accuracy, false positives, missed activations |
-| quality | 20% | Thin assertions, missing feature coverage, low coherence |
-| edges | 15% | No edge cases defined, missing categories (invalid, scale, unicode) |
-| efficiency | 10% | Hedging, filler words, repetition, low signal-to-noise |
-| composability | 10% | Missing scope boundaries, no error behavior, no handoff points |
-| clarity | 5% | Contradictions, vague references, ambiguous instructions |
-| security | 5% | *(opt-in)* Hardcoded secrets, unsafe commands, exposed credentials |
-
-Grades: **S** (≥95) · **A** (≥85) · **B** (≥75) · **C** (≥65) · **D** (≥50) · **E** (≥35) · **F** (<35). Full methodology: [docs/SCORING.md](docs/SCORING.md)
+> An optional LLM judge exists for exploratory work, but it is never part of the deterministic score. The number you gate on is rule-based, end to end.
 
 ---
 
-## Quick Start
+## The 8 scored dimensions
 
-```bash
-schliff score path/to/SKILL.md          # score any instruction file
-schliff score --url https://github.com/user/repo/blob/main/SKILL.md
-schliff suggest path/to/SKILL.md         # ranked fixes with impact estimates
-schliff compare skill-v1.md skill-v2.md  # side-by-side comparison
-schliff doctor                           # scan all installed skills
-```
+For the `SKILL.md` family, Schliff runs **8 scorers** per file. **7 of them form the headline composite**; `security` and `runtime` are reported as **separate opt-in signals** so a security warning never silently inflates or deflates your quality grade.
 
-`schliff suggest` returns the top fixes with their estimated point impact:
+| Dimension | Weight | In headline? |
+|---|---|---|
+| `structure` | 0.15 | ✅ |
+| `triggers` | 0.20 | ✅ |
+| `quality` | 0.20 | ✅ |
+| `edges` | 0.15 | ✅ |
+| `efficiency` | 0.10 | ✅ |
+| `composability` | 0.10 | ✅ |
+| `clarity` | 0.05 | ✅ |
+| `security` | 0.05 | Separate signal (gate threshold 70) |
+| `runtime` | — | Separate signal (no profile weight) |
+
+The seven headline weights are renormalized to sum to **1.0** — that is the canonical basis.
+
+> **Note:** `security` is a side signal for the `SKILL.md` / `CLAUDE.md` / `.cursorrules` / `AGENTS.md` family, but a **core 0.15 headline dimension for the `system_prompt` format**, which uses its own scorer set. Only `runtime` is excluded everywhere.
+
+### The composite: a full-denominator model
+
+Schliff does **not** quietly renormalize across whatever you happened to measure. Unmeasured dimensions **contribute 0 and stay in the denominator** — so coverage gaps lower your ceiling instead of quietly disappearing. Your score ceiling equals your measurement coverage. Measure 4 of the 7 headline dimensions and your maximum possible score is capped accordingly, with an explicit warning:
 
 ```text
-$ schliff suggest demo/bad-skill/SKILL.md
-TOP FIXES (estimated impact):
- 1. [ ~25] Create eval-suite.json with trigger test cases (should_trigger: true/false prompts)
- 2. [  ~8] Create eval-suite.json with 3+ test cases, each with typed assertions (contains, pattern, excludes, format)
- 3. [  +2] Add 'description: <what this skill does and when to use it>' to frontmatter
- 4. [  +2] Add handoff points: 'Then use X skill for...', 'If Y, instead use Z skill'
- 5. [  +2] Add 'Use this skill when...' (positive scope) AND 'Do NOT use for...' (negative scope) sections
-
-Current: 22.6 [F]  →  Estimated after fixes: ~60.6 [D]
+ℹ Scored 4/7 dimensions — the score can't exceed 42% until the rest
+  are measured. Run /schliff:init to add an eval suite and score:
+  triggers, quality, edges.
 ```
+
+This is deliberate. A partial measurement is an honest partial score, never a flattering one. Unmeasured work is missing points, not invisible. To lift the ceiling, measure more — don't hide the gap.
+
+### Grade scale
+
+`S` ≥ 95 · `A` ≥ 85 · `B` ≥ 75 · `C` ≥ 65 · `D` ≥ 50 · `E` ≥ 35 · `F` < 35
 
 ---
 
-## Evolution Engine
+## Multi-format support
 
-Close the loop: score → patch → re-score → stop at plateau. One command.
+One engine, five instruction-file formats — each with its own token budget and scorer set:
 
-```bash
-pip install schliff[evolve]
-schliff evolve path/to/SKILL.md
-```
+| Format | Token budget | Scorers |
+|---|---|---|
+| `SKILL.md` | 1,000 | shared 8-scorer registry |
+| `CLAUDE.md` | 2,000 | shared 8-scorer registry |
+| `.cursorrules` | 500 | shared 8-scorer registry |
+| `AGENTS.md` | 3,000 | shared 8-scorer registry |
+| system prompts | 1,500 | dedicated set (`structure_prompt`, `output_contract`, `efficiency`, `clarity`, `security`, `composability`, `completeness`) |
 
-```
-  structure         70 → 100     Frontmatter, examples, concrete commands
-  triggers           0 → 100     Description keywords, negative boundaries
-  quality            0 →  95     Eval suite generated, assertions added
-  edges              0 → 100     Edge cases synthesized
-  efficiency        35 →  93     Hedging removed, information density up
-  composability     30 →  90     Scope boundaries, error behavior, deps
-  clarity           90 → 100     Vague references resolved
-
-  Composite         54 [D] → 98 [S]    18 iterations, 12 kept / 6 reverted
-```
-
-The engine applies deterministic patches first (free, no LLM), then uses an LLM for what rules can't fix — structural reorganization, example generation, edge case synthesis. Only improvements that pass all dimension guards are kept; rejects are reverted automatically.
+Format is auto-detected; override with `--format` (`skill`, `claude`, `cursor`, `agents`, `system-prompt`).
 
 ---
 
-## CI Integration
+## Install
 
 ```bash
-schliff verify path/to/SKILL.md --min-score 75 --regression
+pip install schliff                  # core, stdlib-only
+pip install "schliff[evolve,judge]"  # optional LLM-judge / evolve extras
 ```
+
+| Install | Pulls in | When you need it |
+|---|---|---|
+| `schliff` | stdlib only | Scoring, verify, badge, CI — everything that gates a release |
+| `schliff[judge]` | LLM client | Opt-in exploratory LLM-judge smoke-test (never scoring) |
+| `schliff[evolve]` | LLM client | Opt-in autonomous-improvement extras |
+
+### GitHub Action
+
+Gate pull requests on instruction-file quality:
+
+```yaml
+# .github/workflows/schliff.yml
+name: schliff
+on: [pull_request]
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install schliff
+      - run: schliff verify path/to/SKILL.md --min-score 75
+```
+
+`schliff verify` exits non-zero below the threshold — a clean CI gate.
+
+### pre-commit
 
 ```yaml
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/Zandereins/schliff
-    rev: v7.2.0
+    rev: v8.1.0
     hooks:
       - id: schliff-verify
         args: ['--min-score', '75']
 ```
 
-`--regression` fails the check if the score dropped versus the last successful run (history file in `.schliff/history.jsonl`). Pair with GitHub Actions to gate PRs on instruction-file quality the same way you gate on test coverage.
-
 ---
 
-## Anti-Gaming
+## CLI
 
-Schliff detects score inflation. The [benchmark suite](benchmarks/anti-gaming/) catches 6 gaming patterns:
-
-| Gaming attempt | How caught |
-|----------------|-----------|
-| Empty headers | Content check — empty sections penalized |
-| Keyword stuffing | Dedup + frequency cap |
-| Copy-paste examples | Repeated-line detection (94 → 43) |
-| Contradictions | "always X" vs "never X" finder |
-| Bloated preamble | Signal-to-noise via sqrt density curve |
-| Missing scope | 10 composability sub-checks |
-
----
-
-<details>
-<summary><b>How it compares to other AI-instruction linters</b></summary>
-
-| | [agnix](https://github.com/agent-sh/agnix) | [AgentLinter](https://github.com/seojoonkim/agentlinter) | Schliff |
-|---|---|---|---|
-| **Approach** | 399 rules across 9 tools | 8-dim scoring + secret scan | 7-dim 0–100 composite + evolution loop |
-| **Stack** | Rust (npm/cargo/brew) | Node.js (npx) | Python 3.9+ stdlib |
-| **Core dependencies** | Rust toolchain | npm/node | **None** (core) |
-| **Output** | Pass/fail rule violations | Score + diagnostics | Composite grade + ranked fixes + auto-improve |
-| **Evolution loop** | — | — | ✅ `schliff evolve` (54→98 in 18 iter) |
-| **Anti-gaming detection** | — | — | ✅ 6 detectors |
-| **CI gate (regression)** | via action | via CLI exit | ✅ `--min-score` + `--regression` |
-
-agnix is great if you want immediate rule-based validation with zero scoring nuance. AgentLinter adds scoring but no evolution. Schliff is the only tool that gives you a deterministic composite you can gate PRs on, plus an evolution engine that closes the loop.
-
-</details>
-
-<details>
-<summary><b>How it differs from autoresearch</b></summary>
-
-Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) — but Schliff is a **linter**, not a research loop. `schliff score` runs in CI without touching the improvement loop.
-
-| | autoresearch | Schliff |
-|---|---|---|
-| **Target** | ML training scripts | AI instruction files |
-| **Patches** | 100% LLM | ~32% deterministic, rest LLM |
-| **Scoring** | 1 metric | 7 dimensions + optional runtime |
-| **Anti-gaming** | None | 6 detection vectors |
-| **Dependencies** | ML frameworks | Python 3.9+ stdlib only (core) |
-
-</details>
-
-<details>
-<summary><b>All commands</b></summary>
-
-| Command | Purpose |
-|---------|---------|
-| `schliff demo` | See schliff in action instantly |
-| `schliff score <path>` | Score any instruction file |
-| `schliff score --url <url>` | Score a remote file (HTTPS-only) |
-| `schliff score --tokens` | Section-by-section token breakdown |
-| `schliff suggest <path>` | Ranked fixes with estimated impact |
-| `schliff compare <a> <b>` | Side-by-side comparison with deltas |
-| `schliff diff <path>` | Score delta vs. previous commit |
-| `schliff verify <path>` | CI gate — exit 0/1, `--min-score`, `--regression` |
-| `schliff doctor` | Scan all installed skills |
-| `schliff badge <path>` | Generate markdown badge |
-| `schliff report <path>` | Markdown quality report |
-| `schliff evolve <path>` | Autonomous improvement loop |
-
-**Claude Code skills** (require `bash install.sh`):
-
-| Command | Purpose |
-|---------|---------|
-| `/schliff:auto` | Autonomous improvement with EMA-based stopping |
-| `/schliff:init <path>` | Bootstrap eval suite + baseline |
-| `/schliff:analyze` | One-shot gap analysis |
-| `/schliff:mesh` | Detect trigger conflicts across skills |
-| `/schliff:report` | Generate shareable report with badge |
-
-</details>
-
-<details>
-<summary><b>Architecture</b></summary>
-
-```mermaid
-flowchart TB
-    subgraph Scoring ["Scoring Engine (deterministic, no LLM)"]
-        SKILL[SKILL.md + eval-suite.json] --> PARSE[Parse & Extract]
-        PARSE --> S1[Structure]
-        PARSE --> S2[Triggers]
-        PARSE --> S3[Quality]
-        PARSE --> S4[Edges]
-        PARSE --> S5[Efficiency]
-        PARSE --> S6[Composability]
-        PARSE --> S7[Clarity]
-        PARSE --> S8[Security]
-        S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 --> COMPOSITE[Weighted Composite + Grade]
-    end
-
-    subgraph Loop ["Evolution Engine (optional, LLM-powered)"]
-        COMPOSITE --> GRADIENT[Identify Weakest Dimension]
-        GRADIENT --> PATCH[Generate Patch]
-        PATCH --> APPLY[Apply + Re-score]
-        APPLY -->|improved| KEEP[Keep]
-        APPLY -->|worse| REVERT[Revert]
-        KEEP & REVERT --> PLATEAU{Plateau?}
-        PLATEAU -->|no| GRADIENT
-        PLATEAU -->|yes| DONE[Done]
-    end
+```text
+schliff <command> [path] [options]
 ```
 
-~32% of patches are applied deterministically (confidence=high, single-edit effort); the rest fall back to the LLM. The LLM handles structural reorganization, example generation, edge case synthesis. (source: `skills/schliff/scripts/measure_patch_ratio.py`)
+| Command | What it does |
+|---|---|
+| `score` | Score a file and print the grade bar |
+| `verify` | CI gate — exit 0/1 based on a minimum score |
+| `doctor` | Scan and grade every installed skill |
+| `badge` | Generate a Markdown score badge |
+| `diff` | Explain score changes between two git commits |
+| `compare` | Compare two files side by side |
+| `suggest` | Rank fixes by estimated score impact |
+| `report` | Generate a Markdown score report |
+| `demo` | Score a built-in bad skill to see Schliff in action |
+| `evolve` | Improve an instruction file's score |
+| `version` | Print the version |
 
-</details>
-
----
-
-## When Schliff isn't the right tool
-
-- **LLM-based semantic understanding** — Schliff is pattern-based. If you need a model to reason about whether two paragraphs are *semantically* contradictory (vs. structurally), a scorer like AgentLinter will catch cases schliff misses
-- **Creative-writing prompts** — the weights and dimensions are opinionated for coding-agent instructions. Applied to persona prompts or creative-writing system prompts, the composite number will be misleading
-- **You don't want to write an eval suite** — 45% of the score stays unmeasured without one. The remaining 55% (structure, efficiency, composability, clarity) still gives useful signal, but the A/S grades are out of reach
-
-## Limitations
-
-The structural score measures **file organization**, not runtime effectiveness. A skill scoring 95/100 can still produce wrong output — use `--runtime` scoring for that.
-
-The trigger scorer uses TF-IDF heuristics. Skills with generic domain vocabulary may hit a precision ceiling around 75-80.
+The version is **single-sourced**: the CLI resolves it at runtime via `importlib.metadata.version("schliff")`, falling back to `dev` from a source checkout.
 
 ---
 
-## Badge
+## The autonomous improvement loop
 
-```bash
-schliff badge path/to/SKILL.md
+Schliff doesn't just grade — it can close the loop. The improvement engine **measures first, then fixes** (not the other way around):
+
+1. **Score** the file across all dimensions.
+2. **Generate** deterministic patch gradients for the weakest dimensions.
+3. **Apply** the safe, rule-based patches automatically — **~32% of suggested fixes** apply deterministically through the apply gate (confidence=high, single-edit; canonical measurement: [`measure_patch_ratio.py`](skills/schliff/scripts/measure_patch_ratio.py)). The rest are handed to an optional LLM.
+4. **Re-score** and keep the change only if the score improved — otherwise revert.
+5. **Stop** on plateau detection or when the target is reached.
+
+It also carries **cross-session episodic memory** ([`episodic_store.py`](skills/schliff/scripts/episodic_store.py)), so improvement runs learn from prior attempts instead of repeating them. Drive it from Claude Code with `/schliff:auto`, or use `schliff evolve` directly.
+
+```text
+→ 7 deterministic fixes available. Run `/schliff:auto` to apply.
 ```
 
-[![Schliff: 99 [S]](https://img.shields.io/badge/Schliff-99%2F100_%5BS%5D-brightgreen)](https://github.com/Zandereins/schliff)
+---
 
-## Contributing
+## How it works
 
-Found a scoring bug? Add a test case and [open an issue](https://github.com/Zandereins/schliff/issues). Want to improve scoring logic? Edit `scoring/*.py`, run the tests, PR the diff.
+The full methodology — scorer internals, the full-denominator composite, the anti-gaming guards, and the calibration model — lives in [`docs/SCORING.md`](docs/SCORING.md). Calibration is strictly opt-in: ambient auto-calibrated weights apply **only** when `SCHLIFF_CALIBRATED_WEIGHTS` is set and **only** for the interactive `score` command, and Schliff emits a `weight_source=calibrated` warning flagging that such scores are **not** comparable to the canonical scale. Everything that gates a release stays canonical.
+
+```text
+scripts/
+├── cli.py                  # CLI entrypoint + dynamic version resolution
+├── scoring/
+│   ├── registry.py         # canonical weights, scorer lists, headline exclusions
+│   ├── composite.py        # full-denominator composite model
+│   ├── formats.py          # format detection + token budgets
+│   ├── guards.py           # anti-gaming detection
+│   └── structure.py · triggers.py · quality.py · edges.py · …
+├── text_gradient.py        # deterministic patch gradients (apply gate)
+├── episodic_store.py       # cross-session episodic memory
+└── measure_patch_ratio.py  # canonical source for the patch-ratio claim
+```
+
+---
+
+## Positioning
+
+> **LLM-judge tools** ask a model how good your prompt *feels* — a different answer every run.
+> **Schliff** computes how good it *measurably is* — the same answer every run, in a number you can pin to a commit and gate a release on.
+
+Ruff lints your Python. Biome lints your JS. Schliff lints the instruction files that drive your AI — deterministically, with no model in the loop.
+
+---
+
+## Contributing & links
+
+- ⭐ **Star the repo:** [github.com/Zandereins/schliff](https://github.com/Zandereins/schliff)
+- 📖 **Docs:** [`docs/SCORING.md`](docs/SCORING.md)
+- 🏆 **Leaderboard:** [github.com/Zandereins/schliff](https://github.com/Zandereins/schliff)
+- 🧪 **Playground:** `schliff demo`
+
+Validated by **1,198 tests** (unit + integration) in `skills/schliff/tests`, with separate self and proof suites via `test-self.sh` and `test-integration.sh`.
 
 ## License
 
-MIT
-
----
-
-*schliff (German) — the finishing cut. "Den letzten Schliff geben" = to give something its final polish.*
+MIT © Franz Paul

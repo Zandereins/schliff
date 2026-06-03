@@ -179,7 +179,6 @@ def check_token_budget(content: str, fmt: str) -> dict:
     tokens = estimate_tokens(content)
     budget = FORMAT_TOKEN_BUDGETS.get(fmt, FORMAT_TOKEN_BUDGETS["unknown"])
     ratio = tokens / budget if budget else 0.0
-    within_budget = tokens <= budget
 
     if ratio > 1.0:
         severity = "over"

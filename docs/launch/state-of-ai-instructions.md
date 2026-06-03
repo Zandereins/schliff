@@ -226,4 +226,4 @@ The full data-collection pipeline is in `scripts/launch/`:
 
 ---
 
-*Data collected 2026-04-17 via `gh search code` top results. Re-runnable pipeline in `scripts/launch/`. Raw scores in `docs/launch/corpus/scores/`.*
+*Data collected 2026-04-17 via `gh search code` top results. Re-runnable pipeline in `skills/schliff/scripts/launch/` (`collect_corpus.py` → `score_corpus.py` → `aggregate_stats.py`); the corpus is regenerated locally rather than bundled (third-party files, varying licenses).*
