@@ -234,8 +234,8 @@ Ruff lints your Python. Biome lints your JS. Schliff lints the instruction files
 
 - ⭐ **Star the repo:** [github.com/Zandereins/schliff](https://github.com/Zandereins/schliff)
 - 📖 **Docs:** [`docs/SCORING.md`](docs/SCORING.md)
-- 🏆 **Leaderboard:** [github.com/Zandereins/schliff](https://github.com/Zandereins/schliff)
-- 🧪 **Playground:** `schliff demo`
+- 🧪 **Playground:** [schliff-playground.vercel.app](https://schliff-playground.vercel.app) — paste a SKILL.md, get a live structural score (or `schliff demo` in the CLI)
+- 🏆 **Leaderboard:** [schliff-leaderboard.vercel.app](https://schliff-leaderboard.vercel.app)
 
 Validated by **1,198 tests** (unit + integration) in `skills/schliff/tests`, with separate self and proof suites via `test-self.sh` and `test-integration.sh`.
 
