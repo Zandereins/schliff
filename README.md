@@ -8,7 +8,6 @@
 [![Python](https://img.shields.io/pypi/pyversions/schliff)](https://pypi.org/project/schliff/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
-[![Tests](https://img.shields.io/badge/tests-1198-brightgreen.svg)](https://github.com/Zandereins/schliff)
 
 Schliff scores the instruction files that drive your AI agents — skills, system prompts, project memory — against an explicit, versioned rubric. No LLM judge in the critical path. No network. No randomness. Just a rule engine you can read, pin, and trust in CI.
 
@@ -28,7 +27,7 @@ schliff v8.0.0
   composability  ███████░░░   70/100  good
   clarity        ██████████  100/100  perfect
 
-  Structural Score  █████████████░░░░░░░  71.2/100  [B]
+  Structural Score  ██████████████░░░░░░  71.2/100  [C]
 
   Tokens: 740 / 1,000 (ok)
 ```
@@ -141,7 +140,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install schliff
-      - run: schliff verify path/to/SKILL.md --min 75
+      - run: schliff verify path/to/SKILL.md --min-score 75
 ```
 
 `schliff verify` exits non-zero below the threshold — a clean CI gate.
@@ -154,7 +153,8 @@ repos:
   - repo: https://github.com/Zandereins/schliff
     rev: v8.0.0
     hooks:
-      - id: schliff
+      - id: schliff-verify
+        args: ['--min-score', '75']
 ```
 
 ---
