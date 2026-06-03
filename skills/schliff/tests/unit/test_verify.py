@@ -464,6 +464,7 @@ class TestVerdictStructure:
             "min_score", "coverage", "effective_min",
             "passed_threshold", "exit_code", "message",
             "previous_score", "delta", "regression",
+            "weight_source", "weights_hash",
         }
         assert set(verdict.keys()) == expected_keys
 

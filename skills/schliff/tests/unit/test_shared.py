@@ -277,3 +277,26 @@ class TestEstimateTokenCost:
         """Nonexistent path returns 0."""
         result = estimate_token_cost("/nonexistent/path/SKILL.md")
         assert result == 0
+
+
+class TestLeadingBOM:
+    """A leading UTF-8 BOM must not change scoring (determinism)."""
+
+    _BODY = "---\nname: x\ndescription: y\n---\n# Body\nScope is source files only.\n"
+
+    def test_strip_frontmatter_bom_invariant(self):
+        assert strip_frontmatter(self._BODY) == strip_frontmatter("﻿" + self._BODY)
+        # frontmatter is actually stripped (body does not start with ---)
+        assert not strip_frontmatter("﻿" + self._BODY).startswith("---")
+
+    def test_read_skill_safe_strips_leading_bom(self, tmp_path):
+        nobom = tmp_path / "nobom.md"
+        bom = tmp_path / "bom.md"
+        nobom.write_text(self._BODY, encoding="utf-8")
+        bom.write_bytes(b"\xef\xbb\xbf" + self._BODY.encode("utf-8"))
+        invalidate_cache(str(nobom))
+        invalidate_cache(str(bom))
+        a = read_skill_safe(str(nobom))
+        b = read_skill_safe(str(bom))
+        assert not b.startswith("﻿")
+        assert a == b

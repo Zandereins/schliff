@@ -51,6 +51,9 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
         "runtime": score_runtime(skill_path, eval_suite, enabled=False),
     }
 
+    # The CI gate is a cross-machine comparison surface: never opt into ambient
+    # calibrated weights here (use_calibrated defaults False), so the pass/fail
+    # decision is reproducible and cannot be flipped by an env var.
     composite = compute_composite(scores)
 
     return {
@@ -60,6 +63,8 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
         "warnings": composite["warnings"],
         "score_type": composite.get("score_type", "structural"),
         "weight_coverage": composite.get("weight_coverage", 0.0),
+        "weight_source": composite.get("weight_source", "default"),
+        "weights_hash": composite.get("weights_hash"),
     }
 
 
@@ -78,13 +83,14 @@ def load_last_score(skill_path: str, history_path: str = _DEFAULT_HISTORY) -> Op
 def load_last_entry(
     skill_path: str, history_path: str = _DEFAULT_HISTORY
 ) -> Optional[tuple]:
-    """Load the latest (composite, weight_coverage) for a skill from history.
+    """Load the latest (composite, weight_coverage, weight_source) for a skill.
 
-    Returns a (composite, coverage) tuple, where coverage is None for legacy
-    entries written before weight_coverage was recorded. Returns None if no
-    matching history exists. Comparing coverage-normalized scores lets the
-    regression gate judge per-measured-dimension quality rather than raw
-    composites, which are capped at each run's weight coverage.
+    Returns a (composite, coverage, weight_source) tuple, where coverage is None
+    for legacy entries written before weight_coverage was recorded and
+    weight_source defaults to "default" for entries written before provenance
+    stamping. Returns None if no matching history exists. Comparing
+    coverage-normalized scores lets the regression gate judge per-measured-dimension
+    quality rather than raw composites, which are capped at each run's coverage.
     """
     hp = Path(history_path)
     if not hp.exists():
@@ -112,7 +118,10 @@ def load_last_entry(
             if str(Path(entry_path).resolve()) == norm_path:
                 cov = entry.get("weight_coverage")
                 cov = float(cov) if cov is not None else None
-                return (float(val), cov)
+                # weight_source defaults to "default" for legacy entries written
+                # before provenance stamping (they were always canonical).
+                wsrc = entry.get("weight_source", "default")
+                return (float(val), cov, wsrc)
         except (json.JSONDecodeError, ValueError, TypeError, OSError):
             continue
     return None
@@ -137,6 +146,10 @@ def append_history(
         "grade": result["grade"],
         "dimensions": result["dimensions"],
         "weight_coverage": result.get("weight_coverage"),
+        # Record the scoring regime so the regression/leaderboard channel never
+        # co-ranks scores produced under different weight models.
+        "weight_source": result.get("weight_source", "default"),
+        "weights_hash": result.get("weights_hash"),
     }
 
     line = json.dumps(entry, separators=(",", ":")) + "\n"
@@ -211,6 +224,9 @@ def run_verify(
         "previous_score": None,
         "delta": None,
         "regression": False,
+        # Provenance so CI consumers can confirm the gate used canonical weights.
+        "weight_source": result.get("weight_source", "default"),
+        "weights_hash": result.get("weights_hash"),
     }
 
     # Threshold check (coverage-aware)
@@ -229,6 +245,17 @@ def run_verify(
         prev_entry = load_last_entry(skill_path, history_path)
         previous = prev_entry[0] if prev_entry is not None else None
         verdict["previous_score"] = previous
+        # Never regress-gate across scoring regimes: a prior score produced under a
+        # different weight model (e.g. calibrated) is not comparable to this run.
+        prev_source = prev_entry[2] if prev_entry is not None and len(prev_entry) > 2 else "default"
+        cur_source = result.get("weight_source", "default")
+        if previous is not None and prev_source != cur_source:
+            verdict["message"] = (
+                f"PASS: baseline used a different weight model "
+                f"({prev_source} -> {cur_source}); regression check skipped [{grade}]"
+            )
+            append_history(skill_path, result, history_path)
+            return verdict
         if previous is not None:
             # Raw composites are capped at each run's weight coverage, so a run
             # with a different eval-suite-presence regime is not comparable to a

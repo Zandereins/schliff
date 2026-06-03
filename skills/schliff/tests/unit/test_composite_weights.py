@@ -144,10 +144,37 @@ class TestCalibratedWeightsLoading:
         scores = _base_scores()
         scores["structure"] = _score(100)
         scores["efficiency"] = _score(0)
-        result = compute_composite(scores)
+        # Calibration is opt-in per caller (use_calibrated) AND env-gated; only the
+        # interactive `score` command opts in. verify/badge stay canonical.
+        result = compute_composite(scores, use_calibrated=True)
         # structure=100 dominates -> composite must be near 100
         assert result["score"] >= 85.0
         assert result["weight_source"] == "calibrated"
+        _reset_calibrated_cache()
+
+    def test_default_caller_ignores_calibration_even_with_env_flag(self, tmp_path, monkeypatch):
+        """verify/badge/leaderboard surface: without use_calibrated, the env flag MUST NOT
+        change the score — otherwise a CI gate / public badge could be flipped by an env var."""
+        calib_dir = tmp_path / ".schliff" / "meta"
+        calib_dir.mkdir(parents=True)
+        (calib_dir / "calibrated-weights.json").write_text(
+            json.dumps({"structure": 100.0, "efficiency": 0.01, "composability": 0.01}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        monkeypatch.setenv("SCHLIFF_CALIBRATED_WEIGHTS", "1")
+        _reset_calibrated_cache()
+
+        scores = _base_scores()
+        scores["structure"] = _score(100)
+        scores["efficiency"] = _score(0)
+        # Default caller (verify/badge): use_calibrated omitted -> must stay canonical.
+        canonical = compute_composite(scores)
+        assert canonical["weight_source"] == "default"
+        # Opt-in caller (score): same inputs, calibration applies and diverges.
+        opted_in = compute_composite(scores, use_calibrated=True)
+        assert opted_in["weight_source"] == "calibrated"
+        assert abs(canonical["score"] - opted_in["score"]) > 1.0
         _reset_calibrated_cache()
 
     def test_malformed_json_falls_back_to_defaults(self, tmp_path, monkeypatch):
@@ -213,7 +240,7 @@ class TestCalibratedWeightsLoading:
         scores = _base_scores()
         scores["structure"] = _score(100)
         scores["efficiency"] = _score(0)
-        result_v1 = compute_composite(scores)
+        result_v1 = compute_composite(scores, use_calibrated=True)
 
         # Overwrite with weights that heavily favour efficiency and bump mtime
         # deterministically — avoids time.sleep flakiness on filesystems with
@@ -225,7 +252,7 @@ class TestCalibratedWeightsLoading:
         new_mtime = old_mtime + 2.0
         os.utime(calib_file, (new_mtime, new_mtime))
 
-        result_v2 = compute_composite(scores)
+        result_v2 = compute_composite(scores, use_calibrated=True)
 
         assert "score" in result_v2
         assert isinstance(result_v2["score"], float)

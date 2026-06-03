@@ -130,7 +130,10 @@ def cmd_score(args: argparse.Namespace) -> None:
         # Weights must match the dimensions actually scored: pass the resolved
         # format (not effective_fmt, which is None for auto-detected formats) so
         # non-skill.md families (e.g. system_prompt) are weighted correctly.
-        composite = compute_composite(scores, fmt=detected_fmt)
+        # The interactive `score` view is the ONLY caller that opts into ambient
+        # calibrated weights (still gated by SCHLIFF_CALIBRATED_WEIGHTS); verify,
+        # badge, diff, compare, suggest and report stay canonical for reproducibility.
+        composite = compute_composite(scores, fmt=detected_fmt, use_calibrated=True)
 
         # Token budget check — reuse cached content from shared.read_skill_safe
         from scoring.formats import estimate_tokens, check_token_budget

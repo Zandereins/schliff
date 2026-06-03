@@ -39,8 +39,9 @@ _SECRET_PATTERNS = [
         r'(?i)('
         r'\b[a-z0-9_]{0,40}'
         r'(?:client[_-]?secret|secret|password|passwd|api[_-]?key|access[_-]?key|auth[_-]?token|token)'
+        r'["\']?'          # optional closing quote on the key (JSON/quoted-key form)
         r'\s*[:=]\s*'
-        r'["\']?'
+        r'["\']?'          # optional opening quote on the value
         r')'
         r'[a-zA-Z0-9/+=_-]{16,200}'),
      r'\1[REDACTED:credential]'),

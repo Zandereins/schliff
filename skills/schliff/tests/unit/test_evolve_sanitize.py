@@ -191,3 +191,13 @@ class TestGenericCredentialCatcher:
         out = redact_secrets("my_api_key = 'aBcDeF0123456789xyz'")
         assert out.count("'") % 2 == 0
         assert "REDACTED" in out
+
+    def test_json_quoted_key_form_redacted(self):
+        # The most common log/config secret shape: "key": "value".
+        for text in (
+            'config: {"client_secret": "wJalrXUtnFEMI1234567"}',
+            '"api_key":"AbCdEf0123456789xyz"',
+        ):
+            out = redact_secrets(text)
+            assert "REDACTED" in out, text
+            assert out.count('"') % 2 == 0, f"unbalanced quotes: {out}"

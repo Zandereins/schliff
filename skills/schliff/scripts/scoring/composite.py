@@ -75,7 +75,7 @@ def _weights_fingerprint(weights: dict) -> str:
 
 
 def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
-                      fmt: Optional[str] = None) -> dict:
+                      fmt: Optional[str] = None, use_calibrated: bool = False) -> dict:
     """Compute weighted composite score with confidence indicator.
 
     Uses a full-denominator model: unmeasured dims are uncredited (contribute 0
@@ -95,6 +95,11 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
             {"structure": 0.3, "triggers": 0.4, "efficiency": 0.3}
         fmt: Optional format identifier. When provided, weights are loaded
             from the scorer registry. Defaults to "skill.md" weights.
+        use_calibrated: Opt-in to ambient per-machine calibrated weights (still
+            additionally gated by SCHLIFF_CALIBRATED_WEIGHTS). Default False so
+            canonical registry weights are used. Cross-comparison consumers
+            (verify CI gate, badge, leaderboard) MUST leave this False to stay
+            reproducible; only the interactive `score` command opts in.
     """
     from scoring.registry import get_weights, get_headline_excluded
 
@@ -118,10 +123,12 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
         for k, v in custom_weights.items():
             if k in weights and isinstance(v, (int, float)) and math.isfinite(v) and v >= 0:
                 weights[k] = v
-    elif _calibration_enabled():
-        # Opt-in only: ambient calibrated weights are a per-machine, mutable score-model
-        # mutation. Applying them by default makes the same skill score differently across
-        # machines, so the canonical default is used unless SCHLIFF_CALIBRATED_WEIGHTS is set.
+    elif use_calibrated and _calibration_enabled():
+        # Opt-in only, and ONLY for callers that explicitly pass use_calibrated=True
+        # (the interactive `score` command). Ambient calibrated weights are a
+        # per-machine, mutable score-model mutation; applying them anywhere a score is
+        # compared across machines (verify gate, badge, leaderboard) would make the
+        # decision depend on a process env var, so those callers keep the default.
         calibrated = _load_calibrated_weights()
         if calibrated:
             weight_source = "calibrated"
