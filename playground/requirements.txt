@@ -1,1 +1,1 @@
-schliff>=7.2.0
+schliff>=8.0.0
