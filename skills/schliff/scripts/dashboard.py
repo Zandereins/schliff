@@ -21,13 +21,14 @@ import re
 import sys
 from pathlib import Path
 
-
 # Import sibling modules via underscore aliases (clean Python imports)
 SCRIPT_DIR = Path(__file__).parent
 
 # Import terminal_art for grade system and shared helpers
-from terminal_art import score_to_grade, grade_colored, colored_bar as _colored_bar
-from shared import load_jsonl_safe, read_skill_safe
+from terminal_art import colored_bar as _colored_bar  # noqa: E402
+from terminal_art import grade_colored, score_to_grade  # noqa: E402
+
+from shared import load_jsonl_safe, read_skill_safe  # noqa: E402
 
 
 def _try_import(module_name: str):

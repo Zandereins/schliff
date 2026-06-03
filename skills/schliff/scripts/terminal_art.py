@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 import sys
 
-
 # ---------------------------------------------------------------------------
 # Color detection
 # ---------------------------------------------------------------------------
@@ -168,11 +167,11 @@ def render_banner(title: str, subtitle: str = "") -> str:
     box_w = max(max_len + 4, 30)
 
     lines = []
-    top = f"\u256d\u2500 Schliff " + "\u2500" * (box_w - 14) + "\u256e"
+    top = "\u256d\u2500 Schliff " + "\u2500" * (box_w - 14) + "\u256e"
     lines.append(top)
     for cl in content_lines:
         lines.append(f"\u2502  {cl:<{box_w - 4}}  \u2502")
-    lines.append(f"\u2570" + "\u2500" * (box_w - 2) + "\u256f")
+    lines.append("\u2570" + "\u2500" * (box_w - 2) + "\u256f")
     return "\n".join(lines)
 
 

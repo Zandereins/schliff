@@ -6,12 +6,18 @@ imperative voice, referenced files, and dead content.
 from bisect import bisect_right
 from pathlib import Path
 
-from shared import read_skill_safe, strip_frontmatter
 from scoring.patterns import (
-    _RE_FRONTMATTER_NAME, _RE_FRONTMATTER_DESC, _RE_REAL_EXAMPLES,
-    _RE_CODE_BLOCKS, _RE_HEADERS, _RE_HEDGING, _RE_REFS, _RE_TODO,
+    _RE_CODE_BLOCKS,
+    _RE_FRONTMATTER_DESC,
+    _RE_FRONTMATTER_NAME,
+    _RE_HEADERS,
+    _RE_HEDGING,
+    _RE_REAL_EXAMPLES,
+    _RE_REFS,
     _RE_SECTION_HEADER,
+    _RE_TODO,
 )
+from shared import read_skill_safe, strip_frontmatter
 
 
 def _ref_resolves(ref: str, skill_dir: Path) -> bool:

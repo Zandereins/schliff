@@ -21,13 +21,11 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 # Import scorer functions for tokenization and description extraction
-import score_skill as scorer
 from nlp import tokenize_meaningful
 from shared import extract_description
-
 
 # --- Skill Discovery ---
 
@@ -556,7 +554,6 @@ def generate_mesh_actions(issues: list[dict], skills: list[dict]) -> list[dict]:
     Returns list of MeshAction dicts with: type, target_path, instruction, patch, confidence.
     """
     actions = []
-    skill_by_name = {s["name"]: s for s in skills}
 
     for issue in issues:
         itype = issue.get("type", "")

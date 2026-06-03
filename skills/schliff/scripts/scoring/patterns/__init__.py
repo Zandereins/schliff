@@ -9,7 +9,6 @@ from scoring.patterns.base import *  # noqa: F401,F403
 from scoring.patterns.base import __all__ as _base_all
 from scoring.patterns.skill_md import *  # noqa: F401,F403
 from scoring.patterns.skill_md import __all__ as _skill_md_all
-
 from scoring.patterns.system_prompt import *  # noqa: F401,F403
 from scoring.patterns.system_prompt import __all__ as _system_prompt_all
 

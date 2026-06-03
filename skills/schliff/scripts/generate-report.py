@@ -21,10 +21,10 @@ from typing import Any, Optional
 
 SCRIPT_DIR = Path(__file__).parent
 
-from shared import load_jsonl_safe, read_skill_safe
-
 # Import terminal_art for grade system and heatmap
-from terminal_art import score_to_grade, render_heatmap
+from terminal_art import render_heatmap, score_to_grade  # noqa: E402
+
+from shared import load_jsonl_safe, read_skill_safe  # noqa: E402
 
 # Optional: achievements
 try:
@@ -111,7 +111,7 @@ def load_progress(results_path: str) -> dict[str, Any]:
 # Formatting helpers
 # ---------------------------------------------------------------------------
 
-from terminal_art import progress_bar as render_progress_bar
+from terminal_art import progress_bar as render_progress_bar  # noqa: E402
 
 
 def trend_arrow(trend: str) -> str:
@@ -317,7 +317,6 @@ def format_report(skill_name: str, progress: dict[str, Any], current: dict[str, 
     # --- Top Improvements ---
     lines.append("## Top Improvements")
     lines.append("")
-    all_exps: list[dict[str, Any]] = []
     # Collect kept experiments from progress summary
     # ProgressAnalyzer doesn't expose the raw list in generate_summary, so we
     # reconstruct from current_best and latest_kept references where available.

@@ -15,10 +15,10 @@ Usage:
 """
 from __future__ import annotations
 
-import sys
-import os
-import json
 import argparse
+import json
+import os
+import sys
 import urllib.parse
 
 # sys.path hack: scripts/ must be on sys.path because scripts/ is NOT a Python
@@ -40,7 +40,7 @@ def _resolve_version() -> str:
     (e.g. running cli.py straight from a source checkout).
     """
     try:
-        from importlib.metadata import version, PackageNotFoundError
+        from importlib.metadata import PackageNotFoundError, version
         try:
             return version("schliff")
         except PackageNotFoundError:
@@ -52,7 +52,8 @@ def _resolve_version() -> str:
 def _load_eval_suite_from_args(args: argparse.Namespace) -> "dict | None":
     """Load eval suite from --eval-suite flag or auto-discover from skill dir."""
     from pathlib import Path
-    from shared import load_eval_suite, MAX_SKILL_SIZE
+
+    from shared import MAX_SKILL_SIZE, load_eval_suite
 
     if getattr(args, "eval_suite", None):
         eval_path = Path(args.eval_suite)
@@ -84,6 +85,7 @@ def cmd_score(args: argparse.Namespace) -> None:
     """Score a single SKILL.md file (structural + runtime when eval suite available)."""
     import tempfile
     from pathlib import Path
+
     from scoring import compute_composite
     from shared import build_scores, fetch_url_safe
 
@@ -154,7 +156,7 @@ def cmd_score(args: argparse.Namespace) -> None:
         composite = compute_composite(scores, fmt=detected_fmt, use_calibrated=True)
 
         # Token budget check — reuse cached content from shared.read_skill_safe
-        from scoring.formats import estimate_tokens, check_token_budget
+        from scoring.formats import check_token_budget, estimate_tokens
         from shared import read_skill_safe
         try:
             skill_content = read_skill_safe(skill_path)
@@ -174,8 +176,8 @@ def cmd_score(args: argparse.Namespace) -> None:
             }
             print(json.dumps(result, indent=2))
         else:
-            from terminal_art import format_score_display
             import text_gradient
+            from terminal_art import format_score_display
 
             # Extract contradictions from clarity details
             clarity_data = scores.get("clarity", {})
@@ -204,7 +206,7 @@ def cmd_score(args: argparse.Namespace) -> None:
             print(output)
 
             # Token budget line
-            from terminal_art import is_color_tty, RESET
+            from terminal_art import RESET, is_color_tty
             tok = token_info["tokens"]
             bud = token_info["budget"]
             if is_color_tty():
@@ -256,8 +258,10 @@ def cmd_score(args: argparse.Namespace) -> None:
 def cmd_verify(args: argparse.Namespace) -> None:
     """CI gate — score a skill and exit with appropriate code."""
     from pathlib import Path
-    from shared import load_eval_suite, MAX_SKILL_SIZE
+
     import verify as verify_mod
+
+    from shared import MAX_SKILL_SIZE, load_eval_suite
 
     if not Path(args.skill_path).exists():
         print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
@@ -329,9 +333,11 @@ def cmd_badge(args: argparse.Namespace) -> None:
     """Generate a markdown badge for a skill's score."""
     import urllib.parse
     from pathlib import Path
+
+    from terminal_art import score_to_grade
+
     from scoring import compute_composite
     from shared import build_scores
-    from terminal_art import score_to_grade
 
     if not Path(args.skill_path).exists():
         print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
@@ -404,9 +410,10 @@ def cmd_diff(args: argparse.Namespace) -> None:
     import subprocess
     import tempfile
     from pathlib import Path
+
     from scoring import compute_composite
-    from scoring.diff import score_diff, explain_score_change
-    from shared import build_scores, MAX_SKILL_SIZE
+    from scoring.diff import explain_score_change, score_diff
+    from shared import MAX_SKILL_SIZE, build_scores
 
     skill_path = args.skill_path
     if not Path(skill_path).exists():
@@ -525,6 +532,7 @@ def cmd_diff(args: argparse.Namespace) -> None:
 def cmd_compare(args: argparse.Namespace) -> None:
     """Score two files and show a side-by-side dimension comparison."""
     from pathlib import Path
+
     from scoring import compute_composite
     from shared import build_scores
 
@@ -632,10 +640,12 @@ def cmd_compare(args: argparse.Namespace) -> None:
 def cmd_suggest(args: argparse.Namespace) -> None:
     """Suggest ranked fixes with estimated score impact."""
     from pathlib import Path
+
+    import text_gradient
+    from terminal_art import score_to_grade
+
     from scoring import compute_composite
     from shared import build_scores
-    from terminal_art import score_to_grade
-    import text_gradient
 
     if not Path(args.skill_path).exists():
         print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
@@ -716,17 +726,19 @@ def cmd_suggest(args: argparse.Namespace) -> None:
 def cmd_report(args: argparse.Namespace) -> None:
     """Generate a Markdown score report, optionally upload as GitHub Gist."""
     from pathlib import Path
+
+    import report as report_mod
+    from terminal_art import score_to_grade
+
     from scoring import compute_composite
     from shared import build_scores
-    from terminal_art import score_to_grade
-    import report as report_mod
 
     if not Path(args.skill_path).exists():
         print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
         sys.exit(1)
 
     eval_suite = _load_eval_suite_from_args(args)
-    from scoring.formats import detect_format, check_token_budget
+    from scoring.formats import check_token_budget, detect_format
     detected_fmt = detect_format(args.skill_path)
     scores = build_scores(args.skill_path, eval_suite, include_runtime=True, fmt=detected_fmt)
     composite = compute_composite(scores, fmt=detected_fmt)

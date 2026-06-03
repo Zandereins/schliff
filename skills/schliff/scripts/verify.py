@@ -35,9 +35,15 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
     Reuses the same scoring functions as `schliff score`.
     """
     from scoring import (
-        score_structure, score_triggers, score_efficiency,
-        score_composability, score_quality, score_edges,
-        score_runtime, score_clarity, compute_composite,
+        compute_composite,
+        score_clarity,
+        score_composability,
+        score_edges,
+        score_efficiency,
+        score_quality,
+        score_runtime,
+        score_structure,
+        score_triggers,
     )
 
     scores = {

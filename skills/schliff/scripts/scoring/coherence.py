@@ -6,9 +6,11 @@ assertion values in the eval suite's test_cases. Returns a bonus score
 """
 from typing import Optional
 
-from shared import read_skill_safe, strip_frontmatter
-from nlp import STOPWORDS, stem as _stem, RE_WORD_TOKEN as _RE_WORD_TOKEN
+from nlp import RE_WORD_TOKEN as _RE_WORD_TOKEN
+from nlp import STOPWORDS
+from nlp import stem as _stem
 from scoring.patterns import _RE_IMPERATIVE_INSTRUCTION
+from shared import read_skill_safe, strip_frontmatter
 
 
 def _assertion_dicts(tc: dict) -> list:

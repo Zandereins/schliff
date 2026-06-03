@@ -15,12 +15,9 @@ concurrency:
 
 jobs:
   # Lint gate for the project's own Python (dogfoods "the Ruff for SKILL.md").
-  # Runs in REPORT-ONLY mode for now: the baseline carries ~142 pre-existing
-  # ruff findings (E/F/W/I), so failing here would make CI red on unrelated
-  # legacy lint. The step prints all findings as GitHub annotations but does
-  # not fail the build. Once the baseline is cleaned (e.g. `ruff check --fix`
-  # plus the simplify sweep), flip this to a hard gate by removing the
-  # `--exit-zero` flag below. ruff is pinned for reproducibility.
+  # ENFORCING: the baseline is clean (0 ruff findings across E/F/W/I), so any
+  # new finding fails the build. Findings are emitted as GitHub annotations via
+  # --output-format=github. ruff is pinned for reproducibility.
   lint:
     runs-on: ubuntu-latest
     permissions:
@@ -36,8 +33,8 @@ jobs:
       - name: Install ruff
         run: pip install "ruff==0.15.8"
 
-      - name: Run ruff (report-only until baseline is cleaned)
-        run: ruff check --output-format=github --exit-zero skills/schliff/scripts/
+      - name: Run ruff (enforcing — baseline is clean)
+        run: ruff check --output-format=github skills/schliff/scripts/
 
   test:
     runs-on: ubuntu-latest

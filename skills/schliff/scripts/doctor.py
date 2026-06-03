@@ -19,10 +19,10 @@ from pathlib import Path
 
 import score_skill as scorer
 import skill_mesh
+from terminal_art import grade_colored, score_to_grade
 
 from scoring.formats import detect_format
 from shared import EXCLUDED_DIRS, estimate_token_cost
-from terminal_art import score_to_grade, grade_colored
 
 # Filenames to match (lowercase) for instruction file discovery
 _INSTRUCTION_FILENAMES = {"claude.md", ".cursorrules", "agents.md"}
@@ -67,7 +67,7 @@ def _default_skill_dirs() -> list[str]:
 
 def _score_single_skill(skill_path: str) -> dict:
     """Score a single skill and return summary."""
-    from shared import load_eval_suite, build_scores
+    from shared import build_scores, load_eval_suite
 
     eval_suite = load_eval_suite(skill_path)
     scores = build_scores(skill_path, eval_suite)
@@ -92,7 +92,6 @@ def _score_single_skill(skill_path: str) -> dict:
     # Determine recommended action
     score = composite["score"]
     has_eval = eval_suite is not None
-    unmeasured = composite.get("unmeasured", [])
 
     if not has_eval:
         action = f"/schliff:init {skill_path}"

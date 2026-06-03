@@ -20,13 +20,21 @@ import json
 import sys
 from pathlib import Path
 
-from shared import VALID_DIMENSIONS, invalidate_cache as _shared_invalidate_cache
 from scoring import (
-    score_structure, score_triggers, score_efficiency,
-    score_composability, score_quality,
-    score_edges, score_runtime, score_clarity,
-    score_diff, explain_score_change, compute_composite,
+    compute_composite,
+    explain_score_change,  # noqa: F401  # re-exported: integration tests load this module and call it
+    score_clarity,
+    score_composability,
+    score_diff,
+    score_edges,
+    score_efficiency,
+    score_quality,
+    score_runtime,
+    score_structure,
+    score_triggers,
 )
+from shared import VALID_DIMENSIONS
+from shared import invalidate_cache as _shared_invalidate_cache
 
 
 def invalidate_cache(skill_path: str) -> None:
@@ -167,7 +175,7 @@ def main():
 
         all_issues = [i for v in scores.values() for i in v["issues"]]
         if all_issues:
-            print(f"\n  Issues found:")
+            print("\n  Issues found:")
             for issue in all_issues:
                 print(f"    \u2022 {issue}")
         print()

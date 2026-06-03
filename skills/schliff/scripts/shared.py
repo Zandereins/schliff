@@ -199,8 +199,9 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
     """
     import os
     import tempfile
+
     from scoring.formats import detect_format, normalize_content
-    from scoring.registry import get_scorers, OPT_IN_SCORERS
+    from scoring.registry import get_scorers
 
     if fmt is None:
         fmt = detect_format(skill_path)

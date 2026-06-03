@@ -102,9 +102,10 @@ def build_system(dim: str, anchors: list[dict]) -> str:
 
 
 def _real_judge_factory(model: str, temp: float) -> Callable:
+    from typing import Literal
+
     import anthropic  # imported lazily so --mock works without the SDK
     from pydantic import BaseModel
-    from typing import Literal
 
     class Verdict(BaseModel):
         label: Literal["PASS", "FAIL"]

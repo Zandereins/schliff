@@ -21,7 +21,6 @@ from scoring.patterns.system_prompt import (
 )
 from shared import read_skill_safe
 
-
 # Module-level compiled patterns (re.compile is NOT covered by re's internal
 # cache, so compiling these inline recompiled them on every score). Hoisted
 # here to match the codebase's module-level pattern discipline; behaviour and
