@@ -176,7 +176,8 @@ class handler(BaseHTTPRequestHandler):
             result = _run_scoring(content, filename)
             self._send_json(200, result)
         except Exception as exc:
-            self._send_json(500, {
-                "error": "Scoring failed",
-                "detail": type(exc).__name__,
-            })
+            # Log the type server-side for debugging; do not leak internal
+            # exception names to the client (avoids handing an attacker a
+            # reconnaissance signal about the scoring internals).
+            print(f"Scoring error: {type(exc).__name__}: {exc}", file=sys.stderr)
+            self._send_json(500, {"error": "Scoring failed"})
