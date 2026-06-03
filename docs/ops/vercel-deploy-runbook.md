@@ -29,6 +29,12 @@ vercel teams switch zaneins-projects
 
 ## 1. Create + deploy the Playground project
 
+> Note: `api/score.py` bootstraps `sys.path` for schliff's scoring package at
+> cold start (the engine's submodules import each other via `from scoring.x`,
+> which needs the package's `scripts/` dir on the path — the CLI does the same).
+> Without it the function 500s on every request against the pip-installed wheel;
+> an editable install masks this locally. Do not remove that bootstrap block.
+
 ```bash
 cd playground
 vercel link            # create new project, e.g. name: schliff-playground
