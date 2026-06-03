@@ -1,0 +1,9 @@
+# Vercel CLI link state
+.vercel
+
+# Vercel's Python builder synthesizes these locally during build/deploy.
+# They are BUILD OUTPUT, not source. The leaderboard is stdlib-only; there is
+# no authored dependency manifest to commit. Keep these out of git.
+pyproject.toml
+uv.lock
+.python-version
