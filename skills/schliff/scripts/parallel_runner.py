@@ -67,6 +67,7 @@ def create_branches(
     skill_path: str,
     strategies: list[str],
     base_branch: Optional[str] = None,
+    skill_relative: Optional[str] = None,
 ) -> list[dict]:
     """Create parallel worktree branches for experimentation.
 
@@ -74,6 +75,8 @@ def create_branches(
         skill_path: Path to SKILL.md
         strategies: List of strategy names to try
         base_branch: Branch to base worktrees on (default: current HEAD)
+        skill_relative: Relative path to SKILL.md from repo root, used to
+            locate (and mutate) the skill inside each worktree before scoring
 
     Returns:
         List of branch info dicts with: name, worktree_path, strategy
@@ -115,11 +118,32 @@ def create_branches(
                 capture_output=True, text=True, timeout=30,
                 check=True,
             )
+            # Apply deterministic improvements inside the worktree before scoring,
+            # otherwise every branch scores the pristine baseline and the winner is
+            # arbitrary. text-gradient.py exposes only --apply (deterministic
+            # patches); it has no per-strategy selector, so all branches currently
+            # apply the same patch set and the `strategy` label is informational
+            # until text_gradient gains a real --strategy option. Using a flag the
+            # CLI actually supports avoids the argparse exit-2 hard-fail that an
+            # unrecognized --apply-top/--strategy would cause.
+            status = "created"
+            if skill_relative:
+                worktree_skill = os.path.join(worktree_path, skill_relative)
+                if os.path.exists(worktree_skill):
+                    apply_result = subprocess.run(
+                        [sys.executable, str(SCRIPT_DIR / "text-gradient.py"),
+                         worktree_skill, "--apply"],
+                        capture_output=True, text=True, timeout=60,
+                    )
+                    if apply_result.returncode != 0:
+                        status = f"error: strategy application failed: {apply_result.stderr[:200]}"
+                else:
+                    status = "error: SKILL.md not found in worktree"
             branches.append({
                 "name": branch_name,
                 "worktree_path": worktree_path,
                 "strategy": strategy,
-                "status": "created",
+                "status": status,
             })
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             branches.append({
@@ -152,7 +176,7 @@ def _score_in_worktree(branch: dict, skill_relative: str) -> dict:
 
     try:
         result = subprocess.run(
-            ["python3", str(SCRIPT_DIR / "score-skill.py"), skill_path, "--json"],
+            [sys.executable, str(SCRIPT_DIR / "score-skill.py"), skill_path, "--json"],
             capture_output=True, text=True, timeout=60,
             cwd=worktree,
         )
@@ -279,7 +303,7 @@ def run_sequential_fallback(
     baseline_score = 0
     try:
         result = subprocess.run(
-            ["python3", str(SCRIPT_DIR / "score-skill.py"), skill_path, "--json"],
+            [sys.executable, str(SCRIPT_DIR / "score-skill.py"), skill_path, "--json"],
             capture_output=True, text=True, timeout=60,
         )
         data = json.loads(result.stdout)
@@ -291,11 +315,13 @@ def run_sequential_fallback(
         # Backup current state
         shutil.copy2(str(skill_path_obj), str(backup_path))
 
-        # Apply strategy via text-gradient
+        # Apply deterministic improvements via text-gradient. Only --apply exists
+        # (no per-strategy selector), so the `strategy` label is informational;
+        # using a real flag avoids an argparse exit-2 hard-fail.
         try:
             apply_result = subprocess.run(
-                ["python3", str(SCRIPT_DIR / "text-gradient.py"), skill_path,
-                 "--apply-top", "--strategy", strategy],
+                [sys.executable, str(SCRIPT_DIR / "text-gradient.py"), skill_path,
+                 "--apply"],
                 capture_output=True, text=True, timeout=60,
             )
         except (subprocess.SubprocessError, OSError):
@@ -307,7 +333,7 @@ def run_sequential_fallback(
         # Score after strategy
         try:
             result = subprocess.run(
-                ["python3", str(SCRIPT_DIR / "score-skill.py"), skill_path, "--json"],
+                [sys.executable, str(SCRIPT_DIR / "score-skill.py"), skill_path, "--json"],
                 capture_output=True, text=True, timeout=60,
             )
             data = json.loads(result.stdout)
@@ -416,7 +442,7 @@ def main():
 
     # Create parallel branches — always clean up on failure
     print("Creating parallel branches...", file=sys.stderr)
-    branches = create_branches(args.skill_path, strategies)
+    branches = create_branches(args.skill_path, strategies, skill_relative=skill_relative)
 
     active = [b for b in branches if b.get("status") == "created"]
     if not active:

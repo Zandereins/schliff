@@ -30,6 +30,10 @@ def score_edges(skill_path: str, eval_suite: Optional[dict]) -> dict:
     edge_cases = eval_suite["edge_cases"]
     if not isinstance(edge_cases, list):
         return {"score": -1, "issues": ["invalid_edge_cases_type"], "details": {}}
+    # Defensive: eval-suites are user-authored JSON; non-dict items (strings,
+    # nulls, numbers) must not crash the per-item ec.get(...) calls below.
+    # Mirrors quality.py's test_cases filter.
+    edge_cases = [ec for ec in edge_cases if isinstance(ec, dict)]
     if not edge_cases:
         return {"score": -1, "issues": ["empty_edge_cases"], "details": {}}
 

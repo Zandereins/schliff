@@ -126,6 +126,15 @@ _RE_ANTI_DOMAIN_SIGNAL = re.compile(
     r"(?:my|the)\s+(?:database|sql|postgres|mysql|sqlite|mongo)\b",
     re.IGNORECASE,
 )
+# "skill" used as the object being acted on (e.g. "my database skill",
+# "the migration skill") is a genuine in-domain signal, not an incidental
+# mention. When this is present the anti-domain suppression must NOT fire,
+# otherwise legitimate skill-improvement prompts that name a domain
+# ("improve the composability of my database skill") get wrongly suppressed.
+_RE_SKILL_AS_OBJECT = re.compile(
+    r"(?i)(?:my|this|the|our|your|a|an)\s+(?:[\w-]+\s+){0,3}skills?\b|"
+    r"[\w-]+\s+skills?\b\s+(?:conflicts?|needs?|works?|is\b|when\b|that\b)"
+)
 
 
 def _has_skill_domain_signal(prompt: str) -> float:
@@ -135,16 +144,24 @@ def _has_skill_domain_signal(prompt: str) -> float:
     Anti-signal is set to 0.2 (not 0.4) so that high-scoring generic-action prompts
     (e.g. 'optimize my database queries') cannot accumulate enough TF-IDF weight to
     exceed the 4.5 threshold even when they contain multiple skill-adjacent verbs.
+
+    The anti-domain check is evaluated BEFORE the bare 'skill' substring boost so an
+    incidental 'skill' mention inside an otherwise generic-action prompt cannot lift
+    it to 1.2. A genuine in-domain prompt that names 'skill' as the object being acted
+    on (e.g. 'improve the composability of my database skill') is exempted from anti-
+    domain suppression via _RE_SKILL_AS_OBJECT so true positives are preserved.
     """
     prompt_lower = prompt.lower()
 
     if _RE_STRONG_DOMAIN_SIGNAL.search(prompt_lower):
         return 1.8
 
+    if _RE_ANTI_DOMAIN_SIGNAL.search(prompt_lower) and not _RE_SKILL_AS_OBJECT.search(
+        prompt_lower
+    ):
+        return 0.2
+
     if "skill" in prompt_lower:
         return 1.2
-
-    if _RE_ANTI_DOMAIN_SIGNAL.search(prompt_lower):
-        return 0.2
 
     return 1.0

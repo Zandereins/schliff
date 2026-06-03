@@ -2,7 +2,25 @@
 import pytest
 
 from shared import invalidate_cache
-from scoring.security import score_security
+from scoring.security import _is_security_domain, score_security
+
+
+class TestBOMSecurityDomainParity:
+    """A leading UTF-8 BOM must not flip security-domain detection (determinism)."""
+
+    _FM = (
+        "---\n"
+        "name: pentest-helper\n"
+        "domain: security\n"
+        "description: Educational skill about prompt injection and exploit mitigation.\n"
+        "---\n# Body\nDiscussing OWASP threats and CVE handling.\n"
+    )
+
+    def test_bom_and_no_bom_agree(self):
+        no_bom = _is_security_domain(self._FM)
+        with_bom = _is_security_domain("﻿" + self._FM)
+        assert no_bom is True
+        assert with_bom == no_bom, "BOM flipped _is_security_domain"
 
 
 # --- Fixtures ---

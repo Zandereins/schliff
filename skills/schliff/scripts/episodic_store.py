@@ -22,6 +22,7 @@ import math
 import os
 import sys
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -144,30 +145,48 @@ def _load_episodes() -> list[dict]:
     return episodes
 
 
-def _save_episode(episode: dict) -> None:
-    """Append a single episode to the store with file locking (POSIX only)."""
+@contextmanager
+def _store_lock():
+    """Acquire an exclusive advisory lock on a stable lockfile (POSIX only).
+
+    Both appends (_save_episode) and the consolidation rewrite
+    (_enforce_size_cap) acquire this same lock so that an append can never
+    race a consolidation that swaps the episodes-file inode out from under it.
+    The lock is held on a dedicated sibling .lock file whose inode is stable
+    across EPISODES_PATH replacement, unlike a lock taken on EPISODES_PATH
+    itself. Degrades to a no-op when fcntl is unavailable (non-POSIX).
+    """
     EPISODES_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
         import fcntl
-        _has_flock = True
     except ImportError:
-        _has_flock = False
+        yield
+        return
 
-    with open(EPISODES_PATH, "a", encoding="utf-8") as f:
-        if _has_flock:
-            try:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-            except OSError as e:
-                print(f"Warning: file locking unavailable ({e}), writing without lock", file=sys.stderr)
-                _has_flock = False
+    lock_path = EPISODES_PATH.with_suffix(".lock")
+    with open(lock_path, "a+", encoding="utf-8") as lf:
+        locked = False
         try:
-            f.write(json.dumps(episode) + "\n")
+            fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+            locked = True
+        except OSError as e:
+            print(f"Warning: file locking unavailable ({e}), proceeding without lock", file=sys.stderr)
+        try:
+            yield
         finally:
-            if _has_flock:
+            if locked:
                 try:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
                 except OSError:
                     pass
+
+
+def _save_episode(episode: dict) -> None:
+    """Append a single episode to the store with file locking (POSIX only)."""
+    EPISODES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _store_lock():
+        with open(EPISODES_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(episode) + "\n")
 
 
 def _episode_text(ep: dict) -> str:
@@ -295,12 +314,12 @@ def synthesize(query: str, top_k: int = 5) -> str:
     lines.append(f"Based on {len(episodes)} relevant past episodes:")
 
     if keeps:
-        strategies = set(ep.get("strategy", "?") for ep in keeps)
+        strategies = sorted(dict.fromkeys(ep.get("strategy", "?") for ep in keeps))
         avg_delta = sum(ep.get("delta", 0) for ep in keeps) / len(keeps)
         lines.append(f"  Successful strategies: {', '.join(strategies)} (avg delta: {avg_delta:+.1f})")
 
     if discards:
-        strategies = set(ep.get("strategy", "?") for ep in discards)
+        strategies = sorted(dict.fromkeys(ep.get("strategy", "?") for ep in discards))
         learnings = [ep.get("learning", "") for ep in discards if ep.get("learning")]
         lines.append(f"  Failed strategies: {', '.join(strategies)}")
         if learnings:
@@ -327,51 +346,57 @@ def _enforce_size_cap() -> None:
             return
     else:
         return
-    episodes = _load_episodes()
-    if len(episodes) <= MAX_EPISODES:
-        return
 
-    # Split: keep recent, consolidate oldest
-    old = episodes[:CONSOLIDATION_BATCH]
-    keep = episodes[CONSOLIDATION_BATCH:]
+    # Hold the exclusive store lock for the entire read-consolidate-replace
+    # sequence so an in-flight _save_episode append cannot be lost when
+    # tmp_path.replace() swaps the episodes-file inode. Re-load inside the lock
+    # to operate on a consistent snapshot.
+    with _store_lock():
+        episodes = _load_episodes()
+        if len(episodes) <= MAX_EPISODES:
+            return
 
-    # Consolidate old episodes: group by (domain, strategy, outcome)
-    groups: dict[tuple, list] = defaultdict(list)
-    for ep in old:
-        key = (ep.get("domain", "?"), ep.get("strategy", "?"), ep.get("outcome", "?"))
-        groups[key].append(ep)
+        # Split: keep recent, consolidate oldest
+        old = episodes[:CONSOLIDATION_BATCH]
+        keep = episodes[CONSOLIDATION_BATCH:]
 
-    consolidated = []
-    for (domain, strategy, outcome), eps in groups.items():
-        avg_delta = sum(ep.get("delta", 0) for ep in eps) / len(eps)
-        learnings = [ep.get("learning", "") for ep in eps if ep.get("learning")]
-        # Pick most informative learning (longest)
-        best_learning = max(learnings, key=len) if learnings else ""
-        consolidated.append({
-            "skill": "consolidated",
-            "domain": domain,
-            "strategy": strategy,
-            "outcome": outcome,
-            "delta": round(avg_delta, 2),
-            "learning": f"[{len(eps)} episodes] {best_learning[:200]}",
-            "context": f"Consolidated from {len(eps)} episodes",
-            "timestamp": eps[-1].get("timestamp", ""),
-            "text": _episode_text({"domain": domain, "strategy": strategy,
-                                    "outcome": outcome, "learning": best_learning,
-                                    "skill": f"consolidated-{domain}",
-                                    "context": f"Consolidated {len(eps)} episodes"}),
-        })
+        # Consolidate old episodes: group by (domain, strategy, outcome)
+        groups: dict[tuple, list] = defaultdict(list)
+        for ep in old:
+            key = (ep.get("domain", "?"), ep.get("strategy", "?"), ep.get("outcome", "?"))
+            groups[key].append(ep)
 
-    # Atomic rewrite: write to temp file then rename (crash-safe on POSIX)
-    all_episodes = consolidated + keep
-    EPISODES_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = EPISODES_PATH.with_suffix(".tmp")
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        for ep in all_episodes:
-            f.write(json.dumps(ep) + "\n")
-    tmp_path.replace(EPISODES_PATH)
+        consolidated = []
+        for (domain, strategy, outcome), eps in groups.items():
+            avg_delta = sum(ep.get("delta", 0) for ep in eps) / len(eps)
+            learnings = [ep.get("learning", "") for ep in eps if ep.get("learning")]
+            # Pick most informative learning (longest)
+            best_learning = max(learnings, key=len) if learnings else ""
+            consolidated.append({
+                "skill": "consolidated",
+                "domain": domain,
+                "strategy": strategy,
+                "outcome": outcome,
+                "delta": round(avg_delta, 2),
+                "learning": f"[{len(eps)} episodes] {best_learning[:200]}",
+                "context": f"Consolidated from {len(eps)} episodes",
+                "timestamp": eps[-1].get("timestamp", ""),
+                "text": _episode_text({"domain": domain, "strategy": strategy,
+                                        "outcome": outcome, "learning": best_learning,
+                                        "skill": f"consolidated-{domain}",
+                                        "context": f"Consolidated {len(eps)} episodes"}),
+            })
 
-    print(f"Consolidated {len(old)} old episodes into {len(consolidated)}", file=sys.stderr)
+        # Atomic rewrite: write to temp file then rename (crash-safe on POSIX)
+        all_episodes = consolidated + keep
+        EPISODES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = EPISODES_PATH.with_suffix(".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            for ep in all_episodes:
+                f.write(json.dumps(ep) + "\n")
+        tmp_path.replace(EPISODES_PATH)
+
+        print(f"Consolidated {len(old)} old episodes into {len(consolidated)}", file=sys.stderr)
 
 
 def get_stats() -> dict:

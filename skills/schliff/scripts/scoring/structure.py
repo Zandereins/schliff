@@ -71,7 +71,11 @@ def _score_structure_inline(skill_path: str) -> dict:
     lines = content.split("\n")
 
     # Frontmatter
-    if lines and lines[0].strip() == "---":
+    # Tolerate a leading UTF-8 BOM (U+FEFF) so files saved by Windows/cross-platform
+    # editors are not silently denied the frontmatter delimiter match. read_skill_safe
+    # decodes with plain "utf-8" and does not strip a BOM, which would otherwise make
+    # lines[0].strip() == "﻿---" != "---" and drop up to 30 structure points.
+    if lines and lines[0].lstrip("﻿").strip() == "---":
         score += 10
         if _RE_FRONTMATTER_NAME.search(content):
             score += 10

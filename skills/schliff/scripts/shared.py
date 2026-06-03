@@ -60,6 +60,12 @@ _RE_GROUP_INNER_QUANT = re.compile(r'\([^)]*[.][*+][^)]*\)[+*?{]')
 
 def strip_frontmatter(content: str) -> str:
     """Strip YAML frontmatter (---...---) from skill content."""
+    # A leading UTF-8 BOM (U+FEFF) is an invisible encoding artifact. Without
+    # stripping it, the bare startswith("---") check fails and the frontmatter
+    # leaks into the body, perturbing body-sensitive dimensions (composability,
+    # efficiency) and breaking BOM-invariant scoring. Mirrors the same fix in
+    # security._extract_frontmatter and structure.py.
+    content = content.lstrip("﻿")
     if content.startswith("---"):
         end = content.find("---", 3)
         if end >= 4:
@@ -77,11 +83,13 @@ def read_skill_safe(skill_path: str) -> str:
     """Read a skill file with size limit enforcement and caching.
 
     Reads first, then checks size (avoids TOCTOU race condition).
-    Rejects symlinks to prevent reading arbitrary files via crafted paths.
+    Symlinks are resolved (via Path.resolve) and the real target is validated
+    to be a regular file. Skill files are commonly symlinked by dotfile
+    managers (stow/chezmoi), ``claude --worktree`` setups, and shared
+    ``~/.claude/skills`` layouts, so they are followed rather than rejected;
+    the resolved target must still be an existing, non-directory regular file.
     """
     raw = Path(skill_path)
-    if raw.is_symlink():
-        raise ValueError(f"Skill path is a symlink (rejected): {skill_path}")
     p = raw.resolve()
     key = str(p)
     if key in _file_cache:
@@ -90,7 +98,19 @@ def read_skill_safe(skill_path: str) -> str:
         raise FileNotFoundError(f"Skill file not found: {skill_path}")
     if p.is_dir():
         raise ValueError(f"Skill path is a directory, not a file: {skill_path}")
+    if not p.is_file():
+        raise ValueError(f"Skill path is not a regular file: {skill_path}")
     content = p.read_text(encoding="utf-8", errors="replace")
+    # Strip ALL leading UTF-8 BOMs (U+FEFF) once, at the read boundary, so no
+    # downstream scorer ever sees one. A leading BOM is an invisible encoding
+    # artifact; left in place it defeats every `startswith("---")` frontmatter
+    # check (structure, composability, efficiency, security-domain), making the
+    # same file score differently with/without a BOM — a determinism break. We
+    # lstrip rather than strip a single char so a (degenerate) multi-BOM prefix
+    # collapses to body too, and any residual U+FEFF is genuinely mid-content
+    # where the obfuscation detector still flags it. Root-cause fix; per-scorer
+    # strips remain as defense for direct callers.
+    content = content.lstrip("﻿")
     if len(content) > MAX_SKILL_SIZE:
         raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
     if len(_file_cache) >= MAX_CACHE_ENTRIES:

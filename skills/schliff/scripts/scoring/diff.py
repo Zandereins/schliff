@@ -19,7 +19,7 @@ def score_diff(skill_path: str, diff_ref: str = "HEAD~1") -> dict:
         return {"available": False, "error": f"Invalid diff reference: {diff_ref}"}
     try:
         result = subprocess.run(
-            ["git", "diff", diff_ref, "--", skill_path],
+            ["git", "--no-pager", "diff", "--no-color", diff_ref, "--", skill_path],
             capture_output=True, text=True, timeout=10, errors="replace"
         )
         if result.returncode != 0:

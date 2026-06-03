@@ -163,17 +163,21 @@ class ProgressAnalyzer:
 
         return current_streak, streak_type, streak_end
 
-    def estimate_iterations_to_goal(self, goal: float) -> Optional[int]:
+    def estimate_iterations_to_goal(self, goal: float,
+                                    experiments: Optional[List[Dict[str, Any]]] = None) -> Optional[int]:
         """
         Estimate iterations needed to reach goal composite score.
 
         Args:
             goal: Target composite score (0-100)
+            experiments: Optional experiment slice (e.g. honoring --since);
+                defaults to the full history.
 
         Returns:
             Estimated iterations, or None if no clear trend
         """
-        kept_exps = [e for e in self.experiments if e.get("status") == "keep"]
+        exps = experiments if experiments is not None else self.experiments
+        kept_exps = [e for e in exps if e.get("status") == "keep"]
         if len(kept_exps) < 2:
             return None
 
@@ -413,7 +417,7 @@ class ProgressAnalyzer:
         }
 
         if goal and current_best:
-            est = self.estimate_iterations_to_goal(goal)
+            est = self.estimate_iterations_to_goal(goal, exps)
             summary["goal_estimate"] = {
                 "target": goal,
                 "current": current_best.get("composite", 0),

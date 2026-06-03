@@ -21,7 +21,7 @@ STOPWORDS = {
     "sure", "well", "okay", "look", "show", "tell",
 }
 
-RE_WORD_TOKEN = re.compile(r"\b[a-z]{4,}\b")
+RE_WORD_TOKEN = re.compile(r"\b[a-z0-9]{4,}\b")
 
 
 def stem(word: str) -> str:
