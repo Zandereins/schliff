@@ -7,23 +7,23 @@ clients can render an appropriate "community-submitted, not verified" notice.
 Read-only; CORS handled in vercel.json.
 """
 
-from http.server import BaseHTTPRequestHandler
 import json
 import os
 import sys
-from urllib.parse import urlparse, parse_qs
+from http.server import BaseHTTPRequestHandler
+from urllib.parse import parse_qs, urlparse
 
 VALID_GRADES = {"S", "A", "B", "C", "D"}
 VALID_FORMATS = {"SKILL.md", ".cursorrules", "CLAUDE.md", "AGENTS.md"}
 
 VALID_SORT_FIELDS = {
     "composite", "structure", "triggers", "quality", "edges",
-    "efficiency", "composability", "clarity", "security", "sync", "date",
+    "efficiency", "composability", "clarity", "security", "date",
     "delta",
 }
 DIMENSION_KEYS = {
     "structure", "triggers", "quality", "edges", "efficiency",
-    "composability", "clarity", "security", "sync",
+    "composability", "clarity", "security",
 }
 
 # Match submit.py storage paths

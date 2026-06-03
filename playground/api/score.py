@@ -71,18 +71,33 @@ def _run_scoring(content: str, filename: str) -> dict:
         with open(skill_path, "w", encoding="utf-8") as f:
             f.write(content)
 
+        # triggers/quality/edges are eval-suite-gated: they need REAL test cases
+        # (which a paste-a-file web tool can't supply, and auto-generating them from
+        # the skill itself produces a circular, non-discriminating score). So they
+        # stay unmeasured here. Instead of surfacing the coverage-capped
+        # full-denominator composite — which makes every web result look like an F —
+        # we report an HONEST renormalized "structural score" over the dimensions
+        # that ARE measured deterministically, using the engine's own weights
+        # (structural_score = composite / weight_coverage). The canonical
+        # full-denominator composite is still returned for transparency.
         scores = build_scores(skill_path, eval_suite=None, include_runtime=False)
         composite = compute_composite(scores)
 
-        grade = score_to_grade(composite["score"])
+        coverage = composite.get("weight_coverage", 0) or 0
+        full_score = composite["score"]
+        structural_score = round(full_score / coverage, 1) if coverage > 0 else full_score
 
         return {
-            "composite_score": composite["score"],
-            "grade": grade,
+            "structural_score": structural_score,
+            "grade": score_to_grade(structural_score),
+            "composite_score": full_score,
+            "full_grade": score_to_grade(full_score),
             "dimensions": {dim: scores[dim]["score"] for dim in scores},
+            "unmeasured": composite.get("unmeasured", []),
             "warnings": composite.get("warnings", []),
             "measured_dimensions": composite.get("measured_dimensions", 0),
             "total_dimensions": composite.get("total_dimensions", 0),
+            "weight_coverage": coverage,
         }
     finally:
         try:
