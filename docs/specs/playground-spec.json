@@ -35,12 +35,16 @@
       "method": "POST /api/score",
       "request": { "content": "string (skill markdown)", "filename": "string (default: SKILL.md)" },
       "response": {
-        "composite_score": "float",
-        "grade": "S/A/B/C/D/F",
+        "structural_score": "float (composite renormalized over measured dims = composite / weight_coverage)",
+        "grade": "S/A/B/C/D/F (grade of structural_score)",
+        "composite_score": "float (canonical full-denominator composite)",
+        "full_grade": "S/A/B/C/D/F (grade of composite_score)",
         "dimensions": "dict (dim -> score, -1 = unmeasured)",
+        "unmeasured": "list[string] (eval-suite-gated dims not measured)",
         "warnings": "list[string]",
         "measured_dimensions": "int",
-        "total_dimensions": "int"
+        "total_dimensions": "int",
+        "weight_coverage": "float (fraction of total dimension weight measured)"
       },
       "constraints": [
         "500KB max content size",

@@ -825,6 +825,23 @@
 
     .trust-banner svg { flex-shrink: 0; }
 
+    /* Demo-mode notice — leaderboard storage is ephemeral and may reset */
+    .demo-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(56,189,248,.07);
+      border: 1px solid rgba(56,189,248,.25);
+      border-radius: var(--radius-sm);
+      margin-top: 16px;
+      font-size: 12.5px;
+      color: var(--accent-blue);
+      line-height: 1.5;
+    }
+
+    .demo-banner svg { flex-shrink: 0; }
+
     /* Per-row unverified marker */
     .unverified-dot {
       display: inline-block;
@@ -890,6 +907,15 @@
         </div>
       </div>
     </header>
+
+    <!-- DEMO-MODE NOTICE -->
+    <div class="demo-banner" role="note">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>Demo mode &mdash; this leaderboard uses ephemeral storage, so entries are not persisted and may reset at any time.</span>
+    </div>
 
     <!-- CONTROLS BAR -->
     <div class="controls" role="toolbar" aria-label="Filter and sort controls">
