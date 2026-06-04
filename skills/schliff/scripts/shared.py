@@ -112,7 +112,10 @@ def read_skill_safe(skill_path: str) -> str:
     # strips remain as defense for direct callers.
     content = content.lstrip("﻿")
     if len(content) > MAX_SKILL_SIZE:
-        raise ValueError(f"Skill file exceeds {MAX_SKILL_SIZE} bytes")
+        raise ValueError(
+            f"file too large: {len(content):,} bytes "
+            f"exceeds the {MAX_SKILL_SIZE:,} byte limit"
+        )
     if len(_file_cache) >= MAX_CACHE_ENTRIES:
         _file_cache.pop(next(iter(_file_cache)))
     _file_cache[key] = content

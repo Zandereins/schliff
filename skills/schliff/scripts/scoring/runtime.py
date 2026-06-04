@@ -12,6 +12,7 @@ from typing import Optional
 
 from shared import read_skill_safe
 from shared import regex_search_safe as _regex_search_safe
+from shared import validate_regex_complexity as _validate_regex_complexity
 
 
 def score_runtime(skill_path: str, eval_suite: Optional[dict] = None,
@@ -109,10 +110,19 @@ def score_runtime(skill_path: str, eval_suite: Optional[dict] = None,
             if atype == "response_contains":
                 case_passed = value.lower() in response.lower()
             elif atype == "response_matches":
-                try:
-                    case_passed = _regex_search_safe(value, response)
-                except re.error:
+                # Validate regex complexity before execution — reject
+                # pathological patterns (ReDoS) up front instead of relying
+                # solely on the regex_search_safe timeout. A rejected pattern
+                # is a clean fail (case_passed stays False), matching the
+                # re.error handling below and runtime-evaluator.py's behavior.
+                safe, _reason = _validate_regex_complexity(value)
+                if not safe:
                     case_passed = False
+                else:
+                    try:
+                        case_passed = _regex_search_safe(value, response)
+                    except re.error:
+                        case_passed = False
             elif atype == "response_excludes":
                 case_passed = value.lower() not in response.lower()
 
