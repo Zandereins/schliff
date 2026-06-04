@@ -49,6 +49,19 @@ def _resolve_version() -> str:
         return "dev"
 
 
+def _ensure_skill_path_exists(skill_path: str, exit_code: int = 1) -> None:
+    """Exit with the standard error if the skill path does not exist.
+
+    Centralizes the repeated existence check across commands. Callers must
+    pass exit_code=2 for the CI verify gate to preserve its exit semantics.
+    """
+    from pathlib import Path
+
+    if not Path(skill_path).exists():
+        print(f"Error: file not found: {skill_path}", file=sys.stderr)
+        sys.exit(exit_code)
+
+
 def _load_eval_suite_from_args(args: argparse.Namespace) -> "dict | None":
     """Load eval suite from --eval-suite flag or auto-discover from skill dir."""
     from pathlib import Path
@@ -263,9 +276,7 @@ def cmd_verify(args: argparse.Namespace) -> None:
 
     from shared import MAX_SKILL_SIZE, load_eval_suite
 
-    if not Path(args.skill_path).exists():
-        print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
-        sys.exit(2)
+    _ensure_skill_path_exists(args.skill_path, exit_code=2)
 
     eval_suite = None
     if args.eval_suite:
@@ -332,16 +343,13 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 def cmd_badge(args: argparse.Namespace) -> None:
     """Generate a markdown badge for a skill's score."""
     import urllib.parse
-    from pathlib import Path
 
     from terminal_art import score_to_grade
 
     from scoring import compute_composite
     from shared import build_scores
 
-    if not Path(args.skill_path).exists():
-        print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
-        sys.exit(1)
+    _ensure_skill_path_exists(args.skill_path)
 
     eval_suite = _load_eval_suite_from_args(args)
     from scoring.formats import detect_format
@@ -639,17 +647,13 @@ def cmd_compare(args: argparse.Namespace) -> None:
 
 def cmd_suggest(args: argparse.Namespace) -> None:
     """Suggest ranked fixes with estimated score impact."""
-    from pathlib import Path
-
     import text_gradient
     from terminal_art import score_to_grade
 
     from scoring import compute_composite
     from shared import build_scores
 
-    if not Path(args.skill_path).exists():
-        print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
-        sys.exit(1)
+    _ensure_skill_path_exists(args.skill_path)
 
     eval_suite = _load_eval_suite_from_args(args)
     top_n = max(1, args.top)
@@ -725,17 +729,13 @@ def cmd_suggest(args: argparse.Namespace) -> None:
 
 def cmd_report(args: argparse.Namespace) -> None:
     """Generate a Markdown score report, optionally upload as GitHub Gist."""
-    from pathlib import Path
-
     import report as report_mod
     from terminal_art import score_to_grade
 
     from scoring import compute_composite
     from shared import build_scores
 
-    if not Path(args.skill_path).exists():
-        print(f"Error: file not found: {args.skill_path}", file=sys.stderr)
-        sys.exit(1)
+    _ensure_skill_path_exists(args.skill_path)
 
     eval_suite = _load_eval_suite_from_args(args)
     from scoring.formats import check_token_budget, detect_format

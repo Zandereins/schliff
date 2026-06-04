@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING: drop Python 3.9 support** — minimum supported version is now Python 3.10
+  (`requires-python = ">=3.10"`). Python 3.9 reached end-of-life on 2025-10-31. The CI test
+  matrix and ruff `target-version` were updated accordingly.
+- Modernized license metadata to the PEP 639 SPDX expression form (`license = "MIT"`), dropping
+  the deprecated `License :: OSI Approved :: MIT License` classifier. Requires `setuptools>=77`.
+
 ## [8.1.0] - 2026-06-03
 
 ### Added

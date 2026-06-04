@@ -237,6 +237,12 @@ Ruff lints your Python. Biome lints your JS. Schliff lints the instruction files
 - 🧪 **Playground:** [schliff-playground.vercel.app](https://schliff-playground.vercel.app) — paste a SKILL.md, get a live structural score (or `schliff demo` in the CLI)
 - 🏆 **Leaderboard:** [schliff-leaderboard.vercel.app](https://schliff-leaderboard.vercel.app)
 
+> **Structural score** = the composite renormalized over the dimensions Schliff can
+> measure deterministically without an eval suite (structure, efficiency, composability,
+> clarity). It is what the web playground reports. The full 7-dimension composite
+> additionally folds in triggers, quality, and edges — which require an eval suite
+> (`schliff init`).
+
 Validated by **1,198 tests** (unit + integration) in `skills/schliff/tests`, with separate self and proof suites via `test-self.sh` and `test-integration.sh`.
 
 ## License

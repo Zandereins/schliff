@@ -83,8 +83,8 @@ jobs:
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           # Pure-Python wheel is interpreter-agnostic; build on a current,
-          # supported interpreter (3.9 is EOL as of 2025-10-31).
-          # requires-python in pyproject.toml is unchanged.
+          # supported interpreter. (Python 3.9 reached EOL on 2025-10-31; the
+          # project's minimum is 3.10, set via requires-python in pyproject.toml.)
           python-version: '3.12'
 
       - name: Install build tools

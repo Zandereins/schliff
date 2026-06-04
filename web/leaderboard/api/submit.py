@@ -25,10 +25,15 @@ MAX_BODY_BYTES = 64 * 1024  # 64 KB
 
 VALID_GRADES = {"S", "A", "B", "C", "D"}
 VALID_FORMATS = {"SKILL.md", ".cursorrules", "CLAUDE.md", "AGENTS.md"}
-VALID_DIMENSIONS = {
+# The 7 headline dimensions emitted by the engine/playground are REQUIRED.
+REQUIRED_DIMENSIONS = {
     "structure", "triggers", "quality", "edges", "efficiency",
-    "composability", "clarity", "security",
+    "composability", "clarity",
 }
+# `security` is a separate opt-in signal: accepted if present, never required.
+OPTIONAL_DIMENSIONS = {"security"}
+# Full set of recognized keys; any key outside this is rejected.
+VALID_DIMENSIONS = REQUIRED_DIMENSIONS | OPTIONAL_DIMENSIONS
 
 # TODO: Replace with external storage (Vercel KV, Postgres, or Blob)
 # for production. /tmp is ephemeral — data is lost between cold starts.
@@ -113,8 +118,13 @@ def _validate(body):
     dimensions = body["dimensions"]
     if not isinstance(dimensions, dict):
         return "dimensions must be an object"
-    if set(dimensions.keys()) != VALID_DIMENSIONS:
-        return f"dimensions must have exactly these keys: {', '.join(sorted(VALID_DIMENSIONS))}"
+    keys = set(dimensions.keys())
+    missing = REQUIRED_DIMENSIONS - keys
+    if missing:
+        return f"dimensions is missing required keys: {', '.join(sorted(missing))}"
+    unknown = keys - VALID_DIMENSIONS
+    if unknown:
+        return f"dimensions has unknown keys: {', '.join(sorted(unknown))}"
     for key, val in dimensions.items():
         if isinstance(val, bool) or not isinstance(val, (int, float)) or not (0 <= val <= 100):
             return f"dimensions.{key} must be a number between 0 and 100"

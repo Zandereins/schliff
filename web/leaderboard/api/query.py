@@ -21,10 +21,14 @@ VALID_SORT_FIELDS = {
     "efficiency", "composability", "clarity", "security", "date",
     "delta",
 }
-DIMENSION_KEYS = {
+# The 7 headline dimensions are the required core; `security` is an optional
+# opt-in signal (kept in sync with submit.py's REQUIRED/OPTIONAL split).
+REQUIRED_DIMENSIONS = {
     "structure", "triggers", "quality", "edges", "efficiency",
-    "composability", "clarity", "security",
+    "composability", "clarity",
 }
+OPTIONAL_DIMENSIONS = {"security"}
+DIMENSION_KEYS = REQUIRED_DIMENSIONS | OPTIONAL_DIMENSIONS
 
 # Match submit.py storage paths
 DATA_DIR = "/tmp/schliff-leaderboard"

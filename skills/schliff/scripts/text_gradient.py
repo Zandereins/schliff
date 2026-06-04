@@ -964,13 +964,21 @@ def main():
 
     eval_suite = None
     if args.eval_suite and Path(args.eval_suite).exists():
-        eval_suite = json.loads(Path(args.eval_suite).read_text())
+        try:
+            eval_suite = json.loads(Path(args.eval_suite).read_text())
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Error: could not read eval-suite '{args.eval_suite}': {e}", file=sys.stderr)
+            sys.exit(1)
     else:
         # Auto-discover eval-suite.json
         skill_dir = Path(args.skill_path).parent
         auto_path = skill_dir / "eval-suite.json"
         if auto_path.exists():
-            eval_suite = json.loads(auto_path.read_text())
+            try:
+                eval_suite = json.loads(auto_path.read_text())
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"Error: could not read eval-suite '{auto_path}': {e}", file=sys.stderr)
+                sys.exit(1)
 
     # Validate eval-suite structure before processing
     if eval_suite is not None:
