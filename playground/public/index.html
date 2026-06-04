@@ -3,13 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13' fill='%233fb950'>%E2%9C%93</text></svg>">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <title>schliff.play — Score your SKILL.md live</title>
 <meta name="description" content="Score your SKILL.md live in the browser. Powered by Schliff.">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* Visually-hidden (screen-reader only) */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Visible keyboard focus (a11y-002) */
+  #editor:focus-visible,
+  .btn:focus-visible,
+  .dropdown-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  #editor:focus-visible { outline-offset: -2px; }
 
   :root {
     --bg: #0d1117;
@@ -571,6 +593,49 @@
     .logo { font-size: 22px; }
   }
 
+  /* ── Touch targets (ux-001) ── */
+  @media (max-width: 768px) {
+    .btn {
+      min-height: 44px;
+      padding: 10px 16px;
+    }
+    .dropdown-item {
+      min-height: 44px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+  }
+
+  /* ── Small phones (responsive-001) ── */
+  @media (max-width: 480px) {
+    html, body { font-size: 13px; }
+    header { padding: 14px 16px 12px; }
+    .logo { font-size: 18px; }
+    .tagline { font-size: 11px; }
+    .editor-panel { height: 40vh; }
+    .button-bar { gap: 6px; padding: 8px 12px; }
+    .btn { font-size: 11px; padding: 10px 12px; }
+    .results-inner { padding: 14px; }
+    .score-value { font-size: 36px; }
+    .dropdown-menu { min-width: calc(100vw - 32px); }
+    .dim-name { flex: 0 0 70px; }
+    footer { padding: 8px 12px; font-size: 10px; }
+  }
+
+  /* ── Reduced motion (a11y-005) ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+    .logo .cursor,
+    .terminal-loader::after,
+    .terminal-cursor { animation: none !important; }
+    .dim-bar { transition: none !important; }
+  }
+
   /* Scrollbar styling */
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -591,7 +656,7 @@
   </header>
 
   <!-- Main -->
-  <div class="main">
+  <main class="main">
     <!-- Left: Editor -->
     <div class="editor-panel">
       <div class="editor-header">
@@ -602,8 +667,9 @@
         <span class="char-count" id="charCount">0 chars</span>
       </div>
       <div class="editor-wrap">
-        <div class="line-numbers" id="lineNumbers">1</div>
-        <textarea id="editor" placeholder="Paste your SKILL.md content here...
+        <div class="line-numbers" id="lineNumbers" aria-hidden="true">1</div>
+        <label class="visually-hidden" for="editor">SKILL.md content to score</label>
+        <textarea id="editor" aria-label="SKILL.md content to score" placeholder="Paste your SKILL.md content here...
 ---
 name: my-skill
 description: &quot;What the skill does&quot;
@@ -618,10 +684,10 @@ Instructions go here..." spellcheck="false"></textarea>
           <span>&#9654;</span> Score
         </button>
         <div class="dropdown-wrap">
-          <button class="btn" id="btnExamples">
-            Examples <span id="exArrow">&#9660;</span>
+          <button class="btn" id="btnExamples" aria-haspopup="menu" aria-expanded="false" aria-controls="examplesMenu">
+            Examples <span id="exArrow" aria-hidden="true">&#9660;</span>
           </button>
-          <div class="dropdown-menu" id="examplesMenu"></div>
+          <div class="dropdown-menu" id="examplesMenu" role="menu" aria-label="Example skills"></div>
         </div>
         <button class="btn" id="btnShare">
           <span>&#128279;</span> Share Link
@@ -632,9 +698,9 @@ Instructions go here..." spellcheck="false"></textarea>
 
     <!-- Right: Results -->
     <div class="results-panel">
-      <div class="results-inner" id="results"></div>
+      <div class="results-inner" id="results" aria-live="polite"></div>
     </div>
-  </div>
+  </main>
 
   <!-- Footer -->
   <footer>
@@ -749,6 +815,9 @@ Instructions go here..." spellcheck="false"></textarea>
     EXAMPLES.forEach(function(ex) {
       var btn = document.createElement('button');
       btn.className = 'dropdown-item';
+      btn.setAttribute('role', 'menuitem');
+      btn.setAttribute('type', 'button');
+      btn.tabIndex = -1;
 
       var labelSpan = document.createElement('span');
       labelSpan.className = 'item-label';
@@ -765,22 +834,97 @@ Instructions go here..." spellcheck="false"></textarea>
         editor.value = ex.content;
         updateLineNumbers();
         updateCharCount();
-        examplesMenu.classList.remove('open');
+        closeExamplesMenu();
       });
 
       examplesMenu.appendChild(btn);
     });
   }
 
-  // ── Examples dropdown toggle ──
+  // ── Examples dropdown: keyboard-accessible menu (a11y-009) ──
+  function getMenuItems() {
+    return Array.prototype.slice.call(examplesMenu.querySelectorAll('.dropdown-item'));
+  }
+
+  function isMenuOpen() {
+    return examplesMenu.classList.contains('open');
+  }
+
+  function openExamplesMenu(focusFirst) {
+    examplesMenu.classList.add('open');
+    btnExamples.setAttribute('aria-expanded', 'true');
+    if (focusFirst) {
+      var items = getMenuItems();
+      if (items.length) items[0].focus();
+    }
+  }
+
+  function closeExamplesMenu(restoreFocus) {
+    if (!isMenuOpen()) return;
+    examplesMenu.classList.remove('open');
+    btnExamples.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) btnExamples.focus();
+  }
+
+  function focusMenuItemByOffset(current, offset) {
+    var items = getMenuItems();
+    if (!items.length) return;
+    var idx = items.indexOf(current);
+    var next = (idx + offset + items.length) % items.length;
+    items[next].focus();
+  }
+
   btnExamples.addEventListener('click', function(e) {
     e.stopPropagation();
-    examplesMenu.classList.toggle('open');
+    if (isMenuOpen()) {
+      closeExamplesMenu();
+    } else {
+      openExamplesMenu(false);
+    }
+  });
+
+  btnExamples.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      openExamplesMenu(true);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      openExamplesMenu(false);
+      var items = getMenuItems();
+      if (items.length) items[items.length - 1].focus();
+    } else if (e.key === 'Escape') {
+      closeExamplesMenu();
+    }
+  });
+
+  examplesMenu.addEventListener('keydown', function(e) {
+    var current = document.activeElement;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusMenuItemByOffset(current, 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusMenuItemByOffset(current, -1);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeExamplesMenu(true);
+    } else if (e.key === 'Tab') {
+      // Let Tab move focus naturally, but close the menu so it doesn't linger open.
+      closeExamplesMenu();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      var first = getMenuItems();
+      if (first.length) first[0].focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      var last = getMenuItems();
+      if (last.length) last[last.length - 1].focus();
+    }
   });
 
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.dropdown-wrap')) {
-      examplesMenu.classList.remove('open');
+      closeExamplesMenu();
     }
   });
 
@@ -1042,13 +1186,19 @@ Instructions go here..." spellcheck="false"></textarea>
           var lrow = document.createElement('div');
           lrow.className = 'dim-row';
           lrow.style.opacity = '0.5';
+          lrow.setAttribute('aria-disabled', 'true');
+          lrow.setAttribute('aria-label', displayName + ': locked — needs eval suite (run schliff init)');
           var lname = document.createElement('div');
           lname.className = 'dim-name';
           lname.title = name;
           lname.textContent = displayName;
           var lnote = document.createElement('div');
           lnote.style.cssText = 'flex:1;font-size:12px;font-style:italic;text-align:right;';
-          lnote.textContent = 'needs eval suite — schliff init';
+          var lock = document.createElement('span');
+          lock.setAttribute('aria-hidden', 'true');
+          lock.textContent = '🔒 ';
+          lnote.appendChild(lock);
+          lnote.appendChild(document.createTextNode('needs eval suite — schliff init'));
           lrow.appendChild(lname);
           lrow.appendChild(lnote);
           dimSection.appendChild(lrow);
@@ -1120,9 +1270,17 @@ Instructions go here..." spellcheck="false"></textarea>
     animateScore(0, score, 800);
   }
 
+  var prefersReducedMotion = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   function animateScore(from, to, duration) {
     var el = document.getElementById('scoreAnimated');
     if (!el) return;
+    // Respect reduced-motion: jump straight to the final value (a11y-005).
+    if (prefersReducedMotion) {
+      el.textContent = String(to);
+      return;
+    }
     var start = performance.now();
 
     function tick(now) {

@@ -26,7 +26,7 @@
       --border-muted: #30363d;
       --text: #e6edf3;
       --text-muted: #8b949e;
-      --text-faint: #6e7681;
+      --text-faint: #7a8496;
       --accent-blue: #38bdf8;
       --accent-purple: #a855f7;
       --accent-green: #34d399;
@@ -684,7 +684,7 @@
     }
 
     .page-btn:disabled {
-      opacity: 0.35;
+      opacity: 0.6;
       cursor: not-allowed;
     }
 
@@ -885,6 +885,30 @@
       .table-wrap { display: block; }
       .cards-wrap  { display: none; }
     }
+
+    /* Tablet range (~768-900px): the 7-column rankings table is cramped.
+       Allow it to scroll horizontally rather than squash, and tighten
+       padding so the most columns possible stay visible without overflow. */
+    @media (min-width: 768px) and (max-width: 900px) {
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      table { min-width: 720px; }
+      thead th,
+      tbody td { padding: 10px 10px; }
+      thead th.col-dims { width: 140px; }
+      thead th.col-name { min-width: 140px; }
+      thead th.col-score { width: 110px; }
+    }
+
+    /* Respect users who prefer reduced motion: kill animations + transitions */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .skeleton { animation: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -1031,7 +1055,7 @@
         </tbody>
       </table>
       <div class="table-empty" id="table-empty">
-        <div class="empty-icon">&#x2205;</div>
+        <div class="empty-icon" aria-hidden="true">&#x2205;</div>
         <div class="empty-title">No results found</div>
         <div class="empty-desc">Try adjusting your filters or check back when more files have been submitted.</div>
       </div>
@@ -1042,7 +1066,7 @@
       <!-- Populated by JS -->
     </div>
     <div class="cards-empty" id="cards-empty">
-      <div class="empty-icon">&#x2205;</div>
+      <div class="empty-icon" aria-hidden="true">&#x2205;</div>
       <div class="empty-title">No results found</div>
       <div class="empty-desc">Try adjusting your filters or check back later.</div>
     </div>
@@ -1438,6 +1462,7 @@
 
         var cardNameEl = document.createElement('div');
         cardNameEl.className = 'card-name';
+        cardNameEl.setAttribute('title', name);
         if (safeUrl) {
           var ca = document.createElement('a');
           ca.href = safeUrl;

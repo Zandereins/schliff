@@ -270,7 +270,8 @@ class TestReadSkillSafeSizeBoundary:
         p = tmp_path / "oversized.md"
         p.write_text("x" * (MAX_SKILL_SIZE + 1), encoding="utf-8")
         invalidate_cache(str(p))
-        with pytest.raises(ValueError, match=str(MAX_SKILL_SIZE)):
+        # message formats the limit with thousands separators (e.g. "1,048,576")
+        with pytest.raises(ValueError, match=f"{MAX_SKILL_SIZE:,}"):
             read_skill_safe(str(p))
 
 
