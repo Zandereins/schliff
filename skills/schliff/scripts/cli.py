@@ -30,6 +30,10 @@ _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
+# Help text for the positional path on multi-format commands. These commands
+# auto-detect and score any supported instruction file, not just SKILL.md.
+_PATH_HELP = "Path to instruction file (SKILL.md/CLAUDE.md/AGENTS.md/.cursorrules)"
+
 
 def _resolve_version() -> str:
     """Single source of truth for the runtime version string.
@@ -73,8 +77,13 @@ def _load_eval_suite_from_args(args: argparse.Namespace) -> "dict | None":
         if not eval_path.exists():
             print(f"Error: eval-suite not found: {args.eval_suite}", file=sys.stderr)
             sys.exit(1)
-        if eval_path.stat().st_size > MAX_SKILL_SIZE:
-            print(f"Error: eval-suite exceeds {MAX_SKILL_SIZE} byte size limit", file=sys.stderr)
+        eval_size = eval_path.stat().st_size
+        if eval_size > MAX_SKILL_SIZE:
+            print(
+                f"Error: eval-suite too large: {eval_size:,} bytes "
+                f"exceeds the {MAX_SKILL_SIZE:,} byte limit",
+                file=sys.stderr,
+            )
             sys.exit(1)
         try:
             suite = json.loads(eval_path.read_text(encoding="utf-8"))
@@ -179,11 +188,26 @@ def cmd_score(args: argparse.Namespace) -> None:
         token_info = check_token_budget(skill_content, detected_fmt)
 
         if getattr(args, "json", False):
+            # A dimension score of -1 is the sentinel for "not measured" (e.g.
+            # triggers/quality/edges with no eval suite). Surface it as JSON null
+            # (not -1, which looks like a poor score) and add a parallel
+            # `dimension_status` map: "measured" for a real value, "unmeasured"
+            # (needs eval suite) for the sentinel. Measured values are unchanged.
+            def _json_dim(v):  # noqa: ANN001
+                s = v["score"]
+                if isinstance(s, float):
+                    return None if s < 0 else round(s, 1)
+                return None if s < 0 else s
+
             result = {
                 "skill_path": display_source,
                 "format": detected_fmt,
                 "composite_score": composite["score"],
-                "dimensions": {k: round(v["score"], 1) if isinstance(v["score"], float) else v["score"] for k, v in scores.items()},
+                "dimensions": {k: _json_dim(v) for k, v in scores.items()},
+                "dimension_status": {
+                    k: ("unmeasured" if v["score"] < 0 else "measured")
+                    for k, v in scores.items()
+                },
                 "warnings": composite["warnings"],
                 "token_budget": token_info,
             }
@@ -278,14 +302,29 @@ def cmd_verify(args: argparse.Namespace) -> None:
 
     _ensure_skill_path_exists(args.skill_path, exit_code=2)
 
+    # Scores are on a 0..100 scale; a --min-score outside that range can never
+    # be satisfied (or is trivially satisfied) and almost always indicates a
+    # typo (e.g. --min-score 500). Fail fast with a clear message.
+    if not 0.0 <= args.min_score <= 100.0:
+        print(
+            f"Error: --min-score must be between 0 and 100 (got {args.min_score:g})",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
     eval_suite = None
     if args.eval_suite:
         eval_path = Path(args.eval_suite)
         if not eval_path.exists():
             print(f"Error: eval-suite not found: {args.eval_suite}", file=sys.stderr)
             sys.exit(2)
-        if eval_path.stat().st_size > MAX_SKILL_SIZE:
-            print(f"Error: eval-suite exceeds {MAX_SKILL_SIZE} byte size limit", file=sys.stderr)
+        eval_size = eval_path.stat().st_size
+        if eval_size > MAX_SKILL_SIZE:
+            print(
+                f"Error: eval-suite too large: {eval_size:,} bytes "
+                f"exceeds the {MAX_SKILL_SIZE:,} byte limit",
+                file=sys.stderr,
+            )
             sys.exit(2)
         try:
             eval_suite = json.loads(eval_path.read_text(encoding="utf-8"))
@@ -473,7 +512,11 @@ def cmd_diff(args: argparse.Namespace) -> None:
 
         # Guard against oversized content from git history
         if len(old_content.stdout) > MAX_SKILL_SIZE:
-            print(f"Error: file at ref '{ref}' exceeds {MAX_SKILL_SIZE} byte size limit", file=sys.stderr)
+            print(
+                f"Error: file at ref '{ref}' too large: {len(old_content.stdout):,} bytes "
+                f"exceeds the {MAX_SKILL_SIZE:,} byte limit",
+                file=sys.stderr,
+            )
             sys.exit(1)
     except FileNotFoundError:
         print("Error: git not available", file=sys.stderr)
@@ -579,13 +622,20 @@ def cmd_compare(args: argparse.Namespace) -> None:
         val_b = scores_b.get(dim, {}).get("score", 0.0)
         deltas[dim] = round(val_b - val_a, 1)
 
-    # Biggest absolute gap
+    # Biggest absolute gap. When several dimensions tie for the largest gap,
+    # report all of them rather than arbitrarily picking the first; when the
+    # largest gap is 0.0 (identical files) there is no meaningful gap at all.
     if deltas:
-        biggest_dim = max(deltas, key=lambda d: abs(deltas[d]))
+        max_abs = max(abs(d) for d in deltas.values())
+        biggest_dims = [d for d in dims if abs(deltas[d]) == max_abs]
+        biggest_dim = biggest_dims[0]
         biggest_delta = deltas[biggest_dim]
+        has_gap = max_abs > 0.0
     else:
+        biggest_dims = []
         biggest_dim = ""
         biggest_delta = 0.0
+        has_gap = False
 
     if getattr(args, "json", False):
         result = {
@@ -600,7 +650,14 @@ def cmd_compare(args: argparse.Namespace) -> None:
                 "dimensions": {k: round(scores_b.get(k, {}).get("score", 0.0), 1) for k in dims},
             },
             "deltas": deltas,
-            "biggest_gap": {"dimension": biggest_dim, "delta": biggest_delta},
+            "biggest_gap": {
+                "dimension": biggest_dim,
+                "delta": biggest_delta,
+                # All dimensions tied for the largest absolute gap (>=1 entry).
+                "dimensions": biggest_dims,
+                # False when files are identical (largest gap is 0.0).
+                "has_gap": has_gap,
+            },
         }
         print(json.dumps(result, indent=2))
         return
@@ -628,7 +685,7 @@ def cmd_compare(args: argparse.Namespace) -> None:
         val_b = scores_b.get(dim, {}).get("score", 0.0)
         delta = deltas[dim]
         delta_str = f"{delta:+.1f}"
-        marker = "  ← biggest gap" if dim == biggest_dim else ""
+        marker = "  ← biggest gap" if (has_gap and dim in biggest_dims) else ""
         print(f"  {dim:<16}{val_a:>8.1f}{val_b:>8.1f}{delta_str:>10}{marker}")
 
     print(separator)
@@ -638,7 +695,20 @@ def cmd_compare(args: argparse.Namespace) -> None:
     print(f"  {'Composite':<16}{score_a:>8.1f}{score_b:>8.1f}{composite_delta_str:>10}")
     print()
 
-    if biggest_dim:
+    if not has_gap:
+        # Identical scores across every dimension — a "biggest gap" marker would
+        # be misleading, so state the absence of any gap instead.
+        print("  No dimension differences — the files score identically.")
+    elif len(biggest_dims) > 1:
+        # Multiple dimensions tie for the largest gap: list them all rather than
+        # arbitrarily attributing the gap to whichever sorts first.
+        direction = "B" if biggest_delta > 0 else "A"
+        dim_list = ", ".join(biggest_dims)
+        print(
+            f"  Biggest gap ({biggest_delta:+.1f}, tied): {dim_list} "
+            f"— {direction} has stronger coverage"
+        )
+    else:
         direction = "B" if biggest_delta > 0 else "A"
         dim_label = biggest_dim
         print(f"  Biggest gap: {dim_label} ({biggest_delta:+.1f}) — {direction} has stronger {dim_label} coverage")
@@ -825,8 +895,37 @@ def cmd_version(_args: argparse.Namespace) -> None:
     print(f"schliff {_resolve_version()}")
 
 
+# Per-command example shown when a required positional argument is missing.
+_USAGE_EXAMPLES: dict[str, str] = {
+    "schliff score": "schliff score path/to/SKILL.md",
+    "schliff verify": "schliff verify path/to/SKILL.md --min-score 75",
+    "schliff badge": "schliff badge path/to/SKILL.md",
+    "schliff diff": "schliff diff path/to/SKILL.md --ref HEAD~1",
+    "schliff compare": "schliff compare a/SKILL.md b/SKILL.md",
+    "schliff suggest": "schliff suggest path/to/SKILL.md",
+    "schliff report": "schliff report path/to/SKILL.md",
+    "schliff evolve": "schliff evolve path/to/SKILL.md --target A",
+}
+
+
+class _ActionableArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser that appends a concrete example on a missing-arg error.
+
+    argparse's default "the following arguments are required: ..." message tells
+    the user *what* is missing but not *how* to invoke the command. We keep the
+    standard message + exit code (2) and add a copy-pasteable example.
+    """
+
+    def error(self, message: str) -> "None":  # type: ignore[override]
+        if "are required" in message:
+            example = _USAGE_EXAMPLES.get(self.prog)
+            if example:
+                message = f"{message}\n\nExample:\n  {example}"
+        super().error(message)
+
+
 def main():
-    parser = argparse.ArgumentParser(
+    parser = _ActionableArgumentParser(
         prog="schliff",
         description="The finishing cut for Claude Code skills",
         epilog="Quick start:\n"
@@ -841,11 +940,16 @@ def main():
         version=f"schliff {_resolve_version()}",
         help="Show version and exit",
     )
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    subparsers = parser.add_subparsers(
+        dest="command", help="Available commands",
+        parser_class=_ActionableArgumentParser,
+    )
 
     # score command
-    score_parser = subparsers.add_parser("score", help="Score a SKILL.md file")
-    score_parser.add_argument("skill_path", nargs="?", help="Path to SKILL.md")
+    score_parser = subparsers.add_parser("score", help="Score an instruction file")
+    score_parser.add_argument(
+        "skill_path", nargs="?", help=f"{_PATH_HELP} (required unless --url is given)"
+    )
     score_parser.add_argument("--url", help="URL to fetch and score (HTTPS only, allowlisted hosts)")
     score_parser.add_argument("--json", action="store_true", help="JSON output")
     score_parser.add_argument("--eval-suite", help="Path to eval-suite.json")
@@ -861,7 +965,7 @@ def main():
 
     # verify command
     verify_parser = subparsers.add_parser("verify", help="CI gate — exit 0/1 based on score")
-    verify_parser.add_argument("skill_path", help="Path to SKILL.md")
+    verify_parser.add_argument("skill_path", help=_PATH_HELP)
     verify_parser.add_argument("--min-score", type=float, default=75.0,
                                help="Minimum passing score (default: 75)")
     verify_parser.add_argument("--regression", action="store_true",
@@ -883,12 +987,12 @@ def main():
 
     # badge command
     badge_parser = subparsers.add_parser("badge", help="Generate markdown badge for a skill")
-    badge_parser.add_argument("skill_path", help="Path to SKILL.md")
+    badge_parser.add_argument("skill_path", help=_PATH_HELP)
     badge_parser.add_argument("--eval-suite", help="Path to eval-suite.json")
 
     # diff command
     diff_parser = subparsers.add_parser("diff", help="Explain score changes between git commits")
-    diff_parser.add_argument("skill_path", help="Path to SKILL.md")
+    diff_parser.add_argument("skill_path", help=_PATH_HELP)
     diff_parser.add_argument("--ref", default="HEAD~1",
                               help="Git ref to compare against (default: HEAD~1)")
     diff_parser.add_argument("--json", action="store_true", help="JSON output")
@@ -896,21 +1000,25 @@ def main():
 
     # compare command
     compare_parser = subparsers.add_parser("compare", help="Compare two files side by side")
-    compare_parser.add_argument("file_a", help="First file to compare")
-    compare_parser.add_argument("file_b", help="Second file to compare")
+    compare_parser.add_argument(
+        "file_a", help="First instruction file (SKILL.md/CLAUDE.md/AGENTS.md/.cursorrules)"
+    )
+    compare_parser.add_argument(
+        "file_b", help="Second instruction file (SKILL.md/CLAUDE.md/AGENTS.md/.cursorrules)"
+    )
     compare_parser.add_argument("--json", action="store_true", help="JSON output")
     compare_parser.add_argument("--eval-suite", help="Path to eval-suite.json (applied to both)")
 
     # suggest command
     suggest_parser = subparsers.add_parser("suggest", help="Suggest ranked fixes with estimated impact")
-    suggest_parser.add_argument("skill_path", help="Path to SKILL.md")
+    suggest_parser.add_argument("skill_path", help=_PATH_HELP)
     suggest_parser.add_argument("--json", action="store_true", help="JSON output")
     suggest_parser.add_argument("--top", type=int, default=5, help="Number of suggestions (default: 5)")
     suggest_parser.add_argument("--eval-suite", help="Path to eval-suite.json")
 
     # report command
     report_parser = subparsers.add_parser("report", help="Generate Markdown score report")
-    report_parser.add_argument("skill_path", help="Path to SKILL.md")
+    report_parser.add_argument("skill_path", help=_PATH_HELP)
     report_parser.add_argument("--gist", action="store_true",
                                help="Upload report as GitHub Gist (requires GITHUB_TOKEN)")
     report_parser.add_argument("--eval-suite", help="Path to eval-suite.json")
@@ -970,6 +1078,17 @@ def main():
     if handler:
         try:
             handler(args)
+        except PermissionError:
+            # A PermissionError's str() leaks the OS-resolved absolute path and
+            # an "[Errno 13]" prefix (read_skill_safe reads the resolved target).
+            # Report the path the user actually typed, with a clean message.
+            user_path = (
+                getattr(args, "skill_path", None)
+                or getattr(args, "file_a", None)
+                or "the file"
+            )
+            print(f"Error: permission denied reading {user_path}", file=sys.stderr)
+            sys.exit(1)
         except (OSError, ValueError) as exc:
             # Catch-all for user-input errors that leak out of any cmd_*
             # handler (e.g. passing a directory to `score`, oversized files,
