@@ -1,6 +1,6 @@
 # Schliff Architecture
 
-System design, file tree, data flow, and implementation details for Schliff v8.0.0 —
+System design, file tree, data flow, and implementation details for Schliff v8.1.0 —
 a deterministic, stdlib-only linter and scoring engine for Claude Code skills and other
 LLM instruction files.
 
@@ -375,7 +375,7 @@ weight calibration before the next run.
 
 The version is **single-sourced**: `_resolve_version()` reads it dynamically via
 `importlib.metadata.version("schliff")`, falling back to `dev` from a source checkout. From
-the installed package it resolves to **8.0.0**. There is no hardcoded version string in the
+the installed package it resolves to **8.1.0**. There is no hardcoded version string in the
 CLI.
 
 ---

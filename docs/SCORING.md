@@ -15,6 +15,12 @@ its eval suite. These are static-analysis checks — they measure file organizat
 keyword coverage, assertion breadth, information density, and so on. They run
 instantly and require no LLM invocation.
 
+The **structural score** is the composite renormalized over the dimensions Schliff can
+measure deterministically without an eval suite — **structure, efficiency, composability,
+and clarity**. It is what the web playground reports. The full 7-dimension composite
+additionally folds in **triggers, quality, and edges**, which require an eval suite
+(`schliff init`).
+
 A high structural score is a **lint score**, not a guarantee of runtime quality. A
 skill with a 99/100 structure can still fail when Claude actually runs it. Two
 dimensions exist specifically as separate **signals** that are never folded into the
@@ -282,4 +288,4 @@ under the top-level `security` field), never folded into the skill.md-family hea
 
 Version is single-sourced: the CLI reads it via
 `importlib.metadata.version("schliff")` (`_resolve_version` in `cli.py`), falling back
-to `dev` in a source checkout. Current release: **8.0.0**.
+to `dev` in a source checkout. Current release: **8.1.0**.

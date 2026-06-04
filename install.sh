@@ -185,8 +185,8 @@ if [ "$MODE" = "update" ]; then
     fi
 
     # Clean up old backups, keep most recent 3
-    ls -dt "$HOME/.claude/skills/schliff.bak."* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null
-    ls -dt "$HOME/.claude/commands/schliff.bak."* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null
+    ls -dt "$HOME/.claude/skills/schliff.bak."* 2>/dev/null | tail -n +4 | xargs -I {} rm -rf "{}" 2>/dev/null
+    ls -dt "$HOME/.claude/commands/schliff.bak."* 2>/dev/null | tail -n +4 | xargs -I {} rm -rf "{}" 2>/dev/null
 fi
 
 # --- Install ---
