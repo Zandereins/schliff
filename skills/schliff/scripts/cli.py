@@ -202,6 +202,7 @@ def cmd_score(args: argparse.Namespace) -> None:
             result = {
                 "skill_path": display_source,
                 "format": detected_fmt,
+                "version": _resolve_version(),
                 "composite_score": composite["score"],
                 "dimensions": {k: _json_dim(v) for k, v in scores.items()},
                 "dimension_status": {
