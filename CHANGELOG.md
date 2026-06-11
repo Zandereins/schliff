@@ -5,12 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.2.0] - 2026-06-11
+
+### Added
+- Public **Vercel deployments**: an interactive playground (`POST /api/score`, real scoring
+  engine) and a community leaderboard (`/api/submit`, `/api/query`). (#50, #54)
+- Leaderboard **durable storage on Upstash Redis (Vercel KV, $0)** — atomic dedup upsert that
+  survives cold starts, plus a KV-backed per-IP rate limiter; transparent ephemeral `/tmp`
+  fallback when KV is not configured. (#58, #59)
+- **CodeQL** SAST workflow (`security-extended`, SHA-pinned, least-privilege). (#59)
+- Machine-readable version output / agentic-integration groundwork. (#57)
+
 ### Changed
 - **BREAKING: drop Python 3.9 support** — minimum supported version is now Python 3.10
   (`requires-python = ">=3.10"`). Python 3.9 reached end-of-life on 2025-10-31. The CI test
-  matrix and ruff `target-version` were updated accordingly.
+  matrix and ruff `target-version` were updated accordingly. (#55)
 - Modernized license metadata to the PEP 639 SPDX expression form (`license = "MIT"`), dropping
-  the deprecated `License :: OSI Approved :: MIT License` classifier. Requires `setuptools>=77`.
+  the deprecated `License :: OSI Approved :: MIT License` classifier. Requires `setuptools>=77`. (#55)
+- Playground now reports an **honest structural score** (renormalized over the four deterministic
+  dimensions) instead of a coverage-capped composite; removed a phantom `sync` dimension. (#54)
+
+### Fixed
+- Leaderboard submit read-modify-write **race + non-atomic write** (now flock-serialized +
+  atomic `os.replace`). (#58)
+- Vercel deployability (score.py `sys.path` bootstrap, `framework:null`, build-artifact
+  gitignore), JSON crash guard, `install.sh` hardening, CLI error UX, and web
+  a11y/contrast/keyboard + Google-Fonts CSP. (#50, #53, #55, #56)
+
+### Security
+- **Fix ReDoS / remote CPU-DoS in the scoring engine.** `_RE_REAL_EXAMPLES` / `_RE_DIFF_EXAMPLE`
+  used an unbounded `input.*output` (O(n²) under `findall`); a ~256KB single-line payload via the
+  public playground pegged a serverless function's CPU for ~90s. Bounded to `input.{0,200}?output`
+  (linear), regression-guarded, and the playground caps scored input at 32KB as defense-in-depth. (#59)
+- **Prompt-injection hardening** — nonce-wrap untrusted skill content in the judge and runtime
+  evaluators; pre-validate regex complexity. (#56)
+- Hardened web security headers across both apps: CSP (playground drops `script-src
+  'unsafe-inline'` via a sha256 pin), HSTS, **Permissions-Policy**, X-Frame-Options, nosniff,
+  Referrer-Policy, `Cache-Control: no-store`. (#50, #56, #59)
+- **Bound durable leaderboard submissions** (global 500/3600s + 10000-entry size cap) against
+  persistent pollution; NFKC + invisible-character dedup-bypass guard; generic 500s. (#50, #58, #59)
+- Supply chain & repo posture: SHA-pinned actions, OIDC trusted publishing, pinned `schliff` in
+  the web apps, `.env*.local` gitignored, and `main` branch protection (required CI checks). (#59)
 
 ## [8.1.0] - 2026-06-03
 
