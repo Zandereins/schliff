@@ -31,6 +31,15 @@ _SCRIPTS_DIR = list(_schliff_scripts.__path__)[0]
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
+# Engine version of the actually-installed schliff package. Emitted in responses
+# so a post-deploy drift check can assert that the live engine == the pinned
+# version (the gap that let a stale lock silently ship an unfixed engine).
+try:
+    import importlib.metadata  # noqa: E402
+    _ENGINE_VERSION = importlib.metadata.version("schliff")
+except Exception:  # pragma: no cover - metadata always present once installed
+    _ENGINE_VERSION = "unknown"
+
 # Hard cap on the raw request body (bounds bytes read off the socket).
 MAX_CONTENT_SIZE = 500 * 1024  # 500 KB
 # Hard cap on the actual skill text handed to the scoring engine. This is the
@@ -101,6 +110,7 @@ def _run_scoring(content: str, filename: str) -> dict:
             "measured_dimensions": composite.get("measured_dimensions", 0),
             "total_dimensions": composite.get("total_dimensions", 0),
             "weight_coverage": coverage,
+            "engine_version": _ENGINE_VERSION,
         }
     finally:
         try:
@@ -131,6 +141,7 @@ class handler(BaseHTTPRequestHandler):
             "service": "schliff-playground",
             "usage": "POST /api/score with {\"content\": \"...\", \"filename\": \"SKILL.md\"}",
             "max_size_kb": MAX_CONTENT_SIZE // 1024,
+            "engine_version": _ENGINE_VERSION,
         })
 
     def do_POST(self):

@@ -178,6 +178,42 @@ Logic is unit-tested (`skills/schliff/tests/unit/test_leaderboard_kv.py`, fake
 Upstash) + `test_leaderboard_storage.py` (the /tmp fallback); the live round-trip
 above is the only step that needs the real store.
 
+## 5b. Playground engine pin (source of truth + drift gate)
+
+The playground scores untrusted input with the real `schliff` engine, so the
+**deployed engine version is security-relevant** (a stale pin once shipped a
+ReDoS-vulnerable engine). The pin is governed by a **committed, hash-pinned
+`playground/uv.lock` + `playground/pyproject.toml`** — these are the single source
+of truth (this reverses #53/de081a2, whose "requirements.txt is authoritative"
+premise was false: the Vercel builder consumes `uv.lock` with `uv sync --frozen`
+and it OVERRIDES requirements.txt, and `.gitignore` does not stop `vercel deploy`
+from uploading a stale local lock). There is no `requirements.txt` anymore.
+
+**Bump the engine version:**
+
+```bash
+cd playground
+uv lock --upgrade-package "schliff==<new-version>"   # rewrites uv.lock with new hashes
+git add playground/pyproject.toml playground/uv.lock   # review the hash diff in the PR
+```
+
+**Deploy + the MANDATORY post-deploy assertion** (a clean `git status` is required
+first — the CLI uploads the working tree, not HEAD):
+
+```bash
+git status --porcelain playground/   # MUST be empty before deploying
+cd playground && vercel deploy --prod
+# assert the LIVE engine == the committed pin:
+INTENDED=$(grep -oE 'schliff==[0-9.]+' pyproject.toml | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+LIVE=$(curl -fsS https://schliff-playground.vercel.app/api/score | jq -r .engine_version)
+[ "$LIVE" = "$INTENDED" ] && echo "OK $LIVE" || echo "DRIFT: live=$LIVE intended=$INTENDED"
+```
+
+This same check runs daily in CI (`.github/workflows/playground-pin-drift.yml`) and
+on demand (`workflow_dispatch`), so a stale/dirty deploy is caught automatically
+rather than by luck. `score.py` emits `engine_version` on both `GET` and `POST
+/api/score`.
+
 ## 6. After launch
 
 - Watch `vercel logs <project> --prod` for 5xx / abuse spikes.
