@@ -288,4 +288,4 @@ under the top-level `security` field), never folded into the skill.md-family hea
 
 Version is single-sourced: the CLI reads it via
 `importlib.metadata.version("schliff")` (`_resolve_version` in `cli.py`), falling back
-to `dev` in a source checkout. Current release: **8.1.0**.
+to `dev` in a source checkout. Current release: **8.2.0**.
