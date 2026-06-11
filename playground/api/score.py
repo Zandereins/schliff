@@ -37,7 +37,10 @@ MAX_CONTENT_SIZE = 500 * 1024  # 500 KB
 # real compute-cost bound: the engine's work scales with this string's length,
 # so it must be enforced on the decoded value, not just the (spoofable)
 # Content-Length header.
-MAX_SKILL_CHARS = 256 * 1024  # 256 KB of text
+# 32 KB (was 256 KB): defense-in-depth against super-linear engine regexes on
+# untrusted input — bounds any residual O(n^2) hot path to well under a second.
+# Real SKILL.md files are <20 KB, so this rejects only pathological payloads.
+MAX_SKILL_CHARS = 32 * 1024  # 32 KB of text
 
 # Only alphanumeric, hyphens, underscores, dots — no path separators
 _SAFE_FILENAME_RE = re.compile(r"^[a-zA-Z0-9_\-]+\.md$")
