@@ -52,6 +52,12 @@ class FakeRedis:
             for f, v in self.hashes.get(key, {}).items():
                 flat.extend([f, v])
             return flat  # REST returns a flat [field, value, ...] array
+        if op == "HEXISTS":
+            _, key, field = args
+            return 1 if field in self.hashes.get(key, {}) else 0
+        if op == "HLEN":
+            _, key = args
+            return len(self.hashes.get(key, {}))
         if op == "INCR":
             _, key = args
             self.counters[key] = self.counters.get(key, 0) + 1
@@ -152,6 +158,22 @@ def test_rate_limit_fail_open_on_kv_error(kv):
     kv.raise_next = True
     # limiter must never block (or raise) when the KV backend errors
     assert submit._kv_rate_limited(submit._kv_config(), "rl:x", limit=1, window=60) is False
+
+
+# --- durable-pollution cap (P1 / dos-02 bound) ---------------------------------
+
+def test_upsert_rejects_new_identity_when_full_but_allows_updates(kv, monkeypatch):
+    cfg = submit._kv_config()
+    monkeypatch.setattr(submit, "MAX_SUBMISSIONS", 2)
+    submit._kv_upsert(cfg, _entry(skill="a", repo="https://github.com/u/a"))
+    submit._kv_upsert(cfg, _entry(skill="b", repo="https://github.com/u/b"))
+    # store now holds MAX_SUBMISSIONS distinct entries -> a brand-new identity is refused
+    with pytest.raises(submit.LeaderboardFullError):
+        submit._kv_upsert(cfg, _entry(skill="c", repo="https://github.com/u/c"))
+    # ...but updating an EXISTING identity still works (no lock-out of real users)
+    assert submit._kv_upsert(
+        cfg, {**_entry(skill="a", repo="https://github.com/u/a"), "composite": 1.0}) is True
+    assert len(kv.hashes[submit.SUBMISSIONS_KEY]) == 2  # cap held
 
 
 # --- cross-file sync guard -----------------------------------------------------
