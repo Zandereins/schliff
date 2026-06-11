@@ -35,8 +35,12 @@ __all__ = [
 # --- Structure patterns (SKILL.md-specific) ---
 _RE_FRONTMATTER_NAME = re.compile(r"^name:\s*\S+", re.MULTILINE)
 _RE_FRONTMATTER_DESC = re.compile(r"^description:", re.MULTILINE)
+# `input.{0,200}?output` (bounded, lazy) not `input.*output`: the unbounded
+# greedy form is O(n^2) under findall() and lets a ~256KB single-line payload peg
+# the playground CPU for ~90s (ReDoS). The 200-char window still catches genuine
+# "input … output" example pairs, which sit close together.
 _RE_REAL_EXAMPLES = re.compile(
-    r"(?i)(example\s*[0-9:#]|input.*output|e\.g\.|for instance|for example)"
+    r"(?i)(example\s*[0-9:#]|input.{0,200}?output|e\.g\.|for instance|for example)"
 )
 # Non-capturing group so findall() yields the FULL referenced path
 # (e.g. "references/patterns.md"), not just the bare resource-dir prefix.

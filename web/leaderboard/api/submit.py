@@ -204,9 +204,22 @@ def _exclusive_lock():
 # Active ONLY when the Upstash/Vercel-KV env vars are present. Absent -> every
 # helper below is bypassed and the /tmp path above runs unchanged, so merging this
 # is safe before the store is provisioned (`vercel install upstash`). stdlib-only.
-# KEEP THIS BLOCK BYTE-IDENTICAL to the copy in query.py — Vercel bundles each
+# KEEP THE SHARED HELPERS (_kv_config/_kv_command/_dedup_field/_client_ip/
+# _kv_rate_limited) BYTE-IDENTICAL to the copy in query.py — Vercel bundles each
 # function independently, so the two files cannot share a module (test enforces it).
+# The submit-only helpers/constants below (caps, _kv_upsert) live here only.
 SUBMISSIONS_KEY = "schliff:submissions"
+
+# Durable storage no longer self-heals on cold start, so dos-02 (coordinated
+# IP-rotation pollution) must be bounded explicitly (issue #51 follow-up):
+MAX_SUBMISSIONS = 10000        # hard cap on distinct entries (memory/cost/pollution)
+GLOBAL_SUBMIT_LIMIT = 500      # global writes per window, IP-rotation-proof
+GLOBAL_SUBMIT_WINDOW = 3600    # seconds (1 hour)
+
+
+class LeaderboardFullError(Exception):
+    """The durable store holds MAX_SUBMISSIONS distinct entries and the incoming
+    submission is a brand-new identity. Updates to existing entries still pass."""
 
 
 def _kv_config():
@@ -266,6 +279,12 @@ def _kv_upsert(cfg, entry):
     an existing entry was updated, False if newly inserted. One HSET = no
     read-modify-write race, durable across cold starts (issue #51)."""
     field = _dedup_field(entry["repo_url"], entry["skill_name"])
+    # Bound growth: once the store is full, refuse brand-new identities but keep
+    # accepting updates to existing rows. (HEXISTS->HLEN->HSET; the tiny TOCTOU
+    # window is acceptable for a DoS bound, not a precise invariant.)
+    if _kv_command(cfg, "HEXISTS", SUBMISSIONS_KEY, field) == 0:
+        if (_kv_command(cfg, "HLEN", SUBMISSIONS_KEY) or 0) >= MAX_SUBMISSIONS:
+            raise LeaderboardFullError
     result = _kv_command(cfg, "HSET", SUBMISSIONS_KEY, field,
                          json.dumps(entry, ensure_ascii=False))
     # HSET returns the count of NEW fields: 1 = inserted, 0 = updated existing.
@@ -338,9 +357,15 @@ class handler(BaseHTTPRequestHandler):
         }
 
         cfg = _kv_config()
-        if cfg and _kv_rate_limited(cfg, f"rl:submit:{_client_ip(self)}", 20, 60):
-            self._send_json(429, {"error": "rate limit exceeded"})
-            return
+        if cfg:
+            ip = _client_ip(self)
+            # Per-IP cap (defense in depth behind the firewall's 10/60s) AND a
+            # global cap that an IP-rotating attacker cannot bypass (dos-02).
+            if (_kv_rate_limited(cfg, f"rl:submit:{ip}", 20, 60)
+                    or _kv_rate_limited(cfg, "rl:submit:global",
+                                        GLOBAL_SUBMIT_LIMIT, GLOBAL_SUBMIT_WINDOW)):
+                self._send_json(429, {"error": "rate limit exceeded"})
+                return
 
         try:
             if cfg:
@@ -365,6 +390,9 @@ class handler(BaseHTTPRequestHandler):
                         entries.append(entry)
 
                     _save_submissions(entries)
+        except LeaderboardFullError:
+            self._send_json(429, {"error": "leaderboard is full"})
+            return
         except Exception as exc:
             print(f"Storage error: {type(exc).__name__}: {exc}", file=sys.stderr)
             self._send_json(500, {"error": "internal storage error"})
