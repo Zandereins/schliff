@@ -6,17 +6,22 @@ scoring engine, so a caller can claim any (valid-range) score. Every stored
 entry is therefore tagged `"verified": false`, and consumers must treat the
 leaderboard as untrusted, self-reported data, not as an authoritative ranking.
 
-There is NO per-IP/per-caller rate limiting in this function: serverless
-invocations share no state across cold starts, so a real cross-request limit
-cannot live here. Flood/abuse protection must be configured at the Vercel
-Firewall level (dashboard / `vercel firewall` CLI / REST API) — see the
-deploy-side checklist. Storage is also ephemeral /tmp (see DATA_DIR note below).
+STORAGE & RATE LIMITING are backend-dependent (see the DATA_DIR / KV notes below):
+when Upstash/Vercel-KV env vars are present, submissions are durable (Redis) and a
+KV-backed per-IP rate limit is enforced in-function; absent, storage is per-instance
+ephemeral /tmp and cross-request limiting must come from the Vercel Firewall
+(dashboard / `vercel firewall` CLI / REST API) — see the deploy-side runbook.
 """
 
+import contextlib
+import fcntl
+import hashlib
 import json
 import os
 import sys
+import tempfile
 import unicodedata
+import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse
@@ -35,11 +40,16 @@ OPTIONAL_DIMENSIONS = {"security"}
 # Full set of recognized keys; any key outside this is rejected.
 VALID_DIMENSIONS = REQUIRED_DIMENSIONS | OPTIONAL_DIMENSIONS
 
-# TODO: Replace with external storage (Vercel KV, Postgres, or Blob)
-# for production. /tmp is ephemeral — data is lost between cold starts.
-# This works for demo/prototype but NOT for persistent leaderboard data.
+# Storage is per-instance, ephemeral /tmp seeded from the bundled data file.
+# Within a warm instance, concurrent POSTs are serialized by an flock'd lock file
+# and writes are atomic (os.replace), so no entry is lost to a read-modify-write
+# race or torn read (issue #51 / tmp-01). DURABILITY across cold starts is a
+# separate, deferred concern: the chosen path is Upstash Redis (= Vercel KV, $0),
+# per docs/specs/schliff-registry-platform.md — gated on real leaderboard traffic.
+# Until then the leaderboard is demo-grade by design.
 DATA_DIR = "/tmp/schliff-leaderboard"
 DATA_PATH = os.path.join(DATA_DIR, "submissions.json")
+LOCK_PATH = os.path.join(DATA_DIR, ".lock")
 
 # Seed data path (bundled with deployment, read-only)
 SEED_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "submissions.json")
@@ -151,12 +161,115 @@ def _load_submissions():
 
 
 def _save_submissions(entries):
-    """Save submissions to /tmp (ephemeral)."""
+    """Atomically persist submissions: write a sibling temp file, fsync it, then
+    os.replace() into place so a concurrent reader never observes a torn file.
+    Callers mutate under _exclusive_lock() to also prevent lost updates."""
     os.makedirs(DATA_DIR, exist_ok=True)
     data = json.dumps(entries, indent=2, ensure_ascii=False)
-    with open(DATA_PATH, "w", encoding="utf-8") as f:
-        f.write(data)
-        f.flush()
+    fd, tmp_path = tempfile.mkstemp(dir=DATA_DIR, prefix=".submissions.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, DATA_PATH)
+    except BaseException:
+        # Never leave a partial temp file behind on failure.
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+@contextlib.contextmanager
+def _exclusive_lock():
+    """Serialize the submissions read-modify-write within a warm instance.
+
+    /tmp is per-instance, so an OS advisory lock (flock) on a sibling lock file is
+    enough to stop two concurrent POSTs from last-write-wins clobbering each other
+    (issue #51 / tmp-01). Cross-instance durability is out of scope here — see the
+    storage note above."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    lock_fd = os.open(LOCK_PATH, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
+
+# --- durable storage + rate-limit via Upstash Redis REST (issues #51/#52) -------
+# Active ONLY when the Upstash/Vercel-KV env vars are present. Absent -> every
+# helper below is bypassed and the /tmp path above runs unchanged, so merging this
+# is safe before the store is provisioned (`vercel install upstash`). stdlib-only.
+# KEEP THIS BLOCK BYTE-IDENTICAL to the copy in query.py — Vercel bundles each
+# function independently, so the two files cannot share a module (test enforces it).
+SUBMISSIONS_KEY = "schliff:submissions"
+
+
+def _kv_config():
+    """(url, token) for the Upstash REST API, or None when not configured."""
+    url = os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
+    token = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    return (url.rstrip("/"), token) if url and token else None
+
+
+def _kv_command(cfg, *args):
+    """Run one Redis command via the Upstash REST API and return its `result`.
+    Raises on transport / HTTP / Redis-level error."""
+    url, token = cfg
+    data = json.dumps([str(a) for a in args]).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data, method="POST",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    if isinstance(payload, dict) and "error" in payload:
+        raise RuntimeError(f"KV error: {payload['error']}")
+    return payload.get("result") if isinstance(payload, dict) else payload
+
+
+def _dedup_field(repo_url, skill_name):
+    """Stable hash of the (repo_url, skill_name) identity — the submissions-hash
+    field and the dedup key. Inputs are NFKC-normalized + invalid-char-rejected
+    upstream, so this is a 1:1 identity."""
+    return hashlib.sha256(f"{repo_url}\n{skill_name}".encode("utf-8")).hexdigest()
+
+
+def _client_ip(handler):
+    """Best-effort client IP from Vercel's forwarding headers."""
+    fwd = handler.headers.get("x-forwarded-for", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return handler.headers.get("x-real-ip", "") or "unknown"
+
+
+def _kv_rate_limited(cfg, key, limit, window):
+    """Fixed-window per-key limiter (INCR + EXPIRE on first hit). Returns True to
+    block. Fail-open: any KV error -> not limited (never break a request because the
+    limiter is unreachable)."""
+    try:
+        count = _kv_command(cfg, "INCR", key)
+        if count == 1:
+            _kv_command(cfg, "EXPIRE", key, window)
+        return count > limit
+    except Exception as exc:
+        print(f"Rate-limit check skipped (KV error): {type(exc).__name__}: {exc}", file=sys.stderr)
+        return False
+
+
+def _kv_upsert(cfg, entry):
+    """Atomic insert-or-update of one entry in the submissions hash. Returns True if
+    an existing entry was updated, False if newly inserted. One HSET = no
+    read-modify-write race, durable across cold starts (issue #51)."""
+    field = _dedup_field(entry["repo_url"], entry["skill_name"])
+    result = _kv_command(cfg, "HSET", SUBMISSIONS_KEY, field,
+                         json.dumps(entry, ensure_ascii=False))
+    # HSET returns the count of NEW fields: 1 = inserted, 0 = updated existing.
+    return result == 0
 
 
 class handler(BaseHTTPRequestHandler):
@@ -224,22 +337,34 @@ class handler(BaseHTTPRequestHandler):
             "verified": False,
         }
 
+        cfg = _kv_config()
+        if cfg and _kv_rate_limited(cfg, f"rl:submit:{_client_ip(self)}", 20, 60):
+            self._send_json(429, {"error": "rate limit exceeded"})
+            return
+
         try:
-            entries = _load_submissions()
+            if cfg:
+                # Durable, atomic upsert — no read-modify-write, no cold-start loss.
+                updated = _kv_upsert(cfg, entry)
+            else:
+                # /tmp fallback (demo-grade). Hold the lock across load->dedup->save
+                # so two concurrent POSTs cannot last-write-wins clobber each other.
+                with _exclusive_lock():
+                    entries = _load_submissions()
 
-            # Dedup: update existing entry if repo_url + skill_name match.
-            key_repo = entry["repo_url"]
-            key_skill = entry["skill_name"]
-            updated = False
-            for i, existing in enumerate(entries):
-                if existing.get("repo_url") == key_repo and existing.get("skill_name") == key_skill:
-                    entries[i] = entry
-                    updated = True
-                    break
-            if not updated:
-                entries.append(entry)
+                    # Dedup: update existing entry if repo_url + skill_name match.
+                    key_repo = entry["repo_url"]
+                    key_skill = entry["skill_name"]
+                    updated = False
+                    for i, existing in enumerate(entries):
+                        if existing.get("repo_url") == key_repo and existing.get("skill_name") == key_skill:
+                            entries[i] = entry
+                            updated = True
+                            break
+                    if not updated:
+                        entries.append(entry)
 
-            _save_submissions(entries)
+                    _save_submissions(entries)
         except Exception as exc:
             print(f"Storage error: {type(exc).__name__}: {exc}", file=sys.stderr)
             self._send_json(500, {"error": "internal storage error"})

@@ -7,9 +7,11 @@ clients can render an appropriate "community-submitted, not verified" notice.
 Read-only; CORS handled in vercel.json.
 """
 
+import hashlib
 import json
 import os
 import sys
+import urllib.request
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -95,6 +97,103 @@ def _sort_key(entry, sort_field):
     return entry.get("dimensions", {}).get(sort_field, 0)
 
 
+# --- durable storage + rate-limit via Upstash Redis REST (issues #51/#52) -------
+# Active ONLY when the Upstash/Vercel-KV env vars are present. Absent -> every
+# helper below is bypassed and the /tmp path above runs unchanged, so merging this
+# is safe before the store is provisioned (`vercel install upstash`). stdlib-only.
+# KEEP THIS BLOCK BYTE-IDENTICAL to the copy in submit.py — Vercel bundles each
+# function independently, so the two files cannot share a module (test enforces it).
+SUBMISSIONS_KEY = "schliff:submissions"
+
+
+def _kv_config():
+    """(url, token) for the Upstash REST API, or None when not configured."""
+    url = os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
+    token = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    return (url.rstrip("/"), token) if url and token else None
+
+
+def _kv_command(cfg, *args):
+    """Run one Redis command via the Upstash REST API and return its `result`.
+    Raises on transport / HTTP / Redis-level error."""
+    url, token = cfg
+    data = json.dumps([str(a) for a in args]).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data, method="POST",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    if isinstance(payload, dict) and "error" in payload:
+        raise RuntimeError(f"KV error: {payload['error']}")
+    return payload.get("result") if isinstance(payload, dict) else payload
+
+
+def _dedup_field(repo_url, skill_name):
+    """Stable hash of the (repo_url, skill_name) identity — the submissions-hash
+    field and the dedup key. Inputs are NFKC-normalized + invalid-char-rejected
+    upstream, so this is a 1:1 identity."""
+    return hashlib.sha256(f"{repo_url}\n{skill_name}".encode("utf-8")).hexdigest()
+
+
+def _client_ip(handler):
+    """Best-effort client IP from Vercel's forwarding headers."""
+    fwd = handler.headers.get("x-forwarded-for", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return handler.headers.get("x-real-ip", "") or "unknown"
+
+
+def _kv_rate_limited(cfg, key, limit, window):
+    """Fixed-window per-key limiter (INCR + EXPIRE on first hit). Returns True to
+    block. Fail-open: any KV error -> not limited (never break a request because the
+    limiter is unreachable)."""
+    try:
+        count = _kv_command(cfg, "INCR", key)
+        if count == 1:
+            _kv_command(cfg, "EXPIRE", key, window)
+        return count > limit
+    except Exception as exc:
+        print(f"Rate-limit check skipped (KV error): {type(exc).__name__}: {exc}", file=sys.stderr)
+        return False
+
+
+def _load_seed():
+    """Bundled, read-only demo rows (data/submissions.json)."""
+    if os.path.exists(SEED_PATH):
+        with open(SEED_PATH, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            return json.loads(content) if content else []
+    return []
+
+
+def _kv_load_all(cfg):
+    """All submissions from KV, unioned with bundled seed rows not yet resubmitted
+    into KV (KV wins on identity conflict). HGETALL over REST returns a flat
+    [field, value, field, value, ...] array."""
+    raw = _kv_command(cfg, "HGETALL", SUBMISSIONS_KEY)
+    if isinstance(raw, list):
+        values = raw[1::2]
+    elif isinstance(raw, dict):
+        values = list(raw.values())
+    else:
+        values = []
+
+    entries, seen = [], set()
+    for v in values:
+        try:
+            e = json.loads(v)
+        except (ValueError, TypeError):
+            continue
+        entries.append(e)
+        seen.add(_dedup_field(e.get("repo_url", ""), e.get("skill_name", "")))
+
+    for e in _load_seed():
+        if _dedup_field(e.get("repo_url", ""), e.get("skill_name", "")) not in seen:
+            entries.append(e)
+    return entries
+
+
 class handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
@@ -114,6 +213,13 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        # Per-IP read rate-limit when KV is configured (issue #52); the firewall's
+        # single rule is spent on /api/submit, so this is the cap for /api/query.
+        cfg = _kv_config()
+        if cfg and _kv_rate_limited(cfg, f"rl:query:{_client_ip(self)}", 100, 60):
+            self._send_json(429, {"error": "rate limit exceeded"})
+            return
+
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
 
@@ -176,7 +282,7 @@ class handler(BaseHTTPRequestHandler):
                 return
 
         try:
-            entries = _load_submissions()
+            entries = _kv_load_all(cfg) if cfg else _load_submissions()
         except Exception as exc:
             print(f"Storage error: {type(exc).__name__}: {exc}", file=sys.stderr)
             self._send_json(500, {"error": "internal storage error"})
