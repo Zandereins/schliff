@@ -7,3 +7,4 @@
 pyproject.toml
 uv.lock
 .python-version
+.env*.local
