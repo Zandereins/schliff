@@ -1,11 +1,14 @@
 # Vercel CLI link state
 .vercel
 
-# Vercel's Python builder synthesizes these locally from requirements.txt on
-# every `vercel build` / `vercel deploy`. They are BUILD OUTPUT, not source.
-# requirements.txt (schliff==8.1.0) is the single source of truth for the pin.
-# Committing them creates a second manifest that can override the pin on a
-# future build (see vercel/vercel#14041). Keep them out of git.
-# (.python-version IS tracked here on purpose — it pins the runtime to 3.12.)
-pyproject.toml
-uv.lock
+# pyproject.toml + uv.lock are TRACKED on purpose. This REVERSES #53/de081a2,
+# whose premise was empirically false: the Vercel Python builder consumes a
+# provided uv.lock with `uv sync --frozen` and it takes PRECEDENCE over
+# requirements.txt, and `.gitignore` does NOT stop `vercel deploy` from uploading
+# local files (only `.vercelignore` does). So "ignore the lock, trust
+# requirements.txt" let a STALE LOCAL uv.lock silently ship the wrong engine
+# (the 8.1.0->8.2.0 ReDoS-fix miss). The committed, hash-pinned uv.lock +
+# pyproject.toml are now the single reproducible source of truth; bump via
+# `uv lock --upgrade-package schliff==<ver>` and review the hash diff.
+# `!uv.lock` re-includes it past the repo-root global `uv.lock` ignore.
+!uv.lock
