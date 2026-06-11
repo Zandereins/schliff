@@ -106,6 +106,25 @@ vercel firewall publish --scope zaneins-projects --yes
 > unauthenticated/unverified → 10/min/IP limits flooding. `/api/query` is
 > read-only; cap it only if you see abuse.
 
+> **`/api/query` rate limit — accepted residual (issue #52).** A per-IP cap on
+> the read-only query endpoint needs a *second* firewall rule, which this plan
+> rejects (see the plan limit above). The endpoint is read-only, returns only
+> public `unverified:true` data (no confidentiality), and already caps results
+> in code (`limit`/`offset`, max 200), so the residual risk is just
+> function-invocation cost / mild DoS — **accepted at current (near-zero)
+> traffic.** Two zero-/low-cost fixes when it matters: (a) upgrade to a plan that
+> allows a 2nd rule, then run the command below; or (b) a KV-backed global
+> counter (same Upstash Redis store as the persistence migration in §5).
+>
+> ```bash
+> # Ready when on a plan that allows a 2nd rate-limit rule (from web/leaderboard/):
+> vercel firewall rules add "rl-api-query" --scope zaneins-projects --yes \
+>   --action rate_limit --rate-limit-requests 100 --rate-limit-window 60 \
+>   --rate-limit-keys ip --rate-limit-action deny \
+>   --condition '{"type":"path","op":"pre","value":"/api/query"}'
+> vercel firewall publish --scope zaneins-projects --yes
+> ```
+
 ## 4. Verify the gate is live
 
 ```bash
@@ -121,10 +140,20 @@ for i in $(seq 1 75); do curl -s -o /dev/null -w "%{http_code}\n" \
 ## 5. Persistence (leaderboard) — known limitation
 
 `web/leaderboard/api/{submit,query}.py` store to `/tmp/schliff-leaderboard`,
-which is **wiped on every cold start** (documented `TODO` in `submit.py`). The
-leaderboard is demo-grade until migrated to durable storage (Vercel KV / Postgres
-/ Blob). For a real launch, provision Vercel KV and swap `_load_submissions` /
-`_save_submissions` before relying on submitted data.
+which is **wiped on every cold start** (documented note in `submit.py`). The
+leaderboard is demo-grade until migrated to durable storage.
+
+- **Within-instance integrity is fixed (issue #51 / tmp-01).** `submit.py` now
+  serializes the read-modify-write under an `flock`'d lock file and writes
+  atomically (`os.replace`), so concurrent POSTs to a warm instance no longer
+  last-write-wins clobber each other and readers never see a torn file. Covered
+  by `skills/schliff/tests/unit/test_leaderboard_storage.py`.
+- **Cross-cold-start durability is still open (issue #51, deferred).** The chosen
+  path is **Upstash Redis (= Vercel KV, $0)** per
+  `docs/specs/schliff-registry-platform.md` (roadmap "Leaderboard Persist"). For a
+  real launch, provision the KV store and swap `_load_submissions` /
+  `_save_submissions` (+ add a KV-backed global write rate-limit) before relying
+  on submitted data. Gated on real leaderboard traffic.
 
 ## 6. After launch
 - Watch `vercel logs <project> --prod` for 5xx / abuse spikes.

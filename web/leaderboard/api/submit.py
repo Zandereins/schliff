@@ -13,9 +13,12 @@ Firewall level (dashboard / `vercel firewall` CLI / REST API) — see the
 deploy-side checklist. Storage is also ephemeral /tmp (see DATA_DIR note below).
 """
 
+import contextlib
+import fcntl
 import json
 import os
 import sys
+import tempfile
 import unicodedata
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
@@ -35,11 +38,16 @@ OPTIONAL_DIMENSIONS = {"security"}
 # Full set of recognized keys; any key outside this is rejected.
 VALID_DIMENSIONS = REQUIRED_DIMENSIONS | OPTIONAL_DIMENSIONS
 
-# TODO: Replace with external storage (Vercel KV, Postgres, or Blob)
-# for production. /tmp is ephemeral — data is lost between cold starts.
-# This works for demo/prototype but NOT for persistent leaderboard data.
+# Storage is per-instance, ephemeral /tmp seeded from the bundled data file.
+# Within a warm instance, concurrent POSTs are serialized by an flock'd lock file
+# and writes are atomic (os.replace), so no entry is lost to a read-modify-write
+# race or torn read (issue #51 / tmp-01). DURABILITY across cold starts is a
+# separate, deferred concern: the chosen path is Upstash Redis (= Vercel KV, $0),
+# per docs/specs/schliff-registry-platform.md — gated on real leaderboard traffic.
+# Until then the leaderboard is demo-grade by design.
 DATA_DIR = "/tmp/schliff-leaderboard"
 DATA_PATH = os.path.join(DATA_DIR, "submissions.json")
+LOCK_PATH = os.path.join(DATA_DIR, ".lock")
 
 # Seed data path (bundled with deployment, read-only)
 SEED_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "submissions.json")
@@ -151,12 +159,43 @@ def _load_submissions():
 
 
 def _save_submissions(entries):
-    """Save submissions to /tmp (ephemeral)."""
+    """Atomically persist submissions: write a sibling temp file, fsync it, then
+    os.replace() into place so a concurrent reader never observes a torn file.
+    Callers mutate under _exclusive_lock() to also prevent lost updates."""
     os.makedirs(DATA_DIR, exist_ok=True)
     data = json.dumps(entries, indent=2, ensure_ascii=False)
-    with open(DATA_PATH, "w", encoding="utf-8") as f:
-        f.write(data)
-        f.flush()
+    fd, tmp_path = tempfile.mkstemp(dir=DATA_DIR, prefix=".submissions.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, DATA_PATH)
+    except BaseException:
+        # Never leave a partial temp file behind on failure.
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+@contextlib.contextmanager
+def _exclusive_lock():
+    """Serialize the submissions read-modify-write within a warm instance.
+
+    /tmp is per-instance, so an OS advisory lock (flock) on a sibling lock file is
+    enough to stop two concurrent POSTs from last-write-wins clobbering each other
+    (issue #51 / tmp-01). Cross-instance durability is out of scope here — see the
+    storage note above."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    lock_fd = os.open(LOCK_PATH, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
 
 
 class handler(BaseHTTPRequestHandler):
@@ -225,21 +264,24 @@ class handler(BaseHTTPRequestHandler):
         }
 
         try:
-            entries = _load_submissions()
+            # Hold the lock across load->dedup->save so two concurrent POSTs
+            # cannot both read the old list and last-write-wins clobber each other.
+            with _exclusive_lock():
+                entries = _load_submissions()
 
-            # Dedup: update existing entry if repo_url + skill_name match.
-            key_repo = entry["repo_url"]
-            key_skill = entry["skill_name"]
-            updated = False
-            for i, existing in enumerate(entries):
-                if existing.get("repo_url") == key_repo and existing.get("skill_name") == key_skill:
-                    entries[i] = entry
-                    updated = True
-                    break
-            if not updated:
-                entries.append(entry)
+                # Dedup: update existing entry if repo_url + skill_name match.
+                key_repo = entry["repo_url"]
+                key_skill = entry["skill_name"]
+                updated = False
+                for i, existing in enumerate(entries):
+                    if existing.get("repo_url") == key_repo and existing.get("skill_name") == key_skill:
+                        entries[i] = entry
+                        updated = True
+                        break
+                if not updated:
+                    entries.append(entry)
 
-            _save_submissions(entries)
+                _save_submissions(entries)
         except Exception as exc:
             print(f"Storage error: {type(exc).__name__}: {exc}", file=sys.stderr)
             self._send_json(500, {"error": "internal storage error"})
