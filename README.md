@@ -4,7 +4,7 @@
 
 **A deterministic quality scorer for AI instruction files.** Same input, same score — every time, on every machine. Think the [Ruff](https://github.com/astral-sh/ruff) for `SKILL.md`, `CLAUDE.md`, and `AGENTS.md`. It measures the things linters miss, the same way every time, so degradation shows up as a number that drops instead of a bug you chase.
 
-[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.1.0)](https://pypi.org/project/schliff/)
+[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.2.0)](https://pypi.org/project/schliff/)
 [![Python](https://img.shields.io/pypi/pyversions/schliff)](https://pypi.org/project/schliff/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
@@ -17,7 +17,7 @@ schliff score path/to/SKILL.md
 ```
 
 ```text
-schliff v8.1.0
+schliff v8.2.0
 
   structure      ████████░░   78/100  good
   triggers       ███████░░░   72/100  good
@@ -151,7 +151,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/Zandereins/schliff
-    rev: v8.1.0
+    rev: v8.2.0
     hooks:
       - id: schliff-verify
         args: ['--min-score', '75']
