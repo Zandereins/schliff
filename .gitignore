@@ -60,3 +60,6 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# Local uv dev lockfile — schliff ships as a library via pyproject (no dep pinning)
+uv.lock

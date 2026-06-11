@@ -60,7 +60,7 @@ The loop stops automatically when:
 ## Notes
 
 - Each iteration makes ONE atomic change, scores, and keeps or reverts
-- All changes are git-committed — full history preserved
+- Score history is tracked in `.schliff/history.jsonl`; file changes are NOT auto-committed to git — commit yourself to preserve them
 - Deterministic patches (frontmatter fixes, TODO cleanup) are applied directly
 - Non-deterministic improvements may invoke Claude for generation
 - Use `--dry-run` to preview without modifying files

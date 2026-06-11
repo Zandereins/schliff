@@ -202,6 +202,7 @@ def cmd_score(args: argparse.Namespace) -> None:
             result = {
                 "skill_path": display_source,
                 "format": detected_fmt,
+                "version": _resolve_version(),
                 "composite_score": composite["score"],
                 "dimensions": {k: _json_dim(v) for k, v in scores.items()},
                 "dimension_status": {
@@ -225,7 +226,10 @@ def cmd_score(args: argparse.Namespace) -> None:
                 gradients = text_gradient.compute_gradients(
                     skill_path, eval_suite, include_clarity=True,
                 )
-                fix_count = len(gradients)
+                # Honest count: only patches /schliff:auto can actually apply,
+                # not every diagnosed gradient (many are manual-only). Mirrors
+                # evolve/engine.py so the displayed number matches what runs.
+                fix_count = len(text_gradient.generate_patches(skill_path, gradients))
             except Exception as exc:
                 print(f"Warning: could not compute fix count: {exc}", file=sys.stderr)
                 fix_count = 0
