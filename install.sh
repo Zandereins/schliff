@@ -173,20 +173,27 @@ fi
 echo ""
 
 # --- Backup existing installation on update ---
+# Backups live OUTSIDE ~/.claude/skills and ~/.claude/commands: Claude Code
+# scans every subdirectory there as a skill/command, so a *.bak.* folder under
+# those paths would duplicate the entire /schliff:* namespace.
 if [ "$MODE" = "update" ]; then
-    BACKUP_DIR="$HOME/.claude/skills/schliff.bak.$(date +%Y%m%d%H%M%S)"
+    BACKUP_ROOT="$HOME/.claude/backups/schliff"
+    mkdir -p "$BACKUP_ROOT"
+    STAMP="$(date +%Y%m%d%H%M%S)"
+
+    BACKUP_DIR="$BACKUP_ROOT/skills.bak.$STAMP"
     cp -r "$SKILLS_DST" "$BACKUP_DIR"
     ok "Backed up existing skills to $BACKUP_DIR"
 
     if [ -d "$COMMANDS_DST" ]; then
-        CMDS_BACKUP="$HOME/.claude/commands/schliff.bak.$(date +%Y%m%d%H%M%S)"
+        CMDS_BACKUP="$BACKUP_ROOT/commands.bak.$STAMP"
         cp -r "$COMMANDS_DST" "$CMDS_BACKUP"
         ok "Backed up existing commands to $CMDS_BACKUP"
     fi
 
-    # Clean up old backups, keep most recent 3
-    ls -dt "$HOME/.claude/skills/schliff.bak."* 2>/dev/null | tail -n +4 | xargs -I {} rm -rf "{}" 2>/dev/null
-    ls -dt "$HOME/.claude/commands/schliff.bak."* 2>/dev/null | tail -n +4 | xargs -I {} rm -rf "{}" 2>/dev/null
+    # Clean up old backups, keep most recent 3 of each kind
+    ls -dt "$BACKUP_ROOT/skills.bak."* 2>/dev/null | tail -n +4 | xargs -I {} rm -rf "{}" 2>/dev/null
+    ls -dt "$BACKUP_ROOT/commands.bak."* 2>/dev/null | tail -n +4 | xargs -I {} rm -rf "{}" 2>/dev/null
 fi
 
 # --- Install ---
