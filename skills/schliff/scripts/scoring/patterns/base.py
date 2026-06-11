@@ -213,8 +213,11 @@ _RE_DIFF_SIGNAL = re.compile(
     r"Extract|Transform|Import|Export|Send|Fetch|Call|Return)\b",
     re.IGNORECASE,
 )
+# Bounded `input.{0,200}?output` (not greedy `input.*output`): the unbounded form
+# is O(n^2) under findall() — ReDoS on large single-line input. 200 chars still
+# catches genuine "input … output" example pairs.
 _RE_DIFF_EXAMPLE = re.compile(
-    r"(?i)(example\s*[0-9:#]|input.*output|e\.g\.|for instance|for example)"
+    r"(?i)(example\s*[0-9:#]|input.{0,200}?output|e\.g\.|for instance|for example)"
 )
 _RE_DIFF_NOISE = re.compile(
     r"(?i)(you (might|could|should|may) (want to|consider|possibly)|"
