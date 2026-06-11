@@ -106,18 +106,18 @@ vercel firewall publish --scope zaneins-projects --yes
 > unauthenticated/unverified → 10/min/IP limits flooding. `/api/query` is
 > read-only; cap it only if you see abuse.
 
-> **`/api/query` rate limit — accepted residual (issue #52).** A per-IP cap on
-> the read-only query endpoint needs a *second* firewall rule, which this plan
-> rejects (see the plan limit above). The endpoint is read-only, returns only
-> public `unverified:true` data (no confidentiality), and already caps results
-> in code (`limit`/`offset`, max 200), so the residual risk is just
-> function-invocation cost / mild DoS — **accepted at current (near-zero)
-> traffic.** Two zero-/low-cost fixes when it matters: (a) upgrade to a plan that
-> allows a 2nd rule, then run the command below; or (b) a KV-backed global
-> counter (same Upstash Redis store as the persistence migration in §5).
+> **`/api/query` rate limit (issue #52) — solved by KV, no 2nd firewall rule
+> needed.** A *firewall* per-IP cap needs a second rule, which this plan rejects
+> (see the plan limit above). Instead, once Upstash is provisioned (see §5), the
+> functions enforce a **KV-backed per-IP limiter in code**: 100/60s/IP on
+> `/api/query` and 20/60s/IP on `/api/submit` (defense in depth behind the
+> firewall's 10/60s). Fail-open: a KV outage never blocks a request. Until Upstash
+> is provisioned the endpoint stays uncapped — accepted at current near-zero
+> traffic (read-only, public `unverified:true` data, results capped at 200 in code).
+> A firewall rule remains available as an alternative on a higher plan:
 >
 > ```bash
-> # Ready when on a plan that allows a 2nd rate-limit rule (from web/leaderboard/):
+> # Alternative (only if NOT using the KV limiter, and on a plan allowing a 2nd rule):
 > vercel firewall rules add "rl-api-query" --scope zaneins-projects --yes \
 >   --action rate_limit --rate-limit-requests 100 --rate-limit-window 60 \
 >   --rate-limit-keys ip --rate-limit-action deny \
@@ -137,25 +137,49 @@ for i in $(seq 1 75); do curl -s -o /dev/null -w "%{http_code}\n" \
 > Note: the `deny` action returns **403 Forbidden**, not 429. Both mean blocked;
 > if you specifically want 429, use a `rate_limit`/challenge action instead.
 
-## 5. Persistence (leaderboard) — known limitation
+## 5. Persistence (leaderboard) — durable storage via Upstash (issue #51)
 
-`web/leaderboard/api/{submit,query}.py` store to `/tmp/schliff-leaderboard`,
-which is **wiped on every cold start** (documented note in `submit.py`). The
-leaderboard is demo-grade until migrated to durable storage.
+`web/leaderboard/api/{submit,query}.py` support **two storage backends**, chosen at
+runtime by whether the Upstash/Vercel-KV env vars are present (design:
+`docs/specs/2026-06-11-leaderboard-kv-storage.md`):
 
-- **Within-instance integrity is fixed (issue #51 / tmp-01).** `submit.py` now
-  serializes the read-modify-write under an `flock`'d lock file and writes
-  atomically (`os.replace`), so concurrent POSTs to a warm instance no longer
-  last-write-wins clobber each other and readers never see a torn file. Covered
-  by `skills/schliff/tests/unit/test_leaderboard_storage.py`.
-- **Cross-cold-start durability is still open (issue #51, deferred).** The chosen
-  path is **Upstash Redis (= Vercel KV, $0)** per
-  `docs/specs/schliff-registry-platform.md` (roadmap "Leaderboard Persist"). For a
-  real launch, provision the KV store and swap `_load_submissions` /
-  `_save_submissions` (+ add a KV-backed global write rate-limit) before relying
-  on submitted data. Gated on real leaderboard traffic.
+- **Durable (Upstash Redis / Vercel KV, $0)** — when `KV_REST_API_URL` +
+  `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_*`) are set, submissions live in a
+  Redis hash. Each submit is one atomic `HSET` (dedup + no read-modify-write race,
+  durable across cold starts); query does `HGETALL` unioned with the bundled seed
+  rows. stdlib-only (`urllib`), no new dependency. **This is the fix for #51.**
+- **`/tmp` fallback (demo-grade)** — when the env vars are absent, the endpoints use
+  the per-instance `/tmp` store, **wiped on every cold start**. The within-instance
+  race is still fixed there (flock + atomic `os.replace`, #51 / tmp-01). This is the
+  default until Upstash is provisioned, so deploying the KV code changes nothing
+  until you opt in.
+
+**Provision (one-time, Franz's step):**
+
+```bash
+# from web/leaderboard/ (linked to schliff-leaderboard)
+vercel install upstash      # provisions Upstash Redis + syncs KV_REST_API_* env vars
+vercel deploy --prod        # redeploy so the functions pick up the env vars
+```
+
+**Verify durability is live (before closing #51/#52):**
+
+```bash
+# POST a submission, force a redeploy (new cold start), then confirm it survived:
+curl -s -X POST https://schliff-leaderboard.vercel.app/api/submit \
+  -H 'Content-Type: application/json' \
+  -d '{"skill_name":"kv-smoke","repo_url":"https://github.com/Zandereins/schliff","format":"SKILL.md","composite":88,"grade":"A","version":"8.1.0","dimensions":{"structure":90,"triggers":90,"quality":90,"edges":90,"efficiency":90,"composability":90,"clarity":90}}'
+vercel deploy --prod
+curl -s 'https://schliff-leaderboard.vercel.app/api/query?limit=200' | grep -c kv-smoke   # expect >=1 after cold start
+# /api/query limiter: 100 GETs in <60s from one IP -> the 101st returns 429.
+```
+
+Logic is unit-tested (`skills/schliff/tests/unit/test_leaderboard_kv.py`, fake
+Upstash) + `test_leaderboard_storage.py` (the /tmp fallback); the live round-trip
+above is the only step that needs the real store.
 
 ## 6. After launch
+
 - Watch `vercel logs <project> --prod` for 5xx / abuse spikes.
 - Custom domains (optional): Project → Domains.
 - The leaderboard already tags every entry `verified:false` / `unverified:true`
