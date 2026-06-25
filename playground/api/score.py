@@ -99,7 +99,10 @@ def _run_scoring(content: str, filename: str) -> dict:
         # (structural_score = composite / weight_coverage). The canonical
         # full-denominator composite is still returned for transparency.
         scores = build_scores(skill_path, eval_suite=None, include_runtime=False, fmt=fmt)
-        composite = compute_composite(scores)
+        # Pass fmt so the format's headline profile applies — e.g. AGENTS.md is
+        # scored on structure+efficiency (no eval-gated dims), not the SKILL.md
+        # rubric that would otherwise cap it and emit an "add an eval suite" warning.
+        composite = compute_composite(scores, fmt=fmt)
 
         coverage = composite.get("weight_coverage", 0) or 0
         full_score = composite["score"]
@@ -116,6 +119,7 @@ def _run_scoring(content: str, filename: str) -> dict:
             "measured_dimensions": composite.get("measured_dimensions", 0),
             "total_dimensions": composite.get("total_dimensions", 0),
             "weight_coverage": coverage,
+            "format": fmt,
             "engine_version": _ENGINE_VERSION,
         }
     finally:
