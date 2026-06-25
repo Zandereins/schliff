@@ -269,3 +269,18 @@ def test_is_reserved_identity_matches_canonical_variants():
     assert submit._is_reserved_identity("https://github.com/zandereins/schliff?x=1", "schliff")
     assert not submit._is_reserved_identity("https://github.com/Zandereins/schliff", "other")
     assert not submit._is_reserved_identity("https://gitlab.com/zandereins/schliff", "schliff")
+
+
+def test_dot_git_spelling_is_reserved():
+    # The .git spelling must not slip past the defense-in-depth _kv_upsert guard.
+    assert submit._is_reserved_identity("https://github.com/zandereins/schliff.git", "schliff")
+
+
+def test_real_seed_both_same_repo_rows_survive_union(kv, monkeypatch):
+    # Both shipped seed rows now canonicalize to the same repo (zandereins/schliff)
+    # but have distinct skill_names (schliff, shieldclaw); they must NOT collapse in
+    # the seed-union, or a repo_url-only dedup regression would silently drop one.
+    real_seed = Path(__file__).resolve().parents[4] / "web" / "leaderboard" / "data" / "submissions.json"
+    monkeypatch.setattr(query, "SEED_PATH", str(real_seed))
+    loaded = query._kv_load_all(query._kv_config())  # empty KV -> seed only
+    assert {"schliff", "shieldclaw"} <= {e["skill_name"] for e in loaded}

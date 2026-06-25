@@ -62,12 +62,15 @@ SEED_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "submissions.j
 # cannot silently rot:
 #   Cc control, Cf format (bidi overrides + zero-width + Tag chars U+E00xx),
 #   Cs surrogate, Co private-use, Cn unassigned.
-# skill_name is a single-line identity field: TAB/CR/LF (all category Cc) are
-# rejected, which also blocks newline-injection into the "repo_url\nskill_name"
-# dedup string. A few blank-rendering Hangul fillers carry category Lo and so
-# escape the category gate — list them explicitly.
-_DISALLOWED_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
-_BLANK_FILLERS = {0x115F, 0x1160, 0x3164, 0xFFA0, 0x180E}
+# skill_name is a single-line identity field: TAB/CR/LF (all category Cc) and the
+# Zl/Zp line/paragraph separators (U+2028/U+2029) are rejected, which also blocks
+# newline-injection into the "repo_url\nskill_name" dedup string. A few
+# blank-rendering or genuinely-invisible code points carry a category that escapes
+# the gate (Hangul fillers Lo, combining grapheme joiner U+034F Mn) — list them
+# explicitly. NOTE: we do NOT reject all of Mn — legitimate scripts use combining
+# marks — only the look-identical CGJ.
+_DISALLOWED_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"}
+_BLANK_FILLERS = {0x115F, 0x1160, 0x3164, 0xFFA0, 0x180E, 0x034F}
 
 # --- scoring-model epoch -----------------------------------------------------
 # v8.0 introduced the full-denominator composite (PR #41/#42): a breaking scale
@@ -275,6 +278,7 @@ class ReservedIdentityError(Exception):
 # (case, trailing slash, /tree/<ref>, ?query) regardless of LB-1 canonicalization.
 RESERVED_IDENTITY = frozenset({
     ("zandereins", "schliff", "schliff"),
+    ("zandereins", "schliff", "shieldclaw"),  # the curated 94.6/A showcase seed row
 })
 
 
@@ -291,7 +295,10 @@ def _reserved_identity_key(repo_url, skill_name):
     segments = [s for s in parsed.path.split("/") if s]
     if len(segments) < 2:
         return None
-    return (segments[0].lower(), segments[1].lower(), skill_name)
+    repo = segments[1].lower()
+    if repo.endswith(".git"):  # match _canonical_repo_url so a .git spelling can't slip past
+        repo = repo[:-4]
+    return (segments[0].lower(), repo, skill_name)
 
 
 def _is_reserved_identity(repo_url, skill_name):
