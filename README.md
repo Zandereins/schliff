@@ -266,7 +266,7 @@ Ruff lints your Python. Biome lints your JS. Schliff lints the instruction files
 > additionally folds in triggers, quality, and edges — which require an eval suite
 > (`schliff init`).
 
-Validated by **1,231 tests** (unit + integration) in `skills/schliff/tests`, with separate self and proof suites via `test-self.sh` and `test-integration.sh`.
+Validated by **1,288 tests** (unit + integration) in `skills/schliff/tests`, with separate self and proof suites via `test-self.sh` and `test-integration.sh`.
 
 ## License
 
