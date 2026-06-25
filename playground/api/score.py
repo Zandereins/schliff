@@ -71,13 +71,20 @@ CORS_HEADERS = {
 def _run_scoring(content: str, filename: str) -> dict:
     """Write content to a temp file, run schliff scoring, return result dict."""
     from skills.schliff.scripts.scoring.composite import compute_composite
+    from skills.schliff.scripts.scoring.formats import detect_format
     from skills.schliff.scripts.shared import build_scores
     from skills.schliff.scripts.terminal_art import score_to_grade
 
+    # The untrusted `filename` is used ONLY to pick the scoring format (SKILL.md
+    # vs AGENTS.md vs CLAUDE.md). detect_format reads only the basename via pure
+    # string ops — for the `.md`-only names this endpoint accepts it never touches
+    # the filesystem — so resolving the format up front lets us keep user data
+    # entirely out of any path expression. The file on disk uses a constant,
+    # non-user-derived name, which removes the path-injection sink at the source.
+    fmt = detect_format(filename)
+
     tmp_dir = tempfile.mkdtemp()
-    # Use only the basename to prevent path traversal
-    safe_name = os.path.basename(filename)
-    skill_path = os.path.join(tmp_dir, safe_name)
+    skill_path = os.path.join(tmp_dir, "skill.md")
 
     try:
         with open(skill_path, "w", encoding="utf-8") as f:
@@ -92,7 +99,7 @@ def _run_scoring(content: str, filename: str) -> dict:
         # that ARE measured deterministically, using the engine's own weights
         # (structural_score = composite / weight_coverage). The canonical
         # full-denominator composite is still returned for transparency.
-        scores = build_scores(skill_path, eval_suite=None, include_runtime=False)
+        scores = build_scores(skill_path, eval_suite=None, include_runtime=False, fmt=fmt)
         composite = compute_composite(scores)
 
         coverage = composite.get("weight_coverage", 0) or 0
