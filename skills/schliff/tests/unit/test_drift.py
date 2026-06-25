@@ -75,8 +75,7 @@ class TestExtractReferences:
     def test_ignores_urls(self):
         content = "See https://example.com/path/to/file.html for docs."
         refs = drift_mod.extract_references(content)
-        urls = [r for r in refs if "example.com" in str(r["ref"])]
-        assert len(urls) == 0, "URLs should not be treated as paths"
+        assert refs == [], "URLs should not be extracted as file references"
 
     def test_line_numbers_are_correct(self):
         content = "line one\n`lib/utils.py` is here\nline three\n`src/index.ts` there"
