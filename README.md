@@ -4,7 +4,7 @@
 
 **A deterministic quality scorer for AI instruction files.** Same input, same score — every time, on every machine. Think the [Ruff](https://github.com/astral-sh/ruff) for `SKILL.md`, `CLAUDE.md`, and `AGENTS.md`. It measures the things linters miss, the same way every time, so degradation shows up as a number that drops instead of a bug you chase.
 
-[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.2.0)](https://pypi.org/project/schliff/)
+[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.3.0)](https://pypi.org/project/schliff/)
 [![Python](https://img.shields.io/pypi/pyversions/schliff)](https://pypi.org/project/schliff/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
@@ -17,7 +17,7 @@ schliff score path/to/SKILL.md
 ```
 
 ```text
-schliff v8.2.0
+schliff v8.3.0
 
   structure      ████████░░   78/100  good
   triggers       ███████░░░   72/100  good
@@ -139,24 +139,34 @@ pip install "schliff[evolve,judge]"  # optional LLM-judge / evolve extras
 
 ### GitHub Action
 
-Gate pull requests on instruction-file quality:
+Gate pull requests on instruction-file quality. The action defaults to your
+repo-root `AGENTS.md` and posts a scored comment on every PR:
 
 ```yaml
-# .github/workflows/schliff.yml
-name: schliff
+# .github/workflows/agents-lint.yml
+name: AGENTS.md Lint
 on: [pull_request]
 jobs:
   score:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install schliff
-      - run: schliff verify path/to/SKILL.md --min-score 75
+      - uses: Zandereins/schliff@v1
+        with:
+          minimum-score: '75'   # optional: fail the PR below this score
 ```
 
-`schliff verify` exits non-zero below the threshold — a clean CI gate.
+By default it scores `AGENTS.md` at the repo root; set `skill-path:` to lint a
+`SKILL.md`, `CLAUDE.md`, or `.cursorrules` instead.
+
+Prefer not to depend on a third-party action? The dependency-light equivalent:
+
+```yaml
+      - run: pip install schliff
+      - run: schliff verify AGENTS.md --min-score 75
+```
+
+`schliff verify` exits non-zero below the threshold — a clean CI gate either way.
 
 ### pre-commit
 
@@ -164,7 +174,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/Zandereins/schliff
-    rev: v8.2.0
+    rev: v8.3.0
     hooks:
       - id: schliff-verify
         args: ['--min-score', '75']

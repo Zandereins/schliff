@@ -1,6 +1,6 @@
 {
   "name": "schliff",
-  "version": "8.2.0",
+  "version": "8.3.0",
   "description": "Deterministic skill linter and scoring engine for Claude Code. 7-dimension scoring, anti-gaming detection, autoresearch-style autonomous improvement.",
   "author": "Zandereins",
   "license": "MIT",
