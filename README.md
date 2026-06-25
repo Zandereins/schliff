@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
 
-Schliff scores the instruction files that drive your AI agents — skills, system prompts, project memory — against an explicit, versioned rubric. No LLM judge in the critical path. No network. No randomness. Just a rule engine you can read, pin, and trust in CI.
+Schliff scores the instruction files that drive your AI agents — skills, system prompts, project memory — against an explicit, versioned rubric, so you can gate a release on the number in CI. No LLM judge in the critical path. No network. No randomness. Just a rule engine you can read, pin, and trust.
 
 ```bash
 pip install schliff
@@ -36,6 +36,19 @@ No model in the loop produced that number. Run it again on another laptop and yo
 
 ---
 
+## A real catch
+
+A SKILL.md for [ShieldClaw](docs/case-studies/shieldclaw/), a prompt-injection-defense plugin, scored **68.3 [C]** — and Schliff showed exactly why: composability **20/100** (no scope boundaries, no I/O contract, no handoffs), and **3 of 7 dimensions unmeasurable** because there was no eval suite. After adding the missing scope section and an eval suite, the same file scored **94.6 [A]** on all 7 dimensions.
+
+| | Score | Grade | Dimensions measured |
+|---|---|---|---|
+| Before | 68.3 | C | 4/7 (no eval suite) |
+| After | 94.6 | A | 7/7 |
+
+Defects you'd otherwise ship caught as a number that's too low — see the [full case study](docs/case-studies/shieldclaw/).
+
+---
+
 ## Why deterministic?
 
 Most "AI quality" tools ask another LLM to grade your prompt. That makes the score **non-reproducible** (re-run it, get a different number), **un-auditable** (the rubric lives in a hidden prompt), and **trivially gameable** (write for the judge, not the user). A score you can't reproduce isn't a measurement — it's a vibe. You can't gate a release on a number that drifts.
@@ -45,7 +58,7 @@ Schliff takes the opposite position:
 - **Reproducible.** The headline composite is computed from a canonical, versioned weight registry. Calibration is **off by default**, so `verify`, `badge`, and the leaderboard return the same score on your laptop and in CI.
 - **Auditable.** Every dimension is a readable scorer in [`scripts/scoring/`](skills/schliff/scripts/scoring/). The weights are a dict you can open. There is no hidden judge prompt.
 - **Anti-gaming by design.** A dedicated guard layer ([`guards.py`](skills/schliff/scripts/scoring/guards.py)) plus per-scorer heuristics detect padding, keyword stuffing, and structure-mimicry instead of rewarding them.
-- **Zero core dependencies.** Core Schliff is stdlib-only and runs on **Python ≥ 3.9**. (Optional `[evolve]` / `[judge]` extras pull in LLM clients for an opt-in smoke-test only — never for scoring.)
+- **Zero core dependencies.** Core Schliff is stdlib-only and runs on **Python ≥ 3.10**. (Optional `[evolve]` / `[judge]` extras pull in LLM clients for an opt-in smoke-test only — never for scoring.)
 
 Because the number is stable, it does real work:
 
@@ -183,9 +196,9 @@ The version is **single-sourced**: the CLI resolves it at runtime via `importlib
 
 ---
 
-## The autonomous improvement loop
+## Optional: closing the loop
 
-Schliff doesn't just grade — it can close the loop. The improvement engine **measures first, then fixes** (not the other way around):
+Beyond grading, Schliff can apply fixes. The improvement engine **measures first, then fixes** (not the other way around):
 
 1. **Score** the file across all dimensions.
 2. **Generate** deterministic patch gradients for the weakest dimensions.
@@ -193,7 +206,7 @@ Schliff doesn't just grade — it can close the loop. The improvement engine **m
 4. **Re-score** and keep the change only if the score improved — otherwise revert.
 5. **Stop** on plateau detection or when the target is reached.
 
-It also carries **cross-session episodic memory** ([`episodic_store.py`](skills/schliff/scripts/episodic_store.py)), so improvement runs learn from prior attempts instead of repeating them. Drive it from Claude Code with `/schliff:auto`, or use `schliff evolve` directly.
+It also carries **cross-session episodic memory** ([`episodic_store.py`](skills/schliff/scripts/episodic_store.py)), so improvement runs learn from prior attempts instead of repeating them. Drive it from Claude Code with `/schliff:auto`, or use `schliff evolve` directly. This is an optional convenience layer — the deterministic score is the product.
 
 ```text
 → 7 deterministic fixes available. Run `/schliff:auto` to apply.
@@ -243,7 +256,7 @@ Ruff lints your Python. Biome lints your JS. Schliff lints the instruction files
 > additionally folds in triggers, quality, and edges — which require an eval suite
 > (`schliff init`).
 
-Validated by **1,198 tests** (unit + integration) in `skills/schliff/tests`, with separate self and proof suites via `test-self.sh` and `test-integration.sh`.
+Validated by **1,231 tests** (unit + integration) in `skills/schliff/tests`, with separate self and proof suites via `test-self.sh` and `test-integration.sh`.
 
 ## License
 
