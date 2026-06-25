@@ -139,24 +139,34 @@ pip install "schliff[evolve,judge]"  # optional LLM-judge / evolve extras
 
 ### GitHub Action
 
-Gate pull requests on instruction-file quality:
+Gate pull requests on instruction-file quality. The action defaults to your
+repo-root `AGENTS.md` and posts a scored comment on every PR:
 
 ```yaml
-# .github/workflows/schliff.yml
-name: schliff
+# .github/workflows/agents-lint.yml
+name: AGENTS.md Lint
 on: [pull_request]
 jobs:
   score:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install schliff
-      - run: schliff verify path/to/SKILL.md --min-score 75
+      - uses: Zandereins/schliff@v1
+        with:
+          minimum-score: '75'   # optional: fail the PR below this score
 ```
 
-`schliff verify` exits non-zero below the threshold — a clean CI gate.
+By default it scores `AGENTS.md` at the repo root; set `skill-path:` to lint a
+`SKILL.md`, `CLAUDE.md`, or `.cursorrules` instead.
+
+Prefer not to depend on a third-party action? The dependency-light equivalent:
+
+```yaml
+      - run: pip install schliff
+      - run: schliff verify AGENTS.md --min-score 75
+```
+
+`schliff verify` exits non-zero below the threshold — a clean CI gate either way.
 
 ### pre-commit
 
