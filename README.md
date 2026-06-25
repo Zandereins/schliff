@@ -38,7 +38,7 @@ No model in the loop produced that number. Run it again on another laptop and yo
 
 ## A real catch
 
-A SKILL.md for [ShieldClaw](docs/case-studies/shieldclaw/), a prompt-injection-defense plugin, scored **68.3 [C]** — and Schliff showed exactly why: composability **20/100** (no scope boundaries, no I/O contract, no handoffs), and **3 of 7 dimensions unmeasurable** because there was no eval suite. After adding the missing scope section and an eval suite, the same file scored **94.6 [A]** on all 7 dimensions.
+A SKILL.md for [ShieldClaw](docs/case-studies/shieldclaw/) — a real prompt-injection-defense skill, now archived — scored **68.3 [C]** — and Schliff showed exactly why: composability **20/100** (no scope boundaries, no I/O contract, no handoffs), and **3 of 7 dimensions unmeasurable** because there was no eval suite. After adding the missing scope section and an eval suite, the same file scored **94.6 [A]** on all 7 dimensions.
 
 | | Score | Grade | Dimensions measured |
 |---|---|---|---|
