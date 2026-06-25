@@ -75,3 +75,87 @@ def test_concurrent_writes_no_lost_update(submit):
     final = submit._load_submissions()
     names = sorted(e["skill_name"] for e in final)
     assert names == sorted(f"skill-{i}" for i in range(n)), "lost update under concurrency"
+
+
+# --- homograph / invisible-char identity defense (LB-2) -----------------------
+import unicodedata  # noqa: E402
+
+
+@pytest.mark.parametrize("cp", [
+    0xE0001,   # Unicode Tag char (category Cf) — escaped the old enumerated denylist
+    0x115F, 0x1160, 0x3164, 0xFFA0,  # blank-rendering Hangul fillers (category Lo)
+    0x180E,    # Mongolian vowel separator
+    0x200B,    # ZWSP (was in the old list — must still reject)
+    0x202E,    # RLO bidi override
+    0x034F,    # combining grapheme joiner (Mn) — invisible, look-identical (council)
+    0x2028, 0x2029,  # LINE / PARAGRAPH separator (Zl/Zp) — newline-class (council)
+    0x09, 0x0A, 0x0D,  # TAB/CR/LF — a single-line identity field rejects these now
+])
+def test_has_unsafe_chars_rejects_invisible_and_homograph(submit, cp):
+    s = unicodedata.normalize("NFKC", "ok" + chr(cp) + "name")
+    assert submit._has_unsafe_chars(s) is True
+
+
+@pytest.mark.parametrize("name", [
+    "my-skill", "Code Reviewer", "skill_v2.1", "café-linter",
+    "日本語スキル", "skill 🚀", "a.b-c_d",
+])
+def test_has_unsafe_chars_allows_legit_identity_names(submit, name):
+    assert submit._has_unsafe_chars(unicodedata.normalize("NFKC", name)) is False
+
+
+# --- reserved-identity gate on the live /tmp (cfg=None) path (LB-3) ------------
+import io  # noqa: E402
+import json as _json  # noqa: E402
+
+
+def _drive_post(submit_mod, body):
+    """Drive the real do_POST handler over the /tmp path (cfg=None, set by the
+    `submit` fixture which leaves KV env unset). Captures the JSON response."""
+    raw = _json.dumps(body).encode("utf-8")
+    captured = {}
+
+    class _H(submit_mod.handler):
+        def __init__(self):  # skip BaseHTTPRequestHandler socket setup
+            self.rfile = io.BytesIO(raw)
+            self.headers = {"Content-Length": str(len(raw))}
+            self.wfile = io.BytesIO()
+
+        def _send_json(self, status, payload):
+            captured["status"] = status
+            captured["payload"] = payload
+
+    _H().do_POST()
+    return captured
+
+
+def _full_body(skill, repo):
+    return {"skill_name": skill, "repo_url": repo, "format": "SKILL.md",
+            "composite": 90, "grade": "A",
+            "dimensions": {k: 90 for k in submit_module_required()},
+            "version": "8.1.0"}
+
+
+def submit_module_required():
+    mod = _load_module("lb_submit_req", "submit.py")
+    return mod.REQUIRED_DIMENSIONS
+
+
+@pytest.mark.parametrize("repo", [
+    "https://github.com/Zandereins/schliff",
+    "https://github.com/zandereins/schliff/",
+    "https://github.com/Zandereins/schliff.git",
+])
+def test_do_post_rejects_reserved_identity_on_tmp_path(submit, repo):
+    res = _drive_post(submit, _full_body("schliff", repo))
+    assert res["status"] == 403
+    # The reserved gate returns before any /tmp write.
+    assert not os.path.exists(submit.DATA_PATH)
+
+
+def test_do_post_allows_non_reserved_on_tmp_path(submit):
+    res = _drive_post(submit, _full_body("schliff", "https://github.com/someone/fork"))
+    assert res["status"] == 200
+    assert res["payload"]["ok"] is True
+    stored = submit._load_submissions()
+    assert [e["skill_name"] for e in stored] == ["schliff"]
