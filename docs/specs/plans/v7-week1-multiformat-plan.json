@@ -268,7 +268,7 @@
         {
           "step": 4,
           "action": "Test manually",
-          "run": "schliff score --url https://raw.githubusercontent.com/Zandereins/openclaw-skill-shieldclaw/main/SKILL.md",
+          "run": "schliff score --url https://raw.githubusercontent.com/Zandereins/schliff/main/docs/case-studies/shieldclaw/SKILL-after.md",
           "expected": "ShieldClaw scores ~94.6 [A]"
         },
         {

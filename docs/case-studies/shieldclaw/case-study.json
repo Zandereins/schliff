@@ -1,7 +1,8 @@
 {
   "title": "ShieldClaw: Security Skill Optimization with Schliff",
   "project": "openclaw-skill-shieldclaw",
-  "repo": "https://github.com/Zandereins/openclaw-skill-shieldclaw",
+  "repo": "https://github.com/Zandereins/schliff/tree/main/docs/case-studies/shieldclaw",
+  "source_status": "The ShieldClaw skill was archived and decommissioned on 2026-06-25; its original repository is no longer public. This Schliff scoring demonstration is unaffected — the before/after SKILL.md, score artifacts, and eval suite are preserved in this case study.",
   "date": "2026-03-26",
   "schliff_version": "6.3.0",
   "skill_type": "OpenClaw prompt injection defense plugin",
