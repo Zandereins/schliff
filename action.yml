@@ -88,12 +88,16 @@ runs:
           RESULT=$(schliff score "$SKILL_FULL" --json 2>/tmp/schliff_stderr) || true
         fi
 
-        if [ -z "$RESULT" ] || ! echo "$RESULT" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
+        # NOTE: every python3 -c below uses -P (PYTHONSAFEPATH) because this action
+        # runs in the consumer's checked-out workspace (GITHUB_WORKSPACE). Without it,
+        # CWD is on sys.path[0] and an attacker's PR could plant a json.py / shadow the
+        # skills.* package at the repo root to get code execution in the consumer's CI.
+        if [ -z "$RESULT" ] || ! echo "$RESULT" | python3 -P -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
           echo "::error::Schliff scorer produced invalid output. stderr: $(cat /tmp/schliff_stderr 2>/dev/null)"
           exit 1
         fi
 
-        COMPOSITE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])" 2>/dev/null) || true
+        COMPOSITE=$(echo "$RESULT" | python3 -P -c "import sys,json; print(json.load(sys.stdin)['composite_score'])" 2>/dev/null) || true
         if [ -z "$COMPOSITE" ]; then
           echo "::error::Schliff output is missing composite_score. stderr: $(cat /tmp/schliff_stderr 2>/dev/null)"
           exit 1
@@ -102,7 +106,7 @@ runs:
 
         # Delegate grade mapping to Schliff's terminal_art.score_to_grade so
         # thresholds (incl. the E band 35-49) stay aligned with `schliff verify`.
-        GRADE=$(SCORE_VAL="$COMPOSITE" python3 -c "
+        GRADE=$(SCORE_VAL="$COMPOSITE" python3 -P -c "
         import os
         from skills.schliff.scripts.terminal_art import score_to_grade
         print(score_to_grade(float(os.environ['SCORE_VAL'])))
@@ -123,7 +127,7 @@ runs:
         COMPOSITE: ${{ steps.score.outputs.composite }}
         MINIMUM: ${{ inputs.minimum-score }}
       run: |
-        python3 -c "
+        python3 -P -c "
         import sys, os
         score = float(os.environ['COMPOSITE'])
         minimum = float(os.environ['MINIMUM'])
