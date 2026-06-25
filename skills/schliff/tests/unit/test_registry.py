@@ -7,19 +7,35 @@ These tests prove the current divergence between the three sources of truth:
 """
 import pytest
 
-from scoring.registry import get_scorers, get_weights, SCORER_REGISTRY, WEIGHT_PROFILES, OPT_IN_SCORERS
+from scoring.registry import (
+    get_scorers,
+    get_weights,
+    SCORER_REGISTRY,
+    WEIGHT_PROFILES,
+    OPT_IN_SCORERS,
+    get_headline_excluded,
+)
 
 
 class TestRegistryIntegrity:
     """Tests for the registry's own internal consistency."""
 
     def test_registry_weights_cover_all_scorers(self):
-        """Every scorer in SCORER_REGISTRY must have a weight in WEIGHT_PROFILES."""
+        """Every headline scorer in SCORER_REGISTRY must have a weight.
+
+        A scorer may legitimately lack a headline weight if it is opt-in
+        (runtime/security) OR excluded from the format's headline composite
+        (e.g. AGENTS.md still runs triggers/quality/edges/composability/clarity
+        as side signals but they are not folded into the headline number).
+        """
         for fmt, scorers in SCORER_REGISTRY.items():
             weights = WEIGHT_PROFILES.get(fmt, {})
+            excluded = get_headline_excluded(fmt)
             for scorer in scorers:
                 if scorer in OPT_IN_SCORERS and scorer not in weights:
                     continue  # opt-in scorers like runtime may lack weights
+                if scorer in excluded:
+                    continue  # excluded from the headline → needs no headline weight
                 assert scorer in weights, (
                     f"Scorer '{scorer}' has no weight for format '{fmt}'"
                 )

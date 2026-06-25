@@ -1,6 +1,6 @@
 # Spec: AGENTS.md scoring profile
 
-Status: RESOLVED + REVIEW-CORRECTED — build-ready (awaiting build greenlight)
+Status: IMPLEMENTED — TDD, 1238 tests green, ruff-clean, end-to-end verified (PR #67)
 Date: 2026-06-25
 Owner: Franz
 Origin: moonshot strategy tournament — wave-rider bet ("agentsmd-lint: the deterministic CI quality gate for AGENTS.md"). The 4 open questions were resolved by an engine-backed subagent panel, then this spec was put through a double-sided adversarial review (5 specialists, every finding verified refute-by-default). The review caught a **critical inert-recipe bug** in the first draft (the frozenset-only edit shipped score 26.4 — worse than baseline); the implementation recipe below is the independently re-reproduced fix.

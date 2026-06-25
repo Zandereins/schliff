@@ -46,7 +46,11 @@ WEIGHT_PROFILES: dict[str, dict[str, float]] = {
     "skill.md": dict(_INSTRUCTION_FILE_WEIGHTS),
     "claude.md": dict(_INSTRUCTION_FILE_WEIGHTS),
     "cursorrules": dict(_INSTRUCTION_FILE_WEIGHTS),
-    "agents.md": dict(_INSTRUCTION_FILE_WEIGHTS),
+    # AGENTS.md is project context for coding agents, not a reusable skill: its
+    # headline is structure+efficiency only (0.5/0.5). Must be an explicit literal —
+    # reusing the 0.15/0.10 instruction weights would renormalize to 0.6/0.4, not the
+    # calibrated 0.5/0.5. See docs/specs/agents-md-scoring-profile.md.
+    "agents.md": {"structure": 0.5, "efficiency": 0.5},
     "system_prompt": {
         "structure_prompt": 0.15, "output_contract": 0.15, "efficiency": 0.15,
         "clarity": 0.15, "security": 0.15, "composability": 0.10, "completeness": 0.15,
@@ -76,7 +80,13 @@ HEADLINE_EXCLUDED: dict[str, frozenset] = {
     "skill.md": _HEADLINE_EXCLUDED_INSTRUCTION,
     "claude.md": _HEADLINE_EXCLUDED_INSTRUCTION,
     "cursorrules": _HEADLINE_EXCLUDED_INSTRUCTION,
-    "agents.md": _HEADLINE_EXCLUDED_INSTRUCTION,
+    # AGENTS.md: the eval-gated dims (triggers/quality/edges) are inapplicable to a
+    # project-context file and would otherwise cap the headline + trigger a nonsensical
+    # "add an eval suite" warning; composability is mis-fit SKILL semantics and clarity is
+    # saturated. All five leave the denominator (exclude, not weight-0 — weight-0 keeps the
+    # warning). The scorers still run as side signals. See the spec.
+    "agents.md": _HEADLINE_EXCLUDED_INSTRUCTION
+    | frozenset({"triggers", "quality", "edges", "composability", "clarity"}),
     "system_prompt": frozenset({"runtime"}),  # security is a core system_prompt dimension
 }
 

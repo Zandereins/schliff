@@ -79,7 +79,7 @@ def _apply_deterministic_patches(skill_path: str, config: EvolutionConfig,
     patch_count = 0
 
     eval_suite = load_eval_suite(skill_path)
-    gradients = text_gradient.compute_gradients(skill_path, eval_suite, include_clarity=True)
+    gradients = text_gradient.compute_gradients(skill_path, eval_suite, include_clarity=True, fmt=config.fmt)
     patches = text_gradient.generate_patches(skill_path, gradients)
 
     if not patches:
@@ -287,7 +287,7 @@ def run_evolution(config: EvolutionConfig,
                         break
 
                 # Build prompt based on strategy
-                gradients = text_gradient.compute_gradients(skill_path, cached_eval_suite, include_clarity=True)
+                gradients = text_gradient.compute_gradients(skill_path, cached_eval_suite, include_clarity=True, fmt=config.fmt)
 
                 if strategy == "dimension" and config.dimension:
                     user_prompt = build_dimension_prompt(
