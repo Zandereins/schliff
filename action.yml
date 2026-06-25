@@ -1,12 +1,13 @@
-name: 'Schliff Skill Score'
-description: 'Score Claude Code skills across 7 dimensions. The quality gate for SKILL.md files.'
+name: 'AGENTS.md Lint (Schliff)'
+description: 'Deterministic CI quality gate for AGENTS.md — works with any agent tool (Cursor, Codex, Copilot, Claude Code).'
 branding:
   icon: 'award'
   color: 'purple'
 inputs:
   skill-path:
-    description: 'Path to SKILL.md file (relative to repo root)'
-    required: true
+    description: 'Path to the instruction file to score, relative to repo root. Defaults to AGENTS.md at the repo root. Also supports SKILL.md, CLAUDE.md, .cursorrules.'
+    required: false
+    default: ''
   eval-suite:
     description: 'Path to eval-suite.json (auto-discovered if not set)'
     required: false
@@ -62,7 +63,20 @@ runs:
         INPUT_SKILL_PATH: ${{ inputs.skill-path }}
         INPUT_EVAL_SUITE: ${{ inputs.eval-suite }}
       run: |
+        # Default to AGENTS.md at the repo root when no path is given (the
+        # AGENTS.md-first entry point). Fail clearly if the file is missing,
+        # with a message tailored to whether the path was explicit or defaulted.
+        EXPLICIT_PATH="${INPUT_SKILL_PATH}"
+        INPUT_SKILL_PATH="${INPUT_SKILL_PATH:-AGENTS.md}"
         SKILL_FULL="${GITHUB_WORKSPACE}/${INPUT_SKILL_PATH}"
+        if [ ! -f "$SKILL_FULL" ]; then
+          if [ -n "$EXPLICIT_PATH" ]; then
+            echo "::error::Instruction file not found: ${INPUT_SKILL_PATH} (from the 'skill-path' input)."
+          else
+            echo "::error::No AGENTS.md found at the repo root. Add one, or set the 'skill-path' input to your instruction file."
+          fi
+          exit 1
+        fi
         EVAL_FLAG=""
         if [ -n "${INPUT_EVAL_SUITE}" ]; then
           EVAL_FLAG="--eval-suite"
@@ -79,7 +93,11 @@ runs:
           exit 1
         fi
 
-        COMPOSITE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])")
+        COMPOSITE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])" 2>/dev/null) || true
+        if [ -z "$COMPOSITE" ]; then
+          echo "::error::Schliff output is missing composite_score. stderr: $(cat /tmp/schliff_stderr 2>/dev/null)"
+          exit 1
+        fi
         echo "composite=$COMPOSITE" >> "$GITHUB_OUTPUT"
 
         # Delegate grade mapping to Schliff's terminal_art.score_to_grade so
@@ -131,15 +149,26 @@ runs:
 
           // Unicode progress bar
           function bar(val) {
-            if (val < 0) return '—';
+            if (val == null || val < 0) return '—';
             const filled = Math.round(val / 5);
             return '█'.repeat(filled) + '░'.repeat(20 - filled) + ` ${Math.round(val)}`;
           }
 
           const dimOrder = ['structure', 'triggers', 'quality', 'edges', 'efficiency', 'composability', 'clarity'];
 
+          // Map the engine's exact format keys (scoring/formats.py) to display labels.
+          // Note: the cursor format is emitted as 'cursorrules' (no leading dot).
+          const FMT = {
+            'agents.md': 'AGENTS.md',
+            'skill.md': 'SKILL.md',
+            'claude.md': 'CLAUDE.md',
+            'cursorrules': '.cursorrules',
+          };
+          const fmtLabel = result.format
+            ? (FMT[String(result.format).toLowerCase()] || String(result.format))
+            : 'instruction file';
           let body = `<!-- schliff-score-comment -->\n`;
-          body += `## ${icon} Schliff Score: ${score}/100 [${grade}]\n\n`;
+          body += `## ${icon} Schliff — ${fmtLabel} quality: ${score}/100 [${grade}]\n\n`;
 
           if (minimum > 0) {
             body += passed
@@ -150,14 +179,15 @@ runs:
           body += `| Dimension | Score | | \n`;
           body += `|:----------|------:|:----|\n`;
           for (const dim of dimOrder) {
-            if (dims[dim] === undefined) continue;
             const s = dims[dim];
-            if (s < 0) {
-              body += `| ${dim} | — | *not measured* |\n`;
-            } else {
-              const dimIcon = s >= 75 ? '🟢' : s >= 50 ? '🟡' : '🔴';
-              body += `| ${dim} | ${Math.round(s)}/100 | ${dimIcon} \`${bar(s)}\` |\n`;
-            }
+            // Omit dims not folded into this format's headline — the engine emits
+            // JSON null for eval-gated/excluded dims (e.g. triggers/quality/edges
+            // on AGENTS.md). Rendering them would show a misleading 0/100. This
+            // matches the engine's own terminal output, which omits them. The
+            // eval-suite nudge for SKILL.md still rides in the warnings section.
+            if (s == null || s < 0) continue;
+            const dimIcon = s >= 75 ? '🟢' : s >= 50 ? '🟡' : '🔴';
+            body += `| ${dim} | ${Math.round(s)}/100 | ${dimIcon} \`${bar(s)}\` |\n`;
           }
 
           if (result.warnings?.length) {
@@ -166,7 +196,7 @@ runs:
             body += `\n</details>\n`;
           }
 
-          body += `\n---\n<sub>Scored by [Schliff](https://github.com/Zandereins/schliff) · [Try the playground](https://play.schliff.dev)</sub>`;
+          body += `\n---\n<sub>Scored by [Schliff](https://github.com/Zandereins/schliff) — the deterministic AGENTS.md quality gate · [Try the playground](https://play.schliff.dev)</sub>`;
 
           // Update existing comment or create new one
           const marker = '<!-- schliff-score-comment -->';
