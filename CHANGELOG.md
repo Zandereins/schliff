@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.3.0] - 2026-06-25
+
+### Added
+- **AGENTS.md scoring profile.** `AGENTS.md` is project context for coding agents,
+  not a reusable skill, so it is now scored on a dedicated headline
+  (`0.5·structure + 0.5·efficiency`) instead of the SKILL.md rubric. The
+  eval-gated dimensions (triggers/quality/edges) plus the mis-fit composability and
+  the saturated clarity are excluded from the headline denominator, and the
+  nonsensical "add an eval suite" warning is suppressed for this format. A
+  well-formed `AGENTS.md` now scores a defensible B/A instead of a capped ~28/None.
+  Other formats (`SKILL.md`/`CLAUDE.md`/`.cursorrules`/`system_prompt`) are
+  byte-identical. Spec: `docs/specs/agents-md-scoring-profile.md`. (#67)
+- `suggest`/`evolve` no longer emit SKILL-only advice (frontmatter, eval-suite,
+  handoffs) for `AGENTS.md`. (#67)
+- **GitHub Action rebranded to "AGENTS.md Lint".** `action.yml` now lives at the
+  repository root (Marketplace-eligible), defaults to scoring a root `AGENTS.md`
+  (`skill-path` is optional), and posts a format-aware scored PR comment. Usable as
+  `uses: Zandereins/schliff@v1`. (#66, #68, #69)
+
+### Fixed
+- The Action's PR comment no longer renders unmeasured (`null`) dimensions as a
+  misleading `0/100`; they are omitted, matching the engine's terminal output. (#68)
+
 ## [8.2.0] - 2026-06-11
 
 ### Added
