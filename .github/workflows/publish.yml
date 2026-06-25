@@ -107,3 +107,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
         with:
           verbose: true
+          # Idempotent: a release re-cut from an already-published version (e.g.
+          # publishing the Action to the Marketplace from an existing tag) is a
+          # no-op upload instead of a hard 400 "file already exists" failure.
+          skip-existing: true
