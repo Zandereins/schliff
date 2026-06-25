@@ -175,7 +175,10 @@ class handler(BaseHTTPRequestHandler):
         try:
             raw_body = self.rfile.read(read_len)
             body = json.loads(raw_body)
-        except (json.JSONDecodeError, ValueError) as exc:
+        except (json.JSONDecodeError, ValueError, RecursionError) as exc:
+            # RecursionError: deeply-nested JSON exhausts the parser's stack (PG-1).
+            # Narrow tuple-broadening (not a blanket except) so genuinely unexpected
+            # errors still surface as 500.
             self._send_json(400, {"error": "Invalid JSON", "detail": str(exc)})
             return
 

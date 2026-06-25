@@ -1,7 +1,7 @@
 [
   {
     "skill_name": "schliff",
-    "repo_url": "https://github.com/Zandereins/schliff",
+    "repo_url": "https://github.com/zandereins/schliff",
     "format": "SKILL.md",
     "composite": 99.0,
     "grade": "S",
@@ -20,7 +20,7 @@
   },
   {
     "skill_name": "shieldclaw",
-    "repo_url": "https://github.com/Zandereins/schliff/tree/main/docs/case-studies/shieldclaw",
+    "repo_url": "https://github.com/zandereins/schliff",
     "format": "SKILL.md",
     "composite": 94.6,
     "grade": "A",

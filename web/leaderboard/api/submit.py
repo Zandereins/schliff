@@ -54,14 +54,23 @@ LOCK_PATH = os.path.join(DATA_DIR, ".lock")
 # Seed data path (bundled with deployment, read-only)
 SEED_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "submissions.json")
 
-# Control characters that could cause visual spoofing
-_CONTROL_CHARS = set(range(0x00, 0x20)) - {0x0A, 0x0D, 0x09}  # allow \n \r \t
-_BIDI_CHARS = {0x200E, 0x200F, 0x202A, 0x202B, 0x202C, 0x202D, 0x202E, 0x2066, 0x2067, 0x2068, 0x2069}
-# Zero-width / invisible characters. Visually undetectable, so they let an
-# attacker create homograph entries that pass validation but compare unequal in
-# the (repo_url, skill_name) dedup key — e.g. "my-skill" vs "my​skill" —
-# polluting the leaderboard with duplicate-looking rows. Reject them outright.
-_INVISIBLE_CHARS = {0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF, 0x061C}
+# Homograph / invisible-char defense for the (repo_url, skill_name) identity.
+# Invisible or blank-rendering code points are visually undetectable, so they let
+# an attacker mint entries that look identical but compare unequal in the dedup
+# key. We run AFTER NFKC (see do_POST) and reject by Unicode general category
+# rather than an enumerated list, so the whole class is covered and the rule
+# cannot silently rot:
+#   Cc control, Cf format (bidi overrides + zero-width + Tag chars U+E00xx),
+#   Cs surrogate, Co private-use, Cn unassigned.
+# skill_name is a single-line identity field: TAB/CR/LF (all category Cc) and the
+# Zl/Zp line/paragraph separators (U+2028/U+2029) are rejected, which also blocks
+# newline-injection into the "repo_url\nskill_name" dedup string. A few
+# blank-rendering or genuinely-invisible code points carry a category that escapes
+# the gate (Hangul fillers Lo, combining grapheme joiner U+034F Mn) — list them
+# explicitly. NOTE: we do NOT reject all of Mn — legitimate scripts use combining
+# marks — only the look-identical CGJ.
+_DISALLOWED_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"}
+_BLANK_FILLERS = {0x115F, 0x1160, 0x3164, 0xFFA0, 0x180E, 0x034F}
 
 # --- scoring-model epoch -----------------------------------------------------
 # v8.0 introduced the full-denominator composite (PR #41/#42): a breaking scale
@@ -84,10 +93,39 @@ def _score_model_for(version: str) -> int:
     return 2 if major >= 8 else 1
 
 
+def _canonical_repo_url(repo_url):
+    """Canonicalize a GitHub repo URL to its identity form
+    ``https://github.com/owner/repo`` (owner+repo lowercased), or return None when it
+    is not an https github.com URL with at least an owner and a repo path segment.
+
+    Query string, fragment, and any path beyond owner/repo (a trailing slash,
+    ``/tree/main``, ``.git``, ...) are dropped so every spelling of the same repo
+    maps to one (repo_url, skill_name) dedup key — otherwise one repo could mint
+    unlimited rows. Keep BYTE-IDENTICAL with the copy in query.py."""
+    if not isinstance(repo_url, str):
+        return None
+    parsed = urlparse(repo_url)
+    if parsed.scheme != "https" or parsed.hostname != "github.com":
+        return None
+    segments = [s for s in parsed.path.split("/") if s]
+    if len(segments) < 2:
+        return None
+    owner, repo = segments[0].lower(), segments[1].lower()
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    if not owner or not repo:
+        return None
+    return f"https://github.com/{owner}/{repo}"
+
+
 def _has_unsafe_chars(s: str) -> bool:
-    """Reject strings with control, bidi-override, or invisible characters."""
+    """Reject control, format (bidi/zero-width/Tag), surrogate, private-use, and
+    unassigned characters, plus blank-rendering Hangul fillers. Expects an
+    already-NFKC-normalized string so compatibility homographs are collapsed
+    first. Currently applied to skill_name (the identity field); it is equally
+    safe to apply to the already-host-validated repo_url."""
     return any(
-        ord(c) in _CONTROL_CHARS or ord(c) in _BIDI_CHARS or ord(c) in _INVISIBLE_CHARS
+        ord(c) in _BLANK_FILLERS or unicodedata.category(c) in _DISALLOWED_CATEGORIES
         for c in s
     )
 
@@ -105,13 +143,12 @@ def _validate(body):
         return "skill_name contains invalid characters"
 
     repo_url = body["repo_url"]
-    if not isinstance(repo_url, str):
+    canonical = _canonical_repo_url(repo_url)
+    if canonical is None:
         return "repo_url must be a valid GitHub repository URL"
-    parsed_url = urlparse(repo_url)
-    if parsed_url.scheme != "https" or parsed_url.hostname != "github.com":
-        return "repo_url must be a valid GitHub repository URL"
-    if len(parsed_url.path.strip("/").split("/")) < 2:
-        return "repo_url must point to a specific repository"
+    # Store the canonical identity form so every spelling of one repo dedups to a
+    # single (repo_url, skill_name) key (LB-1).
+    body["repo_url"] = canonical
 
     fmt = body["format"]
     if fmt not in VALID_FORMATS:
@@ -222,6 +259,54 @@ class LeaderboardFullError(Exception):
     submission is a brand-new identity. Updates to existing entries still pass."""
 
 
+class ReservedIdentityError(Exception):
+    """The submission targets a RESERVED_IDENTITY row (e.g. the project's own
+    canonical entry). The public, unauthenticated endpoint refuses to overwrite it.
+    This is an authorization refusal (-> 403), not a malformed request."""
+
+
+# --- reserved-identity guard (IDOR / unauthenticated-overwrite, LB-3) -----------
+# The board is unauthenticated and self-reported, so anyone can HSET-overwrite any
+# (repo_url, skill_name) row. Acceptable for community rows (all verified:false) but
+# NOT for identities we treat as canonical: the public endpoint must not let a
+# stranger replace the project's own row. Full proof-of-ownership is out of scope for
+# a demo board; this is a small, proportionate denylist of rows the public POST may
+# not write. The canonical row itself ships in the bundled seed (data/submissions.json)
+# and is unioned in by query.py, so display is guaranteed with zero KV/tmp writes —
+# this guard only PREVENTS overwrite, it does not seed. Keyed on
+# (owner_lower, repo_lower, skill_name) so it matches every canonical URL variant
+# (case, trailing slash, /tree/<ref>, ?query) regardless of LB-1 canonicalization.
+RESERVED_IDENTITY = frozenset({
+    ("zandereins", "schliff", "schliff"),
+    ("zandereins", "schliff", "shieldclaw"),  # the curated 94.6/A showcase seed row
+})
+
+
+def _reserved_identity_key(repo_url, skill_name):
+    """Normalize (repo_url, skill_name) to the RESERVED_IDENTITY comparison key, or
+    None if not a github.com owner/repo URL. Uses the first two non-empty path
+    segments, lowercased, so it is independent of repo_url canonicalization."""
+    try:
+        parsed = urlparse(repo_url)
+    except (ValueError, AttributeError):
+        return None
+    if parsed.hostname != "github.com":
+        return None
+    segments = [s for s in parsed.path.split("/") if s]
+    if len(segments) < 2:
+        return None
+    repo = segments[1].lower()
+    if repo.endswith(".git"):  # match _canonical_repo_url so a .git spelling can't slip past
+        repo = repo[:-4]
+    return (segments[0].lower(), repo, skill_name)
+
+
+def _is_reserved_identity(repo_url, skill_name):
+    """True if (repo_url, skill_name) names a RESERVED_IDENTITY row the public,
+    unauthenticated endpoint must not overwrite."""
+    return _reserved_identity_key(repo_url, skill_name) in RESERVED_IDENTITY
+
+
 def _kv_config():
     """(url, token) for the Upstash REST API, or None when not configured."""
     url = os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
@@ -277,7 +362,13 @@ def _kv_rate_limited(cfg, key, limit, window):
 def _kv_upsert(cfg, entry):
     """Atomic insert-or-update of one entry in the submissions hash. Returns True if
     an existing entry was updated, False if newly inserted. One HSET = no
-    read-modify-write race, durable across cold starts (issue #51)."""
+    read-modify-write race, durable across cold starts (issue #51).
+
+    Refuses RESERVED_IDENTITY rows (LB-3): the durable store must never be polluted
+    by an unauthenticated overwrite of a canonical identity, even via a direct call
+    that bypasses the do_POST gate."""
+    if _is_reserved_identity(entry["repo_url"], entry["skill_name"]):
+        raise ReservedIdentityError
     field = _dedup_field(entry["repo_url"], entry["skill_name"])
     # Bound growth: once the store is full, refuse brand-new identities but keep
     # accepting updates to existing rows. (HEXISTS->HLEN->HSET; the tiny TOCTOU
@@ -318,7 +409,8 @@ class handler(BaseHTTPRequestHandler):
             # Never read more than the cap even if Content-Length lies.
             raw = self.rfile.read(min(content_length, MAX_BODY_BYTES))
             body = json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
+        except (json.JSONDecodeError, ValueError, RecursionError):
+            # RecursionError: deeply-nested JSON exhausts the parser's stack (PG-1).
             self._send_json(400, {"error": "invalid JSON body"})
             return
 
@@ -336,6 +428,14 @@ class handler(BaseHTTPRequestHandler):
         error = _validate(body)
         if error:
             self._send_json(400, {"error": error})
+            return
+
+        # LB-3: refuse to let an unauthenticated POST overwrite a reserved identity
+        # (e.g. the project's own canonical row). Compared against the already
+        # NFKC-normalized, validated values; placed before the cfg branch so it
+        # guards BOTH the KV upsert and the /tmp fallback path.
+        if _is_reserved_identity(body["repo_url"], body["skill_name"]):
+            self._send_json(403, {"error": "this entry is reserved and cannot be submitted"})
             return
 
         entry = {
@@ -390,6 +490,9 @@ class handler(BaseHTTPRequestHandler):
                         entries.append(entry)
 
                     _save_submissions(entries)
+        except ReservedIdentityError:
+            self._send_json(403, {"error": "this entry is reserved and cannot be submitted"})
+            return
         except LeaderboardFullError:
             self._send_json(429, {"error": "leaderboard is full"})
             return

@@ -129,6 +129,31 @@ def _kv_command(cfg, *args):
     return payload.get("result") if isinstance(payload, dict) else payload
 
 
+def _canonical_repo_url(repo_url):
+    """Canonicalize a GitHub repo URL to its identity form
+    ``https://github.com/owner/repo`` (owner+repo lowercased), or return None when it
+    is not an https github.com URL with at least an owner and a repo path segment.
+
+    Query string, fragment, and any path beyond owner/repo (a trailing slash,
+    ``/tree/main``, ``.git``, ...) are dropped so every spelling of the same repo
+    maps to one (repo_url, skill_name) dedup key — otherwise one repo could mint
+    unlimited rows. Keep BYTE-IDENTICAL with the copy in query.py."""
+    if not isinstance(repo_url, str):
+        return None
+    parsed = urlparse(repo_url)
+    if parsed.scheme != "https" or parsed.hostname != "github.com":
+        return None
+    segments = [s for s in parsed.path.split("/") if s]
+    if len(segments) < 2:
+        return None
+    owner, repo = segments[0].lower(), segments[1].lower()
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    if not owner or not repo:
+        return None
+    return f"https://github.com/{owner}/{repo}"
+
+
 def _dedup_field(repo_url, skill_name):
     """Stable hash of the (repo_url, skill_name) identity — the submissions-hash
     field and the dedup key. Inputs are NFKC-normalized + invalid-char-rejected
@@ -179,6 +204,14 @@ def _kv_load_all(cfg):
     else:
         values = []
 
+    def _key(e):
+        # Canonicalize the repo_url before keying so a legacy non-canonical KV/seed
+        # row still dedups against the canonical form submit.py now stores (LB-1).
+        # Fall back to the raw value if it is not a canonicalizable github URL, so a
+        # malformed row keeps a stable, distinct key instead of collapsing.
+        repo = _canonical_repo_url(e.get("repo_url", "")) or e.get("repo_url", "")
+        return _dedup_field(repo, e.get("skill_name", ""))
+
     entries, seen = [], set()
     for v in values:
         try:
@@ -186,10 +219,10 @@ def _kv_load_all(cfg):
         except (ValueError, TypeError):
             continue
         entries.append(e)
-        seen.add(_dedup_field(e.get("repo_url", ""), e.get("skill_name", "")))
+        seen.add(_key(e))
 
     for e in _load_seed():
-        if _dedup_field(e.get("repo_url", ""), e.get("skill_name", "")) not in seen:
+        if _key(e) not in seen:
             entries.append(e)
     return entries
 

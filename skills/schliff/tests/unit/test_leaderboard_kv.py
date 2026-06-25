@@ -179,7 +179,8 @@ def test_upsert_rejects_new_identity_when_full_but_allows_updates(kv, monkeypatc
 # --- cross-file sync guard -----------------------------------------------------
 
 @pytest.mark.parametrize("fn", ["_kv_config", "_kv_command", "_dedup_field",
-                                "_client_ip", "_kv_rate_limited"])
+                                "_client_ip", "_kv_rate_limited",
+                                "_canonical_repo_url"])
 def test_shared_kv_helpers_byte_identical_across_files(fn):
     """The two serverless files duplicate this block by hand (Vercel can't share a
     module). Guard against drift between the copies."""
@@ -188,3 +189,98 @@ def test_shared_kv_helpers_byte_identical_across_files(fn):
 
 def test_submissions_key_matches_across_files():
     assert submit.SUBMISSIONS_KEY == query.SUBMISSIONS_KEY
+
+
+# --- repo_url canonicalization (LB-1) -----------------------------------------
+def _valid_body(url):
+    return {"skill_name": "x", "repo_url": url, "format": "SKILL.md",
+            "composite": 50, "grade": "B",
+            "dimensions": {k: 50 for k in submit.REQUIRED_DIMENSIONS},
+            "version": "8.1.0"}
+
+
+@pytest.mark.parametrize("url", [
+    "https://github.com/Owner/Repo",
+    "https://github.com/owner/repo/",
+    "https://github.com/owner/repo/tree/main",
+    "https://github.com/owner/repo?x=1",
+    "https://github.com/owner/repo#frag",
+    "https://github.com/owner/repo.git",
+])
+def test_validate_canonicalizes_repo_url(url):
+    body = _valid_body(url)
+    assert submit._validate(body) is None
+    assert body["repo_url"] == "https://github.com/owner/repo"
+
+
+def test_all_spellings_collapse_to_one_dedup_key():
+    keys = set()
+    for url in ("https://github.com/Owner/Repo", "https://github.com/owner/repo/",
+                "https://github.com/owner/repo/tree/main",
+                "https://github.com/owner/repo?x=1"):
+        body = _valid_body(url)
+        assert submit._validate(body) is None
+        keys.add(submit._dedup_field(body["repo_url"], body["skill_name"]))
+    assert len(keys) == 1
+
+
+@pytest.mark.parametrize("url", [
+    "http://github.com/owner/repo", "https://gitlab.com/o/r",
+    "https://github.com/owner", "https://github.com/", 123,
+])
+def test_validate_rejects_non_canonicalizable_repo_url(url):
+    assert submit._validate(_valid_body(url)) is not None
+
+
+def test_kv_load_dedups_noncanonical_seed_against_canonical_kv(kv, tmp_path, monkeypatch):
+    seed = [_entry(skill="shared", repo="https://github.com/U/Shared/")]
+    seed_file = tmp_path / "seed.json"
+    seed_file.write_text(json.dumps(seed), encoding="utf-8")
+    monkeypatch.setattr(query, "SEED_PATH", str(seed_file))
+    cfg = query._kv_config()
+    submit._kv_upsert(cfg, {**_entry(skill="shared", repo="https://github.com/u/shared"),
+                            "composite": 11.0})
+    loaded = query._kv_load_all(cfg)
+    assert [e["skill_name"] for e in loaded] == ["shared"]
+    assert loaded[0]["composite"] == 11.0
+
+
+# --- reserved-identity / IDOR (LB-3) ------------------------------------------
+def test_upsert_refuses_reserved_identity(kv):
+    cfg = submit._kv_config()
+    with pytest.raises(submit.ReservedIdentityError):
+        submit._kv_upsert(cfg, _entry(skill="schliff", repo="https://github.com/Zandereins/schliff"))
+    assert submit.SUBMISSIONS_KEY not in kv.hashes
+    for url in ("https://github.com/zandereins/schliff/",
+                "https://github.com/Zandereins/schliff/tree/main"):
+        with pytest.raises(submit.ReservedIdentityError):
+            submit._kv_upsert(cfg, _entry(skill="schliff", repo=url))
+
+
+def test_upsert_allows_non_reserved_identity(kv):
+    cfg = submit._kv_config()
+    assert submit._kv_upsert(cfg, _entry(skill="other", repo="https://github.com/Zandereins/schliff")) is False
+    assert submit._kv_upsert(cfg, _entry(skill="schliff", repo="https://github.com/someone/schliff")) is False
+    assert len(kv.hashes[submit.SUBMISSIONS_KEY]) == 2
+
+
+def test_is_reserved_identity_matches_canonical_variants():
+    assert submit._is_reserved_identity("https://github.com/Zandereins/schliff", "schliff")
+    assert submit._is_reserved_identity("https://github.com/zandereins/schliff?x=1", "schliff")
+    assert not submit._is_reserved_identity("https://github.com/Zandereins/schliff", "other")
+    assert not submit._is_reserved_identity("https://gitlab.com/zandereins/schliff", "schliff")
+
+
+def test_dot_git_spelling_is_reserved():
+    # The .git spelling must not slip past the defense-in-depth _kv_upsert guard.
+    assert submit._is_reserved_identity("https://github.com/zandereins/schliff.git", "schliff")
+
+
+def test_real_seed_both_same_repo_rows_survive_union(kv, monkeypatch):
+    # Both shipped seed rows now canonicalize to the same repo (zandereins/schliff)
+    # but have distinct skill_names (schliff, shieldclaw); they must NOT collapse in
+    # the seed-union, or a repo_url-only dedup regression would silently drop one.
+    real_seed = Path(__file__).resolve().parents[4] / "web" / "leaderboard" / "data" / "submissions.json"
+    monkeypatch.setattr(query, "SEED_PATH", str(real_seed))
+    loaded = query._kv_load_all(query._kv_config())  # empty KV -> seed only
+    assert {"schliff", "shieldclaw"} <= {e["skill_name"] for e in loaded}
