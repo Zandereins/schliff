@@ -76,12 +76,11 @@ def _run_scoring(content: str, filename: str) -> dict:
     from skills.schliff.scripts.terminal_art import score_to_grade
 
     # The untrusted `filename` is used ONLY to pick the scoring format (SKILL.md
-    # vs AGENTS.md vs CLAUDE.md). detect_format reads only the basename via pure
-    # string ops — for the `.md`-only names this endpoint accepts it never touches
-    # the filesystem — so resolving the format up front lets us keep user data
-    # entirely out of any path expression. The file on disk uses a constant,
-    # non-user-derived name, which removes the path-injection sink at the source.
-    fmt = detect_format(filename)
+    # vs AGENTS.md vs CLAUDE.md). Pass the in-memory `content` so detect_format
+    # never reaches its `.txt` fallback that would read the path off disk — this
+    # keeps the untrusted filename out of every file-system sink (it stays a pure
+    # basename string op). The file on disk uses a constant, non-user-derived name.
+    fmt = detect_format(filename, content=content)
 
     tmp_dir = tempfile.mkdtemp()
     skill_path = os.path.join(tmp_dir, "skill.md")
