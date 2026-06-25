@@ -97,8 +97,8 @@ class LineageSession:
         if secrets_found:
             import sys
             print(
-                f"Warning: Content contains secret-like patterns ({', '.join(secrets_found)}). "
-                f"Snapshot will be redacted. Use --no-snapshots to skip snapshots entirely.",
+                "Warning: Content contains secret-like patterns. "
+                "Snapshot will be redacted. Use --no-snapshots to skip snapshots entirely.",
                 file=sys.stderr,
             )
             content = redact_secrets(content)
