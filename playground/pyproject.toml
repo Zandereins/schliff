@@ -1,5 +1,5 @@
 [project]
 name = "app"
 version = "0.1.0"
-dependencies = [ "schliff==8.2.0" ]
+dependencies = [ "schliff==8.3.0" ]
 requires-python = "~=3.12.0"
