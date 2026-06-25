@@ -63,3 +63,6 @@ build/
 
 # Local uv dev lockfile — schliff ships as a library via pyproject (no dep pinning)
 uv.lock
+
+# Playwright MCP session artifacts
+.playwright-mcp/

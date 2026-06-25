@@ -224,7 +224,7 @@ def cmd_score(args: argparse.Namespace) -> None:
             # Count available deterministic fixes
             try:
                 gradients = text_gradient.compute_gradients(
-                    skill_path, eval_suite, include_clarity=True,
+                    skill_path, eval_suite, include_clarity=True, fmt=detected_fmt,
                 )
                 # Honest count: only patches /schliff:auto can actually apply,
                 # not every diagnosed gradient (many are manual-only). Mirrors
@@ -743,7 +743,7 @@ def cmd_suggest(args: argparse.Namespace) -> None:
     # Get all ranked gradients (include clarity for full picture)
     try:
         gradients = text_gradient.compute_gradients(
-            args.skill_path, eval_suite, include_clarity=True,
+            args.skill_path, eval_suite, include_clarity=True, fmt=detected_fmt,
         )
     except Exception as exc:
         print(f"Error: failed to compute gradients: {exc}", file=sys.stderr)

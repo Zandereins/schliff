@@ -579,19 +579,41 @@ def compute_gradients(
     eval_suite: Optional[dict] = None,
     include_clarity: bool = False,
     top_n: Optional[int] = None,
+    fmt: Optional[str] = None,
 ) -> list[dict]:
-    """Compute all gradients, rank by priority (delta/effort), return top N."""
+    """Compute all gradients, rank by priority (delta/effort), return top N.
+
+    For ``fmt == agents.md`` only the headline dims (structure, efficiency) are
+    inverted into fixes; the SKILL-only computers (triggers/quality/edges/
+    composability/clarity) are suppressed so an AGENTS.md never receives
+    nonsensical advice like "add YAML frontmatter" or "create eval-suite.json".
+    See docs/specs/agents-md-scoring-profile.md (R2 fix-path).
+    """
+    from scoring.registry import FORMAT_ALIASES
+
+    resolved = FORMAT_ALIASES.get(fmt, fmt) if fmt is not None else None
+    agents_only = resolved == "agents.md"
+
     gradients = []
 
-    gradients.extend(_compute_structure_gradients(skill_path))
-    gradients.extend(_compute_trigger_gradients(skill_path, eval_suite))
+    structure_grads = _compute_structure_gradients(skill_path)
+    if agents_only:
+        # AGENTS.md uses no SKILL-style YAML name/description frontmatter; the engine
+        # synthesizes it before scoring (so the score is not penalized), and the fix-path
+        # must not advise adding it. Suppress the frontmatter-family structure issues. (R2)
+        _SKILL_ONLY_STRUCTURE = {"no_frontmatter", "missing_name", "missing_description"}
+        structure_grads = [g for g in structure_grads if g["issue"] not in _SKILL_ONLY_STRUCTURE]
+    gradients.extend(structure_grads)
     gradients.extend(_compute_efficiency_gradients(skill_path))
-    gradients.extend(_compute_composability_gradients(skill_path))
-    gradients.extend(_compute_quality_gradients(skill_path, eval_suite))
-    gradients.extend(_compute_edges_gradients(skill_path, eval_suite))
 
-    if include_clarity:
-        gradients.extend(_compute_clarity_gradients(skill_path))
+    if not agents_only:
+        gradients.extend(_compute_trigger_gradients(skill_path, eval_suite))
+        gradients.extend(_compute_composability_gradients(skill_path))
+        gradients.extend(_compute_quality_gradients(skill_path, eval_suite))
+        gradients.extend(_compute_edges_gradients(skill_path, eval_suite))
+
+        if include_clarity:
+            gradients.extend(_compute_clarity_gradients(skill_path))
 
     # Dimension weights from registry (match composite formula)
     from scoring.registry import get_weights
