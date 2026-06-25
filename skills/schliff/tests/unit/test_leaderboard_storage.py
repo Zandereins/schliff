@@ -75,3 +75,28 @@ def test_concurrent_writes_no_lost_update(submit):
     final = submit._load_submissions()
     names = sorted(e["skill_name"] for e in final)
     assert names == sorted(f"skill-{i}" for i in range(n)), "lost update under concurrency"
+
+
+# --- homograph / invisible-char identity defense (LB-2) -----------------------
+import unicodedata  # noqa: E402
+
+
+@pytest.mark.parametrize("cp", [
+    0xE0001,   # Unicode Tag char (category Cf) — escaped the old enumerated denylist
+    0x115F, 0x1160, 0x3164, 0xFFA0,  # blank-rendering Hangul fillers (category Lo)
+    0x180E,    # Mongolian vowel separator
+    0x200B,    # ZWSP (was in the old list — must still reject)
+    0x202E,    # RLO bidi override
+    0x09, 0x0A, 0x0D,  # TAB/CR/LF — a single-line identity field rejects these now
+])
+def test_has_unsafe_chars_rejects_invisible_and_homograph(submit, cp):
+    s = unicodedata.normalize("NFKC", "ok" + chr(cp) + "name")
+    assert submit._has_unsafe_chars(s) is True
+
+
+@pytest.mark.parametrize("name", [
+    "my-skill", "Code Reviewer", "skill_v2.1", "café-linter",
+    "日本語スキル", "skill 🚀", "a.b-c_d",
+])
+def test_has_unsafe_chars_allows_legit_identity_names(submit, name):
+    assert submit._has_unsafe_chars(unicodedata.normalize("NFKC", name)) is False
