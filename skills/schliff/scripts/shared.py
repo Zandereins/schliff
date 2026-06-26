@@ -36,7 +36,7 @@ _file_cache: dict[str, str] = {}
 VALID_DIMENSIONS = {
     "structure", "triggers", "quality", "edges",
     "efficiency", "composability", "clarity", "runtime",
-    "security",
+    "security", "operational_coverage",
 }
 
 # Directories to skip during discovery (common non-source dirs).
@@ -254,6 +254,7 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
 # Module-level to avoid per-call dict reconstruction.
 _SCORER_MAP: dict[str, tuple[str, str]] = {
     "structure": ("scoring.structure", "score_structure"),
+    "operational_coverage": ("scoring.operational_coverage", "score_operational_coverage"),
     "triggers": ("scoring.triggers", "score_triggers"),
     "quality": ("scoring.quality", "score_quality"),
     "edges": ("scoring.edges", "score_edges"),

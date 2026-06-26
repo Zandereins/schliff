@@ -1,17 +1,25 @@
 """Golden + regression tests for the AGENTS.md scoring profile.
 
-Spec: docs/specs/agents-md-scoring-profile.md.
+Spec: docs/specs/agents-md-operational-coverage.md (supersedes the original
+agents-md-scoring-profile.md 0.5/0.5 profile).
 
 AGENTS.md is project context for coding agents, not a reusable skill. Its
-headline composite is therefore computed over {structure, efficiency} only
-(0.5/0.5), with the eval-gated dims (triggers/quality/edges) plus the
-mis-fit composability and the saturated clarity excluded from the headline
-denominator. These tests pin that profile and guard the other four formats
-against regression (byte-identity).
+headline composite is the 3-dim OPERATIONAL profile:
 
-Corpus golden values were established empirically over the 30 real public
-AGENTS.md files in docs/launch/corpus/agents/ and are reproducible because
-the profile is deterministic (no LLM, no calibration).
+    0.4 * structure + 0.4 * operational_coverage + 0.2 * efficiency
+
+operational_coverage measures whether the doc actually equips a coding agent
+(runnable setup/build/test commands + code-style/PR/gotcha guidance); it
+demotes efficiency, a gameable fenced-density proxy. The eval-gated dims
+(triggers/quality/edges) plus the mis-fit composability and the saturated
+clarity stay excluded from the headline denominator. These tests pin that
+profile and guard the other four formats against regression (byte-identity).
+
+Corpus golden values were RE-DERIVED ONCE on the hardened operational_coverage
+scorer over the 30 real public AGENTS.md files in docs/launch/corpus/agents/
+(spec §6) and are reproducible because the profile is deterministic (no LLM,
+no calibration). The anti-gaming / recall / determinism unit tests for opcov
+itself live in test_operational_coverage.py.
 """
 from __future__ import annotations
 
@@ -25,9 +33,11 @@ from terminal_art import score_to_grade
 
 from scoring import compute_composite
 from scoring.registry import (
+    _INSTRUCTION_FILE_SCORERS,
     _INSTRUCTION_FILE_WEIGHTS,
     WEIGHT_PROFILES,
     get_headline_excluded,
+    get_scorers,
     get_weights,
 )
 from shared import build_scores
@@ -91,37 +101,58 @@ def _score_agents(path: str) -> dict:
 
 # --- Profile registry shape -------------------------------------------------
 
-def test_agents_md_weight_profile_is_structure_efficiency_5050():
-    assert WEIGHT_PROFILES["agents.md"] == {"structure": 0.5, "efficiency": 0.5}
+def test_agents_md_weight_profile_is_three_dim():
+    assert WEIGHT_PROFILES["agents.md"] == {
+        "structure": 0.4,
+        "operational_coverage": 0.4,
+        "efficiency": 0.2,
+    }
 
 
 def test_agents_md_headline_excludes_eval_gated_plus_composability_clarity():
-    assert get_headline_excluded("agents.md") == frozenset(
+    # HEADLINE_EXCLUDED is intentionally UNCHANGED by the opcov work: opcov was
+    # never excluded, so it is folded into the headline via the weight profile.
+    excluded = get_headline_excluded("agents.md")
+    assert excluded == frozenset(
         {"security", "runtime", "triggers", "quality", "edges", "composability", "clarity"}
     )
+    assert "operational_coverage" not in excluded
 
 
 def test_other_formats_unchanged_byte_identity():
-    # The other four formats must keep the shared instruction weights + {security,runtime}.
+    # The other four formats must keep the shared instruction weights + {security,runtime}
+    # and must NOT have the agents.md-only operational_coverage dimension.
     for fmt in ("skill.md", "claude.md", "cursorrules"):
         assert get_weights(fmt) == _INSTRUCTION_FILE_WEIGHTS
         assert get_headline_excluded(fmt) == frozenset({"security", "runtime"})
+    for fmt in ("skill.md", "claude.md", "cursorrules", "system_prompt"):
+        assert "operational_coverage" not in get_scorers(fmt)
+        assert "operational_coverage" not in get_weights(fmt)
+
+    # opcov was added to agents.md as its OWN literal, not by mutating the shared
+    # instruction-file scorer list.
+    assert len(_INSTRUCTION_FILE_SCORERS) == 8
+    assert "operational_coverage" not in _INSTRUCTION_FILE_SCORERS
 
 
 # --- Headline behavior ------------------------------------------------------
 
-def test_well_formed_agents_md_no_eval_warning_two_dim(tmp_path):
+def test_well_formed_agents_md_no_eval_warning_three_dim(tmp_path):
     path = _write(tmp_path, _GOOD_AGENTS_MD)
     scores = build_scores(path, None, include_runtime=True, fmt="agents.md")
     result = compute_composite(scores, fmt="agents.md", use_calibrated=False)
 
     # No SKILL-only eval-suite warning, no cap.
     assert not any("eval suite" in w for w in result["warnings"])
-    # Headline is over exactly the two kept dims.
-    assert result["measured_dimensions"] == 2
-    assert result["total_dimensions"] == 2
-    # Score == 0.5*structure + 0.5*efficiency.
-    expected = 0.5 * scores["structure"]["score"] + 0.5 * scores["efficiency"]["score"]
+    # Headline is over exactly the three kept dims.
+    assert result["measured_dimensions"] == 3
+    assert result["total_dimensions"] == 3
+    # Score == 0.4*structure + 0.4*operational_coverage + 0.2*efficiency.
+    expected = (
+        0.4 * scores["structure"]["score"]
+        + 0.4 * scores["operational_coverage"]["score"]
+        + 0.2 * scores["efficiency"]["score"]
+    )
     assert result["score"] == pytest.approx(round(expected, 1))
     assert score_to_grade(result["score"]) in {"S", "A", "B", "C", "D", "E", "F"}
 
@@ -150,6 +181,10 @@ def test_compute_gradients_agents_md_emits_no_skill_only_advice(tmp_path):
 
 
 # --- Corpus golden distribution --------------------------------------------
+# Numbers below were re-derived ONCE on the hardened operational_coverage scorer
+# (spec §6). Do NOT reuse the pre-opcov 0.5/0.5 values (73.90/77.25/...) or the
+# un-hardened prototype values — the recall fixes (PNNL/kudu/MacroGraph) and the
+# command-hardening materially changed the distribution.
 
 @pytest.mark.skipif(not _CORPUS.is_dir(), reason="corpus fixtures not present")
 def test_agents_md_corpus_golden_distribution():
@@ -162,29 +197,39 @@ def test_agents_md_corpus_golden_distribution():
     bands = Counter(r[2] for r in rows)
 
     assert len(rows) == 30
-    assert statistics.mean(scores) == pytest.approx(73.90, abs=0.05)
-    assert statistics.median(scores) == pytest.approx(77.25, abs=0.05)
-    assert min(scores) == pytest.approx(37.5, abs=0.05)
-    assert max(scores) == pytest.approx(95.0, abs=0.05)
+    assert statistics.mean(scores) == pytest.approx(60.53, abs=0.05)
+    assert statistics.median(scores) == pytest.approx(62.30, abs=0.05)
+    assert min(scores) == pytest.approx(25.0, abs=0.05)
+    assert max(scores) == pytest.approx(91.0, abs=0.05)
 
-    # Exact band counts (golden lock). F intentionally 0.
-    assert bands["S"] == 2
-    assert bands["A"] == 2
-    assert bands["B"] == 12
-    assert bands["C"] == 7
-    assert bands["D"] == 6
-    assert bands["E"] == 1
-    assert bands["F"] == 0
+    # Exact band counts (golden lock) on the hardened scorer. No file reaches S
+    # (>=95); the two CJK docs floor opcov directives to 0 (English-scoped, §8.1).
+    assert bands["S"] == 0
+    assert bands["A"] == 1
+    assert bands["B"] == 4
+    assert bands["C"] == 8
+    assert bands["D"] == 10
+    assert bands["E"] == 6
+    assert bands["F"] == 1
 
     # No file emits the SKILL-only eval-suite warning.
     assert not any("eval suite" in w for _, _, _, ws in rows for w in ws)
 
 
 @pytest.mark.skipif(not _CORPUS.is_dir(), reason="corpus fixtures not present")
-def test_agents_md_boundary_files_are_exactly_S():
-    # Off-by-one guard on the score >= threshold comparator: only these two
-    # files compute to exactly 95.0 and must grade S.
-    for name in ("meltano__meltano__AGENTS.md.md", "maxcountryman__underway__AGENTS.md.md"):
-        result = _score_agents(str(_CORPUS / name))
-        assert result["score"] == pytest.approx(95.0, abs=0.05)
-        assert score_to_grade(result["score"]) == "S"
+def test_agents_md_top_file_is_underway_grade_a():
+    # Off-by-one guard on the score >= threshold comparator. Under the hardened
+    # scorer the corpus tops out at underway = 91.0 (grade A), and NO file reaches
+    # the S threshold (>= 95). meltano, formerly an S-boundary file, now grades B
+    # after a falsely-credited build command was removed.
+    underway = _score_agents(str(_CORPUS / "maxcountryman__underway__AGENTS.md.md"))
+    assert underway["score"] == pytest.approx(91.0, abs=0.05)
+    assert score_to_grade(underway["score"]) == "A"
+
+    meltano = _score_agents(str(_CORPUS / "meltano__meltano__AGENTS.md.md"))
+    assert score_to_grade(meltano["score"]) == "B"
+
+    # underway is the unique maximum and nothing reaches S.
+    top = max(_score_agents(str(f))["score"] for f in sorted(_CORPUS.glob("*.md")))
+    assert top == pytest.approx(91.0, abs=0.05)
+    assert score_to_grade(top) != "S"
