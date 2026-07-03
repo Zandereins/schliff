@@ -168,6 +168,17 @@ Prefer not to depend on a third-party action? The dependency-light equivalent:
 
 `schliff verify` exits non-zero below the threshold — a clean CI gate either way.
 
+### README badge
+
+Show your repo's AGENTS.md quality — no setup, no CI, no account. The badge is
+scored live from your `AGENTS.md` at `HEAD` and updates when the file changes:
+
+```markdown
+![AGENTS.md quality](https://img.shields.io/endpoint?url=https%3A%2F%2Fschliff-playground.vercel.app%2Fapi%2Fbadge%3Frepo%3DOWNER%2FREPO)
+```
+
+Replace `OWNER/REPO` with your repository. Public repos only.
+
 ### pre-commit
 
 ```yaml
