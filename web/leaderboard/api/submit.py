@@ -36,7 +36,9 @@ REQUIRED_DIMENSIONS = {
     "composability", "clarity",
 }
 # `security` is a separate opt-in signal: accepted if present, never required.
-OPTIONAL_DIMENSIONS = {"security"}
+# `operational_coverage` is emitted for AGENTS.md submissions from engine
+# >= the opcov release; optional so older-engine payloads stay valid.
+OPTIONAL_DIMENSIONS = {"security", "operational_coverage"}
 # Full set of recognized keys; any key outside this is rejected.
 VALID_DIMENSIONS = REQUIRED_DIMENSIONS | OPTIONAL_DIMENSIONS
 
