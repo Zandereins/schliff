@@ -570,6 +570,41 @@
   }
 
   /* Footer */
+  /* ── Badge generator bar ── */
+  .badge-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-card);
+    font-size: 12px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .badge-bar label { white-space: nowrap; }
+
+  .badge-bar input[type="text"] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 12px;
+    padding: 5px 8px;
+    width: 220px;
+  }
+
+  .badge-bar input[type="text"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .badge-bar img { height: 20px; display: none; }
+  .badge-bar img.visible { display: inline-block; }
+
   footer {
     padding: 10px 24px;
     border-top: 1px solid var(--border);
@@ -731,6 +766,15 @@ Instructions go here..." spellcheck="false"></textarea>
       <div class="results-inner" id="results" aria-live="polite"></div>
     </div>
   </main>
+
+  <!-- Badge generator -->
+  <div class="badge-bar">
+    <label for="badgeRepo">README badge:</label>
+    <input type="text" id="badgeRepo" placeholder="owner/repo" spellcheck="false"
+           aria-label="GitHub repository (owner/repo) for the AGENTS.md quality badge">
+    <button class="btn" id="btnBadgeCopy" disabled>Copy Markdown</button>
+    <img id="badgePreview" alt="AGENTS.md quality badge preview">
+  </div>
 
   <!-- Footer -->
   <footer>
@@ -1070,6 +1114,45 @@ Instructions go here..." spellcheck="false"></textarea>
       toastEl.classList.remove('show');
     }, 2000);
   }
+
+  // ── Badge generator ──
+  var badgeRepo = document.getElementById('badgeRepo');
+  var btnBadgeCopy = document.getElementById('btnBadgeCopy');
+  var badgePreview = document.getElementById('badgePreview');
+  var BADGE_REPO_RE = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/;
+  var badgeDebounce = null;
+
+  function badgeMarkdown(repo) {
+    var endpoint = window.location.origin + '/api/badge?repo=' + repo;
+    return '![AGENTS.md quality](https://img.shields.io/endpoint?url=' + encodeURIComponent(endpoint) + ')';
+  }
+
+  badgeRepo.addEventListener('input', function() {
+    clearTimeout(badgeDebounce);
+    badgeDebounce = setTimeout(function() {
+      var repo = badgeRepo.value.trim();
+      var valid = BADGE_REPO_RE.test(repo);
+      btnBadgeCopy.disabled = !valid;
+      if (valid) {
+        badgePreview.src = 'https://img.shields.io/endpoint?url=' +
+          encodeURIComponent(window.location.origin + '/api/badge?repo=' + repo);
+        badgePreview.classList.add('visible');
+      } else {
+        badgePreview.classList.remove('visible');
+        badgePreview.removeAttribute('src');
+      }
+    }, 400);
+  });
+
+  btnBadgeCopy.addEventListener('click', function() {
+    var repo = badgeRepo.value.trim();
+    if (!BADGE_REPO_RE.test(repo)) return;
+    navigator.clipboard.writeText(badgeMarkdown(repo)).then(function() {
+      showToast('Badge Markdown copied!');
+    }).catch(function() {
+      showToast('Copy failed');
+    });
+  });
 
   // ── Score ──
   var scoring = false;

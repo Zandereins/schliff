@@ -1,0 +1,57 @@
+name: Action self-test
+
+# Dogfoods the local composite action (`uses: ./`) against this repo's own
+# AGENTS.md. Exists because dependency bumps to action.yml (setup-python,
+# github-script) otherwise merge on green CI without the action's code path
+# ever executing — PR #82 (github-script 7->9) shipped exactly that way and
+# had to be compatibility-verified by hand against release notes.
+#
+# comment-on-pr stays off: the PR-comment step needs `github-script`, which is
+# exercised... only on pull_request events with the input enabled. We enable it
+# on PRs so the full path (score -> gate -> comment) runs; the comment lands on
+# the PR itself, doubling as a live output preview.
+
+on:
+  pull_request:
+    paths:
+      - 'action.yml'
+      - 'AGENTS.md'
+      - '.github/workflows/action-selftest.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # the action's comment step posts/updates a PR comment
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Run the local action against our own AGENTS.md
+        id: selftest
+        uses: ./
+        with:
+          minimum-score: '85'
+          comment-on-pr: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+
+      - name: Assert outputs are well-formed
+        env:
+          COMPOSITE: ${{ steps.selftest.outputs.composite }}
+          GRADE: ${{ steps.selftest.outputs.grade }}
+          RESULT_B64: ${{ steps.selftest.outputs.result_b64 }}
+        run: |
+          set -euo pipefail
+          python3 -P -c "
+          import base64, json, os
+          composite = float(os.environ['COMPOSITE'])
+          assert 0 <= composite <= 100, composite
+          assert os.environ['GRADE'] in list('SABCDEF'), os.environ['GRADE']
+          result = json.loads(base64.b64decode(os.environ['RESULT_B64']))
+          assert result['format'] == 'agents.md', result.get('format')
+          assert 'operational_coverage' in result['dimensions'], 'opcov missing'
+          print(f'self-test OK: {composite} [{os.environ[\"GRADE\"]}]')
+          "

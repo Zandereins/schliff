@@ -8,6 +8,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/schliff)](https://pypi.org/project/schliff/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
+[![AGENTS.md quality](https://img.shields.io/endpoint?url=https%3A%2F%2Fschliff-playground.vercel.app%2Fapi%2Fbadge%3Frepo%3DZandereins%2Fschliff)](https://schliff-playground.vercel.app)
 
 Schliff scores the instruction files that drive your AI agents — skills, system prompts, project memory — against an explicit, versioned rubric, so you can gate a release on the number in CI. No LLM judge in the critical path. No network. No randomness. Just a rule engine you can read, pin, and trust.
 
