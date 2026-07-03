@@ -23,6 +23,7 @@ import re
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
@@ -73,8 +74,18 @@ def _color(score: float) -> str:
 
 
 def _fetch_agents_md(owner: str, repo: str):
-    """Return (content, None) or (None, badge-dict) on any fetch problem."""
-    url = f"https://raw.githubusercontent.com/{owner}/{repo}/HEAD/AGENTS.md"
+    """Return (content, None) or (None, badge-dict) on any fetch problem.
+
+    SSRF containment: the scheme+host are a fixed literal, and the two
+    caller-validated path segments are additionally percent-encoded with
+    safe='' so no character can act as a path separator, query, fragment,
+    or authority delimiter — the request provably cannot leave
+    raw.githubusercontent.com or escape the /{owner}/{repo}/HEAD/AGENTS.md
+    shape.
+    """
+    owner_q = urllib.parse.quote(owner, safe="")
+    repo_q = urllib.parse.quote(repo, safe="")
+    url = f"https://raw.githubusercontent.com/{owner_q}/{repo_q}/HEAD/AGENTS.md"
     req = urllib.request.Request(url, headers={"User-Agent": "schliff-badge/1.0"})
     try:
         with _OPENER.open(req, timeout=FETCH_TIMEOUT) as resp:
