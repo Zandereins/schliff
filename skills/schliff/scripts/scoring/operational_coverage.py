@@ -446,12 +446,17 @@ def _extract_commands(lines):
                         results.append((fam, _norm(seg)))
             continue
         # §4.2.5: the negation guard is SENTENCE-scoped — "Never commit to
-        # main. Run `pnpm test` before pushing." must keep the test credit.
+        # main. Run `pnpm test` before pushing." must keep the test credit —
+        # and POSITIONAL within the sentence: a contrastive construction
+        # ("Always run `bun typecheck` …, never `tsc` directly") positively
+        # recommends the command BEFORE the cue and negates only what follows.
         for sent in _SENT_SPLIT_RE.split(ln):
-            if _is_negated(sent):
-                continue
-            for span in _INLINE_RE.findall(sent):
-                for seg in _split_segments(span):
+            neg = _NEG_RE.search(sent)
+            neg_at = len(sent) if (neg is None or _NEG_POSITIVE_RE.search(sent)) else neg.start()
+            for m in _INLINE_RE.finditer(sent):
+                if m.start() > neg_at:
+                    continue
+                for seg in _split_segments(m.group(1)):
                     fam = _classify(seg, inline=True)
                     if fam:
                         results.append((fam, _norm(seg)))

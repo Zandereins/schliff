@@ -633,6 +633,27 @@ pnpm install
     assert "pnpm install" in r["details"]["commands"]
 
 
+def test_negation_is_positional_within_sentence(tmp_path):
+    """Field finding (schliff#95, from scoring sst/opencode): a contrastive
+    sentence positively recommends the command BEFORE the negation cue and
+    negates only what follows — 'Always run `bun typecheck` …, never `tsc`
+    directly' must credit typecheck and suppress tsc."""
+    r = _op(
+        tmp_path,
+        """# P
+
+## Testing
+
+- Always run `bun typecheck` from package directories, never `tsc` directly.
+- never use `npm audit fix` here
+""",
+    )
+    cmds = r["details"]["commands"]
+    assert "bun typecheck" in cmds
+    assert not any("tsc" in c for c in cmds)
+    assert not any("audit" in c for c in cmds)
+
+
 def test_negation_is_sentence_scoped(tmp_path):
     """§4.2.5: 'Never commit to main. Run `pnpm test` before pushing.' keeps
     the test credit; 'don't forget to run X' is a positive instruction; and
