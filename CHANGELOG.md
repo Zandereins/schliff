@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.4.0] - 2026-07-03
+
+### Added
+- **`operational_coverage` dimension for AGENTS.md** (PR #83). Measures whether
+  an AGENTS.md actually equips a coding agent to operate the repo: real
+  setup/build/test commands (command-family classification, doc-wide, headings
+  never gate) plus code-style / gotchas / PR directive sections with concrete
+  code tokens. Surfaced in the CLI dimension table, the Action's PR comment,
+  and accepted by the leaderboard submit API.
+
+### Changed
+- **BREAKING (scores): AGENTS.md headline profile is now
+  `structure 0.40 / operational_coverage 0.40 / efficiency 0.20`** (was
+  0.5/0.5). `efficiency` was a validated gameable proxy — a junk-fence-stuffed
+  doc scored 92.5/A while the same real commands inline scored 70.0/C. All
+  AGENTS.md scores re-baseline: 30-file corpus mean 61.06, no file reaches S.
+  SKILL.md / CLAUDE.md / .cursorrules / system-prompt scoring is byte-identical.
+
+### Security
+- Fixed a ReDoS in the operational_coverage heading regex (quadratic on
+  whitespace-only heading lines; playground/Action/leaderboard take untrusted
+  input). Found and fixed pre-release by a 75-agent adversarial review, along
+  with a directive-gate homonym gaming hole, a fence-state desync on
+  info-string openers, and 12 command-recall bugs — see
+  `docs/specs/agents-md-operational-coverage.md` §11.
+
 ## [8.3.0] - 2026-06-25
 
 ### Added
@@ -502,7 +528,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.1.0...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.4.0...HEAD
+[8.4.0]: https://github.com/Zandereins/schliff/compare/v8.3.0...v8.4.0
+[8.3.0]: https://github.com/Zandereins/schliff/compare/v8.2.0...v8.3.0
+[8.2.0]: https://github.com/Zandereins/schliff/compare/v8.1.0...v8.2.0
 [8.1.0]: https://github.com/Zandereins/schliff/compare/v8.0.0...v8.1.0
 [8.0.0]: https://github.com/Zandereins/schliff/compare/v7.2.0...v8.0.0
 [7.2.0]: https://github.com/Zandereins/schliff/compare/v7.1.1...v7.2.0
