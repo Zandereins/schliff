@@ -50,7 +50,7 @@ Eight scorers run per file. Seven of them form the **headline composite**; `secu
 is reported as a separate signal and `runtime` is opt-in (and also a separate signal).
 
 | Dimension | Weight | Role | What it measures |
-|-----------|--------|------|------------------|
+| --- | --- | --- | --- |
 | **structure** | 0.15 | headline | Frontmatter (name, description), headers, examples, progressive disclosure, file length, dead content, referenced-file existence |
 | **triggers** | 0.20 | headline | TF-IDF keyword overlap between description and eval prompts, with stemming, synonym expansion, domain-signal detection, negation handling; reports precision and recall |
 | **quality** | 0.20 | headline | Eval-suite coverage: assertion-type diversity, feature breadth, descriptions, instruction-assertion coherence |
@@ -77,7 +77,7 @@ headline is a 3-dimension operational profile (the eval-gated dimensions — tri
 quality, edges — are excluded, and the remaining scorers stay separate signals):
 
 | Dimension | Weight | What it measures |
-|-----------|--------|------------------|
+| --- | --- | --- |
 | **structure** | 0.40 | Same structural scorer as the skill.md family |
 | **operational_coverage** | 0.40 | Whether the doc equips an agent to operate the repo: real setup/build/test commands (junk-, read-only- and prose-hardened command classification) plus code-style / gotcha / PR directive sections with concrete code tokens |
 | **efficiency** | 0.20 | Information density — deliberately demoted: fenced-code density is a gameable proxy for operational value |
@@ -91,7 +91,7 @@ headline dimension** (weight 0.15) that stays in the composite — only `runtime
 excluded.
 
 | Dimension | Weight |
-|-----------|--------|
+| --- | --- |
 | structure_prompt | 0.15 |
 | output_contract | 0.15 |
 | efficiency | 0.15 |
@@ -109,7 +109,7 @@ excluded.
 Each format carries a recommended token budget (`scoring/formats.py`):
 
 | Format | Budget (tokens) |
-|--------|-----------------|
+| --- | --- |
 | skill.md | 1000 |
 | claude.md | 2000 |
 | cursorrules | 500 |
@@ -123,7 +123,7 @@ Each format carries a recommended token budget (`scoring/formats.py`):
 Grades come from `terminal_art.score_to_grade` (`_GRADE_THRESHOLDS`):
 
 | Grade | Threshold | Meaning |
-|-------|-----------|---------|
+| --- | --- | --- |
 | **S** | >= 95 | Exceptional — near-perfect on measured dimensions |
 | **A** | >= 85 | Strong — minor polish remains |
 | **B** | >= 75 | Good — clear improvement paths exist |
@@ -197,7 +197,7 @@ First, the headline basis is built (security + runtime excluded). The seven raw 
 sum to 0.95, so Stage 2 renormalizes each by dividing by 0.95:
 
 | Dimension | Raw weight | Canonical weight (÷0.95) | Score | Contribution |
-|-----------|-----------|--------------------------|-------|--------------|
+| --- | --- | --- | --- | --- |
 | structure | 0.15 | 0.1579 | 90 | 14.21 |
 | triggers | 0.20 | 0.2105 | 80 | 16.84 |
 | quality | 0.20 | 0.2105 | *(unmeasured)* | 0 |
@@ -293,7 +293,7 @@ under the top-level `security` field), never folded into the skill.md-family hea
 ## Source-of-truth map
 
 | Concern | File |
-|---------|------|
+| --- | --- |
 | Canonical weights, scorer lists, headline-exclusion, aliases | `scoring/registry.py` |
 | Composite computation (full-denominator model) | `scoring/composite.py` |
 | Grade thresholds, gauges | `terminal_art.py` |
