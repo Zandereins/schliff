@@ -8,7 +8,10 @@
   },
   "license": "MIT",
   "homepage": "https://github.com/Zandereins/schliff",
-  "skills": ["./skills/schliff"],
-  "commands": ["./commands/schliff"],
-  "dependencies": ["python3", "bash", "git"]
+  "skills": [
+    "./skills/schliff"
+  ],
+  "commands": [
+    "./commands/schliff"
+  ]
 }
