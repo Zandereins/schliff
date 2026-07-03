@@ -41,7 +41,7 @@ No model in the loop produced that number. Run it again on another laptop and yo
 A SKILL.md for [ShieldClaw](docs/case-studies/shieldclaw/) — a real prompt-injection-defense skill, now archived — scored **68.3 [C]** — and Schliff showed exactly why: composability **20/100** (no scope boundaries, no I/O contract, no handoffs), and **3 of 7 dimensions unmeasurable** because there was no eval suite. After adding the missing scope section and an eval suite, the same file scored **94.6 [A]** on all 7 dimensions.
 
 | | Score | Grade | Dimensions measured |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Before | 68.3 | C | 4/7 (no eval suite) |
 | After | 94.6 | A | 7/7 |
 
@@ -75,7 +75,7 @@ Because the number is stable, it does real work:
 For the `SKILL.md` family, Schliff runs **8 scorers** per file. **7 of them form the headline composite**; `security` and `runtime` are reported as **separate opt-in signals** so a security warning never silently inflates or deflates your quality grade.
 
 | Dimension | Weight | In headline? |
-|---|---|---|
+| --- | --- | --- |
 | `structure` | 0.15 | ✅ |
 | `triggers` | 0.20 | ✅ |
 | `quality` | 0.20 | ✅ |
@@ -113,7 +113,7 @@ This is deliberate. A partial measurement is an honest partial score, never a fl
 One engine, five instruction-file formats — each with its own token budget and scorer set:
 
 | Format | Token budget | Scorers |
-|---|---|---|
+| --- | --- | --- |
 | `SKILL.md` | 1,000 | shared 8-scorer registry |
 | `CLAUDE.md` | 2,000 | shared 8-scorer registry |
 | `.cursorrules` | 500 | shared 8-scorer registry |
@@ -132,7 +132,7 @@ pip install "schliff[evolve,judge]"  # optional LLM-judge / evolve extras
 ```
 
 | Install | Pulls in | When you need it |
-|---|---|---|
+| --- | --- | --- |
 | `schliff` | stdlib only | Scoring, verify, badge, CI — everything that gates a release |
 | `schliff[judge]` | LLM client | Opt-in exploratory LLM-judge smoke-test (never scoring) |
 | `schliff[evolve]` | LLM client | Opt-in autonomous-improvement extras |
@@ -189,7 +189,7 @@ schliff <command> [path] [options]
 ```
 
 | Command | What it does |
-|---|---|
+| --- | --- |
 | `score` | Score a file and print the grade bar |
 | `verify` | CI gate — exit 0/1 based on a minimum score |
 | `doctor` | Scan and grade every installed skill |
