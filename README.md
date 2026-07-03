@@ -117,7 +117,7 @@ One engine, five instruction-file formats — each with its own token budget and
 | `SKILL.md` | 1,000 | shared 8-scorer registry |
 | `CLAUDE.md` | 2,000 | shared 8-scorer registry |
 | `.cursorrules` | 500 | shared 8-scorer registry |
-| `AGENTS.md` | 3,000 | shared 8-scorer registry |
+| `AGENTS.md` | 3,000 | shared 8 scorers + `operational_coverage` (own 3-dim headline) |
 | system prompts | 1,500 | dedicated set (`structure_prompt`, `output_contract`, `efficiency`, `clarity`, `security`, `composability`, `completeness`) |
 
 Format is auto-detected; override with `--format` (`skill`, `claude`, `cursor`, `agents`, `system-prompt`).
@@ -266,7 +266,7 @@ Ruff lints your Python. Biome lints your JS. Schliff lints the instruction files
 > additionally folds in triggers, quality, and edges — which require an eval suite
 > (`schliff init`).
 
-Validated by **1,288 tests** (unit + integration) in `skills/schliff/tests`, with separate self and proof suites via `test-self.sh` and `test-integration.sh`.
+Validated by **1,347 tests** (unit + integration) in `skills/schliff/tests`, with separate self and proof suites via `test-self.sh` and `test-integration.sh`.
 
 ## License
 

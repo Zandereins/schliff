@@ -120,9 +120,12 @@ means "not measured / not applicable" — the dimension stays in the basis but c
 
 ### Dimensions and weights (skill.md family)
 
-The skill.md family (SKILL.md, CLAUDE.md, `.cursorrules`, AGENTS.md) shares **one** registry
+The skill.md family (SKILL.md, CLAUDE.md, `.cursorrules`) shares **one** registry
 of 8 scorers. **7 of them form the headline composite**; `security` and `runtime` are
-reported as **separate signals**, not folded into the headline number.
+reported as **separate signals**, not folded into the headline number. AGENTS.md runs
+the same 8 scorers **plus `operational_coverage`** and has its own headline profile
+(`structure` 0.40 / `operational_coverage` 0.40 / `efficiency` 0.20 — see
+`docs/SCORING.md` and `docs/specs/agents-md-operational-coverage.md`).
 
 | Dimension       | Weight | Role in skill.md headline                                   |
 |-----------------|--------|-------------------------------------------------------------|
