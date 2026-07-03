@@ -14,37 +14,41 @@ Schliff scores the instruction files that drive your AI agents — skills, syste
 
 ```bash
 pip install schliff
-schliff score path/to/SKILL.md
+schliff score AGENTS.md      # or any SKILL.md / CLAUDE.md / .cursorrules
 ```
+
+This is the real, current output of `schliff score AGENTS.md` on this repo's own
+[`AGENTS.md`](AGENTS.md) — clone and run it yourself:
 
 ```text
 schliff v8.4.0
 
-  structure      ████████░░   78/100  good
-  triggers       ███████░░░   72/100  good
-  quality        ██████░░░░   64/100  fair
-  edges          █████░░░░░   55/100  fair
-  efficiency     ████████░░   80/100  good
-  composability  ███████░░░   70/100  good
-  clarity        ██████████  100/100  perfect
+  structure             █████████░   90/100  great
+  operational_coverage  ██████████  100/100  perfect
+  efficiency            ████████░░   78/100  good
+  composability         ████░░░░░░   45/100  poor
+  clarity               ██████████  100/100  perfect
 
-  Structural Score  ██████████████░░░░░░  71.2/100  [C]
+  Structural Score  ██████████████████░░  91.6/100  [A]
 
-  Tokens: 740 / 1,000 (ok)
+  Tokens: 837 / 3,000 (ok)
+  Format: agents.md (normalized)
 ```
 
-No model in the loop produced that number. Run it again on another laptop and you get 71.2 again. That is the whole point.
+No model in the loop produced that number. Run it again on another laptop and you get 91.6 again. That is the whole point.
 
 ---
 
 ## A real catch
 
-A SKILL.md for [ShieldClaw](docs/case-studies/shieldclaw/) — a real prompt-injection-defense skill, now archived — scored **68.3 [C]** — and Schliff showed exactly why: composability **20/100** (no scope boundaries, no I/O contract, no handoffs), and **3 of 7 dimensions unmeasurable** because there was no eval suite. After adding the missing scope section and an eval suite, the same file scored **94.6 [A]** on all 7 dimensions.
+A SKILL.md for [ShieldClaw](docs/case-studies/shieldclaw/) — a real prompt-injection-defense skill, now archived — scored **83.7 [B]**, and Schliff showed exactly why: composability **20/100** (no scope boundaries, no I/O contract, no handoffs), efficiency 60/100, and **3 of 7 dimensions unmeasurable** because there was no eval suite. After adding the missing scope section and an eval suite, the same file scored **93.8 [A]** on all 7 dimensions, with composability at 86.
 
 | | Score | Grade | Dimensions measured |
 | --- | --- | --- | --- |
-| Before | 68.3 | C | 4/7 (no eval suite) |
-| After | 94.6 | A | 7/7 |
+| Before | 83.7 | B | 4/7 (no eval suite) |
+| After | 93.8 | A | 7/7 |
+
+*(Both files ship in [`docs/case-studies/shieldclaw/`](docs/case-studies/shieldclaw/) — the numbers above are the current engine's output, reproducible with `schliff score`.)*
 
 Defects you'd otherwise ship caught as a number that's too low — see the [full case study](docs/case-studies/shieldclaw/).
 
