@@ -28,12 +28,38 @@ _DIRECTIVE_WEIGHTS = {"code_style": 15, "gotchas": 15, "pr": 10}
 # --------------------------------------------------------------------------- #
 # Parsing
 # --------------------------------------------------------------------------- #
-_FENCE_RE = re.compile(r"^([ \t]*)```([A-Za-z0-9_-]*)\s*$")
-_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
+# Fence toggle matches the engine-wide convention (text_gradient, guards):
+# ANY line whose stripped form starts with ``` toggles fence state. This keeps
+# CommonMark info-string openers (```bash title="x") and 4+-backtick fences
+# from desyncing the parser state for the rest of the document. The language
+# is the first word after the backticks.
+_FENCE_RE = re.compile(r"^[ \t]*`{3,}([A-Za-z0-9_+-]*)")
+# Heading title is captured greedily to end-of-line and trimmed by callers.
+# [ \t]+ and \S never compete over the same characters and there is no
+# quantifier overlap at the tail, so matching is linear — a `\s+(.*\S)\s*$`
+# tail is quadratic on whitespace-only heading lines (ReDoS on untrusted
+# AGENTS.md up to MAX_SKILL_SIZE).
+_HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(\S.*)$")
 _INLINE_RE = re.compile(r"`([^`\n]+)`")
 _FLAG_RE = re.compile(r"^-{1,2}[A-Za-z]")
 _ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_]\w*=")
-_NEG_RE = re.compile(r"\b(do not|don'?t|dont|never|avoid|instead of)\b", re.IGNORECASE)
+# Spec §4.2.5 cue list is exactly do-not/don't/never/avoid — `instead of` is
+# NOT a negation ("Use `pnpm test` instead of `npm test`" positively recommends
+# the first command).
+_NEG_RE = re.compile(r"\b(do not|don'?t|dont|never|avoid)\b", re.IGNORECASE)
+# Positive idioms that carry a negation word but INSTRUCT running the command:
+# "don't forget to run X", "never skip X".
+_NEG_POSITIVE_RE = re.compile(
+    r"\b(?:do not|don'?t|dont|never)\s+(?:forget|skip)\b", re.IGNORECASE
+)
+# Sentence boundary for the §4.2.5 negation guard: punctuation followed by
+# whitespace, so dots inside tokens (`.env.example`, `e.g.`-misfires aside)
+# do not split.
+_SENT_SPLIT_RE = re.compile(r"(?<=[.!?;:])\s+")
+
+
+def _is_negated(text: str) -> bool:
+    return bool(_NEG_RE.search(text)) and not _NEG_POSITIVE_RE.search(text)
 _FILE_EXT_RE = re.compile(r"\.(py|ts|tsx|js|jsx|rs|go|rb|java|md|json|sh)\b")
 
 # An inline backtick span only counts toward the directive concreteness signal
@@ -67,26 +93,38 @@ _WRAPPERS = {"sudo", "command", "exec", "time", "env", "xargs", "nohup", "then",
 # inline must be command-shaped (bare single-token inline rejected).
 _TEST_INTRINSIC = {
     "pytest", "vitest", "jest", "mocha", "tox", "nox", "ruff", "eslint", "mypy",
-    "tsc", "prettier", "black", "flake8", "isort", "pyright", "nextest", "pre-commit",
+    "prettier", "black", "flake8", "isort", "pyright", "nextest", "pre-commit",
 }
-_BUILD_INTRINSIC = {"vite", "webpack"}
+# tsc sits in the build family per spec §4.2 ("build / compile / ... / tsc / vite").
+_BUILD_INTRINSIC = {"vite", "webpack", "tsc"}
 
-# Runner verbs (strict tier): consume optional leading run|r then map a family token.
+# Runner verbs (strict tier): consume optional leading run|r|exec|dlx then map a
+# family token. docker/podman credit via a resolved family token after skipping
+# compose/buildx (spec §4.2.1 strict tier); kubectl has no setup/build/test
+# family and therefore never credits — listed here so it is a known verb, not
+# an accidental fall-through.
 _RUNNER = {
     "npm", "pnpm", "yarn", "bun", "pip", "pip3", "uv", "uvx", "poetry", "pipenv",
-    "pdm", "cargo", "dotnet", "gradle", "gradlew", "mvn", "deno", "turbo", "nx",
-    "sbt", "nix", "zig", "mix", "dart", "flutter", "gleam",
+    "pdm", "cargo", "dotnet", "gradle", "gradlew", "mvnw", "mvn", "deno", "turbo",
+    "nx", "sbt", "nix", "zig", "mix", "dart", "flutter", "gleam",
 }
+# Exec-delegation runners: classify by the first resolvable delegated token
+# (`npx playwright test` -> test, `bunx vitest` -> test).
+_EXEC_RUNNER = {"npx", "bunx", "pnpx"}
+_CONTAINER = {"docker", "podman"}
+_CONTAINER_SKIP = {"compose", "buildx"}
 
 # Guarded tier (English homonyms): credit only with a recognized subcommand/flag/path.
+# git/gh are deliberately NOT here: spec §4.2.2 confines git to read-only-junk and
+# PR-directive roles — `git add`/`git init` must not credit the setup category.
 _GUARDED = {
     "go", "make", "just", "node", "python", "python3", "ruby", "swift", "task",
-    "biome", "git", "gh", "rake", "bundle", "rails",
+    "biome", "rake", "bundle", "rails",
 }
 
 _SETUP_TOKENS = {
     "install", "i", "ci", "sync", "add", "bootstrap", "init", "setup",
-    "restore", "develop", "deps", "get",
+    "restore", "develop", "deps", "get", "migrate",
 }
 _BUILD_TOKENS = {
     "build", "compile", "dev", "serve", "start", "watch", "bundle", "dist", "package",
@@ -101,18 +139,24 @@ _GIT_READONLY = {
     "status", "log", "diff", "show", "branch", "remote", "fetch", "blame", "reflog",
 }
 _INSPECT_FLAGS = {"-v", "-h", "--version", "--help"}
-_STOPWORDS = {
-    "to", "the", "it", "in", "of", "a", "an", "sure", "at", "your", "this",
-    "that", "is", "we", "you", "and", "for", "with", "here",
-}
 
 # Tool-name set for the directive concreteness signal.
 _ALL_TOOLS = (
-    _TEST_INTRINSIC | _BUILD_INTRINSIC | _RUNNER | _GUARDED
-    | {"docker", "kubectl", "helm", "podman", "django-admin", "nix-shell"}
+    _TEST_INTRINSIC | _BUILD_INTRINSIC | _RUNNER | _GUARDED | _EXEC_RUNNER
+    | {"docker", "kubectl", "helm", "podman", "django-admin", "nix-shell", "git", "gh"}
 )
 _TOOL_RE = re.compile(
     r"\b(" + "|".join(sorted((re.escape(t) for t in _ALL_TOOLS), key=len, reverse=True))
+    + r")\b"
+)
+# Prose-facing tool signal: the _GUARDED English homonyms (make/go/task/just/
+# ruby/swift/...) must NOT satisfy the directive concreteness gate from raw
+# prose — "You must always make sure..." would otherwise farm all 40 directive
+# points (the §4.3 platitude hole). Inside backticks the full set still counts
+# (_is_code_token): a backticked span is an explicit code reference.
+_PROSE_TOOLS = _ALL_TOOLS - _GUARDED
+_PROSE_TOOL_RE = re.compile(
+    r"\b(" + "|".join(sorted((re.escape(t) for t in _PROSE_TOOLS), key=len, reverse=True))
     + r")\b"
 )
 
@@ -164,14 +208,17 @@ def _norm(seg: str) -> str:
 
 
 def _split_segments(line: str):
-    line = re.sub(r"^\s*[\$>#]\s+", "", line)
+    # Leading $/>/# prompts are NOT stripped here: _classify consumes them as
+    # tokens and records had_prompt — the spec §4.2.3 inline command-shape
+    # signal (`$ pytest` inline must credit).
     return [s for s in re.split(r"&&|\|\||\||;", line) if s.strip()]
 
 
 def _family_of(tok: str):
     t = tok.lower()
-    base = t.split(":", 1)[0]
-    for candidate in (t, base):
+    # Check the full token first (`lint:fix`), then each colon part so script
+    # namespaces resolve (`db:migrate` -> migrate -> setup, spec §4.2 *migrate).
+    for candidate in [t, *t.split(":")]:
         if candidate in _SETUP_TOKENS:
             return "setup"
         if candidate in _BUILD_TOKENS:
@@ -202,9 +249,18 @@ def _is_readonly(verb: str, nonflag, args) -> bool:
         return True
     if a0 in {"version", "help"}:
         return True
-    for a in args:
-        if _FLAG_RE.match(a):
-            return a in _INSPECT_FLAGS
+    # Spec §4.2.2 (refined): --version/--help as FIRST arg is inspection junk.
+    # Short -v/-h count only when they are the ONLY arg (`npm -v`) — with an
+    # operand present, -v almost always means verbose (`pytest -v tests/` is a
+    # real test run and must credit).
+    if args and args[0] in {"--version", "--help"}:
+        return True
+    if len(args) == 1 and args[0] in _INSPECT_FLAGS:
+        # `npm -v` prints a version; `pytest -v` runs the suite verbosely —
+        # for verb-intrinsic tools -v is verbose, while -h/--help stays junk.
+        return not (
+            args[0] == "-v" and (verb in _TEST_INTRINSIC or verb in _BUILD_INTRINSIC)
+        )
     return False
 
 
@@ -213,7 +269,7 @@ def _runner_family(verb: str, nonflag):
         return "setup"
     consumed_run = False
     a0 = nonflag[0] if nonflag else None
-    if a0 in ("run", "r"):
+    if a0 in ("run", "r", "exec", "dlx"):
         consumed_run = True
         a0 = nonflag[1] if len(nonflag) > 1 else None
     if a0 is None:
@@ -226,6 +282,9 @@ def _runner_family(verb: str, nonflag):
         return "test"
     if a0 in _BUILD_INTRINSIC:
         return "build"
+    # Runner-in-runner delegation: `uv pip install ...` -> pip's family.
+    if a0 in _RUNNER:
+        return _runner_family(a0, nonflag[nonflag.index(a0) + 1:])
     # `npm run <unknown-script>` -> generic build/run
     return "build" if consumed_run else None
 
@@ -263,8 +322,12 @@ def _classify(seg: str, inline: bool):
     if verb in _JUNK:
         return None
 
-    # Script delegation (conservative recall).
+    # Script delegation (conservative recall). Wrapper scripts that ARE runners
+    # (`./gradlew build`, `./mvnw install`) classify via the runner path — the
+    # generic prefix heuristic would return None for them.
     if verb_raw.endswith(".sh") or verb_raw.startswith("./"):
+        if verb in _RUNNER:
+            return _runner_family(verb, nonflag)
         return _script_family(verb)
     if verb in ("bash", "sh", "zsh", "source"):
         for a in args:
@@ -293,17 +356,67 @@ def _classify(seg: str, inline: bool):
     if verb == "nix-shell":
         return "setup"
 
+    # Exec-delegation runners: `npx playwright test`, `bunx vitest`.
+    if verb in _EXEC_RUNNER:
+        for a in nonflag:
+            if a in _TEST_INTRINSIC:
+                return "test"
+            if a in _BUILD_INTRINSIC:
+                return "build"
+            fam = _family_of(a)
+            if fam:
+                return fam
+        return None
+
+    # Containers (spec §4.2.1 strict tier): family token after compose/buildx.
+    if verb in _CONTAINER:
+        ops = [a for a in nonflag if a not in _CONTAINER_SKIP]
+        if ops:
+            return _family_of(ops[0])
+        return None
+
+    # `cp .env.example .env` bootstraps configuration (spec §4.2 setup family).
+    if verb == "cp":
+        if any(".env" in a for a in args):
+            return "setup"
+        return None
+
+    # Interpreter delegation: `python -m pytest`, `python3 -m pip install ...`,
+    # `python manage.py migrate`.
+    if verb in ("python", "python3", "node", "ruby"):
+        if "-m" in args:
+            mi = args.index("-m")
+            rest = [a for a in args[mi + 1:] if not _FLAG_RE.match(a)]
+            mod = rest[0] if rest else None
+            if mod is None:
+                return None
+            if mod in _TEST_INTRINSIC:
+                return "test"
+            if mod in _BUILD_INTRINSIC:
+                return "build"
+            if mod in _RUNNER:
+                return _runner_family(mod, rest[1:])
+            if mod == "venv":
+                return "setup"
+            return _family_of(mod)
+        if a0 is not None and a0.endswith((".py", ".js", ".rb")) and len(nonflag) > 1:
+            return _family_of(nonflag[1])
+
     # Guarded tier (English homonyms): credit only on a resolved family token.
     if verb in _GUARDED:
         if a0 is None:
-            return None
+            # `make -j4`: make is spec-listed in the build family and a flag is
+            # a qualifying command shape (§4.2.1); other guarded homonyms stay
+            # uncreditable without an operand.
+            return "build" if verb == "make" and has_flag else None
         fam = _family_of(a0)
         if fam is None:
             return None
         if has_flag or has_path or has_colon:
             return fam
-        # bare guarded operand: at most one trailing token, and not English filler
-        if len(nonflag) <= 2 and (len(nonflag) < 2 or nonflag[1] not in _STOPWORDS):
+        # Bare guarded operand: EXACTLY one token (`make test`). A trailing
+        # token is English prose, not a command (`make tests pass`).
+        if len(nonflag) == 1:
             return fam
         return None
 
@@ -320,25 +433,28 @@ def _extract_commands(lines):
         if fm:
             if not in_fence:
                 in_fence = True
-                lang = fm.group(2).lower()
+                lang = fm.group(1).lower()
             else:
                 in_fence = False
                 lang = ""
             continue
         if in_fence:
-            if lang in _SHELL_LANGS and not _NEG_RE.search(ln.lower()):
+            if lang in _SHELL_LANGS and not _is_negated(ln):
                 for seg in _split_segments(ln):
                     fam = _classify(seg, inline=False)
                     if fam:
                         results.append((fam, _norm(seg)))
             continue
-        if _NEG_RE.search(ln.lower()):
-            continue
-        for span in _INLINE_RE.findall(ln):
-            for seg in _split_segments(span):
-                fam = _classify(seg, inline=True)
-                if fam:
-                    results.append((fam, _norm(seg)))
+        # §4.2.5: the negation guard is SENTENCE-scoped — "Never commit to
+        # main. Run `pnpm test` before pushing." must keep the test credit.
+        for sent in _SENT_SPLIT_RE.split(ln):
+            if _is_negated(sent):
+                continue
+            for span in _INLINE_RE.findall(sent):
+                for seg in _split_segments(span):
+                    fam = _classify(seg, inline=True)
+                    if fam:
+                        results.append((fam, _norm(seg)))
     return results
 
 
@@ -375,7 +491,7 @@ def _sections(lines):
 
 
 def _has_tool(body: str) -> bool:
-    return bool(_TOOL_RE.search(body))
+    return bool(_PROSE_TOOL_RE.search(body))
 
 
 def _is_code_token(span: str) -> bool:

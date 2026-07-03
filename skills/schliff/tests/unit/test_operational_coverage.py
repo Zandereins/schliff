@@ -541,3 +541,217 @@ def test_instruction_file_scorers_unchanged():
 def test_opcov_in_agents_md_only():
     assert "operational_coverage" in get_scorers("agents.md")
     assert "operational_coverage" in WEIGHT_PROFILES["agents.md"]
+
+
+# --------------------------------------------------------------------------- #
+# Adversarial-review regressions (2026-07-03 multi-agent review of the branch)
+# --------------------------------------------------------------------------- #
+
+def test_heading_regex_no_redos():
+    """A `\\s+(.*\\S)\\s*$` heading tail is quadratic on whitespace-only heading
+    lines (same ReDoS class as the project's earlier content-regex fix). The
+    pattern must stay linear: a 200k-space heading line completes in
+    milliseconds — the quadratic pattern needs minutes at this size."""
+    import time
+
+    from scoring.operational_coverage import _HEADING_RE
+
+    malicious = "#" + " " * 200_000
+    benign = "# " + "a " * 100_000
+    _HEADING_RE.match(benign)  # warm-up
+    start = time.perf_counter()
+    _HEADING_RE.match(malicious)
+    _HEADING_RE.match(benign)
+    assert time.perf_counter() - start < 0.5
+
+
+def test_directive_gate_rejects_prose_homonyms(tmp_path):
+    """make/go/task/just in raw prose must NOT satisfy the directive
+    concreteness gate — a platitude doc farmed all 40 directive points."""
+    r = _op(
+        tmp_path,
+        """# Project
+
+## Conventions
+
+You must always make sure the code is clean. Never rush your work, just take it slow.
+
+## Gotchas
+
+Be careful: you must always double check everything before you go further. Never assume the task is done.
+
+## Pull Requests
+
+Always make sure your work is reviewed. You must never merge without approval of the task owner.
+""",
+    )
+    assert r["score"] == 0
+
+
+def test_fence_info_string_no_desync(tmp_path):
+    """A CommonMark opener with an info string (```bash title="x") must toggle
+    fence state — otherwise the parser state inverts for the rest of the doc
+    and later real command blocks are scanned as prose."""
+    r = _op(
+        tmp_path,
+        """# P
+
+## Example
+
+```bash title="demo"
+echo hi
+```
+
+## Setup
+
+```bash
+npm install
+```
+""",
+    )
+    assert "npm install" in r["details"]["commands"]
+
+
+def test_four_backtick_fence_no_desync(tmp_path):
+    r = _op(
+        tmp_path,
+        """# P
+
+````markdown
+```bash
+placeholder-inner-fence
+```
+````
+
+## Setup
+
+```bash
+pnpm install
+```
+""",
+    )
+    assert "pnpm install" in r["details"]["commands"]
+
+
+def test_negation_is_sentence_scoped(tmp_path):
+    """§4.2.5: 'Never commit to main. Run `pnpm test` before pushing.' keeps
+    the test credit; 'don't forget to run X' is a positive instruction; and
+    'use X instead of Y' positively recommends X."""
+    r = _op(
+        tmp_path,
+        """# P
+
+## Workflow
+
+Never commit directly to main. Run `pnpm test` before pushing.
+Don't forget to run `pnpm install` first.
+Use `pnpm build` instead of `npm run build`.
+""",
+    )
+    cmds = r["details"]["commands"]
+    assert "pnpm test" in cmds
+    assert "pnpm install" in cmds
+    assert "pnpm build" in cmds
+
+
+@pytest.mark.parametrize(
+    ("segment", "inline", "family"),
+    [
+        # read-only refinement: -v with an operand (or on an intrinsic) is verbose
+        ("pytest -v", False, "test"),
+        ("pytest -v tests/", False, "test"),
+        ("cargo build -v", False, "build"),
+        # interpreter delegation
+        ("python -m pytest", False, "test"),
+        ("python3 -m pip install -r requirements.txt", False, "setup"),
+        ("python -m venv .venv", False, "setup"),
+        ("python -m build", False, "build"),
+        ("python manage.py migrate", False, "setup"),
+        # runner wrapper scripts
+        ("./gradlew build", False, "build"),
+        ("./gradlew test", False, "test"),
+        ("./mvnw install", False, "setup"),
+        # containers (spec §4.2.1 strict tier)
+        ("docker build -t app .", False, "build"),
+        ("docker compose build", False, "build"),
+        # exec-delegation runners
+        ("npx playwright test", False, "test"),
+        ("npx tsc --noEmit", False, "build"),
+        ("bunx vitest", False, "test"),
+        ("pnpm exec vitest", False, "test"),
+        ("uv pip install -e .", False, "setup"),
+        # spec §4.2 setup family: cp .env* and *migrate
+        ("cp .env.example .env", False, "setup"),
+        ("pnpm db:migrate", False, "setup"),
+        # guarded make: a flag is a qualifying command shape
+        ("make -j4", False, "build"),
+        # spec §4.2 puts tsc in the build family
+        ("tsc", False, "build"),
+        # inline $-prompt is a command-shape signal (spec §4.2.3)
+        ("$ pytest", True, "test"),
+    ],
+)
+def test_classification_recall(segment, inline, family):
+    from scoring.operational_coverage import _classify
+
+    assert _classify(segment, inline) == family
+
+
+@pytest.mark.parametrize(
+    ("segment", "inline"),
+    [
+        # git is read-only-junk or PR-directive, never a command (spec §4.2.2)
+        ("git add .", False),
+        ("git init", False),
+        ("git status", False),
+        # English prose around guarded verbs
+        ("make tests pass", True),
+        ("go to the dashboard", True),
+        # inspection stays junk
+        ("npm -v", False),
+        ("ruff -h", False),
+        ("pytest --version", False),
+        ("docker ps", False),
+    ],
+)
+def test_classification_still_rejects(segment, inline):
+    from scoring.operational_coverage import _classify
+
+    assert _classify(segment, inline) is None
+
+
+def test_known_limit_plausible_fabrication_scores_high(tmp_path):
+    """DOCUMENTED LIMIT (spec §4.4 accepted risk): a doc whose commands are
+    syntactically valid but fabricated is textually indistinguishable from a
+    genuine minimal AGENTS.md — no deterministic text scorer can tell them
+    apart without executing the commands. opcov therefore credits it. The
+    anti-gaming guarantee is scoped to WORTHLESS text (junk commands,
+    platitudes, name-drops), not to plausible lies."""
+    r = _op(
+        tmp_path,
+        """---
+name: fake
+description: plausible fabrication
+---
+
+# Fake Project
+
+## Setup
+
+```bash
+npm install
+```
+
+## Test
+
+```bash
+npm test
+```
+
+## Code Style
+
+Always follow the `eslint.config.js` rules. Never use `var` in new code.
+""",
+    )
+    assert r["details"]["categories"]["setup"]["credited"] is True
+    assert r["details"]["categories"]["test"]["credited"] is True
