@@ -1,0 +1,30 @@
+name: Notify star counter
+
+# Fires the moment someone stars this repo and asks the profile repo
+# (Zandereins/Zandereins) to recount immediately, instead of waiting for
+# its hourly schedule. Un-stars don't emit an event; the hourly cron in
+# the profile repo catches those.
+on:
+  watch:
+    types: [started]
+
+permissions: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger star recount in profile repo
+        env:
+          TOKEN: ${{ secrets.PROFILE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "PROFILE_DISPATCH_TOKEN is not configured — skipping."
+            echo "The hourly Star Count schedule in Zandereins/Zandereins will pick this up instead."
+            exit 0
+          fi
+          curl -sS --fail-with-body -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/Zandereins/Zandereins/dispatches \
+            -d '{"event_type":"star-update"}'
