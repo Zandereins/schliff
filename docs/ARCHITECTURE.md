@@ -127,17 +127,17 @@ the same 8 scorers **plus `operational_coverage`** and has its own headline prof
 (`structure` 0.40 / `operational_coverage` 0.40 / `efficiency` 0.20 — see
 `docs/SCORING.md` and `docs/specs/agents-md-operational-coverage.md`).
 
-| Dimension       | Weight | Role in skill.md headline                                   |
-|-----------------|--------|-------------------------------------------------------------|
-| `structure`     | 0.15   | headline                                                    |
-| `triggers`      | 0.20   | headline                                                    |
-| `quality`       | 0.20   | headline                                                    |
-| `edges`         | 0.15   | headline                                                    |
-| `efficiency`    | 0.10   | headline                                                    |
-| `composability` | 0.10   | headline                                                    |
-| `clarity`       | 0.05   | headline                                                    |
-| `security`      | 0.05   | **separate signal** (opt-in; excluded from skill.md headline, reported in `signals`/`security`) |
-| `runtime`       | n/a    | **separate signal** (no profile weight; never in any headline) |
+| Dimension | Weight | Role in skill.md headline |
+| --- | --- | --- |
+| `structure` | 0.15 | headline |
+| `triggers` | 0.20 | headline |
+| `quality` | 0.20 | headline |
+| `edges` | 0.15 | headline |
+| `efficiency` | 0.10 | headline |
+| `composability` | 0.10 | headline |
+| `clarity` | 0.05 | headline |
+| `security` | 0.05 | **separate signal** (opt-in; excluded from skill.md headline, reported in `signals`/`security`) |
+| `runtime` | n/a | **separate signal** (no profile weight; never in any headline) |
 
 The 7 headline weights are renormalized to sum to 1.0 once `security` and `runtime` are
 removed from the basis (`get_headline_excluded`).
@@ -153,13 +153,13 @@ agents.md family**.
 
 ### Format token budgets (`formats.py`)
 
-| Format          | Budget (tokens) |
-|-----------------|-----------------|
-| skill.md        | 1000            |
-| claude.md       | 2000            |
-| cursorrules     | 500             |
-| agents.md       | 3000            |
-| system_prompt   | 1500            |
+| Format | Budget (tokens) |
+| --- | --- |
+| skill.md | 1000 |
+| claude.md | 2000 |
+| cursorrules | 500 |
+| agents.md | 3000 |
+| system_prompt | 1500 |
 
 Token estimation is the stdlib-only `len(content) // 4` heuristic.
 
@@ -227,14 +227,14 @@ default canonical weights so cross-machine decisions never depend on a process e
 ### Grade scale (`terminal_art.score_to_grade` / `_GRADE_THRESHOLDS`)
 
 | Grade | Threshold |
-|-------|-----------|
-| S     | ≥ 95      |
-| A     | ≥ 85      |
-| B     | ≥ 75      |
-| C     | ≥ 65      |
-| D     | ≥ 50      |
-| E     | ≥ 35      |
-| F     | < 35      |
+| --- | --- |
+| S | ≥ 95 |
+| A | ≥ 85 |
+| B | ≥ 75 |
+| C | ≥ 65 |
+| D | ≥ 50 |
+| E | ≥ 35 |
+| F | < 35 |
 
 ---
 
