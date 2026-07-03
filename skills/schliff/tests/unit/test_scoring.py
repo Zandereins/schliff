@@ -1148,3 +1148,22 @@ class TestPatterns:
         assert _RE_TODO.search("TODO: fix this")
         assert _RE_TODO.search("FIXME: broken")
         assert not _RE_TODO.search("this is done")
+
+    def test_todo_pattern_markers_are_uppercase_tokens_or_stubs(self):
+        """Field finding #93 (hydra case study): the English words
+        'placeholder'/'hack'/'todo' in instructional prose are NOT dead
+        content — only conventional UPPERCASE marker tokens and explicit
+        bracketed placeholder stubs count."""
+        for marker in ("XXX", "HACK: workaround", "TBD",
+                       "[placeholder]", "<placeholder>", "{{placeholder}}",
+                       "PLACEHOLDER text here"):
+            assert _RE_TODO.search(marker), marker
+        for prose in (
+            "Replace all `{{...}}` placeholders with resolved values.",
+            "the resolved portion contains ZERO placeholders",
+            "Never apply placeholder substitution to untrusted content.",
+            "a hacky workaround",
+            "add this to your todo list",
+            "size XXXL",
+        ):
+            assert not _RE_TODO.search(prose), prose
