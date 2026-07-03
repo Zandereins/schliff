@@ -11,13 +11,13 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "schliff", specifier = "==8.3.0" }]
+requires-dist = [{ name = "schliff", specifier = "==8.4.0" }]
 
 [[package]]
 name = "schliff"
-version = "8.3.0"
+version = "8.4.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d5/70/e4488e0127f692ccab092b88ad8b2a538d294f823baca1250b309feb88e8/schliff-8.3.0.tar.gz", hash = "sha256:44ec31832f9973632e72c18142536601296fdbec419054c150dbc60b33405642", size = 231361, upload-time = "2026-06-25T12:32:57.142Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/a6/ccbbf13acaecfa21ab06ac49492760e36d2968056e07656960cb0005d9fa/schliff-8.4.0.tar.gz", hash = "sha256:14d1600a4c5abe9e397b0791289142038b8163f42ac4299c6fc811cac28bb09d", size = 239768, upload-time = "2026-07-03T11:50:14.798Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/7f/93657af8a66fd39fd60c0cb76069ca9944e4db4f08ec27321922659d27a3/schliff-8.3.0-py3-none-any.whl", hash = "sha256:291a0b2ed575693642a50494ae222dccfb46d831079f4e331078d6b7f3cd757b", size = 268038, upload-time = "2026-06-25T12:32:55.777Z" },
+    { url = "https://files.pythonhosted.org/packages/85/f3/5d8bb3f99238f9abf139358ec5445f4b66635844808f9d303907e5540c73/schliff-8.4.0-py3-none-any.whl", hash = "sha256:0cbade341dd8d70d72a4e02d24ff17f2245f3113cbb9497113f457a9f1beb94c", size = 277144, upload-time = "2026-07-03T11:50:13.158Z" },
 ]
