@@ -19,7 +19,11 @@ SCORER_REGISTRY: dict[str, list[str]] = {
     "skill.md": list(_INSTRUCTION_FILE_SCORERS),
     "claude.md": list(_INSTRUCTION_FILE_SCORERS),
     "cursorrules": list(_INSTRUCTION_FILE_SCORERS),
-    "agents.md": list(_INSTRUCTION_FILE_SCORERS),
+    # AGENTS.md gets its own literal (NOT a mutation of the shared list) so the
+    # operational_coverage dimension runs for agents.md only and never leaks into
+    # skill.md/claude.md/cursorrules (byte-identity). See
+    # docs/specs/agents-md-operational-coverage.md §5.
+    "agents.md": [*_INSTRUCTION_FILE_SCORERS, "operational_coverage"],
     "system_prompt": [
         "structure_prompt", "output_contract", "efficiency",
         "clarity", "security", "composability", "completeness",
@@ -46,11 +50,14 @@ WEIGHT_PROFILES: dict[str, dict[str, float]] = {
     "skill.md": dict(_INSTRUCTION_FILE_WEIGHTS),
     "claude.md": dict(_INSTRUCTION_FILE_WEIGHTS),
     "cursorrules": dict(_INSTRUCTION_FILE_WEIGHTS),
-    # AGENTS.md is project context for coding agents, not a reusable skill: its
-    # headline is structure+efficiency only (0.5/0.5). Must be an explicit literal —
-    # reusing the 0.15/0.10 instruction weights would renormalize to 0.6/0.4, not the
-    # calibrated 0.5/0.5. See docs/specs/agents-md-scoring-profile.md.
-    "agents.md": {"structure": 0.5, "efficiency": 0.5},
+    # AGENTS.md is project context for coding agents, not a reusable skill. Its
+    # headline is the 3-dim operational profile: structure (0.4) + operational
+    # coverage (0.4) + efficiency (0.2). operational_coverage measures whether the
+    # doc actually equips a coding agent (runnable setup/build/test commands +
+    # code-style/PR/gotcha guidance) and demotes efficiency, a gameable density
+    # proxy. Must be an explicit literal. See
+    # docs/specs/agents-md-operational-coverage.md.
+    "agents.md": {"structure": 0.4, "operational_coverage": 0.4, "efficiency": 0.2},
     "system_prompt": {
         "structure_prompt": 0.15, "output_contract": 0.15, "efficiency": 0.15,
         "clarity": 0.15, "security": 0.15, "composability": 0.10, "completeness": 0.15,

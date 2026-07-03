@@ -38,9 +38,11 @@ headline number:
 
 ## The dimensions and their weights
 
-Schliff supports five formats. The **skill.md family** — `SKILL.md`, `CLAUDE.md`,
-`.cursorrules`, and `AGENTS.md` — shares one 8-scorer registry and one weight profile.
-The **system prompt** format (`system_prompt`) has its own scorer and weight set.
+Schliff supports five formats. The **skill.md family** — `SKILL.md`, `CLAUDE.md`, and
+`.cursorrules` — shares one 8-scorer registry and one weight profile. `AGENTS.md` runs
+the same 8 scorers **plus `operational_coverage`** and has its own 3-dimension headline
+(see below). The **system prompt** format (`system_prompt`) has its own scorer and
+weight set.
 
 ### skill.md family
 
@@ -67,6 +69,20 @@ to the headline number unless a caller explicitly re-weights it via `--weights`.
 
 > **Note:** `runtime` carries **no weight in any profile**. Any claim that runtime is a
 > "10% weight" dimension is false — it is only ever a separate signal.
+
+### AGENTS.md profile
+
+`AGENTS.md` is project context for a coding agent, not a reusable skill, so its
+headline is a 3-dimension operational profile (the eval-gated dimensions — triggers,
+quality, edges — are excluded, and the remaining scorers stay separate signals):
+
+| Dimension | Weight | What it measures |
+|-----------|--------|------------------|
+| **structure** | 0.40 | Same structural scorer as the skill.md family |
+| **operational_coverage** | 0.40 | Whether the doc equips an agent to operate the repo: real setup/build/test commands (junk-, read-only- and prose-hardened command classification) plus code-style / gotcha / PR directive sections with concrete code tokens |
+| **efficiency** | 0.20 | Information density — deliberately demoted: fenced-code density is a gameable proxy for operational value |
+
+Design, hardening and anti-gaming evidence: `docs/specs/agents-md-operational-coverage.md`.
 
 ### system_prompt format
 

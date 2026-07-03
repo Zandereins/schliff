@@ -158,7 +158,9 @@ runs:
             return '█'.repeat(filled) + '░'.repeat(20 - filled) + ` ${Math.round(val)}`;
           }
 
-          const dimOrder = ['structure', 'triggers', 'quality', 'edges', 'efficiency', 'composability', 'clarity'];
+          // operational_coverage is emitted for AGENTS.md only; other formats
+          // never carry the key and are skipped by the null-check below.
+          const dimOrder = ['structure', 'operational_coverage', 'triggers', 'quality', 'edges', 'efficiency', 'composability', 'clarity'];
 
           // Map the engine's exact format keys (scoring/formats.py) to display labels.
           // Note: the cursor format is emitted as 'cursorrules' (no leading dot).

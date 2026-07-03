@@ -292,9 +292,11 @@ def format_score_display(
     lines.append(f"schliff{ver}")
     lines.append("")
 
-    # Dimension display order (skip runtime if not measured)
-    dim_order = ["structure", "triggers", "quality", "edges",
-                 "efficiency", "composability", "clarity"]
+    # Dimension display order (skip runtime if not measured).
+    # operational_coverage is emitted for agents.md only; other formats never
+    # carry the key and skip it via the score-presence check below.
+    dim_order = ["structure", "operational_coverage", "triggers", "quality",
+                 "edges", "efficiency", "composability", "clarity"]
 
     # Find max dim name length for alignment
     active_dims = [d for d in dim_order if d in scores and scores[d].get("score", -1) >= 0]
