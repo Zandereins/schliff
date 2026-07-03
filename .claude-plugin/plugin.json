@@ -1,19 +1,14 @@
 {
   "name": "schliff",
   "version": "8.4.0",
-  "description": "Deterministic skill linter and scoring engine for Claude Code. 7-dimension scoring, anti-gaming detection, autoresearch-style autonomous improvement.",
-  "author": "Zandereins",
+  "description": "Deterministic quality scorer for AI instruction files (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md). 9 scorers incl. operational_coverage, anti-gaming detection, autoresearch-style autonomous improvement.",
+  "author": {
+    "name": "Zandereins",
+    "url": "https://github.com/Zandereins"
+  },
   "license": "MIT",
   "homepage": "https://github.com/Zandereins/schliff",
-  "skills": ["skills/schliff"],
-  "commands": ["commands/schliff"],
-  "tags": ["autoresearch", "skill-improvement", "autonomous", "evaluation", "meta-skill"],
-  "compatibility": {
-    "claude_code": ">=1.0.0",
-    "platforms": ["linux", "macos", "windows"]
-  },
-  "dependencies": {
-    "required": ["python3", "bash", "git"],
-    "optional": ["jq"]
-  }
+  "skills": ["./skills/schliff"],
+  "commands": ["./commands/schliff"],
+  "dependencies": ["python3", "bash", "git"]
 }
