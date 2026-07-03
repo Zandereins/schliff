@@ -111,7 +111,15 @@ _RE_HEDGING = re.compile(
 )
 _RE_CODE_BLOCKS = re.compile(r"```")
 _RE_HEADERS = re.compile(r"^##\s", re.MULTILINE)
-_RE_TODO = re.compile(r"(?i)(TODO|FIXME|HACK|XXX|placeholder)")
+# Dead-content markers are conventionally UPPERCASE standalone tokens or an
+# explicit bracketed placeholder stub. Matching the English words
+# "placeholder"/"hack" case-insensitively in prose advised deleting
+# load-bearing instructions ("Replace all {{...}} placeholders with resolved
+# values") — field finding #93 from the hydra case study.
+_RE_TODO = re.compile(
+    r"\b(?:TODO|FIXME|XXX|HACK|TBD|PLACEHOLDER)\b"
+    r"|\[[Pp]laceholder\]|<[Pp]laceholder>|\{\{[Pp]laceholder\}\}"
+)
 _RE_CODE_BLOCK_REGION = re.compile(r"```[\s\S]*?```")
 
 # ---------------------------------------------------------------------------

@@ -183,7 +183,7 @@ def test_compute_gradients_agents_md_emits_no_skill_only_advice(tmp_path):
 # --- Corpus golden distribution --------------------------------------------
 # Numbers below were re-derived on the hardened operational_coverage scorer
 # (spec §6), then once more after the 2026-07-03 adversarial-review fixes
-# (ReDoS/fence-desync/homonym-gate + recall: pytest -v, python -m, ./gradlew,
+# (ReDoS/fence-desync/homonym-gate + recall + #93 marker-precision + #96, incl.:
 # docker, npx, cp .env, *migrate). Do NOT reuse the pre-opcov 0.5/0.5 values
 # (73.90/77.25/...) or earlier intermediates.
 
@@ -198,9 +198,9 @@ def test_agents_md_corpus_golden_distribution():
     bands = Counter(r[2] for r in rows)
 
     assert len(rows) == 30
-    assert statistics.mean(scores) == pytest.approx(61.06, abs=0.05)
+    assert statistics.mean(scores) == pytest.approx(61.46, abs=0.05)
     assert statistics.median(scores) == pytest.approx(61.40, abs=0.05)
-    assert min(scores) == pytest.approx(25.0, abs=0.05)
+    assert min(scores) == pytest.approx(29.0, abs=0.05)
     assert max(scores) == pytest.approx(91.0, abs=0.05)
 
     # Exact band counts (golden lock) on the hardened scorer. No file reaches S
@@ -209,8 +209,8 @@ def test_agents_md_corpus_golden_distribution():
     assert bands["A"] == 1
     assert bands["B"] == 4
     assert bands["C"] == 8
-    assert bands["D"] == 11
-    assert bands["E"] == 5
+    assert bands["D"] == 12
+    assert bands["E"] == 4
     assert bands["F"] == 1
 
     # No file emits the SKILL-only eval-suite warning.
