@@ -32,35 +32,22 @@ _DEFAULT_MIN_SCORE = 75.0
 def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
     """Run the full scorer on a skill. Returns composite dict + per-dim scores.
 
-    Reuses the same scoring functions as `schliff score`.
+    Reuses the same scoring path as `schliff score`: format detection +
+    per-format scorer registry + per-format headline profile. Hand-rolling
+    the SKILL scorer set here scored AGENTS.md under the wrong profile
+    (issue #101: 27.7/F on a file `score` grades 91.6/A).
     """
-    from scoring import (
-        compute_composite,
-        score_clarity,
-        score_composability,
-        score_edges,
-        score_efficiency,
-        score_quality,
-        score_runtime,
-        score_structure,
-        score_triggers,
-    )
+    from scoring import compute_composite
+    from scoring.formats import detect_format
+    from shared import build_scores
 
-    scores = {
-        "structure": score_structure(skill_path),
-        "triggers": score_triggers(skill_path, eval_suite),
-        "quality": score_quality(skill_path, eval_suite),
-        "edges": score_edges(skill_path, eval_suite),
-        "efficiency": score_efficiency(skill_path),
-        "composability": score_composability(skill_path),
-        "clarity": score_clarity(skill_path),
-        "runtime": score_runtime(skill_path, eval_suite, enabled=False),
-    }
+    fmt = detect_format(skill_path)
+    scores = build_scores(skill_path, eval_suite, fmt=fmt)
 
     # The CI gate is a cross-machine comparison surface: never opt into ambient
     # calibrated weights here (use_calibrated defaults False), so the pass/fail
     # decision is reproducible and cannot be flipped by an env var.
-    composite = compute_composite(scores)
+    composite = compute_composite(scores, fmt=fmt)
 
     return {
         "composite": composite["score"],

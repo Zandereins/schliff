@@ -433,6 +433,98 @@ class TestRunVerifyRegression:
 
 
 # ---------------------------------------------------------------------------
+# Format profiles: verify must score under the detected format, not the
+# SKILL profile (issue #101 — AGENTS.md verified at 27.7/F vs score's 91.6/A)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def agents_md(tmp_path):
+    """A well-formed AGENTS.md that scores high under the agents.md profile."""
+    content = '''# Agent Instructions
+
+## Setup
+
+```bash
+pip install -e ".[dev]"
+```
+
+## Build & Test
+
+```bash
+make build
+pytest tests/ -x
+```
+
+Always run the full test suite before opening a PR.
+
+## Code Style
+
+- Run `ruff check src/` before committing; the CI lint gate is blocking.
+- Type hints are required on public functions.
+
+## PR Conventions
+
+- Conventional commits (`feat:`, `fix:`, `docs:`).
+- One reviewer approval required before merge.
+
+## Gotchas
+
+- `make build` must run before `pytest` — the fixtures are generated.
+- Never edit `src/generated/` by hand; it is overwritten on build.
+'''
+    path = tmp_path / "AGENTS.md"
+    path.write_text(content, encoding="utf-8")
+    return str(path)
+
+
+class TestVerifyFormatProfile:
+    def test_agents_md_verdict_matches_score_path(self, agents_md, history_file):
+        """run_verify on AGENTS.md must produce the same composite as the
+        `schliff score` path (agents.md profile), not the SKILL profile."""
+        from scoring import compute_composite
+        from scoring.formats import detect_format
+        from shared import build_scores
+
+        fmt = detect_format(agents_md)
+        assert fmt == "agents.md"
+        expected = compute_composite(
+            build_scores(agents_md, None, fmt=fmt), fmt=fmt
+        )["score"]
+
+        verdict = verify_mod.run_verify(
+            agents_md, min_score=75.0, history_path=history_file
+        )
+        assert verdict["composite"] == expected
+
+    def test_agents_md_full_coverage_no_eval_suite(self, agents_md, history_file):
+        """AGENTS.md's 3-dim headline is always measurable — verify must not
+        cap it at the SKILL profile's 42% no-eval-suite ceiling."""
+        verdict = verify_mod.run_verify(
+            agents_md, min_score=75.0, history_path=history_file
+        )
+        assert verdict["coverage"] == 1.0
+        assert verdict["effective_min"] == 75.0
+
+    def test_skill_md_verdict_unchanged_by_format_wiring(self, good_skill, history_file):
+        """SKILL.md verdicts must equal the score path under the skill profile
+        (regression guard for the format wiring)."""
+        from scoring import compute_composite
+        from scoring.formats import detect_format
+        from shared import build_scores
+
+        fmt = detect_format(good_skill)
+        assert fmt == "skill.md"
+        expected = compute_composite(
+            build_scores(good_skill, None, fmt=fmt), fmt=fmt
+        )["score"]
+
+        verdict = verify_mod.run_verify(
+            good_skill, min_score=50.0, history_path=history_file
+        )
+        assert verdict["composite"] == expected
+
+
+# ---------------------------------------------------------------------------
 # format_verdict
 # ---------------------------------------------------------------------------
 
