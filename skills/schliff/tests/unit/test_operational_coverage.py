@@ -654,6 +654,51 @@ def test_negation_is_positional_within_sentence(tmp_path):
     assert not any("audit" in c for c in cmds)
 
 
+def test_negation_object_first_prohibition_not_credited(tmp_path):
+    """Adversarial-review finding (2026-07-07): a prohibition that names the
+    command BEFORE the negation cue ('`pnpm test` should never be run in CI')
+    must NOT credit the command — the positional guard only keeps before-cue
+    spans when the sentence is genuinely contrastive (a positive
+    recommendation verb precedes the cue)."""
+    r = _op(
+        tmp_path,
+        """# P
+
+## Testing
+
+- The `pnpm test` command should never be run in CI.
+- Running `pnpm build` is something you must never do here.
+- `pnpm install` should be avoided in this repo.
+""",
+    )
+    cmds = r["details"]["commands"]
+    assert not any("pnpm test" in c for c in cmds)
+    assert not any("pnpm build" in c for c in cmds)
+    assert not any("pnpm install" in c for c in cmds)
+
+
+def test_negation_contrastive_and_positive_paths_unaffected(tmp_path):
+    """Regression guards around the object-first fix: the contrastive keep
+    (#96), the plain positive credit, and the don't-forget positive idiom
+    must all survive."""
+    r = _op(
+        tmp_path,
+        """# P
+
+## Testing
+
+- Run `pnpm test`, never `npx jest` directly.
+- Use `make build` before packaging.
+- Don't forget to run `cargo fmt` before committing.
+""",
+    )
+    cmds = r["details"]["commands"]
+    assert "pnpm test" in cmds
+    assert not any("npx jest" in c for c in cmds)
+    assert "make build" in cmds
+    assert "cargo fmt" in cmds
+
+
 def test_negation_is_sentence_scoped(tmp_path):
     """§4.2.5: 'Never commit to main. Run `pnpm test` before pushing.' keeps
     the test credit; 'don't forget to run X' is a positive instruction; and

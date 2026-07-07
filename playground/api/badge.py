@@ -20,6 +20,7 @@ grey badge, not a broken image). Security posture:
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 import urllib.error
@@ -51,6 +52,11 @@ MAX_FETCH_BYTES = 512 * 1024
 # s-maxage lets Vercel's edge absorb shields/camo refetches; SWR keeps badges
 # instant while revalidating in the background.
 CACHE_CONTROL = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+# Fallback badges (fetch errors, no AGENTS.md yet, invalid input) must not be
+# pinned in the edge cache for a day: a transient GitHub 5xx would freeze
+# "unavailable", and a user who just added their AGENTS.md would stare at
+# "no AGENTS.md" — the onboarding moment. Only real scores cache long.
+CACHE_CONTROL_FALLBACK = "public, max-age=60, s-maxage=300"
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -126,20 +132,19 @@ def _score(content: str) -> dict:
         grade = score_to_grade(score)
         return _badge(f"{score:g} · {grade}", _color(score), label="AGENTS.md quality")
     finally:
-        try:
-            os.unlink(skill_path)
-            os.rmdir(tmp_dir)
-        except OSError:
-            pass
+        # rmtree, not unlink+rmdir: if the file write itself failed (e.g.
+        # ENOSPC), unlink would raise and leak the mkdtemp dir on a warm
+        # instance's persistent /tmp.
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 class handler(BaseHTTPRequestHandler):
-    def _send(self, body: dict):
+    def _send(self, body: dict, cache_control: str = CACHE_CONTROL_FALLBACK):
         # Always 200: shields renders the payload; non-200 shows a broken badge.
         payload = json.dumps(body).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Cache-Control", CACHE_CONTROL)
+        self.send_header("Cache-Control", cache_control)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
@@ -158,6 +163,6 @@ class handler(BaseHTTPRequestHandler):
             self._send(err)
             return
         try:
-            self._send(_score(content))
+            self._send(_score(content), cache_control=CACHE_CONTROL)
         except Exception:
             self._send(_badge("scoring error", "lightgrey"))
