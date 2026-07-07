@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.5.0] - 2026-07-07
+
+### Fixed
+- **`verify` scores under the detected format profile** (#102, closes #101).
+  It previously hand-rolled the SKILL scorer set, so `schliff verify AGENTS.md`
+  scored the file under the wrong profile and failed spuriously (27.7/F on a
+  file `score` grades 91.6/A). Now wired like `score`/`badge`:
+  `detect_format → build_scores(fmt) → compute_composite(fmt=fmt)`. SKILL.md
+  verdicts are unchanged.
+- **Positional negation in `operational_coverage`** (#96): contrastive
+  sentences ("run X, never Y directly") keep the recommended command instead
+  of discarding both.
+- **Dead-marker detector matches marker tokens, not English prose** (#97,
+  closes #93): UPPERCASE tokens/stubs count; words like "placeholder" in
+  prose no longer false-positive. Corpus goldens re-derived.
+
+### Security
+- **Runtime scorer prompt hardened** (#99): skill content is nonce-wrapped
+  (`<skill_context_NONCE>`) so crafted files cannot forge the prompt
+  structure. Defense-in-depth — the dimension remains opt-in and gated off.
+
+### Added
+- Instant star-count notify workflow for the profile-repo badge (#98).
+- Theme-aware README hero (light/dark SVG) + social-preview asset (#106).
+- Dependabot now groups github-actions bumps into one PR — split bumps of
+  lockstep actions (codeql init/analyze) could never pass CI (#107).
+
+### Docs
+- **README redesigned** (#100): AGENTS.md-first, every number ground-truthed
+  against the released engine, ShieldClaw case-study table disambiguated
+  (ceiling vs quality), hydra field study added, new "What the score does not
+  measure" section, Marketplace listing linked.
+
 ## [8.4.0] - 2026-07-03
 
 ### Added
@@ -528,7 +561,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.4.0...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.5.0...HEAD
+[8.5.0]: https://github.com/Zandereins/schliff/compare/v8.4.0...v8.5.0
 [8.4.0]: https://github.com/Zandereins/schliff/compare/v8.3.0...v8.4.0
 [8.3.0]: https://github.com/Zandereins/schliff/compare/v8.2.0...v8.3.0
 [8.2.0]: https://github.com/Zandereins/schliff/compare/v8.1.0...v8.2.0
