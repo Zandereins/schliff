@@ -9,6 +9,12 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    # One PR per update round: split bumps of lockstep actions
+    # (codeql-action/init + /analyze) fail CI when versions mix.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
