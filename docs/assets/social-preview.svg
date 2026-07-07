@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="t">
+  <title id="t">Schliff — the Ruff for AGENTS.md</title>
+  <rect width="1280" height="640" fill="#0d1117"/>
+  <!-- wordmark + terminal cursor -->
+  <text x="80" y="204" textLength="404" lengthAdjust="spacingAndGlyphs"
+        font-family="-apple-system, 'Segoe UI', system-ui, sans-serif"
+        font-size="108" font-weight="700" letter-spacing="-2" fill="#e6edf3">Schliff</text>
+  <rect x="506" y="126" width="30" height="80" rx="4" fill="#3fb950"/>
+  <!-- subtitle -->
+  <text x="80" y="278" font-family="-apple-system, 'Segoe UI', system-ui, sans-serif"
+        font-size="42" font-weight="600" fill="#3fb950">The Ruff for AGENTS.md</text>
+  <!-- sublines -->
+  <g font-family="-apple-system, 'Segoe UI', system-ui, sans-serif" font-size="25" fill="#8b949e">
+    <text x="80" y="342">Deterministic quality scores for</text>
+    <text x="80" y="380">AI instruction files — same input,</text>
+    <text x="80" y="418">same score, on every machine.</text>
+  </g>
+  <!-- footer -->
+  <text x="80" y="556" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="22" fill="#59636e">github.com/Zandereins/schliff</text>
+  <!-- terminal card -->
+  <rect x="720" y="104" width="480" height="432" rx="16" fill="#161b22" stroke="#30363d"/>
+  <circle cx="756" cy="140" r="7" fill="#f85149"/>
+  <circle cx="780" cy="140" r="7" fill="#d29922"/>
+  <circle cx="804" cy="140" r="7" fill="#3fb950"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="19">
+    <text x="752" y="198"><tspan fill="#3fb950">$</tspan><tspan fill="#c9d1d9" dx="10">pip install schliff</tspan></text>
+    <text x="752" y="234"><tspan fill="#3fb950">$</tspan><tspan fill="#c9d1d9" dx="10">schliff score AGENTS.md</tspan></text>
+  </g>
+  <!-- meter: agents.md headline dimensions (decorative, no values) -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b949e">
+    <text x="752" y="300">structure</text>
+    <rect x="752" y="312" width="384" height="10" rx="5" fill="#21262d"/>
+    <rect x="752" y="312" width="346" height="10" rx="5" fill="#3fb950"/>
+    <text x="752" y="368">operational_coverage</text>
+    <rect x="752" y="380" width="384" height="10" rx="5" fill="#21262d"/>
+    <rect x="752" y="380" width="384" height="10" rx="5" fill="#3fb950"/>
+    <text x="752" y="436">efficiency</text>
+    <rect x="752" y="448" width="384" height="10" rx="5" fill="#21262d"/>
+    <rect x="752" y="448" width="299" height="10" rx="5" fill="#3fb950"/>
+  </g>
+</svg>

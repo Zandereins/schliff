@@ -1,4 +1,9 @@
-# Schliff
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Zandereins/schliff/main/docs/assets/hero-dark.svg">
+    <img src="https://raw.githubusercontent.com/Zandereins/schliff/main/docs/assets/hero-light.svg" alt="Schliff — deterministic quality scores for AGENTS.md" width="840">
+  </picture>
+</div>
 
 **The Ruff for `AGENTS.md` — deterministic quality scores for the instruction files that drive your AI. Same input, same score, on every machine.**
 
