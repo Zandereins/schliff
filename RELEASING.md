@@ -11,7 +11,7 @@ Run through this list before creating a new tag. Skipping a step has burned us b
 5. **Run full test suite locally:** `pytest -q` — all tests green.
 6. **Run build locally:** `python3 -m build && twine check dist/*`.
 7. **Commit on a release branch** (`chore/release-X.Y.Z`), open PR, merge to `main`.
-8. **Tag:** `git tag -a vX.Y.Z -m "vX.Y.Z" && git push --tags` — `publish.yml` fires.
+8. **Create the GitHub Release** (tag `vX.Y.Z`, e.g. `gh release create vX.Y.Z`) — `publish.yml` fires on `release: published`, NOT on a bare tag push.
 9. **Verify PyPI release** — check `pip install schliff==X.Y.Z` works.
 10. **Post-release:** close milestone, update memory entries that reference version.
 
