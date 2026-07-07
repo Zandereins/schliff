@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 170" role="img" aria-labelledby="t">
+  <title id="t">Schliff — deterministic quality scores for AGENTS.md</title>
+  <!-- card -->
+  <rect x="0.5" y="0.5" width="879" height="169" rx="12" fill="#f6f8fa" stroke="#d0d7de"/>
+  <!-- wordmark + terminal cursor -->
+  <text x="40" y="78" textLength="172" lengthAdjust="spacingAndGlyphs"
+        font-family="-apple-system, 'Segoe UI', system-ui, sans-serif"
+        font-size="46" font-weight="700" letter-spacing="-0.5" fill="#1f2328">Schliff</text>
+  <rect x="222" y="45" width="15" height="34" rx="2" fill="#1a7f37"/>
+  <!-- tagline -->
+  <text x="40" y="116" font-family="-apple-system, 'Segoe UI', system-ui, sans-serif"
+        font-size="15.5" fill="#59636e">The deterministic quality score for AGENTS.md.</text>
+  <text x="40" y="140" font-family="-apple-system, 'Segoe UI', system-ui, sans-serif"
+        font-size="15.5" fill="#59636e">Same input, same score — on every machine.</text>
+  <!-- meter: agents.md headline dimensions (decorative, no values) -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" fill="#59636e">
+    <text x="560" y="47">structure</text>
+    <rect x="560" y="55" width="280" height="8" rx="4" fill="#d8dee4"/>
+    <rect x="560" y="55" width="252" height="8" rx="4" fill="#1a7f37"/>
+    <text x="560" y="87">operational_coverage</text>
+    <rect x="560" y="95" width="280" height="8" rx="4" fill="#d8dee4"/>
+    <rect x="560" y="95" width="280" height="8" rx="4" fill="#1a7f37"/>
+    <text x="560" y="127">efficiency</text>
+    <rect x="560" y="135" width="280" height="8" rx="4" fill="#d8dee4"/>
+    <rect x="560" y="135" width="218" height="8" rx="4" fill="#1a7f37"/>
+  </g>
+</svg>
