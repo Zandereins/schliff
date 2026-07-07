@@ -46,11 +46,18 @@ _ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_]\w*=")
 # Spec §4.2.5 cue list is exactly do-not/don't/never/avoid — `instead of` is
 # NOT a negation ("Use `pnpm test` instead of `npm test`" positively recommends
 # the first command).
-_NEG_RE = re.compile(r"\b(do not|don'?t|dont|never|avoid)\b", re.IGNORECASE)
+_NEG_RE = re.compile(r"\b(do not|don'?t|dont|never|avoid(?:ed|ing|s)?)\b", re.IGNORECASE)
 # Positive idioms that carry a negation word but INSTRUCT running the command:
 # "don't forget to run X", "never skip X".
 _NEG_POSITIVE_RE = re.compile(
     r"\b(?:do not|don'?t|dont|never)\s+(?:forget|skip)\b", re.IGNORECASE
+)
+# Base-form recommendation verbs that mark a sentence as CONTRASTIVE when they
+# appear before the negation cue ("Always run `x` …, never `y` directly").
+# Deliberately base forms only: "Running `x` is something you must never do"
+# is an object-first prohibition, and \brun\b does not match "Running".
+_POS_RECO_RE = re.compile(
+    r"\b(?:always|prefer|use|run|call|invoke|execute)\b", re.IGNORECASE
 )
 # Sentence boundary for the §4.2.5 negation guard: punctuation followed by
 # whitespace, so dots inside tokens (`.env.example`, `e.g.`-misfires aside)
@@ -452,7 +459,16 @@ def _extract_commands(lines):
         # recommends the command BEFORE the cue and negates only what follows.
         for sent in _SENT_SPLIT_RE.split(ln):
             neg = _NEG_RE.search(sent)
-            neg_at = len(sent) if (neg is None or _NEG_POSITIVE_RE.search(sent)) else neg.start()
+            if neg is None or _NEG_POSITIVE_RE.search(sent):
+                neg_at = len(sent)
+            elif _POS_RECO_RE.search(sent[: neg.start()]):
+                # Contrastive: a recommendation verb precedes the cue, so
+                # spans before the cue are positively recommended.
+                neg_at = neg.start()
+            else:
+                # Plain prohibition — even object-first ("`pnpm test` should
+                # never be run"): nothing in this sentence is recommended.
+                continue
             for m in _INLINE_RE.finditer(sent):
                 if m.start() > neg_at:
                     continue
