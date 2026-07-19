@@ -54,9 +54,72 @@ def test_existing_script_path_is_resolved(tmp_path):
     assert _status(results, "scripts/setup.sh") == "resolved"
 
 
+# --- Regression tests: false-positive classes found on real repos (2026-07-19) ---
+
+def test_env_assignment_prefix_not_a_path(tmp_path):
+    # ColorlibHQ/gentelella: `BASE_PATH=/theme/gentelella/ npm run build` — the
+    # env value was read as a missing path. Strip env prefix; resolve the command.
+    (tmp_path / "package.json").write_text('{"scripts": {"build": "webpack"}}')
+    agents = "# A\n\n```bash\nBASE_PATH=/theme/gentelella/ npm run build\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert not [r for r in results if r["status"] == "dangling"]
+    assert _status(results, "build") == "resolved"
+
+
+def test_inline_comment_stripped(tmp_path):
+    # okTurtles/group-income: `npm run lint # run eslint` — comment must not leak
+    # into resolution; `lint` really is absent (scripts has `eslint`, not `lint`).
+    (tmp_path / "package.json").write_text('{"scripts": {"eslint": "eslint ."}}')
+    agents = "# A\n\n```bash\nnpm run lint # run eslint\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "lint") == "dangling"
+    assert "# run eslint" not in " ".join(r["evidence"] for r in results)
+
+
+def test_quoted_tool_argument_not_a_path(tmp_path):
+    # ViewComfy: `npx eslint "components/ui/button.tsx"` — a linter argument /
+    # example, not a runnable repo artifact. Must be unknown, never dangling.
+    agents = '# A\n\n```bash\nnpx eslint "components/ui/button.tsx"\n```\n'
+    results = resolve_commands(agents, str(tmp_path))
+    assert not [r for r in results if r["status"] == "dangling"]
+
+
+def test_make_target_in_resolved_include(tmp_path):
+    # authgear: `make start` where start lives in an included makefile.
+    (tmp_path / "makefiles").mkdir()
+    (tmp_path / "makefiles" / "common.mk").write_text("start:\n\tgo run .\n")
+    (tmp_path / "Makefile").write_text("include ./makefiles/common.mk\n\nbuild:\n\tgo build .\n")
+    agents = "# A\n\n```bash\nmake start\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "make start") == "resolved"
+
+
+def test_make_unresolvable_include_is_unknown(tmp_path):
+    # An include we cannot follow (variable path) => can't prove absence => unknown.
+    (tmp_path / "Makefile").write_text("include $(TOOLS)/x.mk\n\nbuild:\n\tgo build .\n")
+    agents = "# A\n\n```bash\nmake test\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "make test") == "unknown"  # not dangling: could be in the include
+
+
 def test_deterministic(tmp_path):
     (tmp_path / "Makefile").write_text("lint:\n\truff check .\n")
     agents = "# Agents\n\n```bash\nmake test\n```\n"
     a = resolve_commands(agents, str(tmp_path))
     b = resolve_commands(agents, str(tmp_path))
     assert a == b
+
+
+def test_placeholder_script_is_unknown(tmp_path):
+    # cssnr/cache-cleaner: `npm run *` — `*` is a prose placeholder, never dangling.
+    (tmp_path / "package.json").write_text('{"scripts": {"build": "x"}}')
+    agents = "# A\n\n```bash\nnpm run *\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert not [r for r in results if r["status"] == "dangling"]
+
+
+def test_duplicate_command_reported_once(tmp_path):
+    (tmp_path / "package.json").write_text('{"scripts": {}}')
+    agents = "# A\n\n```bash\nnpm run dev\n```\n\n## Again\n\n```bash\nnpm run dev\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert sum(1 for r in results if "dev" in r["command"]) == 1

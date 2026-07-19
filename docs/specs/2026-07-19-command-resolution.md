@@ -36,6 +36,30 @@ own command extractor is what surfaces it.
   (`operational_coverage._extract_commands`), but does **zero** filesystem
   resolution — it scores a file in isolation. This feature adds the repo-aware layer.
 
+## Live hardening (2026-07-19, ~70 real repos)
+
+Ran the check across ~70 real AGENTS.md/CLAUDE.md via code-search before merge.
+Six false-positive classes surfaced on real data (none caught by synthetic
+fixtures) — all fixed in this module (opcov untouched), each pinned by a
+regression test named after the repo that produced it:
+
+1. **env-assign prefix** — `BASE_PATH=/x npm run build` read the env value as a path (gentelella).
+2. **quoted tool argument** — `npx eslint "a/b.tsx"` is an example arg, not a repo artifact (ViewComfy).
+3. **inline comment** — `npm run lint # run eslint` leaked the comment into resolution (group-income).
+4. **Makefile `include`** — `make start` lives in `makefiles/common.mk`; not following includes = false dangling (authgear). Now follows static relative includes; unresolvable include ⇒ `unknown`.
+5. **workspace flag** — `npm run x -w pkg` resolves in a sub-package ⇒ `unknown`.
+6. **placeholder** — `npm run *`, `make deploy-<env>` are doc placeholders ⇒ `unknown` (cache-cleaner).
+
+Plus dedup (same command listed twice → reported once).
+
+**Method caveat (load-bearing):** the `path` resolver needs the *full* repo. The
+code-search sweep built a mini-repo (manifests only), which produced a false
+`./test` dangling on semgrep (the path exists as a symlink not fetched). make/npm
+findings are manifest-only and trustworthy from a mini-repo; **path findings
+require a full clone.** After hardening: 5/5 reported dangling verified real
+(100% precision) — conformal `npm run dev`, group-income `npm run lint`,
+pebble-navi `npm run debug`, fizzbuzz `npm run evals`, Orvion `make test`.
+
 ## Requirements
 
 1. **Additive, zero scoring impact.** MUST NOT modify `score_operational_coverage`,
