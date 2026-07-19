@@ -1,0 +1,79 @@
+# Spec: Command Resolution (dangling-command check)
+
+**Status:** done (branch `feat/command-resolution`, not yet merged)
+**Branch:** `feat/command-resolution`
+**Date:** 2026-07-19
+
+## Outcome
+
+Shipped `scripts/scoring/command_resolution.py` + `schliff check-commands` CLI + 6
+tests. Verified: golden opcov/profile scores byte-identical (69 tests unchanged),
+full suite 1358 → 1364 green, ruff clean. E2E on a mini-repo correctly flags
+`make test` (no target) and `npm run coverage` (no script) as dangling with line
+numbers, exits 1. Learned: `_extract_commands` returns `(family, lowercased_cmd)`,
+so resolution is case-insensitive by necessity — which also serves the
+false-positive-safety goal.
+
+## Goal
+
+Given an `AGENTS.md` (or `CLAUDE.md`) **and its surrounding repository**, statically
+verify that every setup/build/test command the file tells an agent to run actually
+resolves to something that exists in the repo. Report **dangling** commands — a
+command the instructions promise but the repo does not provide — as a deterministic,
+`found-with-schliff` defect.
+
+This is the "your AGENTS.md line N says `run X`; X does not exist on a clean
+checkout" artifact: self-authenticating (needs no account reputation), deterministic
+(same inputs → same verdict), and honestly attributable to schliff because schliff's
+own command extractor is what surfaces it.
+
+## Context / why now
+
+- Distribution is the bottleneck, not the engine (verified repeatedly). The single
+  channel with traction has been a reproduced, self-authenticating technical defect
+  delivered peer-to-peer, not a broadcast (see 13-agent strategy panel, 2026-07-19).
+- schliff already extracts + classifies commands from instruction files
+  (`operational_coverage._extract_commands`), but does **zero** filesystem
+  resolution — it scores a file in isolation. This feature adds the repo-aware layer.
+
+## Requirements
+
+1. **Additive, zero scoring impact.** MUST NOT modify `score_operational_coverage`,
+   the dimension weights, or any golden score. `_extract_commands` is *reused*
+   (imported), not changed. Corpus goldens stay byte-identical.
+2. **Reuse, don't reimplement** the extractor (fence/negation/inline handling lives
+   in one place — DRY).
+3. **Conservative / false-positive-safe.** Report a command as `dangling` ONLY when
+   resolution is unambiguous:
+   - `make <target>` → a `Makefile`/`makefile` exists AND `<target>` is not a defined target.
+   - `npm run <script>` / `pnpm <script>` / `yarn <script>` → `package.json` exists AND `<script>` is not in its `scripts`.
+   - explicit path/script reference (e.g. `./scripts/foo.sh`, `bash tools/x.sh`) → the path does not exist on disk.
+   Everything else → `unknown` (NOT a defect). A false dangling claim burns the
+   whole artifact, so silence beats a marginal call (ReDoS-report discipline).
+4. **Deterministic + stdlib-only.** No clock/entropy/network. Same file+repo → same result.
+5. **CLI entrypoint** `schliff check-commands <file> [--repo DIR] [--json]`, exit
+   nonzero iff ≥1 dangling command (CI-gate-able, like `verify`). `--repo` defaults
+   to the file's directory.
+
+## Technical decisions
+
+- New module `scripts/scoring/command_resolution.py`. Pure functions:
+  `resolve_commands(text, repo_root) -> list[CommandResult]` where each result is
+  `{command, family, status: resolved|dangling|unknown, evidence}`.
+- Resolvers are pure parsers over `Makefile` targets and `package.json` `scripts`;
+  path check via `os.path.exists` relative to `repo_root`. Missing manifest ⇒
+  `unknown`, never `dangling` (can't prove absence without the manifest).
+- Line numbers for the report are recovered by a post-hoc scan for the command's
+  literal text (the extractor stays `(family, command)`-shaped; we don't widen its
+  contract and risk its callers/goldens).
+- CLI `cmd_check_commands` mirrors `cmd_verify`'s exit-code + `--json` conventions.
+
+## Non-goals
+
+- Not a security scanner (that's `security.py`; note its fenced-block FP-hole, out of scope here).
+- Not executing anything — pure static resolution.
+- Not scoring — this is a separate check, not a dimension.
+
+## Open questions
+
+- Extend resolvers to `just`/`cargo`/`task` targets? Deferred until a real target repo needs it (YAGNI).

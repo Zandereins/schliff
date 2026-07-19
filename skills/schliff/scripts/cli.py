@@ -364,6 +364,45 @@ def cmd_verify(args: argparse.Namespace) -> None:
     sys.exit(verdict["exit_code"])
 
 
+def cmd_check_commands(args: argparse.Namespace) -> None:
+    """Check that setup/build/test commands in an instruction file actually
+    resolve to targets/scripts/paths that exist in the repo. Exit 1 iff any
+    command is provably dangling (CI-gate-able)."""
+    import os
+
+    from scoring.command_resolution import resolve_commands
+    from shared import read_skill_safe
+
+    _ensure_skill_path_exists(args.skill_path, exit_code=2)
+    content = read_skill_safe(args.skill_path)
+
+    repo_root = args.repo or os.path.dirname(os.path.abspath(args.skill_path))
+    if not os.path.isdir(repo_root):
+        print(f"Error: repo directory not found: {repo_root}", file=sys.stderr)
+        sys.exit(2)
+
+    results = resolve_commands(content, repo_root)
+    dangling = [r for r in results if r["status"] == "dangling"]
+
+    if getattr(args, "json", False):
+        print(json.dumps({"repo": repo_root, "results": results,
+                          "dangling_count": len(dangling)}, indent=2))
+    else:
+        if not results:
+            print("No setup/build/test commands found to check.")
+        for r in dangling:
+            loc = f":{r['line']}" if r["line"] else ""
+            print(f"DANGLING  {args.skill_path}{loc}  `{r['command']}` — {r['evidence']}")
+        resolved = sum(1 for r in results if r["status"] == "resolved")
+        unknown = sum(1 for r in results if r["status"] == "unknown")
+        print(
+            f"\n{len(dangling)} dangling, {resolved} resolved, {unknown} unknown "
+            f"(of {len(results)} commands)."
+        )
+
+    sys.exit(1 if dangling else 0)
+
+
 def cmd_doctor(args: argparse.Namespace) -> None:
     """Run doctor scan across all installed skills."""
     import doctor as doctor_mod
@@ -979,6 +1018,18 @@ def main():
     verify_parser.add_argument("--eval-suite", help="Path to eval-suite.json")
     verify_parser.add_argument("--json", action="store_true", help="JSON output")
 
+    # check-commands command
+    check_cmds_parser = subparsers.add_parser(
+        "check-commands",
+        help="Verify setup/build/test commands in a file exist in the repo (exit 1 if dangling)",
+    )
+    check_cmds_parser.add_argument("skill_path", help=_PATH_HELP)
+    check_cmds_parser.add_argument(
+        "--repo", default=None,
+        help="Repository root to resolve against (default: the file's directory)",
+    )
+    check_cmds_parser.add_argument("--json", action="store_true", help="JSON output")
+
     # doctor command
     doctor_parser = subparsers.add_parser("doctor", help="Scan all installed skills")
     doctor_parser.add_argument("--json", action="store_true", help="JSON output")
@@ -1069,6 +1120,7 @@ def main():
         "compare": cmd_compare,
         "diff": cmd_diff,
         "verify": cmd_verify,
+        "check-commands": cmd_check_commands,
         "doctor": cmd_doctor,
         "badge": cmd_badge,
         "suggest": cmd_suggest,
