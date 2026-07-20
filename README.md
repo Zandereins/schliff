@@ -242,6 +242,7 @@ schliff <command> [path] [options]
 | --- | --- |
 | `score` | Score a file and print the grade bar |
 | `verify` | CI gate — exit 0/1 based on a minimum score |
+| `check-commands` | CI gate — flag setup/build/test commands that don't exist in the repo (exit 1 if dangling) |
 | `doctor` | Scan and grade every installed skill |
 | `badge` | Generate a Markdown score badge |
 | `diff` | Explain score changes between two git commits |
