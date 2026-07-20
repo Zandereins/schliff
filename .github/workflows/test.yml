@@ -93,6 +93,13 @@ jobs:
         working-directory: skills/schliff
         run: python3 -m pytest tests/unit/ -v
 
+      # Dogfood: schliff holds its own AGENTS.md to the dangling-command gate.
+      # Fails CI if any setup/build/test command in AGENTS.md stops resolving
+      # to a real make target / npm script / path in this repo.
+      - name: Dogfood check-commands on own AGENTS.md
+        working-directory: skills/schliff
+        run: python3 -m scripts.cli check-commands ../../AGENTS.md --repo ../..
+
       - name: Run proof test
         working-directory: skills/schliff
         run: bash tests/proof/test-proof.sh

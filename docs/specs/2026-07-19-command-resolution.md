@@ -1,6 +1,11 @@
 # Spec: Command Resolution (dangling-command check)
 
-**Status:** done (branch `feat/command-resolution`, not yet merged)
+**Status:** done + merge-ready (branch `feat/command-resolution`, not yet merged)
+**Merge-prep:** `check-commands` documented in README CLI table; CI dogfood gate
+added (test.yml runs it against schliff's own AGENTS.md — 0 dangling, exit 0),
+making schliff its own first adopter. `just`/`cargo`/`uv` resolvers deliberately
+dropped (cargo/uv are builtins with no dangling potential; just recipes exist in
+maintained repos — more resolvers ≠ more findings in credible repos).
 **Branch:** `feat/command-resolution`
 **Date:** 2026-07-19
 
