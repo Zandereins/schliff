@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.6.0] - 2026-07-20
+
 ### Added
 - **`check-commands`** — a deterministic CI gate that flags setup/build/test
   commands in an `AGENTS.md`/`CLAUDE.md` that don't resolve to a real make
