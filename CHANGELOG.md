@@ -575,7 +575,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.5.0...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.6.0...HEAD
+[8.6.0]: https://github.com/Zandereins/schliff/compare/v8.5.0...v8.6.0
 [8.5.0]: https://github.com/Zandereins/schliff/compare/v8.4.0...v8.5.0
 [8.4.0]: https://github.com/Zandereins/schliff/compare/v8.3.0...v8.4.0
 [8.3.0]: https://github.com/Zandereins/schliff/compare/v8.2.0...v8.3.0
