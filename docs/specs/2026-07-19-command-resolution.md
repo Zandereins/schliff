@@ -75,7 +75,17 @@ pebble-navi `npm run debug`, fizzbuzz `npm run evals`, Orvion `make test`.
 3. **Conservative / false-positive-safe.** Report a command as `dangling` ONLY when
    resolution is unambiguous:
    - `make <target>` → a `Makefile`/`makefile` exists AND `<target>` is not a defined target.
-   - `npm run <script>` / `pnpm <script>` / `yarn <script>` → `package.json` exists AND `<script>` is not in its `scripts`.
+   - `npm run <script>`, bare npm lifecycle words, and `pnpm run <script>` →
+     `package.json` exists AND `<script>` is not in its `scripts`. **These are the
+     only dangling-capable package-manager forms** (amended 2026-07-20): they are
+     the ones whose manager hard-errors on a missing script (`npm error Missing
+     script`, `ERR_PNPM_NO_SCRIPT`). Every `yarn` form falls back to
+     `node_modules/.bin` (`yarn tsc` runs the typescript binary, and the binary
+     name need not match the package name), and `bun` resolves scripts, then
+     files, then binaries — for those, absence from `scripts` proves nothing, so
+     they are `unknown`. The original wording claimed `pnpm <script>` / `yarn
+     <script>` were dangling-capable; that was verified false and produced live
+     false positives.
    - explicit path/script reference (e.g. `./scripts/foo.sh`, `bash tools/x.sh`) → the path does not exist on disk.
    Everything else → `unknown` (NOT a defect). A false dangling claim burns the
    whole artifact, so silence beats a marginal call (ReDoS-report discipline).
