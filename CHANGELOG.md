@@ -5,12 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.6.2] - 2026-07-21
+
 ### Added
 - **GitHub Action surfaces dangling commands.** The `AGENTS.md Lint` action now
   runs `check-commands` for `AGENTS.md`/`CLAUDE.md` and renders any dangling
   commands as a section in its existing PR comment. New opt-in `fail-on-dangling`
   input (default `false`) and `dangling_count` output. Requires schliff ≥ 8.6.1
   for false-positive-safe behavior; older engines degrade silently.
+
+### Fixed
+- **`check-commands` workspace false positives + resolver hardening.** A large
+  adversarial review + council + a field sweep of 135 real repos found the 8.6.1
+  check still reporting working commands as `dangling` on monorepos. Every change
+  only demotes `dangling`→`unknown` (never a new false claim); `operational_coverage`
+  is untouched, so scoring is byte-identical. A field diff over 140 real repos: 17 →
+  4 dangling claims, every removal workspace-justified.
+  - **Workspace-aware demotion** (the real false-positive class): a `<pm> run <script>`
+    missing from the ROOT manifest is `unknown`, not `dangling`, when the repo declares
+    workspaces (`pnpm-workspace.yaml` or a truthy `workspaces` key) — the script may
+    live in a child package.
+  - **Denial-of-service input-budget guard** on attacker-authored docs (5000 lines /
+    2048 bytes-per-line / 256 distinct commands → all-`unknown`, no per-command work),
+    plus per-call memoization of manifest parses.
+  - **realpath containment** for the interpreter path check, closing a symlink
+    existence-oracle.
+  - **Accurate report lines** — the real extraction line is threaded from the
+    extractor, retiring a quadratic substring scan that could mislocate the line and
+    bypass the `cd` demotion.
+  - **Dequoted script tokens** and `--if-present` handling (a missing script is not a
+    hard error) → `unknown`.
 
 ## [8.6.1] - 2026-07-21
 
@@ -613,7 +637,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.6.1...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.6.2...HEAD
+[8.6.2]: https://github.com/Zandereins/schliff/compare/v8.6.1...v8.6.2
 [8.6.1]: https://github.com/Zandereins/schliff/compare/v8.6.0...v8.6.1
 [8.6.0]: https://github.com/Zandereins/schliff/compare/v8.5.0...v8.6.0
 [8.5.0]: https://github.com/Zandereins/schliff/compare/v8.4.0...v8.5.0
