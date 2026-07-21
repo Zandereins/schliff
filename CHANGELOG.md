@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.6.1] - 2026-07-21
+
+### Fixed
+- **`check-commands` false positives on real repos.** An adversarial review plus a
+  field sweep of real monorepos (palantir/blueprint, remotion, remix, swc) found
+  the 8.6.0 check reporting working commands as `dangling` — the exact
+  credibility-fatal error its conservative contract exists to prevent. All are now
+  correctly `resolved`/`unknown`; every fix only demotes `dangling`→`unknown`, so
+  the check can never gain a false claim, and `operational_coverage` is untouched
+  (scoring unchanged). Classes fixed:
+  - `cd sub/dir && npm run x` — the extractor drops the `cd`, so the script
+    resolved against the repo-root manifest (standard monorepo idiom).
+  - `(cd x && npm run build)` — the trailing paren clung to the token.
+  - `bun run index.ts` / `bun run dist/out.js` — bun resolves scripts, then files,
+    then binaries; absence is unprovable, so bun never yields `dangling`.
+  - `yarn tsc` / `yarn run x` — every yarn form falls back to `node_modules/.bin`.
+  - `make -C dir target` — the directory was read as the target.
+  - `pnpm run -r build` — the flag was read as the script name.
+  - `$(TARGETS):` and `%.o: %.c` — variable/pattern targets are not enumerable, so
+    the target set is treated as incomplete.
+- **`check-commands` denial-of-service on attacker-authored build files.** Parsing
+  a consumer's `Makefile`/`package.json` in CI is untrusted input:
+  - `include` fan-out had no visited-set (N**5 file opens; 15s at N=12) → iterative
+    worklist, O(files).
+  - the `include` regex backtracked quadratically on long whitespace (15.7s on one
+    800KB line) → linear.
+  - `include ../../outside` was opened (a read primitive outside the checkout) →
+    realpath-contained to the repo root.
+  - a deeply-nested `package.json` raised `RecursionError` (a `RuntimeError`, not
+    caught) and crashed the check → now degrades to `unknown`.
+
 ## [8.6.0] - 2026-07-20
 
 ### Added
@@ -575,7 +606,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.6.0...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.6.1...HEAD
+[8.6.1]: https://github.com/Zandereins/schliff/compare/v8.6.0...v8.6.1
 [8.6.0]: https://github.com/Zandereins/schliff/compare/v8.5.0...v8.6.0
 [8.5.0]: https://github.com/Zandereins/schliff/compare/v8.4.0...v8.5.0
 [8.4.0]: https://github.com/Zandereins/schliff/compare/v8.3.0...v8.4.0
