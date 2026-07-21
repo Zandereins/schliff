@@ -279,3 +279,74 @@ def test_include_regex_has_no_quadratic_backtracking(tmp_path):
     start = time.monotonic()
     resolve_commands(agents, str(tmp_path))
     assert time.monotonic() - start < 5.0
+
+
+def test_variable_expanded_make_target_is_unknown(tmp_path):
+    """`$(TARGETS): build test lint` defines targets via variable expansion; the
+    target regex cannot see them, so `make test` was falsely dangling."""
+    (tmp_path / "Makefile").write_text("TARGETS := build test lint\n$(TARGETS):\n\t@echo $@\n")
+    agents = "# Agents\n\n```bash\nmake test\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "make test") == "unknown"
+
+
+def test_pattern_rule_makefile_is_unknown(tmp_path):
+    """A Makefile with a `%.o: %.c` pattern rule has non-enumerable targets."""
+    (tmp_path / "Makefile").write_text("%.o: %.c\n\t@echo compile\nbuild:\n\t@echo hi\n")
+    agents = "# Agents\n\n```bash\nmake test\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "make test") == "unknown"
+
+
+def test_static_makefile_still_reports_dangling(tmp_path):
+    """The dynamic-target guard must not over-trigger: a purely static Makefile
+    (even with `:=` assignments containing `$` and `:`) still proves absence."""
+    (tmp_path / "Makefile").write_text(
+        "VAR := $(shell echo hi)\nURL := http://example.com\nbuild:\n\t@echo hi\n"
+    )
+    agents = "# Agents\n\n```bash\nmake test\nmake build\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "make test") == "dangling"
+    assert _status(results, "make build") == "resolved"
+
+
+# --- Field regressions: real repos where shipped 8.6.0 emitted false danglings.
+# Per feedback_field_test_over_fixtures, each real-world false positive is pinned
+# by a test named after the repo that produced it. Verified 2026-07-21 against
+# fresh clones: 8.6.0 reported these dangling, the hardened engine does not.
+
+
+def test_field_blueprint_pnpm_nx_binary_is_unknown(tmp_path):
+    """palantir/blueprint AGENTS.md: `pnpm nx compile @blueprintjs/core`. `nx` is
+    a node_modules/.bin workspace tool, not a package.json script — 8.6.0 reported
+    "script 'nx' is not defined" (false)."""
+    (tmp_path / "package.json").write_text('{"scripts": {"build": "tsc"}}')
+    agents = "# Agents\n\n```bash\npnpm nx compile @blueprintjs/core\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "pnpm nx compile") == "unknown"
+
+
+def test_field_remotion_bun_run_dev_is_unknown(tmp_path):
+    """remotion-dev/remotion AGENTS.md: `bun run dev`. bun resolves scripts, then
+    files, then binaries — 8.6.0 reported "script 'dev' is not defined" (false)."""
+    (tmp_path / "package.json").write_text('{"scripts": {"build": "tsc"}}')
+    agents = "# Agents\n\n```bash\nbun run dev\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "bun run dev") == "unknown"
+
+
+def test_field_swc_subshell_cd_path_is_unknown(tmp_path):
+    """swc-project/swc AGENTS.md: `(cd crates/... && ./scripts/test.sh)`. 8.6.0
+    reported "path './scripts/test.sh)' does not exist" — wrong name (glued paren)
+    AND a false claim. The paren strip removes the `)`; the `cd` then makes the
+    path's location unprovable, so it degrades to unknown, not a false dangling."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "test.sh").write_text("#!/bin/sh\necho hi\n")
+    agents = "# Agents\n\n```bash\n(cd crates/swc && ./scripts/test.sh)\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    # The credibility-critical property: the path must NOT be a false dangling.
+    # (It resolves to the root script; the cd only demotes dangling->unknown, never
+    # resolved->dangling, so the safe direction is preserved either way.)
+    assert not any(r["status"] == "dangling" for r in results)
+    assert _status(results, "test.sh") in ("resolved", "unknown")

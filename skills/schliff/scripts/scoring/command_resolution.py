@@ -28,6 +28,13 @@ _MAKEFILE_NAMES = ("Makefile", "makefile", "GNUmakefile")
 # `name =`). The negative lookahead `(?!=)` rejects `:=`; assignments with a
 # space (`NAME = v`) have no colon so never match.
 _MAKE_TARGET_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9_.\-/]*)[ \t]*:(?!=)")
+# A rule whose target name is variable- or pattern-expanded (`$(TARGETS):`,
+# `%.o: %.c`, `$(BIN)/foo:`) defines targets we cannot enumerate statically. If a
+# Makefile contains ANY such rule its target set is incomplete, so absence of a
+# queried target is unprovable -> the caller must not claim dangling. Matches a
+# non-recipe (not tab-indented) line whose left-hand side before a `:` (not `:=`)
+# contains `$` or `%`. Assignments (`VAR := $(X)`) are excluded by the `(?!=)`.
+_MAKE_DYNAMIC_TARGET_RE = re.compile(r"^(?![\t#])[^:#]*[$%][^:#]*:(?!=)")
 # `include foo.mk` / `-include foo.mk`. A target defined in an included makefile
 # is still real — not following includes caused a false `make start` dangling on
 # authgear (start lives in makefiles/common.mk). We follow static relative
@@ -115,6 +122,9 @@ def _make_targets(makefile: str, repo_root: str) -> tuple[set[str], bool]:
             m = _MAKE_TARGET_RE.match(line)
             if m:
                 targets.add(m.group(1).lower())
+            elif _MAKE_DYNAMIC_TARGET_RE.match(line):
+                # Variable/pattern target: the target set is not fully knowable.
+                unresolved = True
             inc = _INCLUDE_RE.match(line)
             if not inc:
                 continue
