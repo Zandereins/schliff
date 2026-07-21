@@ -23,6 +23,10 @@ inputs:
     description: 'Schliff version to install (e.g. "6.3.0", ">=7.0"). Defaults to latest.'
     required: false
     default: ''
+  fail-on-dangling:
+    description: 'Fail the build when the instruction file references setup/build/test commands that do not resolve in the repo. AGENTS.md / CLAUDE.md only; requires schliff >= 8.6.1.'
+    required: false
+    default: 'false'
 outputs:
   composite:
     description: 'Composite score (0-100)'
@@ -33,6 +37,9 @@ outputs:
   result_b64:
     description: 'Full JSON score result (base64 encoded)'
     value: ${{ steps.score.outputs.result_b64 }}
+  dangling_count:
+    description: "Number of dangling commands found. Empty string when the check did not run (non-AGENTS/CLAUDE format, engine older than 8.6.1, or no valid output)."
+    value: ${{ steps.dangling.outputs.dangling_count }}
 runs:
   using: 'composite'
   steps:
@@ -120,6 +127,59 @@ runs:
         echo "result_b64=$RESULT_B64" >> "$GITHUB_OUTPUT"
         echo "Score: $COMPOSITE/100 [$GRADE]"
 
+        # Detected format, for the AGENTS.md/CLAUDE.md-only dangling gate.
+        # `.get` (not `[...]`) so a pre-8.x engine that omits the key does not
+        # KeyError (schliff 6.3.0 emits no `format`).
+        FORMAT=$(echo "$RESULT" | python3 -P -c "import sys,json; print(json.load(sys.stdin).get('format',''))" 2>/dev/null) || true
+        echo "format=$FORMAT" >> "$GITHUB_OUTPUT"
+        # The already-resolved absolute path — single source of truth so the
+        # dangling step does not re-derive the default-to-AGENTS.md logic.
+        echo "skill_full=$SKILL_FULL" >> "$GITHUB_OUTPUT"
+
+    - name: Check dangling commands
+      id: dangling
+      # AGENTS.md / CLAUDE.md only. `check-commands` resolves each setup/build/test
+      # command against the repo; other formats are skill-/editor-local and would
+      # invite false positives. Never fails: exit 1 is the engine's "dangling found"
+      # signal, and any error degrades to count 0 (the comment/gate handle the rest).
+      if: steps.score.outputs.format == 'agents.md' || steps.score.outputs.format == 'claude.md'
+      shell: bash
+      env:
+        SKILL_FULL: ${{ steps.score.outputs.skill_full }}
+      run: |
+        # Resolve against the file's OWN directory (engine default, no --repo): for a
+        # repo-root AGENTS.md this equals GITHUB_WORKSPACE; for a nested file it uses
+        # the nested manifest (safer than the root one). Executes nothing — static only.
+        schliff check-commands "$SKILL_FULL" --json > /tmp/schliff_dangling.json 2>/dev/null || true
+        # -P (PYTHONSAFEPATH): the workspace is attacker-writable via PR; a planted
+        # json.py / shadowed skills.* at the repo root must not land on sys.path.
+        # Validate shape; an old engine (no subcommand) writes nothing here -> count 0.
+        COUNT=$(python3 -P -c "
+        import sys, json
+        try:
+            d = json.load(open('/tmp/schliff_dangling.json'))
+            assert isinstance(d, dict) and isinstance(d.get('dangling_count'), int) and isinstance(d.get('results'), list)
+            print(d['dangling_count'])
+        except Exception:
+            print(0)
+        " 2>/dev/null) || COUNT=0
+        [ -z "$COUNT" ] && COUNT=0
+        echo "dangling_count=$COUNT" >> "$GITHUB_OUTPUT"
+        if [ "$COUNT" -gt 0 ] 2>/dev/null; then
+          # -w0: Ubuntu base64 wraps at 76 cols; the github-script decode needs one line.
+          echo "dangling_b64=$(base64 -w0 < /tmp/schliff_dangling.json)" >> "$GITHUB_OUTPUT"
+          echo "Found $COUNT dangling command(s):"
+          # Plain-text summary — the only human-visible surface on push events.
+          python3 -P -c "
+          import json
+          for r in json.load(open('/tmp/schliff_dangling.json'))['results']:
+              if r.get('status') == 'dangling':
+                  print(f\"  line {r.get('line','?')}: {r.get('command','')}  ->  {r.get('evidence','')}\")
+          " 2>/dev/null || true
+        else
+          echo "No dangling commands."
+        fi
+
     - name: Check minimum score
       if: inputs.minimum-score != '0'
       shell: bash
@@ -202,6 +262,47 @@ runs:
             body += `\n</details>\n`;
           }
 
+          // --- Dangling commands section (AGENTS.md / CLAUDE.md only) ------------
+          // db64 is EMPTY in the common case (no danglings, step skipped, or old
+          // engine); a bare JSON.parse(Buffer.from('',...)) throws SyntaxError and
+          // would abort this whole step, killing the score comment too. Guard it.
+          const db64 = '${{ steps.dangling.outputs.dangling_b64 }}';
+          let dangling = [];
+          if (db64) {
+            try {
+              dangling = (JSON.parse(Buffer.from(db64, 'base64').toString('utf8')).results || [])
+                .filter(r => r.status === 'dangling');
+            } catch { dangling = []; }
+          }
+          // Attacker-authored command/evidence text: strip backticks (code-span
+          // break-out), collapse control chars, and defang the pipe. Rendered inside
+          // a code span so `[x](url)`/`!` cannot become a link or image.
+          function cell(s) {
+            return String(s ?? '')
+              .replace(/`/g, '')
+              .replace(/[\x00-\x1f]+/g, ' ')
+              .replace(/\|/g, '│')
+              .slice(0, 120);
+          }
+          if (dangling.length) {
+            const seen = new Set();
+            const rows = dangling.filter(r => {
+              const k = `${r.line}:${r.command}`;
+              if (seen.has(k)) return false;
+              seen.add(k);
+              return true;
+            }).slice(0, 10);
+            body += `\n### 🔗 Dangling commands (${dangling.length})\n\n`;
+            body += `These commands in ${fmtLabel} don't resolve to a make target, npm script, or path in this repo:\n\n`;
+            body += `| Line | Command | Why |\n|-----:|:--------|:----|\n`;
+            for (const r of rows) {
+              body += `| ${r.line ?? '—'} | \`${cell(r.command)}\` | \`${cell(r.evidence)}\` |\n`;
+            }
+            if (dangling.length > rows.length) {
+              body += `\n…and ${dangling.length - rows.length} more.\n`;
+            }
+          }
+
           body += `\n---\n<sub>Scored by [Schliff](https://github.com/Zandereins/schliff) — the deterministic AGENTS.md quality gate · [Try the playground](https://play.schliff.dev)</sub>`;
 
           // Update existing comment or create new one
@@ -214,18 +315,38 @@ runs:
           });
           const existing = comments.find(c => c.body?.includes(marker));
 
-          if (existing) {
-            await github.rest.issues.updateComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: existing.id,
-              body: body,
-            });
-          } else {
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body,
-            });
+          // On a PR from a fork, GITHUB_TOKEN is read-only, so posting fails. That
+          // is not a build error — the score/gate already ran and the job log carries
+          // the summary. Degrade gracefully instead of turning the consumer's CI red.
+          try {
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+          } catch (e) {
+            core.warning(`Could not post the Schliff comment (likely a fork PR with a read-only token): ${e.message}`);
           }
+
+    - name: Enforce dangling gate
+      # Opt-in, and LAST: the comment above always posts first, then (only if the
+      # consumer asked) the build goes red. `!= ''` matters — a skipped dangling
+      # step yields '' (not '0'), which must not trip the gate.
+      if: inputs.fail-on-dangling == 'true' && steps.dangling.outputs.dangling_count != '' && steps.dangling.outputs.dangling_count != '0'
+      shell: bash
+      env:
+        COUNT: ${{ steps.dangling.outputs.dangling_count }}
+        SKILL_PATH: ${{ inputs.skill-path }}
+      run: |
+        echo "::error::${COUNT} dangling command(s) in ${SKILL_PATH:-AGENTS.md} do not resolve in this repo. See the PR comment / job log above."
+        exit 1
