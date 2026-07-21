@@ -1,0 +1,6 @@
+{
+  "name": "dangling-fixture",
+  "scripts": {
+    "build": "echo build"
+  }
+}

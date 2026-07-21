@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **GitHub Action surfaces dangling commands.** The `AGENTS.md Lint` action now
+  runs `check-commands` for `AGENTS.md`/`CLAUDE.md` and renders any dangling
+  commands as a section in its existing PR comment. New opt-in `fail-on-dangling`
+  input (default `false`) and `dangling_count` output. Requires schliff ≥ 8.6.1
+  for false-positive-safe behavior; older engines degrade silently.
+
 ## [8.6.1] - 2026-07-21
 
 ### Fixed

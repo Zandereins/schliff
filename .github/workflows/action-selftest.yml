@@ -17,12 +17,16 @@ on:
       - 'action.yml'
       - 'AGENTS.md'
       - '.github/workflows/action-selftest.yml'
+      - 'skills/schliff/tests/fixtures/dangling-repo/**'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  # V3: the real repo path — own AGENTS.md scores, has 0 dangling, and the score
+  # comment still posts (only this job posts a comment; the fixture jobs below set
+  # comment-on-pr:false so N jobs never clobber the one shared comment marker).
   selftest:
     runs-on: ubuntu-latest
     permissions:
@@ -43,6 +47,7 @@ jobs:
           COMPOSITE: ${{ steps.selftest.outputs.composite }}
           GRADE: ${{ steps.selftest.outputs.grade }}
           RESULT_B64: ${{ steps.selftest.outputs.result_b64 }}
+          DANGLING_COUNT: ${{ steps.selftest.outputs.dangling_count }}
         run: |
           set -euo pipefail
           python3 -P -c "
@@ -53,5 +58,110 @@ jobs:
           result = json.loads(base64.b64decode(os.environ['RESULT_B64']))
           assert result['format'] == 'agents.md', result.get('format')
           assert 'operational_coverage' in result['dimensions'], 'opcov missing'
+          # V3: own AGENTS.md has no dangling commands (also the CI dogfood gate).
+          assert os.environ['DANGLING_COUNT'] == '0', os.environ['DANGLING_COUNT']
           print(f'self-test OK: {composite} [{os.environ[\"GRADE\"]}]')
           "
+
+  # V4 + V6: the fixture repo has 3 dangling commands, one carrying a markdown
+  # link-injection vector. Asserts the count via the output (no comment race), and
+  # decodes the action's own render path to prove the injection cannot form a link.
+  dangling-fixture:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Run against the dangling fixture
+        id: fx
+        uses: ./
+        with:
+          skill-path: 'skills/schliff/tests/fixtures/dangling-repo/AGENTS.md'
+          comment-on-pr: 'false'
+      - name: Assert count and injection-safe rendering
+        env:
+          DANGLING_COUNT: ${{ steps.fx.outputs.dangling_count }}
+        run: |
+          set -euo pipefail
+          test "$DANGLING_COUNT" = "3" || { echo "expected 3 dangling, got '$DANGLING_COUNT'"; exit 1; }
+          # Re-run the check to get the JSON, then exercise the exact cell() render
+          # path and assert no markdown anchor escapes a code span. `|| true`:
+          # check-commands exits 1 when danglings exist, which set -e would treat
+          # as a step failure.
+          schliff check-commands skills/schliff/tests/fixtures/dangling-repo/AGENTS.md --json > /tmp/fx.json || true
+          node -e '
+            const d = JSON.parse(require("fs").readFileSync("/tmp/fx.json","utf8"));
+            const cell = s => String(s ?? "").replace(/`/g,"").replace(/[\x00-\x1f]+/g," ").replace(/\|/g,"│").slice(0,120);
+            let body = "";
+            for (const r of d.results.filter(r=>r.status==="dangling"))
+              body += `| ${r.line} | \`${cell(r.command)}\` | \`${cell(r.evidence)}\` |\n`;
+            const stray = /\]\([^)]*\)(?![^`]*`)/.test(body.replace(/`[^`]*`/g,""));
+            if (stray) { console.error("markdown anchor escaped a code span:\n"+body); process.exit(1); }
+            if (!/\[pwned\]/.test(body)) { console.error("injection fixture missing"); process.exit(1); }
+            console.log("render injection-safe; rows:\n"+body);
+          '
+
+  # V5: a pinned engine WITHOUT check-commands. The step runs (it is NOT skipped),
+  # finds no subcommand, and degrades to count 0 with a green job.
+  old-engine:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Run with schliff 8.5.0 (no check-commands)
+        id: old
+        uses: ./
+        with:
+          schliff-version: '8.5.0'
+          comment-on-pr: 'false'
+      - name: Assert graceful degradation
+        env:
+          DANGLING_COUNT: ${{ steps.old.outputs.dangling_count }}
+        run: |
+          set -euo pipefail
+          test "$DANGLING_COUNT" = "0" || { echo "expected 0, got '$DANGLING_COUNT'"; exit 1; }
+          echo "old engine degraded to 0 dangling, job green"
+
+  # V7: fail-on-dangling turns the fixture red. continue-on-error is on the action
+  # STEP so the job survives to assert the failure outcome.
+  fail-on-dangling:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Run with fail-on-dangling
+        id: gate
+        continue-on-error: true
+        uses: ./
+        with:
+          skill-path: 'skills/schliff/tests/fixtures/dangling-repo/AGENTS.md'
+          comment-on-pr: 'false'
+          fail-on-dangling: 'true'
+      - name: Assert the action failed
+        run: |
+          set -euo pipefail
+          test "${{ steps.gate.outcome }}" = "failure" || { echo "expected failure, got '${{ steps.gate.outcome }}'"; exit 1; }
+          echo "fail-on-dangling correctly failed the action"
+
+  # V8: a non-AGENTS format skips the dangling step entirely (empty output).
+  non-agents-format:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Score this repo's SKILL.md
+        id: skill
+        uses: ./
+        with:
+          skill-path: 'skills/schliff/SKILL.md'
+          comment-on-pr: 'false'
+      - name: Assert the dangling step did not run
+        env:
+          DANGLING_COUNT: ${{ steps.skill.outputs.dangling_count }}
+        run: |
+          set -euo pipefail
+          test -z "$DANGLING_COUNT" || { echo "expected empty (step skipped), got '$DANGLING_COUNT'"; exit 1; }
+          echo "non-AGENTS format skipped the dangling step"
