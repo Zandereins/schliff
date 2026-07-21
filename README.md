@@ -200,7 +200,7 @@ Prefer not to depend on a third-party action? The dependency-light equivalent:
 
 `schliff verify` exits non-zero when the score falls short and works for every
 supported format — the minimum is scaled by measurement coverage, so `SKILL.md`
-files without an eval suite aren't auto-failed. Requires schliff ≥ 8.6.0 for
+files without an eval suite aren't auto-failed. Requires schliff ≥ 8.5.0 for
 `AGENTS.md`: older engines scored it under the SKILL profile
 ([#101](https://github.com/Zandereins/schliff/issues/101)).
 
