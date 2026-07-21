@@ -28,11 +28,29 @@ _MAKEFILE_NAMES = ("Makefile", "makefile", "GNUmakefile")
 # `name =`). The negative lookahead `(?!=)` rejects `:=`; assignments with a
 # space (`NAME = v`) have no colon so never match.
 _MAKE_TARGET_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9_.\-/]*)[ \t]*:(?!=)")
+# A rule whose target name is variable- or pattern-expanded (`$(TARGETS):`,
+# `%.o: %.c`, `$(BIN)/foo:`) defines targets we cannot enumerate statically. If a
+# Makefile contains ANY such rule its target set is incomplete, so absence of a
+# queried target is unprovable -> the caller must not claim dangling. Matches a
+# non-recipe (not tab-indented) line whose left-hand side before a `:` (not `:=`)
+# contains `$` or `%`. Assignments (`VAR := $(X)`) are excluded by the `(?!=)`.
+_MAKE_DYNAMIC_TARGET_RE = re.compile(r"^(?![\t#])[^:#]*[$%][^:#]*:(?!=)")
 # `include foo.mk` / `-include foo.mk`. A target defined in an included makefile
 # is still real — not following includes caused a false `make start` dangling on
 # authgear (start lives in makefiles/common.mk). We follow static relative
 # includes and fall back to `unknown` on any include we cannot resolve.
-_INCLUDE_RE = re.compile(r"^[ \t]*-?include[ \t]+(.+?)[ \t]*$")
+# The capture is greedy-to-end and stripped in Python. A lazy `(.+?)[ \t]*$`
+# backtracks quadratically on a long whitespace run (measured: 15.7s on one
+# 800KB line, vs 0.25ms here) — an attacker-authored Makefile is untrusted input
+# in CI, so the ReDoS shape must not survive. Verified byte-identical on every
+# include form (`include a.mk`, `  -include a.mk b.mk  `, tabs, `includefoo`).
+_INCLUDE_RE = re.compile(r"^[ \t]*-?include[ \t]+(.*)")
+# Hard bounds for parsing untrusted build files. `_make_targets` follows includes;
+# without a visited-set the depth cap alone allowed N**5 fan-out (measured 15.0s
+# at N=12 through the real CLI). Budgets bound work even when the graph is legal.
+_MAX_INCLUDE_FILES = 64
+_MAX_MAKEFILE_BYTES = 1_048_576
+_MAX_PKG_JSON_BYTES = 2_097_152
 # Leading `VAR=value` env-assignments precede the real command
 # (`BASE_PATH=/x npm run build`) — skip them so the value is not read as a path.
 _ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_]\w*=")
@@ -63,44 +81,87 @@ def _find_makefile(repo_root: str) -> str | None:
     return None
 
 
-def _make_targets(makefile: str, _depth: int = 0) -> tuple[set[str], bool]:
+def _make_targets(makefile: str, repo_root: str) -> tuple[set[str], bool]:
     """Return (defined targets, unresolved_include). ``unresolved_include`` is
     True when the makefile pulls in an include we cannot statically follow
-    (variable/glob path, missing file, or too-deep nesting) — in that case a
-    target we did not find may still exist, so the caller must not claim dangling.
+    (variable/glob path, missing file, escaping path, or an exhausted budget) —
+    in that case a target we did not find may still exist, so the caller must not
+    claim dangling.
+
+    Iterative worklist with a realpath visited-set: every Makefile is parsed at
+    most once, so include diamonds and cycles cost O(files), not O(N**depth).
+    Includes are contained to ``repo_root`` — before this, `include ../../etc/x`
+    was opened, giving attacker-authored build files a read primitive outside the
+    checkout.
     """
     targets: set[str] = set()
     unresolved = False
     try:
-        with open(makefile, encoding="utf-8", errors="replace") as fh:
-            lines = fh.readlines()
+        root = os.path.realpath(repo_root)
+        queue = [os.path.realpath(makefile)]
     except OSError:
         return set(), True
-    for line in lines:
-        m = _MAKE_TARGET_RE.match(line)
-        if m:
-            targets.add(m.group(1).lower())
-        inc = _INCLUDE_RE.match(line)
-        if inc:
-            for part in inc.group(1).split():
-                if "$" in part or "*" in part or "?" in part or _depth >= 5:
+    visited: set[str] = set()
+    while queue:
+        path = queue.pop()
+        if path in visited:
+            continue
+        if len(visited) >= _MAX_INCLUDE_FILES:
+            return targets, True
+        visited.add(path)
+        try:
+            if os.path.getsize(path) > _MAX_MAKEFILE_BYTES:
+                unresolved = True
+                continue
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                lines = fh.readlines()
+        except OSError:
+            unresolved = True
+            continue
+        for line in lines:
+            m = _MAKE_TARGET_RE.match(line)
+            if m:
+                targets.add(m.group(1).lower())
+            elif _MAKE_DYNAMIC_TARGET_RE.match(line):
+                # Variable/pattern target: the target set is not fully knowable.
+                unresolved = True
+            inc = _INCLUDE_RE.match(line)
+            if not inc:
+                continue
+            for part in inc.group(1).strip().split():
+                if "$" in part or "*" in part or "?" in part:
                     unresolved = True
                     continue
-                inc_path = os.path.normpath(os.path.join(os.path.dirname(makefile), part))
-                if os.path.isfile(inc_path):
-                    sub, sub_unresolved = _make_targets(inc_path, _depth + 1)
-                    targets |= sub
-                    unresolved = unresolved or sub_unresolved
+                try:
+                    inc_path = os.path.realpath(
+                        os.path.normpath(os.path.join(os.path.dirname(path), part))
+                    )
+                    contained = os.path.commonpath([root, inc_path]) == root
+                except (OSError, ValueError):
+                    unresolved = True
+                    continue
+                if not contained:
+                    # Never open it: an escaping include is unprovable *and* a
+                    # read primitive. realpath first, so symlinks cannot escape.
+                    unresolved = True
+                elif os.path.isfile(inc_path):
+                    if inc_path not in visited:
+                        queue.append(inc_path)
                 else:
                     unresolved = True
     return targets, unresolved
 
 
 def _pkg_scripts(package_json: str) -> set[str] | None:
+    # RecursionError is a RuntimeError, NOT a ValueError, so it used to escape
+    # this handler: a ~20KB deeply-nested package.json crashed the whole check.
+    # Size alone does not bound it (the payload is tiny), hence both guards.
     try:
+        if os.path.getsize(package_json) > _MAX_PKG_JSON_BYTES:
+            return None
         with open(package_json, encoding="utf-8") as fh:
             data = json.load(fh)
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return None
     if not isinstance(data, dict):
         return None
@@ -115,15 +176,39 @@ def _pm_script(verb: str, args: list[str]) -> str | None:
     script invocation (or too ambiguous to claim)."""
     if verb not in ("npm", "pnpm", "yarn", "bun"):
         return None
-    if args and args[0] == "run" and len(args) >= 2:
-        return args[1]
+    if args and args[0] == "run":
+        # The script is the first NON-FLAG token after `run`; `pnpm run -r build`
+        # and `pnpm run --silent build` used to read the flag as the script name
+        # and report `script '-r' is not defined`.
+        for a in args[1:]:
+            if not a.startswith("-"):
+                return a
+        return None
     if not args or args[0].startswith("-"):
         return None
     first = args[0]
     if verb == "npm":
         return first if first in _NPM_LIFECYCLE else None
-    # pnpm / yarn / bun: an unknown (non-builtin) word runs the matching script.
+    # pnpm / yarn / bun: an unknown (non-builtin) word MAY run the matching
+    # script — but yarn/bun also fall back to a node_modules/.bin binary, so
+    # absence is not provable here. See `_pm_absence_provable`.
     return first if first not in _PM_BUILTINS else None
+
+
+def _pm_absence_provable(verb: str, args: list[str]) -> bool:
+    """True only for invocation forms where a missing script is a *hard error*,
+    so 'not in package.json' proves the command is broken.
+
+    `npm run X` (npm error Missing script) and `pnpm run X` (ERR_PNPM_NO_SCRIPT)
+    qualify. Every yarn form falls back to `node_modules/.bin` (`yarn tsc` runs
+    the typescript binary), and bun resolves scripts, then files, then binaries —
+    for those, absence from `scripts` proves nothing. The bare pnpm/yarn/bun
+    shorthand has the same fallback, so it is unprovable too.
+    """
+    if args and args[0] == "run":
+        return verb in ("npm", "pnpm")
+    # bare lifecycle word: only npm maps these to scripts with a hard error.
+    return verb == "npm"
 
 
 def _clean_tokens(cmd: str) -> list[str]:
@@ -134,6 +219,12 @@ def _clean_tokens(cmd: str) -> list[str]:
         if t.startswith("#"):  # inline comment starts here
             toks = toks[:j]
             break
+    # Subshell punctuation clings to the tokens after segment splitting:
+    # `(cd pkg && npm run build)` yields a segment whose last token is `build)`,
+    # which resolved as a script literally named "build)". Strip the grouping
+    # characters so the real name surfaces.
+    toks = [t.strip("()") for t in toks]
+    toks = [t for t in toks if t]
     k = 0
     while k < len(toks) and _ENV_ASSIGN_RE.match(toks[k]):
         k += 1
@@ -174,6 +265,12 @@ def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
 
     # 1) make <target>
     if verb == "make":
+        # `-C dir` / `-f file` retarget make at a different directory or makefile.
+        # The extractor lowercases, so `-C` arrives as `-c`. Without this guard the
+        # directory was read as the target: `make -C build test` reported
+        # "target 'build' is not defined" — a false dangling on a standard form.
+        if any(a in ("-c", "-f") or a.startswith(("-c", "-f", "--directory", "--file", "--makefile")) for a in args):
+            return "unknown", "make runs against another directory/makefile (-C/-f)"
         targets = [a for a in args if not a.startswith("-") and "=" not in a]
         if not targets:
             return "unknown", "make with no explicit target"
@@ -183,7 +280,7 @@ def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
         makefile = _find_makefile(repo_root)
         if makefile is None:
             return "unknown", "no Makefile in repo root"
-        defined, unresolved_include = _make_targets(makefile)
+        defined, unresolved_include = _make_targets(makefile, repo_root)
         if target.lower() in defined:
             return "resolved", f"make target '{target}' defined in {os.path.basename(makefile)}"
         if unresolved_include:
@@ -195,8 +292,11 @@ def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
     if script is not None:
         if _is_placeholder(script):
             return "unknown", f"'{script}' is a placeholder, not a concrete script"
-        if any(a == "-w" or a.startswith("--workspace") for a in args):
-            return "unknown", "workspace-scoped script (-w); resolves in a sub-package"
+        if any(
+            a in ("-w", "-r", "--recursive") or a.startswith(("--workspace", "--filter"))
+            for a in args
+        ):
+            return "unknown", "workspace-scoped script; resolves in a sub-package"
         package_json = os.path.join(repo_root, "package.json")
         if not os.path.isfile(package_json):
             return "unknown", "no package.json in repo root"
@@ -205,6 +305,22 @@ def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
             return "unknown", "package.json is unparseable"
         if script.lower() in scripts:
             return "resolved", f"npm script '{script}' defined in package.json"
+        # bun resolves scripts, then FILES, then binaries: `bun run index.ts` and
+        # bare `bun index.ts` execute the file. Codegen'd targets (`bun run
+        # dist/index.js`, built earlier in the same doc) mean a missing file
+        # proves nothing either — so bun never yields dangling here.
+        if verb == "bun":
+            if os.path.exists(os.path.normpath(os.path.join(repo_root, script))):
+                return "resolved", f"file '{script}' exists"
+            return "unknown", (
+                f"'{script}' is neither a package.json script nor a file on a clean "
+                "checkout; bun also resolves node_modules binaries"
+            )
+        if not _pm_absence_provable(verb, args):
+            return "unknown", (
+                f"script '{script}' is not in package.json scripts; {verb} may fall "
+                "back to a node_modules/.bin binary"
+            )
         return "dangling", f"script '{script}' is not defined in package.json scripts"
 
     # 3) explicit interpreter-run script / `./` executable
@@ -219,6 +335,49 @@ def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
         return "dangling", f"path '{path}' does not exist on a clean checkout"
 
     return "unknown", "no resolver for this command"
+
+
+_CD_VERBS = frozenset({"cd", "pushd", "popd"})
+
+
+def _cd_tainted_lines(lines: list[str]) -> set[int]:
+    """1-based line numbers whose commands run in a working directory we cannot
+    statically prove.
+
+    The extractor splits on `&&`/`;`/`|` and discards the `cd`, so
+    `cd packages/api && npm run lint` reaches resolution as a bare `npm run lint`
+    and was resolved against the ROOT manifest — a false dangling on the standard
+    monorepo idiom. We do not try to reconstruct the working directory (a design
+    that does *resolve* the cd target leaks context across subshells and creates
+    fresh false positives); we only mark the affected lines unprovable.
+
+    Inside a shell fence a `cd` persists for the rest of that fence. Outside, it
+    only affects its own line. Fence boundaries reset the state.
+    """
+    tainted: set[int] = set()
+    in_fence = False
+    fence_tainted = False
+    for i, raw in enumerate(lines, 1):
+        if raw.lstrip().startswith("```"):
+            in_fence = not in_fence
+            fence_tainted = False
+            continue
+        if in_fence and fence_tainted:
+            tainted.add(i)
+        line_tainted = False
+        for seg in re.split(r"&&|\|\||\||;", raw):
+            toks = [t for t in seg.strip().lstrip("$>#").strip().split() if t]
+            toks = [t.strip("()") for t in toks]
+            toks = [t for t in toks if t]
+            if line_tainted:
+                tainted.add(i)
+            if toks and toks[0].lower() in _CD_VERBS:
+                line_tainted = True
+                if in_fence:
+                    fence_tainted = True
+        if line_tainted:
+            tainted.add(i)
+    return tainted
 
 
 def _find_line(cmd: str, lines: list[str]) -> int | None:
@@ -237,6 +396,7 @@ def resolve_commands(text: str, repo_root: str) -> list[dict]:
     where status is ``resolved`` | ``dangling`` | ``unknown``.
     """
     lines = text.splitlines()
+    tainted = _cd_tainted_lines(lines)
     results: list[dict] = []
     seen: set[str] = set()
     for family, cmd in _extract_commands(lines):
@@ -244,11 +404,17 @@ def resolve_commands(text: str, repo_root: str) -> list[dict]:
             continue
         seen.add(cmd)
         status, evidence = _resolve_one(cmd, repo_root)
+        line = _find_line(cmd, lines)
+        # Demote only — a cd context makes absence unprovable, but a target we
+        # DID find is still real, so `resolved` is never downgraded.
+        if status == "dangling" and line in tainted:
+            status = "unknown"
+            evidence = "runs after a 'cd'; the working directory is not statically resolvable"
         results.append({
             "command": cmd,
             "family": family,
             "status": status,
             "evidence": evidence,
-            "line": _find_line(cmd, lines),
+            "line": line,
         })
     return results

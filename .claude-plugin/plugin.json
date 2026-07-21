@@ -1,6 +1,6 @@
 {
   "name": "schliff",
-  "version": "8.6.0",
+  "version": "8.6.1",
   "description": "Deterministic quality scorer for AI instruction files (SKILL.md, CLAUDE.md, .cursorrules, AGENTS.md). 9 scorers incl. operational_coverage, anti-gaming detection, autoresearch-style autonomous improvement.",
   "author": {
     "name": "Zandereins",
