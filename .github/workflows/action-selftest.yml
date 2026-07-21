@@ -85,8 +85,10 @@ jobs:
           set -euo pipefail
           test "$DANGLING_COUNT" = "3" || { echo "expected 3 dangling, got '$DANGLING_COUNT'"; exit 1; }
           # Re-run the check to get the JSON, then exercise the exact cell() render
-          # path and assert no markdown anchor escapes a code span.
-          schliff check-commands skills/schliff/tests/fixtures/dangling-repo/AGENTS.md --json > /tmp/fx.json
+          # path and assert no markdown anchor escapes a code span. `|| true`:
+          # check-commands exits 1 when danglings exist, which set -e would treat
+          # as a step failure.
+          schliff check-commands skills/schliff/tests/fixtures/dangling-repo/AGENTS.md --json > /tmp/fx.json || true
           node -e '
             const d = JSON.parse(require("fs").readFileSync("/tmp/fx.json","utf8"));
             const cell = s => String(s ?? "").replace(/`/g,"").replace(/[\x00-\x1f]+/g," ").replace(/\|/g,"│").slice(0,120);
