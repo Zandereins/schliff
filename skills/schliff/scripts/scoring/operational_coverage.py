@@ -431,11 +431,16 @@ def _classify(seg: str, inline: bool):
 
 
 def _extract_commands(lines):
-    """Return list of (family, normalized_segment) for real commands, doc-wide."""
+    """Return list of (family, normalized_segment, lineno) for real commands,
+    doc-wide. ``lineno`` is 1-based and points at the source line the segment came
+    from (all segments split from one line share its lineno). The line is additive:
+    the scoring consumer ignores it; the dangling-check threads it so the report
+    line is the real extraction line, not a substring guess (retires ``_find_line``).
+    """
     results = []
     in_fence = False
     lang = ""
-    for ln in lines:
+    for lineno, ln in enumerate(lines, 1):
         fm = _FENCE_RE.match(ln)
         if fm:
             if not in_fence:
@@ -450,7 +455,7 @@ def _extract_commands(lines):
                 for seg in _split_segments(ln):
                     fam = _classify(seg, inline=False)
                     if fam:
-                        results.append((fam, _norm(seg)))
+                        results.append((fam, _norm(seg), lineno))
             continue
         # §4.2.5: the negation guard is SENTENCE-scoped — "Never commit to
         # main. Run `pnpm test` before pushing." must keep the test credit —
@@ -475,7 +480,7 @@ def _extract_commands(lines):
                 for seg in _split_segments(m.group(1)):
                     fam = _classify(seg, inline=True)
                     if fam:
-                        results.append((fam, _norm(seg)))
+                        results.append((fam, _norm(seg), lineno))
     return results
 
 
@@ -602,9 +607,9 @@ def score_operational_coverage(skill_path: str) -> dict:
 
     lines = content.split("\n")
     cmds = _extract_commands(lines)
-    distinct_norms = {norm for _fam, norm in cmds}
+    distinct_norms = {norm for _fam, norm, _ln in cmds}
     distinct = len(distinct_norms)
-    families = {fam for fam, _norm in cmds}
+    families = {fam for fam, _norm, _ln in cmds}
 
     # Diversity (§4.2.4): a single distinct command resolves to a single family,
     # so the spec's ">=2 distinct before crediting all three" reduces to crediting

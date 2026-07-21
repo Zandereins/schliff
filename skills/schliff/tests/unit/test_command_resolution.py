@@ -350,3 +350,147 @@ def test_field_swc_subshell_cd_path_is_unknown(tmp_path):
     # resolved->dangling, so the safe direction is preserved either way.)
     assert not any(r["status"] == "dangling" for r in results)
     assert _status(results, "test.sh") in ("resolved", "unknown")
+
+
+# --- Hotfix 2026-07-21 (spec 2026-07-21-command-resolution-hotfix.md) ---
+
+
+def test_find_line_puncture_uses_real_extraction_line(tmp_path):
+    """`_find_line`'s loose substring scan matched an EARLIER prose line whose text
+    happens to contain the command tokens ("We make tests pass"), which was not
+    cd-tainted — bypassing the cd demotion and reporting a false dangling. The real
+    extraction is inside a fence after `cd`, so the threaded line must be tainted
+    and the command `unknown`, and the reported `line` must point at the real line."""
+    (tmp_path / "Makefile").write_text("lint:\n\truff check .\n")  # no `test` target
+    agents = (
+        "# Agents\n"
+        "We make tests pass here.\n"  # prose decoy: contains 'make' + 'test' substrings
+        "\n"
+        "```bash\n"
+        "cd subdir\n"
+        "make test\n"
+        "```\n"
+    )
+    results = resolve_commands(agents, str(tmp_path))
+    r = next(r for r in results if "make test" in r["command"])
+    assert r["status"] == "unknown"  # real line (6) is tainted, not the decoy (2)
+    assert r["line"] == 6
+
+
+# --- Field regressions: the REAL false-positive class (workspace/subdir scripts).
+# The field sweep over 135 real repos found every real FALSE dangling was the same
+# class: `npm/pnpm run <script>` where the script lives in a workspace child, not
+# the root manifest. Manifest shapes below are the real ones (verified against
+# fresh clones, 2026-07-21). The engine only checks the root manifest, so it must
+# demote to `unknown` when the repo declares workspaces.
+
+
+def test_field_kmarkussen_workspaces_npm_run_is_unknown(tmp_path):
+    """kmarkussen/vs-code-work-share-plugin: `npm run compile`. Root package.json
+    declares `workspaces` (as a `{packages: [...]}` object) and the script lives in
+    a workspace child, not root scripts — 8.6.1 reported it dangling (false)."""
+    (tmp_path / "package.json").write_text(
+        '{"workspaces": {"packages": ["@m/extension", "@m/server"]},'
+        ' "scripts": {"build": "tsc", "dev:extension": "x"}}'
+    )
+    agents = "# Agents\n\n```bash\nnpm run compile\nnpm run watch\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "npm run compile") == "unknown"
+    assert _status(results, "npm run watch") == "unknown"
+
+
+def test_field_chainlit_pnpm_workspace_yaml_is_unknown(tmp_path):
+    """Chainlit/chainlit: `pnpm run dev`. The repo has a pnpm-workspace.yaml and
+    `dev` lives in the frontend/ workspace, not the root scripts — 8.6.1 reported it
+    dangling (false)."""
+    (tmp_path / "pnpm-workspace.yaml").write_text("packages:\n  - frontend/\n")
+    (tmp_path / "package.json").write_text('{"scripts": {"build": "tsc", "lint": "x"}}')
+    agents = "# Agents\n\n```bash\npnpm run dev\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "pnpm run dev") == "unknown"
+
+
+def test_field_cervellone_no_workspaces_stays_dangling(tmp_path):
+    """Orsati/cervellone-game: `npm run install-all` — a genuine dangling (the doc
+    names a script the root package.json does not define, and the repo has NO
+    workspaces). The workspace demotion must NOT over-fire and mask this."""
+    (tmp_path / "package.json").write_text(
+        '{"scripts": {"start": "x", "dev": "y", "dev-admin": "z"}}'
+    )
+    agents = "# Agents\n\n```bash\nnpm run install-all\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "npm run install-all") == "dangling"
+
+
+# --- DoS input-budget guard (council CATASTROPHIC: a tiny attacker-authored doc
+# driving unbounded resolver work). On overflow every command degrades to
+# `unknown` with no per-command resolution. Caps are field-validated (observed MAX
+# over 177 files = 56 cmds / 926 lines / 964 line-len) and clip no real repo.
+
+
+def test_dos_budget_line_count_overflow_is_all_unknown(tmp_path):
+    (tmp_path / "package.json").write_text('{"scripts": {}}')  # would be dangling
+    agents = "# Agents\n" + ("\n" * 5001) + "```bash\nnpm run build\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert results and all(r["status"] == "unknown" for r in results)
+
+
+def test_dos_budget_long_line_overflow_is_all_unknown(tmp_path):
+    (tmp_path / "package.json").write_text('{"scripts": {}}')
+    agents = "# Agents\n" + ("x" * 3000) + "\n```bash\nnpm run build\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert results and all(r["status"] == "unknown" for r in results)
+
+
+def test_dos_budget_distinct_command_overflow_is_all_unknown(tmp_path):
+    (tmp_path / "package.json").write_text('{"scripts": {}}')
+    body = "\n".join(f"npm run build{i}" for i in range(300))  # 300 distinct > 256
+    agents = f"# Agents\n\n```bash\n{body}\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert results and all(r["status"] == "unknown" for r in results)
+
+
+def test_within_budget_still_resolves(tmp_path):
+    # A normal-sized doc must still resolve dangling — the guard must not over-fire.
+    (tmp_path / "package.json").write_text('{"scripts": {"build": "tsc"}}')
+    agents = "# Agents\n\n```bash\nnpm run build\nnpm run missing\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "npm run build") == "resolved"
+    assert _status(results, "npm run missing") == "dangling"
+
+
+# --- Edge hardening (council cheap-wins) ---
+
+
+def test_symlinked_path_escaping_repo_is_unknown_not_an_oracle(tmp_path):
+    """A symlinked dir pointing outside the checkout turns `os.path.exists` into an
+    existence oracle for external files. `abspath` containment did not resolve the
+    symlink, so the escape looked contained; `realpath` closes it -> unknown."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "setup.sh").write_text("#!/bin/sh\n")  # setup.* is a classified family
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "link").symlink_to(outside)  # repo/link -> ../outside
+    agents = "# Agents\n\n```bash\nbash link/setup.sh\n```\n"
+    results = resolve_commands(agents, str(repo))
+    r = next(r for r in results if "setup.sh" in r["command"])
+    assert r["status"] == "unknown"  # escapes the repo via symlink; not an oracle
+
+
+def test_quoted_script_name_is_dequoted(tmp_path):
+    """`npm run "build"` — the quoted token was read literally as `"build"` and
+    reported dangling. Dequote so it resolves to the real script."""
+    (tmp_path / "package.json").write_text('{"scripts": {"build": "tsc"}}')
+    agents = '# Agents\n\n```bash\nnpm run "build"\n```\n'
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "build") == "resolved"
+
+
+def test_npm_run_if_present_is_not_dangling(tmp_path):
+    """`npm run <script> --if-present` exits 0 when the script is missing (not a
+    hard error), so absence proves nothing -> unknown, never dangling."""
+    (tmp_path / "package.json").write_text('{"scripts": {"build": "tsc"}}')
+    agents = "# Agents\n\n```bash\nnpm run coverage --if-present\n```\n"
+    results = resolve_commands(agents, str(tmp_path))
+    assert _status(results, "coverage") == "unknown"

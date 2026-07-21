@@ -171,6 +171,39 @@ def _pkg_scripts(package_json: str) -> set[str] | None:
     return {str(k).lower() for k in scripts}
 
 
+_PNPM_WORKSPACE_NAMES = ("pnpm-workspace.yaml", "pnpm-workspace.yml")
+
+
+def _repo_has_workspaces(repo_root: str) -> bool:
+    """True when the repo declares a workspace/monorepo layout, so a `<pm> run
+    <script>` may legitimately live in a child package the root manifest does not
+    list. The field sweep (135 real repos) found this is the ONLY real source of
+    false danglings: the engine checks only the root manifest.
+
+    Signals: a ``pnpm-workspace.yaml``/``.yml`` (pnpm), or a truthy ``workspaces``
+    key in the root ``package.json`` (npm/yarn/bun — an array, or a
+    ``{"packages": [...]}`` object). An empty/false value is not a workspace.
+    """
+    for name in _PNPM_WORKSPACE_NAMES:
+        if os.path.isfile(os.path.join(repo_root, name)):
+            return True
+    package_json = os.path.join(repo_root, "package.json")
+    try:
+        if os.path.getsize(package_json) > _MAX_PKG_JSON_BYTES:
+            return False
+        with open(package_json, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError, RecursionError):
+        return False
+    return isinstance(data, dict) and bool(data.get("workspaces"))
+
+
+def _dequote(tok: str) -> str:
+    """Strip matching surrounding quotes: `npm run "build"` names the `build`
+    script, not a literal `"build"`."""
+    return tok.strip("'\"")
+
+
 def _pm_script(verb: str, args: list[str]) -> str | None:
     """The package.json script a `<pm> ...` invocation runs, or None if not a
     script invocation (or too ambiguous to claim)."""
@@ -182,11 +215,11 @@ def _pm_script(verb: str, args: list[str]) -> str | None:
         # and report `script '-r' is not defined`.
         for a in args[1:]:
             if not a.startswith("-"):
-                return a
+                return _dequote(a)
         return None
     if not args or args[0].startswith("-"):
         return None
-    first = args[0]
+    first = _dequote(args[0])
     if verb == "npm":
         return first if first in _NPM_LIFECYCLE else None
     # pnpm / yarn / bun: an unknown (non-builtin) word MAY run the matching
@@ -205,6 +238,10 @@ def _pm_absence_provable(verb: str, args: list[str]) -> bool:
     for those, absence from `scripts` proves nothing. The bare pnpm/yarn/bun
     shorthand has the same fallback, so it is unprovable too.
     """
+    # `--if-present` makes a missing script exit 0 (npm/pnpm/yarn all honor it),
+    # so absence is not an error -> not provable.
+    if "--if-present" in args:
+        return False
     if args and args[0] == "run":
         return verb in ("npm", "pnpm")
     # bare lifecycle word: only npm maps these to scripts with a hard error.
@@ -257,7 +294,18 @@ def _is_placeholder(name: str) -> bool:
     return any(c in name for c in "*<>$?") or name in ("...", "…")
 
 
-def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
+def _memo(cache: dict, key: str, producer):
+    """Per-call memo: repo_root is constant across all commands in one
+    ``resolve_commands`` call, so each manifest is parsed at most once instead of
+    once per command (the compound-DoS multiplier the council flagged). The cache
+    is call-scoped (never process-global) so tests reusing a repo path can't
+    cross-contaminate."""
+    if key not in cache:
+        cache[key] = producer()
+    return cache[key]
+
+
+def _resolve_one(cmd: str, repo_root: str, cache: dict) -> tuple[str, str]:
     tokens = _clean_tokens(cmd)
     if not tokens:
         return "unknown", "empty command"
@@ -277,10 +325,12 @@ def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
         target = targets[0]
         if _is_placeholder(target):
             return "unknown", f"'{target}' is a placeholder, not a concrete target"
-        makefile = _find_makefile(repo_root)
+        makefile = _memo(cache, "makefile", lambda: _find_makefile(repo_root))
         if makefile is None:
             return "unknown", "no Makefile in repo root"
-        defined, unresolved_include = _make_targets(makefile, repo_root)
+        defined, unresolved_include = _memo(
+            cache, "make_targets", lambda: _make_targets(makefile, repo_root)
+        )
         if target.lower() in defined:
             return "resolved", f"make target '{target}' defined in {os.path.basename(makefile)}"
         if unresolved_include:
@@ -300,7 +350,7 @@ def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
         package_json = os.path.join(repo_root, "package.json")
         if not os.path.isfile(package_json):
             return "unknown", "no package.json in repo root"
-        scripts = _pkg_scripts(package_json)
+        scripts = _memo(cache, "pkg_scripts", lambda: _pkg_scripts(package_json))
         if scripts is None:
             return "unknown", "package.json is unparseable"
         if script.lower() in scripts:
@@ -321,6 +371,14 @@ def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
                 f"script '{script}' is not in package.json scripts; {verb} may fall "
                 "back to a node_modules/.bin binary"
             )
+        if _memo(cache, "workspaces", lambda: _repo_has_workspaces(repo_root)):
+            # Root manifest is not authoritative in a monorepo — the script may
+            # live in a workspace child. Absence is unprovable -> unknown, never
+            # dangling. (The field sweep's one real false-positive class.)
+            return "unknown", (
+                f"script '{script}' is not in the root package.json, but the repo "
+                "declares workspaces; it may be defined in a workspace package"
+            )
         return "dangling", f"script '{script}' is not defined in package.json scripts"
 
     # 3) explicit interpreter-run script / `./` executable
@@ -328,7 +386,17 @@ def _resolve_one(cmd: str, repo_root: str) -> tuple[str, str]:
     if path is not None:
         full = os.path.normpath(os.path.join(repo_root, path))
         # Only claim on paths that stay inside the repo; escapes are unprovable.
-        if os.path.commonpath([os.path.abspath(repo_root), os.path.abspath(full)]) != os.path.abspath(repo_root):
+        # realpath (not abspath) resolves symlinks first, so a symlinked path that
+        # points outside the checkout escapes here instead of turning os.path.exists
+        # into an existence oracle for external files. Matches _make_targets, which
+        # already realpaths its include containment.
+        try:
+            root_real = os.path.realpath(repo_root)
+            full_real = os.path.realpath(full)
+            contained = os.path.commonpath([root_real, full_real]) == root_real
+        except (OSError, ValueError):
+            return "unknown", f"path '{path}' is not statically resolvable"
+        if not contained:
             return "unknown", f"path '{path}' escapes repo root"
         if os.path.exists(full):
             return "resolved", f"path '{path}' exists"
@@ -380,13 +448,17 @@ def _cd_tainted_lines(lines: list[str]) -> set[int]:
     return tainted
 
 
-def _find_line(cmd: str, lines: list[str]) -> int | None:
-    toks = [t for t in cmd.lower().split() if t]
-    for i, ln in enumerate(lines, 1):
-        low = ln.lower()
-        if all(t in low for t in toks):
-            return i
-    return None
+# Input-budget caps for untrusted docs (the resolver runs on attacker-authored
+# AGENTS.md in CI). Field-validated: observed MAX over 177 real instruction files
+# = 56 distinct commands / 926 lines / 964 line-length — these clip no real repo.
+# On overflow every command degrades to `unknown` with NO per-command resolution
+# (no manifest parsing / filesystem walk), bounding the compound DoS the council
+# flagged (a ~60-byte doc driving hours of CI work).
+_MAX_DOC_LINES = 5000
+_MAX_LINE_BYTES = 2048
+_MAX_DISTINCT_CMDS = 256
+
+_BUDGET_EVIDENCE = "input exceeds the resolver's budget; not resolved (unknown)"
 
 
 def resolve_commands(text: str, repo_root: str) -> list[dict]:
@@ -396,20 +468,36 @@ def resolve_commands(text: str, repo_root: str) -> list[dict]:
     where status is ``resolved`` | ``dangling`` | ``unknown``.
     """
     lines = text.splitlines()
-    tainted = _cd_tainted_lines(lines)
+    # Budget guard (cheap, pre-resolution): oversized input degrades to all-unknown
+    # rather than driving unbounded resolver work.
+    over_budget = len(lines) > _MAX_DOC_LINES or any(
+        len(ln) > _MAX_LINE_BYTES for ln in lines
+    )
+    extracted = _extract_commands(lines)
+    if not over_budget and len({norm for _f, norm, _l in extracted}) > _MAX_DISTINCT_CMDS:
+        over_budget = True
+
+    # Skip the (regex-per-line) cd scan when nothing will be resolved anyway.
+    tainted = set() if over_budget else _cd_tainted_lines(lines)
+    cache: dict = {}  # per-call manifest memo (see _memo)
     results: list[dict] = []
     seen: set[str] = set()
-    for family, cmd in _extract_commands(lines):
+    # ``_extract_commands`` yields the real 1-based extraction line, so the report
+    # line is the actual source line (not a substring guess) and the cd demotion
+    # keys on the line the command was truly extracted from.
+    for family, cmd, line in extracted:
         if cmd in seen:  # same command listed twice — report once
             continue
         seen.add(cmd)
-        status, evidence = _resolve_one(cmd, repo_root)
-        line = _find_line(cmd, lines)
-        # Demote only — a cd context makes absence unprovable, but a target we
-        # DID find is still real, so `resolved` is never downgraded.
-        if status == "dangling" and line in tainted:
-            status = "unknown"
-            evidence = "runs after a 'cd'; the working directory is not statically resolvable"
+        if over_budget:
+            status, evidence = "unknown", _BUDGET_EVIDENCE
+        else:
+            status, evidence = _resolve_one(cmd, repo_root, cache)
+            # Demote only — a cd context makes absence unprovable, but a target we
+            # DID find is still real, so `resolved` is never downgraded.
+            if status == "dangling" and line in tainted:
+                status = "unknown"
+                evidence = "runs after a 'cd'; the working directory is not statically resolvable"
         results.append({
             "command": cmd,
             "family": family,
