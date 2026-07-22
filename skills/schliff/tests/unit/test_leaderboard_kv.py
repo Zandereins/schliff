@@ -52,6 +52,9 @@ class FakeRedis:
             for f, v in self.hashes.get(key, {}).items():
                 flat.extend([f, v])
             return flat  # REST returns a flat [field, value, ...] array
+        if op == "HGET":
+            _, key, field = args
+            return self.hashes.get(key, {}).get(field)
         if op == "HEXISTS":
             _, key, field = args
             return 1 if field in self.hashes.get(key, {}) else 0
@@ -170,9 +173,11 @@ def test_upsert_rejects_new_identity_when_full_but_allows_updates(kv, monkeypatc
     # store now holds MAX_SUBMISSIONS distinct entries -> a brand-new identity is refused
     with pytest.raises(submit.LeaderboardFullError):
         submit._kv_upsert(cfg, _entry(skill="c", repo="https://github.com/u/c"))
-    # ...but updating an EXISTING identity still works (no lock-out of real users)
+    # ...but updating an EXISTING identity still works (no lock-out of real users).
+    # Use a non-downgrade update (95 >= 90) so the cap check is exercised
+    # independently of the grief-downgrade refusal (tested separately below).
     assert submit._kv_upsert(
-        cfg, {**_entry(skill="a", repo="https://github.com/u/a"), "composite": 1.0}) is True
+        cfg, {**_entry(skill="a", repo="https://github.com/u/a"), "composite": 95.0}) is True
     assert len(kv.hashes[submit.SUBMISSIONS_KEY]) == 2  # cap held
 
 
@@ -284,3 +289,45 @@ def test_real_seed_both_same_repo_rows_survive_union(kv, monkeypatch):
     monkeypatch.setattr(query, "SEED_PATH", str(real_seed))
     loaded = query._kv_load_all(query._kv_config())  # empty KV -> seed only
     assert {"schliff", "shieldclaw"} <= {e["skill_name"] for e in loaded}
+
+
+# --- abuse hardening (audit 2026-07-22): #17 grief-downgrade, #18 spoofable IP ---
+
+class _FakeHandler:
+    def __init__(self, headers):
+        self.headers = headers
+
+
+def test_client_ip_prefers_unspoofable_x_real_ip():
+    # x-real-ip is set by Vercel's proxy; it must win over a spoofed leftmost XFF.
+    h = _FakeHandler({"x-real-ip": "9.9.9.9", "x-forwarded-for": "1.2.3.4, 5.6.7.8"})
+    assert submit._client_ip(h) == "9.9.9.9"
+
+
+def test_client_ip_uses_rightmost_xff_not_attacker_leftmost():
+    # The leftmost XFF hop is client-controlled; key the limit on the rightmost
+    # (trusted-proxy) hop so a spoofer can neither bypass nor target a victim.
+    h = _FakeHandler({"x-forwarded-for": "1.2.3.4, 203.0.113.9"})
+    assert submit._client_ip(h) == "203.0.113.9"
+
+
+def test_client_ip_unknown_when_no_headers():
+    assert submit._client_ip(_FakeHandler({})) == "unknown"
+
+
+def test_kv_upsert_refuses_grief_downgrade(kv):
+    cfg = submit._kv_config()
+    submit._kv_upsert(cfg, {**_entry(skill="a"), "composite": 90.0})
+    with pytest.raises(submit.DowngradeRefusedError):
+        submit._kv_upsert(cfg, {**_entry(skill="a"), "composite": 5.0})
+    # the victim's row is intact
+    import json as _json
+    field = submit._dedup_field(_entry(skill="a")["repo_url"], "a")
+    assert _json.loads(kv.hashes[submit.SUBMISSIONS_KEY][field])["composite"] == 90.0
+
+
+def test_kv_upsert_allows_equal_or_higher(kv):
+    cfg = submit._kv_config()
+    submit._kv_upsert(cfg, {**_entry(skill="a"), "composite": 90.0})
+    assert submit._kv_upsert(cfg, {**_entry(skill="a"), "composite": 90.0}) is True  # equal ok
+    assert submit._kv_upsert(cfg, {**_entry(skill="a"), "composite": 95.0}) is True  # higher ok
