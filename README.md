@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![AGENTS.md quality](https://img.shields.io/endpoint?url=https%3A%2F%2Fschliff-playground.vercel.app%2Fapi%2Fbadge%3Frepo%3DZandereins%2Fschliff)](https://schliff-playground.vercel.app)
 
-*That last badge is Schliff scoring this repo's own `AGENTS.md` — live, right now: **93.6 · A**.*
+*That last badge is Schliff scoring this repo's own `AGENTS.md` — live, and reproducible from your own checkout.*
 
 **Your AI instruction files silently degrade — and nothing catches it.** `AGENTS.md` is read by Cursor, Codex, Copilot, and Claude Code — one rotting file now quietly degrades four tools. A trigger phrase rots, an edge case slips, the file balloons past its token budget. No error, no red test — just agents that quietly get worse.
 
@@ -31,19 +31,19 @@ This is the real, current output of `schliff score AGENTS.md` on this repo's own
 ```text
 schliff v8.7.0
 
-  structure             ██████████   95/100  excellent
+  structure             ██████████  100/100  perfect
   operational_coverage  ██████████  100/100  perfect
-  efficiency            ████████░░   78/100  good
-  composability         ████░░░░░░   45/100  poor
+  efficiency            ████████░░   79/100  good
+  composability         ██████████   95/100  excellent
   clarity               ██████████  100/100  perfect
 
-  Structural Score  ███████████████████░  93.6/100  [A]
+  Structural Score  ███████████████████░  95.8/100  [S]
 
-  Tokens: 837 / 3,000 (ok)
+  Tokens: 996 / 3,000 (ok)
   Format: agents.md (normalized)
 ```
 
-No model produced that number. Run it on another laptop and you get 93.6 again — **a score you can't reproduce isn't a measurement, it's a vibe.** And we hold *ourselves* to that: this repo's own badge (scored in isolation) once disagreed with its own CLI (scored in-repo) by ~15 points on the *same bytes*, because `structure` was crediting an on-disk `references/` neighbourhood instead of the file's content. We fixed the engine, not the file ([#10](https://github.com/Zandereins/schliff/pull/129)) — now `cp AGENTS.md /tmp && schliff score /tmp/AGENTS.md` returns the same number as CI and the badge. (The `agents.md` headline weights `structure`·`operational_coverage`·`efficiency` at 0.4/0.4/0.2; `composability` and `clarity` are shown for information, not counted.)
+No model produced that number. Run it on another laptop and you get 95.8 again — **a score you can't reproduce isn't a measurement, it's a vibe.** And we hold *ourselves* to that: this repo's own badge (scored in isolation) once disagreed with its own CLI (scored in-repo) by ~15 points on the *same bytes*, because `structure` was crediting an on-disk `references/` neighbourhood instead of the file's content. We fixed the engine, not the file ([#10](https://github.com/Zandereins/schliff/pull/129)) — now `cp AGENTS.md /tmp && schliff score /tmp/AGENTS.md` returns the same number as CI and the badge. (The `agents.md` headline weights `structure`·`operational_coverage`·`efficiency` at 0.4/0.4/0.2; `composability` and `clarity` are shown for information, not counted.)
 
 *The quick-start and case-study numbers here are reproducible from released `schliff==8.7.0` (`pip install schliff==8.7.0`); the hydra field run below is dated to the version it was measured on. No install? Paste your file into the [playground](https://schliff-playground.vercel.app) — same engine, with AGENTS.md and SKILL.md tabs.*
 
