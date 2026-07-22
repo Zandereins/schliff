@@ -35,6 +35,16 @@ def _write_skill(tmp_path, lines=100, has_refs=False):
         "Output: error message",
         "",
     ]
+    # Progressive disclosure is credited from CONTENT (the skill links external
+    # detail), not from a bare on-disk references/ dir a reader never sees. A
+    # properly-disclosed skill LINKS its reference files.
+    if has_refs:
+        content_lines += [
+            "",
+            "See [example](references/example.md) for detailed patterns.",
+            "See [more](references/more.md) for additional detail.",
+        ]
+
     # Pad with realistic content to reach target line count
     while len(content_lines) < lines:
         content_lines.append(f"- Step {len(content_lines)}: process item")
@@ -47,9 +57,8 @@ def _write_skill(tmp_path, lines=100, has_refs=False):
     if has_refs:
         refs_dir = skill_dir / "references"
         refs_dir.mkdir()
-        (refs_dir / "example.md").write_text(
-            "# Reference\nSome content.", encoding="utf-8"
-        )
+        (refs_dir / "example.md").write_text("# Reference\nSome content.", encoding="utf-8")
+        (refs_dir / "more.md").write_text("# More\nMore content.", encoding="utf-8")
 
     return str(skill_file)
 

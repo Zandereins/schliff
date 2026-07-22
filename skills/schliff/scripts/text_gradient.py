@@ -89,7 +89,7 @@ def _compute_structure_gradients(skill_path: str) -> list[dict]:
                 "issue": "no_progressive_disclosure",
                 "target": "directory",
                 "op": "create",
-                "instruction": "Create a references/ directory and extract detailed content from SKILL.md into reference files",
+                "instruction": "Extract detailed content from SKILL.md into references/ files AND link them from SKILL.md (e.g. `See [details](references/details.md)`) — progressive disclosure is credited from the links in the content, not from a references/ directory the skill never points to",
                 "delta": 1.5,
                 "confidence": "high",
                 "effort": EFFORT_COMPLEX,

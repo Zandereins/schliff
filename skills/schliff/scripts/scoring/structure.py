@@ -3,6 +3,7 @@
 Checks frontmatter, length, examples, headers, progressive disclosure,
 imperative voice, referenced files, and dead content.
 """
+import re
 from bisect import bisect_right
 from pathlib import Path
 
@@ -18,6 +19,33 @@ from scoring.patterns import (
     _RE_TODO,
 )
 from shared import read_skill_safe, strip_frontmatter
+
+# Progressive-disclosure signal (#10, content-only): the SKILL.md POINTS the reader
+# to external detail. Two byte-verifiable forms, unioned by _disclosure_refs:
+#  (1) a markdown link to a LOCAL .md file  ](./x.md) / ](references/x.md)  — not http/anchor
+#  (2) a references/ path in a link/backtick/see-read-load verb (non-.md resources)
+# A bare `scripts/build` build-command mention does NOT count (it is code, not disclosure).
+_RE_MD_LINK = re.compile(r"\]\(\s*(?!https?:|#)([\w./-]+\.md)\s*\)", re.I)
+_RE_REF_PATH = re.compile(r"(?:\]\(|`|\bsee\s+|\bread\s+|\bload\s+)(references/[\w./-]+)", re.I)
+
+
+def _disclosure_refs(content: str) -> set:
+    """Distinct local-detail pointers declared in the content (see regexes above)."""
+    return set(_RE_MD_LINK.findall(content)) | set(_RE_REF_PATH.findall(content))
+
+
+def _refs_verifiable(skill_dir: Path) -> bool:
+    """A reference can only be PROVEN dangling from a real on-disk location. Positive
+    evidence of one: a references/ dir, or a .claude-plugin / .git ancestor. A bare
+    mkdtemp (playground/badge) or a normalized temp copy (non-skill.md) has none, so
+    dangling is unprovable and never claimed — a false dangling burns the artifact
+    (the command_resolution doctrine)."""
+    if (skill_dir / "references").is_dir():
+        return True
+    for anc in [skill_dir, *skill_dir.parents]:
+        if (anc / ".claude-plugin").is_dir() or (anc / ".git").exists():
+            return True
+    return False
 
 
 def _ref_resolves(ref: str, skill_dir: Path) -> bool:
@@ -136,10 +164,18 @@ def _score_structure_inline(skill_path: str) -> dict:
     elif header_count >= 1:
         score += 5
 
-    # Progressive disclosure
+    # Progressive disclosure — credited from CONTENT (the skill links external
+    # detail), not from an on-disk references/ dir, so the score is reproducible
+    # across contexts (#10). A long skill that points readers to detail files is
+    # practicing disclosure in its bytes; a references/ dir it never links is
+    # invisible to the reader and earns nothing.
     skill_dir = Path(skill_path).parent
-    if (skill_dir / "references").is_dir() or len(lines) <= 200:
+    disclosure = _disclosure_refs(content)
+    if len(lines) <= 200 or len(disclosure) >= 2:
         score += 15
+    elif len(disclosure) == 1:
+        score += 10
+        issues.append("thin_progressive_disclosure")
     else:
         score += 5
         issues.append("no_progressive_disclosure")
@@ -151,20 +187,27 @@ def _score_structure_inline(skill_path: str) -> dict:
     elif hedge_count <= 2:
         score += 3
 
-    # Referenced files exist (resolved skill-local OR against a plugin/repo root)
+    # Referenced files — credited from CONTENT (declared refs), never from on-disk
+    # existence, so the score is reproducible (#10). Declaration alone cannot be
+    # farmed: traversal tokens and ref-stuffing get only the neutral credit.
     refs = set(_RE_REFS.findall(content))
     if not refs:
         # No references declared — neutral score (not rewarded, not penalized)
         score += 5
+    elif any(".." in Path(r).parts for r in refs) or len(refs) > 32:
+        # Traversal ('..') or excessive ref-stuffing — neutral credit, no on-disk
+        # resolution attempted (the linter can never become a filesystem oracle).
+        score += 5
+        issues.append("malformed_or_excessive_refs")
     else:
-        missing = sorted(r for r in refs if not _ref_resolves(r, skill_dir))
-        if not missing:
-            # All declared references resolve — reward completeness
-            score += 10
-        else:
-            # Some references resolve in no valid location — partial credit
-            score += 5
-            issues.append(f"missing_refs: {missing}")
+        # References declared and well-formed — content credit.
+        score += 10
+        # Dangling detection is a NON-scoring lint issue, emitted only from a
+        # provable on-disk location (never in an isolated/temp context).
+        if _refs_verifiable(skill_dir):
+            missing = sorted(r for r in refs if not _ref_resolves(r, skill_dir))
+            if missing:
+                issues.append(f"missing_refs: {missing}")
 
     # No dead content (TODO/FIXME/placeholder, empty sections)
     todo_count = len(_RE_TODO.findall(content))
