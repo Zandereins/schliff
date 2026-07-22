@@ -73,6 +73,19 @@ _PM_BUILTINS = frozenset({
 _NPM_LIFECYCLE = frozenset({"test", "start", "stop", "restart"})
 
 
+def _contained(root: str, path: str) -> bool:
+    """True iff ``path`` (symlinks + ``..`` resolved) stays inside ``root`` (also
+    resolved). Every manifest read guards on this: a symlinked Makefile/package.json
+    or an escaping script path would otherwise turn a resolved/dangling verdict into
+    an out-of-repo content/existence oracle when the check runs on an attacker's
+    repo in CI. Mirrors the include-containment already used in ``_make_targets``."""
+    try:
+        root_real = os.path.realpath(root)
+        return os.path.commonpath([root_real, os.path.realpath(path)]) == root_real
+    except (OSError, ValueError):
+        return False
+
+
 def _find_makefile(repo_root: str) -> str | None:
     for name in _MAKEFILE_NAMES:
         p = os.path.join(repo_root, name)
@@ -96,6 +109,10 @@ def _make_targets(makefile: str, repo_root: str) -> tuple[set[str], bool]:
     """
     targets: set[str] = set()
     unresolved = False
+    if not _contained(repo_root, makefile):
+        # A symlinked root Makefile pointing outside the checkout must not be parsed:
+        # its `target:` lines would become an out-of-repo content oracle. Unprovable.
+        return set(), True
     try:
         root = os.path.realpath(repo_root)
         queue = [os.path.realpath(makefile)]
@@ -152,7 +169,11 @@ def _make_targets(makefile: str, repo_root: str) -> tuple[set[str], bool]:
     return targets, unresolved
 
 
-def _pkg_scripts(package_json: str) -> set[str] | None:
+def _pkg_scripts(package_json: str, repo_root: str) -> set[str] | None:
+    # A symlinked package.json pointing outside the checkout must not be read — its
+    # `scripts` keys would become an out-of-repo key oracle. Treat as unparseable.
+    if not _contained(repo_root, package_json):
+        return None
     # RecursionError is a RuntimeError, NOT a ValueError, so it used to escape
     # this handler: a ~20KB deeply-nested package.json crashed the whole check.
     # Size alone does not bound it (the payload is tiny), hence both guards.
@@ -188,6 +209,8 @@ def _repo_has_workspaces(repo_root: str) -> bool:
         if os.path.isfile(os.path.join(repo_root, name)):
             return True
     package_json = os.path.join(repo_root, "package.json")
+    if not _contained(repo_root, package_json):
+        return False
     try:
         if os.path.getsize(package_json) > _MAX_PKG_JSON_BYTES:
             return False
@@ -350,7 +373,7 @@ def _resolve_one(cmd: str, repo_root: str, cache: dict) -> tuple[str, str]:
         package_json = os.path.join(repo_root, "package.json")
         if not os.path.isfile(package_json):
             return "unknown", "no package.json in repo root"
-        scripts = _memo(cache, "pkg_scripts", lambda: _pkg_scripts(package_json))
+        scripts = _memo(cache, "pkg_scripts", lambda: _pkg_scripts(package_json, repo_root))
         if scripts is None:
             return "unknown", "package.json is unparseable"
         if script.lower() in scripts:
@@ -360,7 +383,10 @@ def _resolve_one(cmd: str, repo_root: str, cache: dict) -> tuple[str, str]:
         # dist/index.js`, built earlier in the same doc) mean a missing file
         # proves nothing either — so bun never yields dangling here.
         if verb == "bun":
-            if os.path.exists(os.path.normpath(os.path.join(repo_root, script))):
+            full = os.path.normpath(os.path.join(repo_root, script))
+            if not _contained(repo_root, full):
+                return "unknown", f"path '{script}' escapes repo root"
+            if os.path.exists(full):
                 return "resolved", f"file '{script}' exists"
             return "unknown", (
                 f"'{script}' is neither a package.json script nor a file on a clean "

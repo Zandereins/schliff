@@ -177,7 +177,12 @@ def check_token_budget(content: str, fmt: str) -> dict:
       - over: exceeds budget
     """
     tokens = estimate_tokens(content)
-    budget = FORMAT_TOKEN_BUDGETS.get(fmt, FORMAT_TOKEN_BUDGETS["unknown"])
+    # Resolve short --format aliases (cursor->cursorrules, agents->agents.md, ...)
+    # to the canonical key before the budget lookup; otherwise every alias fell to
+    # the unknown=1500 default and silently flipped the within-budget verdict.
+    from scoring.registry import FORMAT_ALIASES
+    canonical = FORMAT_ALIASES.get(fmt, fmt)
+    budget = FORMAT_TOKEN_BUDGETS.get(canonical, FORMAT_TOKEN_BUDGETS["unknown"])
     ratio = tokens / budget if budget else 0.0
 
     if ratio > 1.0:
