@@ -7,13 +7,13 @@
 
 **The Ruff for `AGENTS.md` — deterministic quality scores for the instruction files that drive your AI. Same input, same score, on every machine.**
 
-[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.6.3)](https://pypi.org/project/schliff/)
+[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.7.0)](https://pypi.org/project/schliff/)
 [![Python](https://img.shields.io/pypi/pyversions/schliff)](https://pypi.org/project/schliff/)
 [![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![AGENTS.md quality](https://img.shields.io/endpoint?url=https%3A%2F%2Fschliff-playground.vercel.app%2Fapi%2Fbadge%3Frepo%3DZandereins%2Fschliff)](https://schliff-playground.vercel.app)
 
-*That last badge is Schliff scoring this repo's own `AGENTS.md` — live, right now: **91.6 · A**.*
+*That last badge is Schliff scoring this repo's own `AGENTS.md` — live, right now: **93.6 · A**.*
 
 **Your AI instruction files silently degrade — and nothing catches it.** `AGENTS.md` is read by Cursor, Codex, Copilot, and Claude Code — one rotting file now quietly degrades four tools. A trigger phrase rots, an edge case slips, the file balloons past its token budget. No error, no red test — just agents that quietly get worse.
 
@@ -29,37 +29,37 @@ This is the real, current output of `schliff score AGENTS.md` on this repo's own
 [`AGENTS.md`](AGENTS.md) — clone and run it yourself:
 
 ```text
-schliff v8.6.3
+schliff v8.7.0
 
-  structure             █████████░   90/100  great
+  structure             ██████████   95/100  excellent
   operational_coverage  ██████████  100/100  perfect
   efficiency            ████████░░   78/100  good
   composability         ████░░░░░░   45/100  poor
   clarity               ██████████  100/100  perfect
 
-  Structural Score  ██████████████████░░  91.6/100  [A]
+  Structural Score  ███████████████████░  93.6/100  [A]
 
   Tokens: 837 / 3,000 (ok)
   Format: agents.md (normalized)
 ```
 
-No model produced that number. Run it on another laptop and you get 91.6 again. **A score you can't reproduce isn't a measurement — it's a vibe.**
+No model produced that number. Run it on another laptop and you get 93.6 again — **a score you can't reproduce isn't a measurement, it's a vibe.** And we hold *ourselves* to that: this repo's own badge (scored in isolation) once disagreed with its own CLI (scored in-repo) by ~15 points on the *same bytes*, because `structure` was crediting an on-disk `references/` neighbourhood instead of the file's content. We fixed the engine, not the file ([#10](https://github.com/Zandereins/schliff/pull/129)) — now `cp AGENTS.md /tmp && schliff score /tmp/AGENTS.md` returns the same number as CI and the badge. (The `agents.md` headline weights `structure`·`operational_coverage`·`efficiency` at 0.4/0.4/0.2; `composability` and `clarity` are shown for information, not counted.)
 
-*Every number in this README comes from released `schliff==8.6.3` (`pip install schliff==8.6.3` to reproduce byte-for-byte). No install? Paste your file into the [playground](https://schliff-playground.vercel.app) — same engine, with AGENTS.md and SKILL.md tabs.*
+*The quick-start and case-study numbers here are reproducible from released `schliff==8.7.0` (`pip install schliff==8.7.0`); the hydra field run below is dated to the version it was measured on. No install? Paste your file into the [playground](https://schliff-playground.vercel.app) — same engine, with AGENTS.md and SKILL.md tabs.*
 
 ---
 
 ## A real catch
 
-The SKILL.md for ShieldClaw — a real prompt-injection-defense skill, now archived — is Schliff's reproducible before/after. The fixtures ship in [`docs/case-studies/shieldclaw/`](docs/case-studies/shieldclaw/); every number below is the current engine's output, reproducible with `schliff score`. (For the 27.9 row, score a copy of `SKILL-before.md` outside that directory — in place, the engine auto-discovers the sibling eval suite.)
+The SKILL.md for ShieldClaw — a real prompt-injection-defense skill, now archived — is Schliff's reproducible before/after. The fixtures ship in [`docs/case-studies/shieldclaw/`](docs/case-studies/shieldclaw/); every number below is the current engine's output, reproducible with `schliff score`. (For the 28.7 row, score a copy of `SKILL-before.md` outside that directory — in place, the engine auto-discovers the sibling eval suite.)
 
 | | Score | Grade | Dimensions measured |
 | --- | --- | --- | --- |
-| Before, scored in isolation | 27.9 | F | 4/7 — no eval suite; explicit ceiling warning |
-| Before, with its eval suite | 83.7 | B | 7/7 |
-| After fixes | 93.8 | A | 7/7 |
+| Before, scored in isolation | 28.7 | F | 4/7 — no eval suite; explicit ceiling warning |
+| Before, with its eval suite | 84.5 | B | 7/7 |
+| After fixes | 94.6 | A | 7/7 |
 
-Two separate effects, and Schliff refuses to conflate them. Adding the eval suite lifted the **measurement ceiling** (27.9 → 83.7) — that is coverage, not quality. The **quality** delta is 83.7 → 93.8, driven by composability **20 → 86** and efficiency **60 → 83** after adding scope boundaries, an I/O contract, and handoffs — structural gaps a linter can't see, caught as a number that was too low.
+Two separate effects, and Schliff refuses to conflate them. Adding the eval suite lifted the **measurement ceiling** (28.7 → 84.5) — that is coverage, not quality. The **quality** delta is 84.5 → 94.6, driven by composability **20 → 86** and efficiency **60 → 83** after adding scope boundaries, an I/O contract, and handoffs — structural gaps a linter can't see, caught as a number that was too low.
 
 A second field run, against an external repo ([hydra](docs/case-studies/hydra/), measured on released `schliff==8.4.0`, 2026-07-03): **71.0 [C] → 76.5 [B]** — edges 82→100, composability 56→81, fix merged upstream ([Zandereins/hydra#34](https://github.com/Zandereins/hydra/pull/34)). Efficiency deliberately stayed at 47: a ~14k-token file against a 1,000-token budget was an **informed decline**, not a blind chase of the number. (External repo — not re-runnable from these fixtures.)
 
@@ -186,7 +186,7 @@ jobs:
 By default it scores `AGENTS.md` at the repo root; set `skill-path:` to lint a
 `SKILL.md`, `CLAUDE.md`, or `.cursorrules` instead. One caveat: the Action
 installs the latest released engine from PyPI, so after a release its scores can
-lead an older pinned install; pin it with `schliff-version: '8.6.3'` in the
+lead an older pinned install; pin it with `schliff-version: '8.7.0'` in the
 `with:` block if you need byte-stable gates.
 
 ### CI gate without the Action
@@ -222,7 +222,7 @@ repos only.
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/Zandereins/schliff
-    rev: v8.6.3
+    rev: v8.7.0
     hooks:
       - id: schliff-verify
         args: ['--min-score', '75']
