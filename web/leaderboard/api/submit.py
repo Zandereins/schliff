@@ -267,6 +267,13 @@ class ReservedIdentityError(Exception):
     This is an authorization refusal (-> 403), not a malformed request."""
 
 
+class DowngradeRefusedError(Exception):
+    """The (repo_url, skill_name) already holds a HIGHER composite. The board is
+    unauthenticated, so an overwrite that LOWERS an existing row is grief (anyone
+    can zero out a victim's entry). Refuse it (-> 409); genuine re-scores that raise
+    or hold the score still pass. Full ownership proof is out of scope (see #16)."""
+
+
 # --- reserved-identity guard (IDOR / unauthenticated-overwrite, LB-3) -----------
 # The board is unauthenticated and self-reported, so anyone can HSET-overwrite any
 # (repo_url, skill_name) row. Acceptable for community rows (all verified:false) but
@@ -340,11 +347,19 @@ def _dedup_field(repo_url, skill_name):
 
 
 def _client_ip(handler):
-    """Best-effort client IP from Vercel's forwarding headers."""
+    """Best-effort client IP for rate-limit keying. ``x-real-ip`` is set by Vercel's
+    trusted proxy and is not client-spoofable, so prefer it. For ``x-forwarded-for``
+    the RIGHTMOST hop is the one the trusted proxy appended; the leftmost is
+    attacker-controlled — keying the limit on it lets a spoofer both bypass their own
+    limit (rotate the left value) and target a victim (spoof the victim's IP to burn
+    their bucket)."""
+    real = handler.headers.get("x-real-ip", "").strip()
+    if real:
+        return real
     fwd = handler.headers.get("x-forwarded-for", "")
     if fwd:
-        return fwd.split(",")[0].strip()
-    return handler.headers.get("x-real-ip", "") or "unknown"
+        return fwd.split(",")[-1].strip() or "unknown"
+    return "unknown"
 
 
 def _kv_rate_limited(cfg, key, limit, window):
@@ -372,10 +387,19 @@ def _kv_upsert(cfg, entry):
     if _is_reserved_identity(entry["repo_url"], entry["skill_name"]):
         raise ReservedIdentityError
     field = _dedup_field(entry["repo_url"], entry["skill_name"])
-    # Bound growth: once the store is full, refuse brand-new identities but keep
-    # accepting updates to existing rows. (HEXISTS->HLEN->HSET; the tiny TOCTOU
-    # window is acceptable for a DoS bound, not a precise invariant.)
-    if _kv_command(cfg, "HEXISTS", SUBMISSIONS_KEY, field) == 0:
+    existing_raw = _kv_command(cfg, "HGET", SUBMISSIONS_KEY, field)
+    if existing_raw:
+        # Refuse a grief downgrade (an overwrite that LOWERS the stored composite).
+        refuse = False
+        try:
+            refuse = float(json.loads(existing_raw).get("composite", 0)) > float(entry["composite"])
+        except (ValueError, TypeError, RecursionError):
+            refuse = False  # unparseable existing row -> allow overwrite (self-heal)
+        if refuse:
+            raise DowngradeRefusedError
+    else:
+        # Brand-new identity: bound growth. (The tiny TOCTOU window before HSET is
+        # acceptable for a DoS bound, not a precise invariant.)
         if (_kv_command(cfg, "HLEN", SUBMISSIONS_KEY) or 0) >= MAX_SUBMISSIONS:
             raise LeaderboardFullError
     result = _kv_command(cfg, "HSET", SUBMISSIONS_KEY, field,
@@ -463,7 +487,11 @@ class handler(BaseHTTPRequestHandler):
             ip = _client_ip(self)
             # Per-IP cap (defense in depth behind the firewall's 10/60s) AND a
             # global cap that an IP-rotating attacker cannot bypass (dos-02).
-            if (_kv_rate_limited(cfg, f"rl:submit:{ip}", 20, 60)
+            # Namespace the per-IP key under `:ip:` so a client sending
+            # `X-Forwarded-For: global` cannot collide with the reserved
+            # `rl:submit:global` counter (which would let it exhaust the global
+            # bucket for everyone, or ride the global limit as its own).
+            if (_kv_rate_limited(cfg, f"rl:submit:ip:{ip}", 20, 60)
                     or _kv_rate_limited(cfg, "rl:submit:global",
                                         GLOBAL_SUBMIT_LIMIT, GLOBAL_SUBMIT_WINDOW)):
                 self._send_json(429, {"error": "rate limit exceeded"})
@@ -485,10 +513,19 @@ class handler(BaseHTTPRequestHandler):
                     updated = False
                     for i, existing in enumerate(entries):
                         if existing.get("repo_url") == key_repo and existing.get("skill_name") == key_skill:
+                            try:
+                                refuse = float(existing.get("composite", 0)) > float(entry["composite"])
+                            except (ValueError, TypeError):
+                                refuse = False
+                            if refuse:
+                                raise DowngradeRefusedError  # grief downgrade
                             entries[i] = entry
                             updated = True
                             break
                     if not updated:
+                        # Bound growth on the KV-less fallback too (no MAX cap before).
+                        if len(entries) >= MAX_SUBMISSIONS:
+                            raise LeaderboardFullError
                         entries.append(entry)
 
                     _save_submissions(entries)
@@ -497,6 +534,9 @@ class handler(BaseHTTPRequestHandler):
             return
         except LeaderboardFullError:
             self._send_json(429, {"error": "leaderboard is full"})
+            return
+        except DowngradeRefusedError:
+            self._send_json(409, {"error": "a higher score for this entry already exists"})
             return
         except Exception as exc:
             print(f"Storage error: {type(exc).__name__}: {exc}", file=sys.stderr)

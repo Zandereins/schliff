@@ -1402,13 +1402,18 @@
         tdRank.appendChild(txt(rank));
         tr.appendChild(tdRank);
 
-        // Name
+        // Name. Only VERIFIED rows get an active hyperlink to their repo: the board
+        // is unauthenticated, so a self-reported row can attribute any score to any
+        // repo. An active <a href> to an attacker-chosen repo_url is an
+        // impersonation/defamation vector (a board that actively links "torvalds/linux
+        // → D") — so unverified rows render as plain, non-clickable text. (Future-proof:
+        // if a server-verified tier is added, those rows link again.)
         var tdName = makeTd('td-name');
-        if (safeUrl) {
+        if (safeUrl && !isUnverified) {
           var a = document.createElement('a');
           a.href = safeUrl;
           a.target = '_blank';
-          a.rel = 'noopener noreferrer';
+          a.rel = 'nofollow ugc noopener noreferrer';
           a.appendChild(txt(name));
           tdName.appendChild(a);
         } else {
@@ -1463,11 +1468,13 @@
         var cardNameEl = document.createElement('div');
         cardNameEl.className = 'card-name';
         cardNameEl.setAttribute('title', name);
-        if (safeUrl) {
+        // See the table-row note: unverified rows render as plain text, not an
+        // active link to a (possibly attacker-chosen) repo_url.
+        if (safeUrl && !isUnverified) {
           var ca = document.createElement('a');
           ca.href = safeUrl;
           ca.target = '_blank';
-          ca.rel = 'noopener noreferrer';
+          ca.rel = 'nofollow ugc noopener noreferrer';
           ca.appendChild(txt(name));
           cardNameEl.appendChild(ca);
         } else {
