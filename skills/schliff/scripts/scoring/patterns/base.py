@@ -143,14 +143,20 @@ _RE_SEC_INSTRUCTION_OVERRIDE = re.compile(
 )
 
 # Category: exfil
+# The gap between a verb prefix and its terminator is bounded (`[^\n]{0,200}`, not
+# greedy `[^\n]*`): the engine scores untrusted content up to the 1MB read cap, and
+# a single newline-free line of a repeated verb ("curl " * N) with no terminator
+# made the greedy form O(n^2) (~1h CPU at the cap; reachable ungated via a .txt that
+# auto-detects as a system_prompt). A real exfil/leak command fits well inside 200
+# chars between the verb and the sink. Same bound already used by _RE_DIFF_EXAMPLE.
 _RE_SEC_DATA_EXFIL = re.compile(
-    r"(?:(?:curl|wget|fetch|nc|ncat|netcat)\s+[^\n]*(?:\$\(|`[^`]*`|<\(|\|)|"
+    r"(?:(?:curl|wget|fetch|nc|ncat|netcat)\s+[^\n]{0,200}(?:\$\(|`[^`]*`|<\(|\|)|"
     r"\$\(cat\s[^\)]+\)\s*\|\s*(?:curl|wget|nc|netcat)|"
-    r"(?:curl|wget)\s+[^\n]*(?:--data|--upload|-d\s|-F\s|-T\s)[^\n]*(?:https?://|ftp://))",
+    r"(?:curl|wget)\s+[^\n]{0,200}(?:--data|--upload|-d\s|-F\s|-T\s)[^\n]{0,200}(?:https?://|ftp://))",
     re.IGNORECASE,
 )
 _RE_SEC_ENV_LEAK = re.compile(
-    r"(?:(?:echo|print|cat|send|post|curl|wget|log)\s[^\n]*(?:\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)|"
+    r"(?:(?:echo|print|cat|send|post|curl|wget|log)\s[^\n]{0,200}(?:\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)|"
     r"process\.env\.[A-Z_]+|os\.environ\[))|"
     r"(?:\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)\s*[|>])",
     re.IGNORECASE,

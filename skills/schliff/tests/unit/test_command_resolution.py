@@ -494,3 +494,53 @@ def test_npm_run_if_present_is_not_dangling(tmp_path):
     agents = "# Agents\n\n```bash\nnpm run coverage --if-present\n```\n"
     results = resolve_commands(agents, str(tmp_path))
     assert _status(results, "coverage") == "unknown"
+
+
+# --- Filesystem-containment (audit 2026-07-22): the manifest-resolving branches
+# must not read/probe files outside the repo root. A symlinked Makefile/package.json
+# or a `bun run <escaping-path>` turned resolved/dangling verdicts into an
+# out-of-repo content/existence oracle. Every escape must degrade to `unknown`.
+
+
+def test_symlinked_makefile_outside_repo_is_unknown(tmp_path):
+    """repo/Makefile -> a file outside the checkout must not be parsed: its `word:`
+    lines would otherwise drive resolved/dangling verdicts (content oracle)."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret").write_text("build: X\nlint: Y\n")  # attacker-readable target
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "Makefile").symlink_to(outside / "secret")
+    agents = "# Agents\n\n```bash\nmake build\nmake test\n```\n"
+    results = resolve_commands(agents, str(repo))
+    # Without containment: `make build` -> resolved (leaks that 'build:' is present).
+    assert _status(results, "make build") == "unknown"
+    assert not any(r["status"] == "dangling" for r in results)
+
+
+def test_bun_run_escaping_path_is_unknown(tmp_path):
+    """`bun run <escaping-path>` existence check must be containment-guarded like the
+    interpreter-path branch, not an arbitrary-path existence oracle. The escaping
+    file must actually EXIST for this to exercise the oracle."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "package.json").write_text('{"name":"x","scripts":{}}')
+    (tmp_path / "secret_present").write_text("x")  # exists, OUTSIDE the repo
+    agents = "# Agents\n\n```bash\nbun run ../secret_present\n```\n"
+    results = resolve_commands(agents, str(repo))
+    assert _status(results, "secret_present") == "unknown"  # escapes -> not "file exists"
+
+
+def test_symlinked_package_json_outside_repo_is_unknown(tmp_path):
+    """repo/package.json -> a file outside the checkout must not be read: its
+    `scripts` keys would otherwise drive resolved/dangling verdicts (key oracle)."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "pkg.json").write_text('{"scripts": {"deploy-prod": "x"}}')
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "package.json").symlink_to(outside / "pkg.json")
+    agents = "# Agents\n\n```bash\nnpm run deploy-prod\nnpm run nope\n```\n"
+    results = resolve_commands(agents, str(repo))
+    assert _status(results, "deploy-prod") == "unknown"  # not resolved from out-of-repo keys
+    assert not any(r["status"] == "dangling" for r in results)
