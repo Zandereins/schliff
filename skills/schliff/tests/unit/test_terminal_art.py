@@ -275,6 +275,30 @@ class TestFormatScoreDisplay:
         assert "/schliff:init" in output
         assert "ℹ" in output and "⚠" not in output
 
+    def test_shows_calibrated_weights_warning(self, monkeypatch):
+        """A warning that is neither an eval-suite invitation nor an 'unreliable'
+        note — e.g. the calibrated-weights 'not comparable' notice that the JSON
+        output already includes — must still render, not be silently dropped."""
+        monkeypatch.setenv("NO_COLOR", "1")
+        warning = (
+            "Non-canonical weights in effect (weight_source=calibrated via "
+            "SCHLIFF_CALIBRATED_WEIGHTS); this score is not comparable to "
+            "default-weight scores from verify/badge/leaderboard."
+        )
+        output = format_score_display(
+            _make_scores(), _make_composite(warnings=[warning]),
+        )
+        assert "not comparable" in output
+
+    def test_shows_no_weighted_dimensions_warning(self, monkeypatch):
+        """The 'No weighted dimensions to score.' warning must also render —
+        it matches neither keyword branch and was being dropped too."""
+        monkeypatch.setenv("NO_COLOR", "1")
+        output = format_score_display(
+            _make_scores(), _make_composite(warnings=["No weighted dimensions to score."]),
+        )
+        assert "No weighted dimensions to score." in output
+
     def test_single_contradiction_grammar(self, monkeypatch):
         monkeypatch.setenv("NO_COLOR", "1")
         output = format_score_display(

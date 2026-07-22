@@ -343,7 +343,11 @@ def format_score_display(
         if "eval suite" in wl:
             info_prefix = f"\x1b[36m\u2139{RESET}" if is_color_tty() else "\u2139"
             lines.append(f"  {info_prefix} {w}")
-        elif "unreliable" in wl:
+        else:
+            # Every other warning (low-confidence "unreliable" notes, the
+            # non-canonical calibrated-weights "not comparable" notice, "no
+            # weighted dimensions", ...) renders with the warning glyph rather
+            # than being silently dropped \u2014 the JSON output already surfaces them.
             warn_prefix = f"\x1b[33m\u26a0{RESET}" if is_color_tty() else "\u26a0"
             lines.append(f"  {warn_prefix} {w}")
 
