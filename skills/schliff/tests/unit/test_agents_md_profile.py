@@ -198,9 +198,16 @@ def test_agents_md_corpus_golden_distribution():
     bands = Counter(r[2] for r in rows)
 
     assert len(rows) == 30
-    assert statistics.mean(scores) == pytest.approx(61.46, abs=0.05)
-    assert statistics.median(scores) == pytest.approx(61.40, abs=0.05)
-    assert min(scores) == pytest.approx(29.0, abs=0.05)
+    # Re-baselined for the content-only structure model (#10, A', 2026-07-22).
+    # AGENTS.md is always scored through a normalized temp copy (build_scores), so
+    # its on-disk structure checks always failed; A' now credits progressive
+    # disclosure + declared refs from CONTENT, lifting files that link detail. All
+    # movement is upward (mean/median/min up, max unchanged) — the systematic
+    # under-crediting fix, not noise. Was 61.46/61.40/29.0; one former-F file
+    # (29.0) clears 35 → E (F 1→0, E 4→5).
+    assert statistics.mean(scores) == pytest.approx(61.79, abs=0.05)
+    assert statistics.median(scores) == pytest.approx(61.70, abs=0.05)
+    assert min(scores) == pytest.approx(35.0, abs=0.05)
     assert max(scores) == pytest.approx(91.0, abs=0.05)
 
     # Exact band counts (golden lock) on the hardened scorer. No file reaches S
@@ -210,8 +217,8 @@ def test_agents_md_corpus_golden_distribution():
     assert bands["B"] == 4
     assert bands["C"] == 8
     assert bands["D"] == 12
-    assert bands["E"] == 4
-    assert bands["F"] == 1
+    assert bands["E"] == 5
+    assert bands["F"] == 0
 
     # No file emits the SKILL-only eval-suite warning.
     assert not any("eval suite" in w for _, _, _, ws in rows for w in ws)

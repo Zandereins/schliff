@@ -483,8 +483,13 @@ class TestRegressionGoodSkillPinned:
     def test_structure_exact(self, tmp_path):
         path = _write(tmp_path, _GOOD_SKILL_CONTENT)
         result = score_structure(path)
-        assert result["score"] == 95, (
-            f"good_skill structure regression: expected 95, got {result['score']}"
+        # Re-baselined 95→100 for the content-only structure model (#10, A').
+        # good_skill declares `scripts/score-skill.py`; the referenced-files
+        # component now credits a well-formed declared ref (+10) from content
+        # instead of requiring on-disk resolution (+5 when it did not resolve in
+        # the temp scoring dir). Progressive disclosure unchanged (37 lines ≤200).
+        assert result["score"] == 100, (
+            f"good_skill structure regression: expected 100, got {result['score']}"
         )
 
     def test_efficiency_exact(self, tmp_path):
@@ -511,13 +516,14 @@ class TestRegressionGoodSkillPinned:
     def test_composite_exact(self, tmp_path):
         path = _write(tmp_path, _GOOD_SKILL_CONTENT)
         result = _score_all(path)
-        # Re-baselined for the unified full-denominator composite (2026-05-26).
-        # _score_all measures only structure/efficiency/composability/clarity — with
-        # no eval suite, triggers/quality/edges are uncredited → coverage 0.42, so the
-        # ceiling is ~42. Verified: 95*(.15/.95)+100*(.10/.95)+30*(.10/.95)+87*(.05/.95)
-        # = 33.3. Was 79.0 under the old renormalized (coverage-divided) scale.
-        assert result["score"] == 33.3, (
-            f"good_skill composite regression: expected 33.3, got {result['score']}"
+        # Re-baselined for the unified full-denominator composite (2026-05-26),
+        # then 33.3→34.1 for the content-only structure model (#10, A', 2026-07-22):
+        # structure 95→100 (the declared `scripts/score-skill.py` ref is credited
+        # from content, not on-disk resolution). _score_all measures only
+        # structure/efficiency/composability/clarity (no eval suite → coverage 0.42).
+        # Verified: 100*(.15/.95)+100*(.10/.95)+30*(.10/.95)+87*(.05/.95) = 34.1.
+        assert result["score"] == 34.1, (
+            f"good_skill composite regression: expected 34.1, got {result['score']}"
         )
 
 

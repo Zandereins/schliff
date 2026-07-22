@@ -1,6 +1,6 @@
 # Structure score reproducibility (#10) — content-only model (A′)
 
-- Status: direction A′ approved; written design pending Franz review
+- Status: implemented (TDD, 1422 tests green, golden rebaselined + documented)
 - Audit finding: #10 (pre-launch audit 2026-07-22)
 - Branch: `fix/prelaunch-10-structure-reproducibility`
 
