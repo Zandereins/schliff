@@ -7,7 +7,7 @@
 
 **The Ruff for `AGENTS.md` — deterministic quality scores for the instruction files that drive your AI. Same input, same score, on every machine.**
 
-[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.6.2)](https://pypi.org/project/schliff/)
+[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.6.3)](https://pypi.org/project/schliff/)
 [![Python](https://img.shields.io/pypi/pyversions/schliff)](https://pypi.org/project/schliff/)
 [![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -29,7 +29,7 @@ This is the real, current output of `schliff score AGENTS.md` on this repo's own
 [`AGENTS.md`](AGENTS.md) — clone and run it yourself:
 
 ```text
-schliff v8.6.2
+schliff v8.6.3
 
   structure             █████████░   90/100  great
   operational_coverage  ██████████  100/100  perfect
@@ -45,7 +45,7 @@ schliff v8.6.2
 
 No model produced that number. Run it on another laptop and you get 91.6 again. **A score you can't reproduce isn't a measurement — it's a vibe.**
 
-*Every number in this README comes from released `schliff==8.6.2` (`pip install schliff==8.6.2` to reproduce byte-for-byte). No install? Paste your file into the [playground](https://schliff-playground.vercel.app) — same engine, with AGENTS.md and SKILL.md tabs.*
+*Every number in this README comes from released `schliff==8.6.3` (`pip install schliff==8.6.3` to reproduce byte-for-byte). No install? Paste your file into the [playground](https://schliff-playground.vercel.app) — same engine, with AGENTS.md and SKILL.md tabs.*
 
 ---
 
@@ -186,7 +186,7 @@ jobs:
 By default it scores `AGENTS.md` at the repo root; set `skill-path:` to lint a
 `SKILL.md`, `CLAUDE.md`, or `.cursorrules` instead. One caveat: the Action
 installs the latest released engine from PyPI, so after a release its scores can
-lead an older pinned install; pin it with `schliff-version: '8.6.2'` in the
+lead an older pinned install; pin it with `schliff-version: '8.6.3'` in the
 `with:` block if you need byte-stable gates.
 
 ### CI gate without the Action
@@ -222,7 +222,7 @@ repos only.
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/Zandereins/schliff
-    rev: v8.6.2
+    rev: v8.6.3
     hooks:
       - id: schliff-verify
         args: ['--min-score', '75']
