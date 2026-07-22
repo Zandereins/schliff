@@ -175,6 +175,50 @@ class TestCompareTerminalOutput:
 
 
 # ---------------------------------------------------------------------------
+# Unmeasured dimensions (no eval suite) must not leak as -1 sentinels
+# ---------------------------------------------------------------------------
+
+class TestCompareExcludesUnmeasured:
+    """Without an eval suite, triggers/quality/edges score -1 (unmeasured).
+    They must be excluded from the comparison — not rendered as literal -1.0
+    rows, and not counted in deltas/biggest_gap where they produce phantom gaps.
+    Mirrors the terminal score display, which already skips score < 0."""
+
+    def test_terminal_has_no_sentinel_rows(self, tmp_path):
+        path_a = tmp_path / "bad_skill.md"
+        path_b = tmp_path / "good_skill.md"
+        path_a.write_text(BAD_SKILL, encoding="utf-8")
+        path_b.write_text(GOOD_SKILL, encoding="utf-8")
+
+        result = _run_cli("compare", str(path_a), str(path_b))
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        assert "-1.0" not in result.stdout, (
+            f"Unmeasured -1 sentinel leaked into compare table:\n{result.stdout}"
+        )
+
+    def test_json_excludes_unmeasured_dims(self, tmp_path):
+        path_a = tmp_path / "bad_skill.md"
+        path_b = tmp_path / "good_skill.md"
+        path_a.write_text(BAD_SKILL, encoding="utf-8")
+        path_b.write_text(GOOD_SKILL, encoding="utf-8")
+
+        result = _run_cli("compare", str(path_a), str(path_b), "--json")
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        data = json.loads(result.stdout)
+
+        for unmeasured in ("triggers", "quality", "edges"):
+            assert unmeasured not in data["deltas"], (
+                f"Unmeasured dim {unmeasured!r} must not appear in deltas"
+            )
+            assert unmeasured not in data["file_a"]["dimensions"], (
+                f"Unmeasured dim {unmeasured!r} must not appear in dimensions"
+            )
+        # every reported delta comes from a measured dimension
+        for dim, delta in data["deltas"].items():
+            assert delta != 1.0 or dim in data["file_b"]["dimensions"]
+
+
+# ---------------------------------------------------------------------------
 # Error handling
 # ---------------------------------------------------------------------------
 
