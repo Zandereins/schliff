@@ -303,7 +303,7 @@ runs:
             }
           }
 
-          body += `\n---\n<sub>Scored by [Schliff](https://github.com/Zandereins/schliff) — the deterministic AGENTS.md quality gate · [Try the playground](https://play.schliff.dev)</sub>`;
+          body += `\n---\n<sub>Scored by [Schliff](https://github.com/Zandereins/schliff) — the deterministic AGENTS.md quality gate · [Try the playground](https://schliff-playground.vercel.app)</sub>`;
 
           // Update existing comment or create new one
           const marker = '<!-- schliff-score-comment -->';

@@ -1,6 +1,9 @@
 """Score instruction clarity — detect contradictions, ambiguity, vague references.
 
-Optional 7th dimension with zero default weight. Activated via --clarity.
+Runs in the DEFAULT scorer set for every instruction-file format (skill.md,
+agents.md, claude.md, cursorrules, system_prompt) — see registry._INSTRUCTION_FILE
+/ shared. It therefore executes on untrusted content up to the 1MB read cap, so its
+regex/loops must stay linear (see the bounded tail slice below).
 
 Sub-checks (100 pts total):
 - Contradiction detection (30 pts): "always X" vs "never X" on same topic
@@ -41,11 +44,13 @@ def _extract_action_pairs(text, pattern):
     for match in pattern.finditer(text):
         topic = match.group(2).strip().split()
         verb = topic[0].lower().rstrip(".,;:!?")
-        # Only use words from the same line as context (not cross-line)
-        line_end = text.find("\n", match.end())
-        if line_end == -1:
-            line_end = len(text)
-        rest_of_line = text[match.end():line_end].strip().split()
+        # Only use words from the same line as context (not cross-line). Bound the
+        # tail slice: only rest_of_line[:4] is consumed below, and scanning the full
+        # tail of a newline-free line per match made this O(n^2) on untrusted input
+        # (~3min at the 1MB read cap). 200 chars >> the 4 words we read.
+        tail = text[match.end():match.end() + 200]
+        nl = tail.find("\n")
+        rest_of_line = (tail[:nl] if nl != -1 else tail).strip().split()
         candidates = topic[1:] + rest_of_line[:4]
         obj_candidates = [
             w.lower().rstrip(".,;:!?") for w in candidates
