@@ -4,6 +4,18 @@ Deterministic quality scorer for AI instruction files (Python, stdlib-only core,
 zero runtime dependencies). The engine lives in `skills/schliff/scripts/`; the
 web playground in `playground/`; the GitHub Action in `action.yml`.
 
+## Scope & composition
+
+**Use when** you need to score or improve a `SKILL.md`, `AGENTS.md`, `CLAUDE.md`, or
+`.cursorrules`. **Do not use** it on a whole codebase — it grades one instruction
+file, not a repo. For a brand-new skill, use skill-creator instead; schliff improves
+existing files, it doesn't scaffold new ones.
+
+- **Input:** one instruction-file path. **Output:** a deterministic per-dimension
+  score plus a composite (text or `--json`); scoring writes nothing.
+- **Idempotent, no side effects** — same input, same score, safe to re-run.
+- Requires Python >= 3.10, no other runtime dependency; supported versions 3.10–3.13.
+
 ## Setup
 
 ```bash
