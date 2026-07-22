@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.6.3] - 2026-07-22
+
+### Security
+- **Hardened the engine against untrusted input in third-party CI.** A pre-launch
+  adversarial audit reproduced these before fixing; no golden score changes
+  (`operational_coverage`/profile byte-identical).
+  - **ReDoS** in the security exfil/env-leak patterns: the greedy `[^\n]*` after a
+    verb prefix was O(n²) on a newline-free line (~1h CPU at the 1MB read cap,
+    reachable ungated via a `.txt` that auto-detects as a system prompt). Bounded to
+    `[^\n]{0,200}`.
+  - **Quadratic DoS** in the clarity scorer (runs on every default instruction-file
+    score): the action-pair extractor scanned the full tail of a newline-free line
+    per match (~3min at the cap). Bounded the tail slice.
+  - **Filesystem-boundary oracles** in `check-commands`: a symlinked `Makefile`/
+    `package.json` or an escaping `bun run <path>` was read/probed outside the repo
+    root, turning resolved/dangling verdicts into an out-of-repo content/existence
+    oracle. Added a `realpath`+`commonpath` containment guard at each manifest read.
+
+### Fixed
+- **`--format <alias>` token budget.** The short aliases (`cursor`, `agents`,
+  `claude`, `skill`, `system-prompt`) fell back to the unknown=1500 budget instead
+  of their real one, flipping the within-budget verdict. They now resolve via
+  `FORMAT_ALIASES` before the lookup.
+- **Dead playground link.** The Action's PR comment linked `play.schliff.dev`
+  (never registered, NXDOMAIN); repointed to the live playground.
+
 ## [8.6.2] - 2026-07-21
 
 ### Added
@@ -637,7 +663,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.6.2...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.6.3...HEAD
+[8.6.3]: https://github.com/Zandereins/schliff/compare/v8.6.2...v8.6.3
 [8.6.2]: https://github.com/Zandereins/schliff/compare/v8.6.1...v8.6.2
 [8.6.1]: https://github.com/Zandereins/schliff/compare/v8.6.0...v8.6.1
 [8.6.0]: https://github.com/Zandereins/schliff/compare/v8.5.0...v8.6.0
