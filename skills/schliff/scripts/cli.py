@@ -655,8 +655,16 @@ def cmd_compare(args: argparse.Namespace) -> None:
     score_a = composite_a["score"]
     score_b = composite_b["score"]
 
-    # Collect dimension names present in both scores
-    dims = [k for k in scores_a if isinstance(scores_a[k], dict) and "score" in scores_a[k]]
+    # Collect dimension names measured in BOTH files. Unmeasured dims carry the
+    # -1 sentinel (e.g. triggers/quality/edges without an eval suite); including
+    # them would render literal -1.0 rows and produce phantom deltas against the
+    # 0.0 default. Mirrors the terminal score display, which skips score < 0.
+    dims = [
+        k for k in scores_a
+        if isinstance(scores_a[k], dict)
+        and scores_a[k].get("score", -1) >= 0
+        and scores_b.get(k, {}).get("score", -1) >= 0
+    ]
 
     # Per-dimension deltas: B - A
     deltas = {}
