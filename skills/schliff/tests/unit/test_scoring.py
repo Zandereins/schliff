@@ -221,9 +221,13 @@ class TestScoreStructure:
 
     def test_genuinely_missing_ref_flagged_with_full_path(self, tmp_path):
         """A ref that exists in no valid location is still flagged — and the issue
-        names the full file path, not the bare 'references' prefix (regex fix)."""
+        names the full file path, not the bare 'references' prefix (regex fix).
+        Content-only model: the dangling lint fires only from a PROVABLE on-disk
+        location, so the skill dir carries a references/ dir (positive evidence)
+        while the referenced patterns.md is genuinely absent."""
         skill_dir = tmp_path / "skills" / "bar"
         skill_dir.mkdir(parents=True)
+        (skill_dir / "references").mkdir()  # real location, but patterns.md absent
         f = skill_dir / "SKILL.md"
         f.write_text(self._REF_BODY)
         result = score_structure(str(f))
@@ -231,10 +235,23 @@ class TestScoreStructure:
         assert missing, "genuinely missing ref must still be flagged"
         assert "references/patterns.md" in missing[0], missing[0]
 
+    def test_missing_ref_not_flagged_in_isolated_context(self, tmp_path):
+        """Content-only model: in a bare context with no provable on-disk location
+        (no references/ dir, no .git/.claude-plugin ancestor — e.g. a playground
+        mkdtemp or a normalized temp copy), a declared ref is NEVER claimed missing.
+        A false dangling burns the artifact (command_resolution doctrine)."""
+        f = tmp_path / "SKILL.md"
+        f.write_text(self._REF_BODY)  # declares references/patterns.md, no siblings
+        result = score_structure(str(f))
+        assert not any("missing_refs" in i for i in result["issues"]), result["issues"]
+
     def test_ref_with_parent_traversal_is_confined(self, tmp_path):
-        """Security: a ref containing '..' is rejected, so the linter cannot be used
-        as a filesystem existence oracle — even when the traversed-to file really
-        exists outside the skill/plugin tree (would resolve True under the old code)."""
+        """Security: a ref containing '..' is rejected at the SCORE component before
+        any filesystem touch, so the linter can never be used as a filesystem
+        existence oracle — even when the traversed-to file really exists outside the
+        tree. Content-only model: '..' → malformed_or_excessive_refs (no on-disk
+        resolution attempted at all), a strictly stronger confinement than the old
+        resolve-then-flag path."""
         skill_dir = tmp_path / "skills" / "foo"
         skill_dir.mkdir(parents=True)
         # A real file OUTSIDE the tree that a traversal ref would reach unconfined.
@@ -251,8 +268,12 @@ class TestScoreStructure:
             f = skill_dir / "SKILL.md"
             f.write_text(body)
             result = score_structure(str(f))
-            missing = [i for i in result["issues"] if "missing_refs" in i]
-            assert missing, "traversal ref must be treated as unresolved (confinement), not silently resolved"
+            assert any("malformed_or_excessive_refs" in i for i in result["issues"]), (
+                f"traversal ref must be rejected as malformed, not resolved: {result['issues']}"
+            )
+            assert not any("missing_refs" in i for i in result["issues"]), (
+                "a '..' ref must never reach on-disk resolution"
+            )
         finally:
             secret.unlink(missing_ok=True)
 
@@ -296,6 +317,85 @@ class TestScoreStructure:
         result = score_structure(good_skill)
         # Threshold lowered from 70 to 65 to account for refs change (5pt less)
         assert result["score"] >= 65
+
+
+# --- content-only structure model (#10 reproducibility, A') ---
+
+def _long_skill(num_md_links: int = 0, extra_body: str = "") -> str:
+    """A >200-line SKILL.md with `num_md_links` distinct markdown links to local
+    .md files (the disclosure signal). Long enough that progressive disclosure is
+    not credited by the length branch alone."""
+    links = "\n".join(
+        f"See [detail {i}](./references/detail{i}.md) for more." for i in range(num_md_links)
+    )
+    sections = "\n".join(
+        f"## Section {i}\n\nDo step {i} carefully and verify the output before continuing.\n"
+        f"Run the check and confirm the result matches what is expected here.\n"
+        for i in range(40)
+    )
+    return (
+        "---\nname: long-skill\n"
+        "description: A long skill for exercising the content-only structure model.\n---\n\n"
+        "# Long Skill\n\nUse this when you need the long thing.\n\n"
+        f"{links}\n\n{extra_body}\n\n{sections}\n"
+    )
+
+
+class TestStructureContentOnly:
+    """#10: structure score is a pure function of content bytes (byte-purity).
+    Same content scores identically with or without on-disk siblings."""
+
+    def test_reproducible_with_and_without_siblings(self, tmp_path):
+        content = _long_skill(num_md_links=2)
+        assert content.count("\n") + 1 > 200  # exercises the on-disk-dependent branch
+
+        # (a) real skill dir WITH the referenced files present
+        real = tmp_path / "real"
+        (real / "references").mkdir(parents=True)
+        (real / "references" / "detail0.md").write_text("# d0\n")
+        (real / "references" / "detail1.md").write_text("# d1\n")
+        (real / "SKILL.md").write_text(content)
+
+        # (b) bare mkdtemp WITHOUT any siblings (playground/badge context)
+        bare = tmp_path / "bare"
+        bare.mkdir()
+        (bare / "SKILL.md").write_text(content)
+
+        s_real = score_structure(str(real / "SKILL.md"))["score"]
+        s_bare = score_structure(str(bare / "SKILL.md"))["score"]
+        assert s_real == s_bare, f"structure not reproducible: real={s_real} bare={s_bare}"
+
+    def test_two_md_links_earn_full_disclosure(self, tmp_path):
+        f = tmp_path / "SKILL.md"
+        f.write_text(_long_skill(num_md_links=2))
+        result = score_structure(str(f))
+        assert "no_progressive_disclosure" not in result["issues"]
+        assert "thin_progressive_disclosure" not in result["issues"]
+
+    def test_one_md_link_is_thin_disclosure(self, tmp_path):
+        f = tmp_path / "SKILL.md"
+        f.write_text(_long_skill(num_md_links=1))
+        result = score_structure(str(f))
+        assert "thin_progressive_disclosure" in result["issues"]
+
+    def test_scripts_build_mention_is_not_disclosure(self, tmp_path):
+        # A long skill that only mentions scripts/ in a build command (no .md links,
+        # no references/ path) must NOT be credited with progressive disclosure.
+        f = tmp_path / "SKILL.md"
+        f.write_text(_long_skill(num_md_links=0, extra_body="Run `npm run scripts/build` to build."))
+        result = score_structure(str(f))
+        assert "no_progressive_disclosure" in result["issues"]
+
+    def test_ref_stuffing_is_capped(self, tmp_path):
+        stuffed = " ".join(f"references/f{i}.md" for i in range(40))
+        content = (
+            "---\nname: stuffed\ndescription: A skill stuffing many references.\n---\n\n"
+            f"# Stuffed\n\nUse this. {stuffed}\n"
+        )
+        f = tmp_path / "SKILL.md"
+        f.write_text(content)
+        result = score_structure(str(f))
+        assert any("malformed_or_excessive_refs" in i for i in result["issues"]), result["issues"]
 
 
 # --- score_efficiency tests ---
