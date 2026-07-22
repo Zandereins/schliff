@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.7.0] - 2026-07-22
+
+### Changed
+- **The `structure` score is now reproducible — a pure function of the file's
+  bytes (#10).** It previously depended on the file's on-disk neighbourhood (a
+  sibling `references/` directory and whether declared references resolved on
+  disk), so the *same* file scored ~15 points higher in its real directory than
+  in isolation — the public badge disagreed with the author's own CLI, worst on
+  AGENTS.md (structure weight 0.4). Now:
+  - Progressive disclosure is credited from **content** — markdown links to local
+    `.md` detail files (and anchored `references/` paths) — not from a
+    `references/` directory a reader is never pointed to. `scripts/` build-command
+    mentions no longer count. Tiered: ≥2 links → full credit, 1 → partial, 0 → none.
+  - The referenced-files component credits well-formed declared references from
+    content, with a traversal (`..`) / ref-stuffing guard that also prevents the
+    linter from ever being used as a filesystem existence oracle.
+  - Dangling-reference detection is preserved as a **non-scoring lint issue**,
+    emitted only from a provable on-disk location, so it never fires falsely in an
+    isolated or temp-scored context.
+  - This also corrects a long-standing under-crediting of AGENTS.md/CLAUDE.md/
+    `.cursorrules`, which are always scored through a normalized temp copy: their
+    content disclosure links are now credited. **Scores for files that link detail
+    move upward** — including this repo's own AGENTS.md (91.6 [A] → 93.6 [A]), which
+    now scores identically in-repo and in isolation. Golden scores were rebaselined
+    with documented values; field-validated over 115 real installed skills. A new
+    isolation-equivalence test pins that a file scores the same with and without
+    its on-disk siblings.
+
+### Fixed
+- **The terminal no longer silently drops score warnings (#22).** The calibrated-
+  weights "not comparable" notice and the "no weighted dimensions" warning — both
+  already present in the JSON output — were dropped from the terminal rendering.
+- **`compare` no longer leaks the `-1` sentinel (#21).** Unmeasured dimensions
+  (triggers/quality/edges with no eval suite) were rendered as literal `-1.0`
+  rows and produced phantom deltas; they are now excluded, mirroring the terminal
+  score display.
+
 ## [8.6.3] - 2026-07-22
 
 ### Security

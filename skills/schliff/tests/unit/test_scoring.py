@@ -397,6 +397,29 @@ class TestStructureContentOnly:
         result = score_structure(str(f))
         assert any("malformed_or_excessive_refs" in i for i in result["issues"]), result["issues"]
 
+    def test_own_skill_md_scores_identically_in_isolation(self):
+        """#10 held to ourselves: the repo's own SKILL.md must score the same
+        in-repo (with its references/ siblings on disk) as in a bare temp dir
+        (no siblings) — the flagship reproducibility claim, as an executable gate.
+        This is the exact non-reproducibility #10 fixed: a skill.md is scored at
+        its real path, so before the content-only model the on-disk neighbourhood
+        shifted the composite."""
+        from shared import build_scores
+
+        skill = Path(__file__).resolve().parents[2] / "SKILL.md"  # skills/schliff/SKILL.md
+        assert skill.exists(), skill
+        assert (skill.parent / "references").is_dir(), "expected a real references/ sibling"
+
+        in_repo = compute_composite(build_scores(str(skill)))["score"]
+        with tempfile.TemporaryDirectory() as d:
+            copy = Path(d) / "SKILL.md"
+            copy.write_text(skill.read_text(encoding="utf-8"), encoding="utf-8")
+            isolated = compute_composite(build_scores(str(copy)))["score"]
+        assert in_repo == isolated, (
+            f"own SKILL.md not reproducible across contexts: "
+            f"in-repo={in_repo} isolated={isolated}"
+        )
+
 
 # --- score_efficiency tests ---
 

@@ -15,17 +15,17 @@
       "clarity": 100,
       "security": 100
     },
-    "version": "8.6.3",
+    "version": "8.7.0",
     "submitted_at": "2026-03-25T10:00:00Z"
   },
   {
     "skill_name": "shieldclaw",
     "repo_url": "https://github.com/zandereins/schliff",
     "format": "SKILL.md",
-    "composite": 93.8,
+    "composite": 94.6,
     "grade": "A",
     "dimensions": {
-      "structure": 95,
+      "structure": 100,
       "triggers": 100,
       "quality": 90,
       "edges": 100,
