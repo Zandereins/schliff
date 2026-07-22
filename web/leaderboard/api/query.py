@@ -162,11 +162,19 @@ def _dedup_field(repo_url, skill_name):
 
 
 def _client_ip(handler):
-    """Best-effort client IP from Vercel's forwarding headers."""
+    """Best-effort client IP for rate-limit keying. ``x-real-ip`` is set by Vercel's
+    trusted proxy and is not client-spoofable, so prefer it. For ``x-forwarded-for``
+    the RIGHTMOST hop is the one the trusted proxy appended; the leftmost is
+    attacker-controlled — keying the limit on it lets a spoofer both bypass their own
+    limit (rotate the left value) and target a victim (spoof the victim's IP to burn
+    their bucket)."""
+    real = handler.headers.get("x-real-ip", "").strip()
+    if real:
+        return real
     fwd = handler.headers.get("x-forwarded-for", "")
     if fwd:
-        return fwd.split(",")[0].strip()
-    return handler.headers.get("x-real-ip", "") or "unknown"
+        return fwd.split(",")[-1].strip() or "unknown"
+    return "unknown"
 
 
 def _kv_rate_limited(cfg, key, limit, window):
