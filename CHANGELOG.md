@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+- **An unrecognised `<runner> run <target>` no longer counts as a build command
+  (#133).** `operational_coverage` credited the `build` category whenever a
+  `run`/`r`/`exec`/`dlx` keyword had been consumed — without ever inspecting the
+  target. `npm run wibble` scored a build; `npm run test-unit` scored a build
+  rather than a test; and the identical script written as `yarn test-unit`, with
+  no keyword to consume, was dropped entirely. The engine reported "real build
+  command resolved" about a target it had not looked at.
+
+  Such commands now carry the family `unclassified`: real and runnable, family
+  undetermined. This mirrors the doctrine `check-commands` already follows —
+  claim `dangling` only when provable, otherwise `unknown`.
+
+  `pylint` joined the intrinsic test tools, where the 16 other linters already
+  sat, so `uv run pylint` is now classified `test` instead of losing its family
+  along with the fallback.
+
+  **Impact:** `unclassified` credits no category, so files that documented no
+  build step stop being scored as if they did. Over the 30-file AGENTS.md corpus
+  exactly one file moves (80.6 → 72.6, one B→C reclassification); mean 61.79 →
+  61.53, median/min/max unchanged. Golden re-derived from the engine.
+
+  **Not affected:** `check-commands` resolves the identical command set — proven
+  set-identical over 259 real instruction files (409 command/status tuples, zero
+  difference, zero new `dangling` claims). `make test-unit` and friends remain
+  outside the vocabulary by design; loosening that guard was measured to buy 2
+  genuine commands at the cost of 14 non-commands, and is documented in the
+  README rather than changed.
+
+- **Output contract:** `schliff check-commands --json` may now emit
+  `"family": "unclassified"`. Existing values are unchanged and `status` is
+  untouched, but consumers that switch on `family` should treat it as an open set.
+
 ## [8.7.0] - 2026-07-22
 
 ### Changed

@@ -198,14 +198,26 @@ def test_agents_md_corpus_golden_distribution():
     bands = Counter(r[2] for r in rows)
 
     assert len(rows) == 30
-    # Re-baselined for the content-only structure model (#10, A', 2026-07-22).
-    # AGENTS.md is always scored through a normalized temp copy (build_scores), so
-    # its on-disk structure checks always failed; A' now credits progressive
-    # disclosure + declared refs from CONTENT, lifting files that link detail. All
-    # movement is upward (mean/median/min up, max unchanged) — the systematic
-    # under-crediting fix, not noise. Was 61.46/61.40/29.0; one former-F file
-    # (29.0) clears 35 → E (F 1→0, E 4→5).
-    assert statistics.mean(scores) == pytest.approx(61.79, abs=0.05)
+    # Re-baselined for UNCLASSIFIED runner targets (#133, 2026-07-27). Was
+    # 61.79 mean / B 4 / C 8. An unrecognised `<runner> run <target>` no longer
+    # credits `build` on the strength of the consumed `run` keyword alone, so a
+    # file that documented no build step stops being reported as if it did.
+    # EXACTLY ONE of the 30 files moves: markov-kernel__databricks-mcp
+    # 80.6 → 72.6, which is opcov −20 × the agents.md weight 0.4 = −8.0 — the
+    # arithmetic is an internal check that nothing else shifted. That file
+    # documents `uv run pytest`, `uv run black .`, `uv run pylint …` and a
+    # `-- --help` invocation, i.e. no build command at all; the credit it lost
+    # was manufactured. Movement is downward and confined to that correction:
+    # median/min/max unchanged, one B→C reclassification.
+    #
+    # Derived by running the engine over the corpus, never hand-tuned. The
+    # per-target behaviour this rests on is pinned in
+    # TestRunnerClassificationCharacterization (test_operational_coverage.py).
+    #
+    # Prior baseline for the content-only structure model (#10, A', 2026-07-22):
+    # was 61.46/61.40/29.0 before that change; one former-F file (29.0) cleared
+    # 35 → E (F 1→0, E 4→5).
+    assert statistics.mean(scores) == pytest.approx(61.53, abs=0.05)
     assert statistics.median(scores) == pytest.approx(61.70, abs=0.05)
     assert min(scores) == pytest.approx(35.0, abs=0.05)
     assert max(scores) == pytest.approx(91.0, abs=0.05)
@@ -214,8 +226,8 @@ def test_agents_md_corpus_golden_distribution():
     # (>=95); the two CJK docs floor opcov directives to 0 (English-scoped, §8.1).
     assert bands["S"] == 0
     assert bands["A"] == 1
-    assert bands["B"] == 4
-    assert bands["C"] == 8
+    assert bands["B"] == 3
+    assert bands["C"] == 9
     assert bands["D"] == 12
     assert bands["E"] == 5
     assert bands["F"] == 0
