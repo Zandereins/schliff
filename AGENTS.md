@@ -57,7 +57,7 @@ wiring is broken — check `SCORER_REGISTRY["agents.md"]`.
 
 ## Code style
 
-- Ruff is the authority (`pyproject.toml`: E, F, W, I; line length 120). Run `make lint` before pushing.
+- Ruff is the authority (`pyproject.toml`: E, F, W, I; line length 120). Run `make lint` before pushing — it gates Python and markdown (`.markdownlint-cli2.jsonc`), exactly as CI does.
 - Core engine code (`skills/schliff/scripts/`) is stdlib-only — never add a runtime dependency there, because "pip install schliff, zero deps" is the product promise CI and the README both make.
 - Scorers must be deterministic: no `time`, `random`, `os.environ` reads, or network in any scoring path, because same-input-same-score is the core guarantee. Tests pin this (`test_purity_no_forbidden_imports`).
 - Prefer explicit error handling; no silent `except: pass` in scoring code.
@@ -65,6 +65,7 @@ wiring is broken — check `SCORER_REGISTRY["agents.md"]`.
 ## Gotchas
 
 - **Never run blanket `ruff --fix`** on existing modules: F401 "unused" imports in `skills/schliff/scripts/` are real re-exports — removing them breaks the CLI (23 tests). Fix only files you authored.
+- **Never lint or reformat scorer input** — `benchmarks/`, `demo/`, test fixtures and the corpora are controlled inputs whose scores are asserted; `.markdownlint-cli2.jsonc` excludes them for that reason.
 - The version lives in **three lockstep sources** (`pyproject.toml`, `.claude-plugin/plugin.json`, `skills/schliff/__init__.py`), gated by `test_version_consistency.py`. Bump all three together.
 - Changing any scorer re-baselines the corpus golden tests (`test_agents_md_profile.py` pins mean/median/band counts on 30 real files). Re-derive the numbers from the engine — never hand-tweak them.
 - `playground/public/index.html` has its inline `<script>` pinned by a CSP `sha256-…` hash in `playground/vercel.json`. Any edit to the inline script requires recomputing the hash, or the deployed page breaks silently.
