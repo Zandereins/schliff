@@ -182,10 +182,13 @@ the only adoption claim made here.
 - **Conservative by design:** a command is reported `dangling` only when absence is
   *provable* (the manifest exists and the target is definitively missing). Anything
   unprovable is `unknown`, never `dangling` — one false accusation would burn the tool.
-- **Known gap:** make targets are matched against a fixed vocabulary while npm scripts
-  use prefix matching, so a hyphenated target like `make test-unit` is currently not
-  examined at all ([#133](https://github.com/Zandereins/schliff/issues/133)). It stays
-  silent rather than guessing — but silence here is a coverage limit, not a clean bill.
+- **Known gap:** `make` targets are recognised only from a fixed vocabulary — `make test`
+  is examined, `make test-unit` is not looked at at all. That is a deliberate tradeoff, not
+  an oversight: the same narrow matching is what stops English prose like *"make sure the
+  tests pass"* from being read as a command. Measured over 259 real instruction files,
+  loosening it would catch 2 genuine commands and 14 non-commands
+  ([#133](https://github.com/Zandereins/schliff/issues/133)). It stays silent rather than
+  guessing — but silence here is a coverage limit, not a clean bill.
 
 It is a drift guard, not a bug finder: across a sweep of real repositories most findings
 were in small or unmaintained projects, because well-maintained repos generally keep
