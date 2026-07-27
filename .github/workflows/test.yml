@@ -36,6 +36,22 @@ jobs:
       - name: Run ruff (enforcing — baseline is clean)
         run: ruff check --output-format=github skills/schliff/scripts/
 
+      # Markdown gate. Conventions live in .markdownlint-cli2.jsonc, which
+      # records which rules this repo deliberately ignores and which it treats
+      # as correctness (a short table row silently drops data on GitHub; a
+      # missing blank line merges a list into the paragraph above).
+      #
+      # No setup-node: GitHub-hosted runners ship Node, and pinning the linter
+      # version is what buys reproducibility here — same reasoning as the
+      # `ruff==0.15.8` pin above.
+      #
+      # File list comes from git rather than a glob, so CI lints exactly the
+      # tracked files. A `**/*.md` glob would additionally catch build/ and
+      # .hydra/ artifacts locally while missing them in a fresh checkout, i.e.
+      # local and CI would disagree.
+      - name: Run markdownlint (enforcing — baseline is clean)
+        run: git ls-files '*.md' | xargs npx --yes markdownlint-cli2@0.23.2
+
   test:
     runs-on: ubuntu-latest
     permissions:

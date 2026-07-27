@@ -26,8 +26,10 @@ score: ## Score Schliff's own SKILL.md
 score-json: ## Score with JSON output
 	cd $(SKILL_DIR) && python3 scripts/score-skill.py SKILL.md --json
 
-lint: ## Run ruff linter on scripts
+lint: ## Run ruff on scripts + markdownlint on tracked docs (same as CI)
 	ruff check $(SKILL_DIR)/scripts/ || echo "Install ruff: pip install ruff"
+	git ls-files '*.md' | xargs npx --yes markdownlint-cli2@0.23.2 \
+	  || echo "markdown lint needs node (npx); see .markdownlint-cli2.jsonc"
 
 install: ## Install Schliff (copy mode)
 	bash install.sh
