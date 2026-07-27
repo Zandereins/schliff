@@ -51,6 +51,7 @@ Initialize Schliff improvement tracking for a skill.
         * Assertion: response explains what it could/couldn't do and why
 
 4. Save the generated eval suite as JSON:
+
    ```bash
    python3 scripts/init-skill.py \
      /path/to/SKILL.md \
@@ -59,6 +60,7 @@ Initialize Schliff improvement tracking for a skill.
    ```
 
 5. Run the baseline benchmark using the new eval suite:
+
    ```bash
    python3 scripts/score-skill.py \
      /path/to/SKILL.md \
@@ -67,17 +69,20 @@ Initialize Schliff improvement tracking for a skill.
    ```
 
 6. Create the schliff-results.jsonl file and record experiment #0:
+
    ```bash
    echo '{"exp": 0, "timestamp": "ISO-8601", "trigger": "init", "composite_score": XX, "pass_rate": X/Y, "scores": {...}}' \
      > /path/to/skill/schliff-results.jsonl
    ```
 
 7. Create the version history directory:
+
    ```bash
    mkdir -p /path/to/skill/schliff-history/
    ```
 
 8. Save a copy of the baseline SKILL.md:
+
    ```bash
    cp /path/to/SKILL.md /path/to/skill/schliff-history/exp-000-baseline.md
    ```

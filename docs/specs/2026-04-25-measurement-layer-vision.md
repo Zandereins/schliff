@@ -99,6 +99,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
 **Status today.** Spec exists (`2026-03-29-v8-final-plan.md`), implementation 0%. v7.2.0 ships the CLI; the library API does not exist as a public surface yet.
 
 **Scope.**
+
 - Public `from schliff import score, evaluate, observe` API with stable type-annotated signatures
 - Single-choke-point security: `allowed_root: Path` parameter on every public entry that touches a filesystem path. **Action item from architecture review:** the existing v8-final-plan does not explicitly scope this refactor; cross-reference must be added to v8-final-plan Phase 1a security requirements (path-traversal threat tests, `allowed_root` parameter on `build_scores()` and every public scorer entry, `os.path.realpath()` prefix-match on all file I/O).
 - Pure-function scorers (no hidden home-dir state introduced by Säule 1). **Existing-state caveat (architecture review):** `composite.py:_load_calibrated_weights()` already reads `~/.schliff/meta/calibrated-weights.json` silently. This is a feature (auto-calibrated weights) not a bug, but Säule 1 must document it explicitly: every public entry that may consult calibrated weights documents it in its docstring; `compute_composite(..., use_calibrated_weights=False)` opt-out exists; tests cover both cold-cache and warm-cache paths.
@@ -106,6 +107,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
 - Multi-format support extended to system-prompts (zero existing competition per v8-vision)
 
 **Acceptance criteria.**
+
 - A consumer can `pip install schliff` and run `from schliff import score; score(Path("CLAUDE.md"), allowed_root=Path.cwd())` without touching the CLI
 - Path-traversal threat tests pass for every public entry
 - All existing CLI behaviours backed by the new library API (no parallel implementations)
@@ -120,6 +122,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
 **Status today.** Net-new. No code, no spec.
 
 **Scope.**
+
 - `schliff.eval.run(suite, output)` accepts a normalized eval suite and returns `EvalResult` with deterministic-rule verdicts
 - Built-in adapters: Promptfoo-yaml-import, DeepEval-pytest-fixture, OpenAI-evals-jsonl
 - Deterministic-first decision tree:
@@ -132,6 +135,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
   - DeepEval-pytest: AST-check imports for arbitrary `exec`/`eval`/`__import__` calls in fixture defaults BEFORE pytest discovery; reject suspicious files
 
 **Acceptance criteria.**
+
 - Promptfoo-yaml suite import: `schliff.eval.run(suite="promptfoo.yaml", output=...)` produces results identical to Promptfoo's own runner for 95%+ of suite types
 - Deterministic-shortcut metric: at least 40% of real-world public Promptfoo suites should hit at least one deterministic check (pre-launch corpus study required — see §13 OQ3)
 - Zero LLM calls when a suite uses only `contains`/`regex`/`json_schema`/`format`/`length`/`equals`
@@ -144,6 +148,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
 **Status today.** Net-new. No code, no spec. Hardest of the five.
 
 **Scope.**
+
 - `schliff.observe(trace)` accepts a normalized trace format and returns `TraceReport` with detected patterns
 - Initial pattern library (5–7 detectors, all deterministic):
   - Prompt-injection cascade: agent-A output containing instructions appears unsanitized in agent-B prompt
@@ -156,6 +161,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
 - **Output sanitization (security review condition).** Trace-derived output payloads (the JUnit/GitHub/Sentry emissions) must NOT re-leak unsanitized user content. Specifically: every adapter declares which trace fields contain user-controlled content (LangSmith `messages`, OpenAI `function outputs`, Anthropic `thinking` blocks); `observe()` strips or hashes these in the emitted payload by default; opt-in `include_raw=True` for users who explicitly want raw content (and accept the third-party-leakage risk).
 
 **Acceptance criteria.**
+
 - Each detector has at least 3 positive-case tests (real traces from public agents, anonymized) and 5 negative-case tests (clean traces that should NOT trigger)
 - False-positive rate < 5% on a benchmark corpus of 1000+ clean public traces (security review expanded baseline from 100)
 - Embedding-free fallback for off-topic drift (no mandatory `[ml]` extra)
@@ -169,6 +175,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
 **Status today.** Partially started. v7-launch attempted (see `project_schliff_state.md` — posts never went out). Awesome-list submissions tried, none accepted yet. Public playground exists.
 
 **Scope.**
+
 - Public benchmark site (`leaderboard.schliff.dev`): top 100 public skills/CLAUDE.mds by Schliff-score, updated nightly. **Anti-vision boundary (architecture review).** This is a *quality-bar leaderboard*, not a registry-of-record: skills are submitted by their owners via `schliff publish`; Schliff hosts the score display but does not curate, gate, or own the canonical list. The badge definition is public + versioned so the community can fork the leaderboard. This wording matters because §8 explicitly disclaims marketplace ambitions.
 - VS Code extension with live Schliff-score in the gutter
 - Pre-commit hook + GitHub Action mature, badge-able, documented in 5+ public repo READMEs
@@ -178,6 +185,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
 - **IPC and upload boundary hardening (security review condition).** VS Code extension messages must be valid JSON, size-capped (1MB), and schema-validated; `BadJSON` and oversize messages dropped with clear error. Leaderboard uploads enforce `MAX_SKILL_SIZE`, reject path-traversal in any zip extraction (Zip-Slip guard), timeout extraction at 5s, require GitHub-OAuth or scoped API key (no anonymous submissions to prevent leaderboard-spam).
 
 **Acceptance criteria.**
+
 - 10+ external repos using `schliff verify` in CI by end of 2026
 - Mentioned in at least 2 third-party blog posts / talks
 - Featured in at least 1 awesome-list (without nudging — see `reference_awesome_claude_code.md` policy)
@@ -190,6 +198,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
 **Status today.** Net-new. No code, no spec.
 
 **Scope.**
+
 - Specialised dimensions for regulated use-cases:
   - PII-leakage detector (in skills AND in observed outputs) — extends existing security scorer
   - Jailbreak-resistance scoring: skill resists known jailbreak families on a held-out adversarial set
@@ -199,6 +208,7 @@ Each Säule has: scope, acceptance criteria, dependencies. Ship targets are trac
 
 **Key Management (security review condition — added v0.2).**
 Signing keys MUST NOT live in `.schliff/keys/` or any filesystem path that a malicious skill could reach via path-traversal. Required policy:
+
 - Keys live in environment variables (`SCHLIFF_SIGNING_KEY` containing base64-encoded Ed25519 private key) or are injected via hermetic build systems (Bazel, Nix, GitHub-Actions secrets)
 - Keys rotated annually; every signing operation verifies key age < 365 days and refuses to sign with stale keys
 - CI environments must NOT log key material; key-detection in stack traces / error messages is mandatory
@@ -206,6 +216,7 @@ Signing keys MUST NOT live in `.schliff/keys/` or any filesystem path that a mal
 - No "convenience" auto-generated keys — refusing to sign without configured key is the default
 
 **Acceptance criteria.**
+
 - One certified compliance-mode passes a third-party legal review (target: GDPR for v0.1, EU-AI-Act for v1.0)
 - PII detector benchmark: 95%+ recall on a synthetic test corpus, < 1% false-positive rate on 1000 random public skills
 - Audit-trail receipts cryptographically reproducible from the input + rule version
@@ -288,6 +299,7 @@ This workflow is heavy. Honestly heavy. But it is what produced v7.2.0 with zero
 **Critical assumption (added v0.2 from simplify review).** Reviewer-agents in the Cross-Review gate run in **parallel** (minutes), not serial (days). If agent dispatch becomes serial, the workflow exceeds sustainable cycle time for solo+AI capacity and must be re-evaluated. Track this empirically: average Cross-Review wall-clock per non-trivial PR; if it exceeds 2 hours consistently, a Säule's velocity is threatened.
 
 **Two carve-outs:**
+
 - One-line bugfixes do not need a spec (commit message + reverse-TDD test is enough)
 - Doc-only PRs skip the cross-review agents
 
@@ -323,36 +335,42 @@ The register is updated at every reviewer-agent pass. New entries require an own
 Each entry: decision, alternatives considered, why-this-one, what-would-flip-it.
 
 **ADR-001 — Position Schliff as a measurement layer, not a competitor.**
+
 - Alternatives: (a) compete head-on with Promptfoo for output-eval, (b) merge into agnix as a quality module, (c) become a hosted SaaS
 - Chosen: (d) measurement layer used by all of the above
 - Why: avoids 3 unwinnable head-on fights; Datadog precedent shows the category is a viable scaling path; matches existing deterministic-first ideology
 - Flip if: Anthropic ships a free official skill-quality SDK with the same deterministic-first API AND market evidence shows users prefer the official version over Schliff (≥ 80% adoption inside 12 months of Anthropic's launch). Response then aligns with R1 mitigation: re-position as adapter / reference implementation under the official SDK; only consider retirement of the core if Schliff's deterministic-first differentiation no longer holds (e.g., Anthropic's official tool ships the same engine and supersedes Schliff's MIT advantage).
 
 **ADR-002 — Library-first, CLI-second.**
+
 - Alternatives: (a) keep CLI as primary; (b) ship CLI + library at parity; (c) deprecate CLI
 - Chosen: (b) parity, but library is the canonical surface for new features
 - Why: adapters and IDE extensions need the library; CLI users are not abandoned but no longer drive design
 - Flip if: a usability study shows users dramatically prefer CLI for >80% of flows (unlikely)
 
 **ADR-003 — Deterministic-first decision tree, LLM-judge as opt-in fallback.**
+
 - Alternatives: (a) LLM-judge always; (b) deterministic-only, no LLM ever; (c) library decides automatically based on assertion type
 - Chosen: (d) deterministic when applicable, LLM only on explicit `judge="llm"` arg
 - Why: keeps cost predictable for CI users; protects deterministic-first marketing claim; users who want LLM can always opt in
 - Flip if: deterministic checks turn out to apply to <10% of real eval suites (Säule 2 corpus study will tell us)
 
 **ADR-004 — Single `allowed_root` parameter on every path-touching public entry.**
+
 - Alternatives: (a) one global `allowed_root` set per process; (b) per-call argument; (c) no enforcement, document the threat
 - Chosen: (b) per-call argument, mandatory in library, default `None` in CLI for backward compat
 - Why: per-call is composable; library users (Promptfoo etc.) need fine-grained control; backward-compat keeps CLI users
 - Flip if: no library users emerge, suggesting the security argument is theoretical for current adoption
 
 **ADR-005 — No core dependency on a specific LLM SDK.**
+
 - Alternatives: (a) bundle litellm; (b) bundle Anthropic SDK; (c) abstract everything via litellm but as optional dep
 - Chosen: (c) — `schliff[evolve]` extras include litellm; core stays zero-dep
 - Why: matches current shipping pattern; protects core install footprint; avoids supply-chain blast on unrelated installs
 - Flip if: zero users adopt the optional dep (signal: nobody actually wants the LLM features)
 
 **ADR-006 — Reviewer-agent gates use hallucination-exclusion protocol mandatorily.**
+
 - Alternatives: (a) trust agent verdicts; (b) require human re-verification of every finding; (c) require every finding cite file:line + empirical reproduction
 - Chosen: (c) — see protocol in PR #32 review process
 - Why: agents over-claim in extended runs; the protocol caught false-positives in the v7.2.0 review (e.g. SSRF claim was wrong because allowlist was overlooked); validated again on this spec's own review (market-validation softened the "LLM-judge-first" claim that v0.1 overstated)
@@ -381,21 +399,25 @@ OQ7 (test infrastructure) and OQ8 (burn-rate) from v0.1 deferred to per-Säule r
 ## 14. Reviewer-agent verdicts (v0.1 review, integrated in v0.2)
 
 ### Architecture-reviewer — GREEN-WITH-CONDITIONS
+
 - **Verdict:** No blockers. The codebase has evolved to address critical architectural risks. Säulen-split is sound.
 - **Conditions integrated v0.2:** (1) calibrated-weights hidden state documented as feature in §6.1 + Principle 2 reworded; (2) `allowed_root` cross-reference added as Säule-1 action item; (3) Säule-3 stream-vs-stateless tension added as OQ9; (4) Säule-4 leaderboard wording clarified as quality-bar-not-marketplace (§6.4 + §8).
 - **Awareness findings (non-blocking):** runtime.py has implicit `claude` CLI dependency (acceptable); composite.py cache is process-local-not-thread-safe (documented); MCP-tool-scoring spec must be written before Phase 1c (was already in v8-final-plan).
 
 ### Security-reviewer — GREEN-WITH-CONDITIONS
+
 - **Verdict:** No exploitable vulnerabilities introduced. Three Säulen (2, 3, 4) introduce new boundaries that must be hardened in their sub-specs before code.
 - **Conditions integrated v0.2:** (1) Principle 8 added — adapter input validation; (2) R11 / Principle 7 strengthened — trace content leakage to third-party sinks; (3) Principle 9 / R12 added — IPC + upload boundaries; (4) §6.5 Key Management subsection + R13 added; (5) R14 added — adapter supply-chain risks; (6) Principle 7 strengthened to flag PII fields in observe() output.
 - **Hardening (defense-in-depth, tracked):** Säule-2 assertion-type whitelist (already in §6.2 acceptance criteria); Säule-3 false-positive baseline expanded from 100 to 1000+ traces; Säule-4 leaderboard auth via OAuth/API-key.
 
 ### Market-validation-reviewer — GREEN-WITH-CONDITIONS
+
 - **Verdict:** Strategic thesis defensible. Three corrections required.
 - **Corrections integrated v0.2:** (1) star counts updated (Promptfoo 12k → 20.5k, DeepEval 10k → 15k, agnix 207 → 208, awesome-claude-code 38.9k → 40.9k); (2) LangFuse 25k★ added to §5 table; (3) "LLM-judge-first" framing softened in §3 — Promptfoo + DeepEval recommend deterministic-first in docs but their tooling defaults still pull users toward LLM-judges; Schliff's wedge is library-first canonical implementation.
 - **Findings integrated v0.2:** R11 added (no AI-trace standard, OpenTelemetry-AI nascent) — affects Säule 3 long-term; R1 commentary updated (Anthropic Agent Skills standard already shipped Dec 2025, Skill-Creator plugin Mar 2026 — increases probability of full quality-scorer SDK).
 
 ### Simplify-reviewer — GREEN-WITH-CONDITIONS
+
 - **Verdict:** Spec is sound but contains redundancy. Several high-value cuts taken in v0.2; aggressive cuts deferred.
 - **Cuts integrated v0.2:** (1) §15 + §16 merged into single Navigation & Governance; (2) R3 + R5 merged → R3; R6 + R10 merged → R6 in risk register; (3) Säule ship-target lines removed from §6 (single source of truth in §7); (4) §10 parallel-agent-assumption explicitly noted as a workflow load-bearer.
 - **Cuts NOT taken (rationale):** §2+§4 collapse and §3-table-move would conflict with new security/market content additions; preserved for clarity. §9 Principles kept inline (not moved to ARCH-005) because they are read frequently by reviewer-agents and the indirection cost exceeds the duplication cost.
@@ -405,6 +427,7 @@ OQ7 (test infrastructure) and OQ8 (burn-rate) from v0.1 deferred to per-Säule r
 ## 15. Navigation & Governance
 
 **Cross-references (related specs and source docs):**
+
 - v8 implementation detail (Säule 1 superset): `docs/specs/plans/2026-03-29-v8-final-plan.md`
 - v8 architectural design: `docs/specs/2026-03-28-v8-design.md`
 - System prompt scoring spec (Säule 1 sub-component): `docs/specs/system-prompt-scoring-spec.md`

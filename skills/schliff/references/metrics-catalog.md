@@ -24,6 +24,7 @@ and progressive disclosure.
 | Action-oriented | 5 | Uses imperative voice ("Do X", not "You should X") |
 
 **Score ranges:**
+
 - 90-100: Production-ready structure, follows all conventions
 - 70-89: Good structure, minor gaps
 - 50-69: Functional but disorganized
@@ -36,6 +37,7 @@ for unrelated ones.
 
 **Eval method:**
 Create a test suite with:
+
 - 10+ **positive triggers** — prompts that SHOULD activate the skill
 - 5+ **negative triggers** — prompts that should NOT activate it
 - 5+ **edge triggers** — ambiguous prompts near the boundary
@@ -45,6 +47,7 @@ trigger_score = (correct_activations / total_test_prompts) × 100
 ```
 
 **Common trigger failures:**
+
 - Description too narrow → misses valid use cases (false negatives)
 - Description too broad → activates for unrelated tasks (false positives)
 - Missing synonyms → user says "deploy" but description only says "release"
@@ -99,6 +102,7 @@ relative to its total size.
 **How `score-skill.py` measures this (automated):**
 
 The scorer computes a signal-to-noise density ratio:
+
 - **Signal:** actionable instructions (imperative verbs), real examples,
   WHY-based reasoning, verification commands
 - **Noise:** hedging language, filler phrases ("it should be noted that"),
@@ -109,6 +113,7 @@ This approach rewards **fewer words with more punch** rather than the old
 formula which rewarded adding headers and code blocks.
 
 **Red flags (noise indicators):**
+
 - Repeated instructions (same thing said 3 different ways)
 - Verbose preambles before actionable content
 - Filler phrases: "it is important to note that", "as mentioned above"
@@ -116,6 +121,7 @@ formula which rewarded adding headers and code blocks.
 - Instructions Claude already knows: "make sure to save your file"
 
 **Green flags (signal indicators):**
+
 - Concise imperative instructions
 - Real input/output examples
 - WHY-based reasoning (explains rationale, not just rules)
@@ -151,6 +157,7 @@ Opt-in dimension that doesn't affect the default composite score.
 | Complete instructions | 25 | Every "Run X" has a concrete command or path |
 
 **Score ranges:**
+
 - 90-100: Crystal clear instructions, no ambiguity
 - 70-89: Minor clarity issues, mostly readable
 - 50-69: Several vague references or ambiguous sections
@@ -175,6 +182,7 @@ coverage. The scorer reports **coverage** — the fraction of total weight
 actually measured — and warns when coverage is below 50%.
 
 **Quality tiers (with sufficient coverage):**
+
 - 90+ Excellent — production-ready, community-shareable
 - 80-89 Good — reliable for personal/team use
 - 70-79 Adequate — works but has clear gaps

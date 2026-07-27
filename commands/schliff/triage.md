@@ -13,12 +13,15 @@ Cluster and prioritize logged failures, then generate targeted fixes.
 ## Instructions
 
 1. Locate the failure log:
+
    ```bash
    cat .schliff/failures.jsonl 2>/dev/null | head -5
    ```
+
    If empty or missing: "No failures logged yet. Use `/schliff:log-failure` to record issues, or failures are auto-logged during eval runs."
 
 2. Load and parse all failure entries. Each entry has:
+
    ```json
    {"skill": "skill-name", "failure_type": "trigger|quality|edge|crash", "description": "what went wrong", "timestamp": "ISO-8601", "context": "optional details"}
    ```
@@ -26,6 +29,7 @@ Cluster and prioritize logged failures, then generate targeted fixes.
 3. Cluster failures by `skill` + `failure_type`. Count occurrences per cluster.
 
 4. Sort clusters by count (descending). Present the top issues:
+
    ```
    === Schliff Failure Triage ===
 
@@ -45,11 +49,13 @@ Cluster and prioritize logged failures, then generate targeted fixes.
    - **Crash failures**: Identify the unhandled input and suggest a guard clause
 
 6. If `text-gradient.py` is available, run it to generate concrete patches:
+
    ```bash
    python3 scripts/text-gradient.py /path/to/SKILL.md --focus "failure_description" --json
    ```
 
 7. Present recommended actions:
+
    ```
    Recommended Actions:
    1. [skill-name] Add 3 negative triggers to eval-suite.json (trigger cluster)

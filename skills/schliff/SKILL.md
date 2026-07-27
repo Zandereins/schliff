@@ -157,6 +157,7 @@ Read full skill tree before each change. Extract sections to `references/` when 
 ## Discovery Mode (Auto-Gap Analysis)
 
 Run `/schliff:analyze` without a GOAL:
+
 1. Run all 7 dimension scorers.
 2. Identify weakest dimension and failure patterns.
 3. Cluster eval failures for systemic issues (e.g., "all false negatives share short prompts").
@@ -220,6 +221,7 @@ Requires Python >= 3.9, Git >= 2.0, jq >= 1.6, Bash >= 4.0. Standard library onl
 ## Files
 
 Run `ls -R` in skill directory. Run `python3 scripts/score-skill.py SKILL.md --json` for scores. Key files:
+
 - `scripts/init-skill.py` — Bootstrap eval-suite (`--json --dry-run`)
 - `scripts/generate-report.py` — Shareable improvement report
 - `scripts/score-skill.py` — Dimension scores incl. runtime (`--diff --clarity --weights`)

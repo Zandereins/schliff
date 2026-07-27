@@ -35,12 +35,14 @@ The deterministic linter's existing dimensions remain untouched. The LLM-Judge l
 ## Consequences
 
 **Positive:**
+
 - AI-Eval pillar evaluates what cannot be regex-checked; provides genuine value-add over the existing linter.
 - Aligns with Hamel/Shreya practitioner consensus, reducing "premature formalization" risk identified during sparring-round meta-finding.
 - Failure taxonomy is a reusable artifact for v8.1+ AI-Eval expansion (more dims, more domains).
 - Avoids the trap of building eval infrastructure before understanding failure modes.
 
 **Negative:**
+
 - Day 1–3 budget is locked to Franz's solo cognitive work; subagents can prepare (clone, pre-annotate, queue) but cannot replace the reading.
 - If kill-gate triggers (no semantic dims emerge), AI-Eval pillar is dropped from v8.0 — narrative is simpler but less ambitious. Trade-off accepted.
 - Phase 0 cannot start in parallel with Phase 1 worktree builds; serializes the first 3 days.

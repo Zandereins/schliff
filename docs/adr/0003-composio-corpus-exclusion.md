@@ -30,11 +30,13 @@ The license posture across the candidate sources is therefore not uniform: **Com
 ## Consequences
 
 **Positive:**
+
 - Zero legal risk on launch; corpus is provably clean.
 - Forces tighter focus on the 191-skill set — sufficient for ADR-0001's failure-mode coding (n=30 sample) and Phase P3 calibration (n=100–150 holdout per ADR-0002).
 - Establishes a clean precedent: license-first corpus hygiene is a measurement-layer credibility signal.
 
 **Negative:**
+
 - Corpus is ~4.5x smaller than the maximum-feasible alternative; some long-tail failure modes (especially integration-skill-specific ones) likely under-represented.
 - Schliff loses the "evaluated against ~1000 skills" headline number; v8.0 ships with "evaluated against ~190 skills, all clean-licensed".
 

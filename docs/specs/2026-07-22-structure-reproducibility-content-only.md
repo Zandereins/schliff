@@ -94,7 +94,7 @@ reader to external detail" forms:
   not `http(s)`, not an anchor). This is the **dominant real-world disclosure
   pattern** (field-validated below).
 - `_RE_REF_PATH = re.compile(r"(?:\]\(|`|\bsee\s+|\bread\s+|\bload\s+)(references/[\w./-]+)", re.I)` —
-  a `references/` path in a markdown link, backtick, or see/read/load verb (covers
+  a `references/`path in a markdown link, backtick, or see/read/load verb (covers
   non-`.md` reference resources). The anchor keeps bare build-command mentions of
   `scripts/…` from counting as disclosure.
 
@@ -168,6 +168,7 @@ declared ref; the gate suppresses those.
 (AGENTS.md/CLAUDE.md/.cursorrules) into a `NamedTemporaryFile` and scores *that*.
 So for AGENTS.md — the flagship, structure weight 0.4 — the on-disk checks
 **always** fail, even locally. Two consequences:
+
 - The reproducibility gap this spec reproduces is a **skill.md** phenomenon
   (real path vs mkdtemp); AGENTS.md is already temp-scored in every context.
 - A′ is a **bigger win for AGENTS.md than framed**: the normalized temp preserves

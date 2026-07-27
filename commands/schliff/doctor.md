@@ -13,6 +13,7 @@ Run a comprehensive health check on all installed skills.
 ## Instructions
 
 1. Run the doctor script:
+
    ```bash
    python3 scripts/doctor.py --json
    ```

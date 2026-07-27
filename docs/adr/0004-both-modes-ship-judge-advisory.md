@@ -32,11 +32,13 @@ On (1), a phased rollout (advisor-only in v8.0, autonomous in v8.1) was the orig
 ## Consequences
 
 **Positive:**
+
 - One gating-mechanism (the deterministic guard) means one place to audit and tune for regressions; reduces cognitive surface area.
 - LLM-Judge stays slow/expensive but advisory — it can be Sonnet-4.5 with N=5 self-consistency (ADR-0006) without blocking the inner loop.
 - Both modes ship → no "advisor never gets used" failure mode.
 
 **Negative:**
+
 - Two modes to document, support, and test in the README/CHANGELOG.
 - Users who *want* LLM-judgment to block patches must wait for v8.1 (an opt-in `--llm-gate` flag is on the v8.1 backlog).
 

@@ -1,0 +1,86 @@
+// Markdown conventions for this repo, made explicit.
+//
+// Without this file every editor lints against markdownlint's defaults, which
+// this repo has never followed: ~5,000 findings across 98 files, 54% of them
+// line-length alone. Noise at that volume hides the findings that are real.
+//
+// The dividing line below is CORRECTNESS vs COSMETICS. Rules that change what a
+// reader sees stay on. Rules that merely pick one valid style over another are
+// off, because this repo never chose one and retrofitting a choice means a
+// ~2,000-line diff across 60 mostly-historical documents — measured, and it
+// broke a scoring guard that had held across ten edits to the same file.
+{
+  "config": {
+    // --- off: no convention exists, and enforcing one is churn ---------------
+
+    // Prose and tables, not code. 1,413 lines exceed 120 chars (longest 1,363)
+    // and markdown reflows on render, so a column limit buys churn, not
+    // readability. Python keeps its 120-char ruff limit; different medium,
+    // different reason.
+    "MD013": false,
+
+    // The README hero needs <picture>/<source> for a theme-aware image, which
+    // markdown cannot express.
+    "MD033": false,
+
+    // GitHub alert syntax (`> [!NOTE]`) puts blank lines between adjacent
+    // blockquotes. That is how the feature is written.
+    "MD028": false,
+
+    // Files legitimately open with an HTML block (README hero) or YAML
+    // frontmatter rather than an H1.
+    "MD041": false,
+
+    // Table pipe style. Measured before deciding: enforcing `tight` strips all
+    // padding (`|Dimension|Metric|`), which is harder to read at source and
+    // rewrote this repo's own SKILL.md enough to move its pinned score;
+    // enforcing `compact` or `aligned` rewrites ~100 tables the other way.
+    // Cosmetic either way — GitHub renders all three identically. MD056 below
+    // still catches tables that are genuinely broken.
+    "MD060": false,
+
+    // Bullet marker, emphasis marker, ordered-list numbering, emphasis used as
+    // a heading: all valid markdown, all rendering the same. No convention was
+    // ever recorded, so there is nothing to enforce.
+    "MD004": false,
+    "MD049": false,
+    "MD029": false,
+    "MD036": false,
+
+    // A fence without a language loses syntax highlighting but renders
+    // correctly, and many here are deliberately plain (command output, score
+    // readouts). Note for scorer work: operational_coverage treats an
+    // unlabelled fence as shell, so adding labels would change extraction.
+    "MD040": false,
+
+    // GitHub autolinks bare URLs; this repo renders on GitHub.
+    "MD034": false,
+
+    // --- configured ---------------------------------------------------------
+
+    // A CHANGELOG repeats "### Changed" under every version heading, which is
+    // the format's whole shape. Duplicates only matter between siblings.
+    "MD024": { "siblings_only": true }
+
+    // --- everything else stays ON, because it changes what a reader sees -----
+    // MD056 table-column-count : a short row silently drops data on GitHub
+    // MD032/MD022/MD031/MD058  : missing blank lines merge lists, headings and
+    //                            fences into the preceding paragraph
+    // MD009/MD010/MD012/MD047  : trailing spaces become hard breaks; tabs and
+    //                            stray blanks render inconsistently
+    // MD038 no-space-in-code   : `` ` x ` `` renders the padding
+  },
+
+  // Scorer INPUT, not documentation. Deliberately malformed fixtures, pinned
+  // third-party snapshots, and regenerable corpora. The proof suite asserts
+  // that a bad skill scores badly, so linting these would be a category error.
+  "ignores": [
+    "benchmarks/**",
+    "demo/**",
+    "skills/schliff/tests/**",
+    "docs/launch/corpus/**",
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/.vercel/**"
+  ]
+}

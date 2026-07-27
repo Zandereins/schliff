@@ -6,6 +6,7 @@ skill-specific enhancements. The loop runs autonomously (no human confirmation) 
 the goal is met or a stop condition occurs.
 
 **Core principles:**
+
 - One atomic change per iteration
 - Fixed time budget per iteration (no hung experiments)
 - User-defined goal + metric + verification, with defaults
@@ -21,6 +22,7 @@ the goal is met or a stop condition occurs.
 Initialize the autonomous improvement session with user-provided configuration.
 
 **Required inputs from user:**
+
 1. **GOAL** (natural language): What should the skill achieve?
    - Example: "Handle CSV parsing with quoted fields and escaped quotes"
    - Example: "Improve trigger accuracy for data pipeline tasks"
@@ -47,6 +49,7 @@ Initialize the autonomous improvement session with user-provided configuration.
    - Stop after N iterations even if goal not met
 
 **Setup phase actions:**
+
 - Create `schliff-session.json` with all config
 - Initialize git branch: `git checkout -b schliff-session-{timestamp}`
 - Create `.schliff/` directory for session artifacts
@@ -55,6 +58,7 @@ Initialize the autonomous improvement session with user-provided configuration.
 - Print summary and confirm loop is ready to start
 
 **Setup output:**
+
 ```json
 {
   "session_id": "schliff-20260319-143022",
@@ -76,6 +80,7 @@ Initialize the autonomous improvement session with user-provided configuration.
 Read the current state and identify improvement opportunities.
 
 **Actions:**
+
 - Re-read SKILL.md in full (never assume state is cached)
 - Re-read all reference files linked from SKILL.md
 - Read git log: `git log --oneline -20`
@@ -95,20 +100,24 @@ ELSE → focus on lowest-scoring dimension
 ```
 
 **For custom metrics:**
+
 - Analyze trends in `schliff-results.jsonl` for the user-defined metric
 - Identify which code/content blocks correlate with metric improvements
 - Look for patterns: which types of changes moved the metric most?
 
 **Stopping condition check:**
+
 - If 10 consecutive discards with zero metric improvement → stop, notify user
 - If metric reached goal threshold → stop, celebrate
 - If max_iterations reached → stop
 
 **Special case: Dimension thrashing**
+
 - If same dimension discarded 3+ times consecutively → switch to different dimension
 - For custom metrics: rotate focus every 5 discards to avoid local minima
 
 **Output:**
+
 ```
 === Phase 1: REVIEW (iteration 5) ===
 Current structure: 68.5
@@ -125,23 +134,27 @@ Ready to ideate.
 Choose ONE specific, atomic change.
 
 **Rules for atomic changes:**
+
 - Expressible in a single sentence
 - Affects exactly one aspect of the skill
 - Testable (will move the metric)
 - Reversible (clean `git revert` rollback)
 
 **Good examples:**
+
 - "Add 3 trigger synonyms to description for data pipeline tasks"
 - "Add input/output example for CSV with quoted fields edge case"
 - "Compress 20-line setup block to 4 lines of concise steps"
 - "Fix frontmatter format: description field exceeds 200 chars"
 
 **Bad examples (too broad):**
+
 - "Rewrite the entire skill" — not atomic
 - "Make it better" — not specific
 - "Add lots of examples" — unbounded
 
 **Ideation strategy (text-gradient-first):**
+
 - Run `python3 scripts/text-gradient.py SKILL.md --json --top 5` to get ranked improvements
 - Pick the highest-priority gradient that hasn't been tried in the last 3 iterations
 - If all top gradients have been tried, fall back to manual ideation:
@@ -151,6 +164,7 @@ Choose ONE specific, atomic change.
   - For default metrics: use the decision framework from Phase 1
 
 **Output:**
+
 ```
 === Phase 2: IDEATE (iteration 5) ===
 Experiment: exp-005
@@ -167,11 +181,13 @@ Ready to modify.
 Apply the change to skill files.
 
 **Pre-modification:**
+
 - Set a timer (start time budget countdown)
 - Record hash of SKILL.md before changes
 - Pre-load ALL target files into context (never edit partially)
 
 **Rules:**
+
 - Only modify files within the target skill directory
 - Preserve formatting conventions
 - Maintain YAML frontmatter validity
@@ -179,14 +195,16 @@ Apply the change to skill files.
 - If removing content, verify no other files depend on it
 
 **Frontmatter edits (high-risk):**
+
 - The `description` field is the primary trigger mechanism
 - Keep under 200 words (longer descriptions dilute matching)
 - Include both what it does AND when to use it
 - Include specific trigger phrases
 - Include negative boundaries ("do NOT use for...")
-- After edit, validate with: `python3 -c "import yaml; yaml.safe_load(open('SKILL.md'))" `
+- After edit, validate with: `python3 -c "import yaml; yaml.safe_load(open('SKILL.md'))"`
 
 **Output:**
+
 ```
 === Phase 3: MODIFY (iteration 5) ===
 Experiment: exp-005
@@ -218,17 +236,20 @@ Goal: Improve trigger accuracy for domain-specific phrases
 ```
 
 **Commit message guidelines:**
+
 - First line: `experiment: exp-{NN} [dimension] one-sentence description`
 - Add metadata in body (experiment number, dimension, goal)
 - Enable filtering: `git log --grep="experiment:"`
 - Sequential numbering essential for traceability
 
 **Example commits:**
+
 - `experiment: exp-001 [structure] validate frontmatter and add missing sections`
 - `experiment: exp-042 [triggers] add deployment-related synonyms to description`
 - `experiment: exp-083 [quality] add input/output example for CSV edge case`
 
 **Commands:**
+
 ```bash
 git add -A
 git commit -m "experiment: exp-005 [triggers] Add data pipeline, workflow automation
@@ -245,6 +266,7 @@ the `gradient_id` (format: `dimension:issue`) in the commit message trailer. Thi
 tracking which gradients have high keep-rates via `strategy-log.jsonl`.
 
 **Output:**
+
 ```
 === Phase 4: COMMIT (iteration 5) ===
 Experiment: exp-005
@@ -260,15 +282,18 @@ Ready to verify.
 Run evaluation suite and measure the metric.
 
 **Pre-verification:**
+
 - Note current time (for timeout)
 - Capture environment for reproducibility
 
 **For default 6-dimension scoring:**
 
 1. **Structure score** (automated):
+
    ```bash
    bash scripts/analyze-skill.sh /path/to/skill/SKILL.md
    ```
+
    Checks: YAML validity, required frontmatter fields, file organization
 
 2. **Triggers score** (eval suite):
@@ -294,12 +319,14 @@ Run evaluation suite and measure the metric.
    - References clear? Frontmatter unambiguous?
 
 **For custom metrics:**
+
 - Execute VERIFY_COMMAND
 - Parse output (JSON, TSV, key=value)
 - Extract the user-defined metric value
 - Validate it's comparable to baseline
 
 **Timeout handling (Karpathy's fixed time budget):**
+
 - If verification phase exceeds TIME_BUDGET (default 300 sec):
   - Kill the evaluation process
   - Treat as crash/timeout
@@ -308,17 +335,20 @@ Run evaluation suite and measure the metric.
   - Don't mark as pass or fail; trigger retry logic
 
 **Assertion handling (Olelehmann's binary eval):**
+
 - Track both continuous scores AND pass/fail assertions
 - Example: "Does skill output valid YAML? YES/NO"
 - Pass rate = (assertions passed / total assertions) × 100
 - Include pass rate in results alongside dimension scores
 
 **Error handling:**
+
 - YAML parse error: log error, don't fail; record structure_score=0
 - Eval script crash: log error; advance to Phase 6 with `status=eval_error`
 - Missing dependencies: skip that dimension; note in results
 
 **Output:**
+
 ```
 === Phase 5: VERIFY (iteration 5) ===
 Experiment: exp-005
@@ -355,32 +385,38 @@ Compare new score against best-so-far and decide: KEEP or DISCARD.
 | eval_error | RETRY | Yes (up to max_retries) |
 
 **Retry logic (Uditgoenka's feature):**
+
 - On first crash/timeout: immediately retry (don't count as iteration)
 - On second crash: retry once more
 - On third crash: discard permanently; revert and log
 - Track retry count: `exp-005_retry_1`, `exp-005_retry_2`
 
 **Dimension-level decision:**
+
 - If total score is flat, KEEP if:
   - Target dimension improved by 5+ points, AND
   - No other dimension regressed by more than 2 points
 
 **Custom metric decision:**
+
 - KEEP if metric moved closer to goal
 - DISCARD if metric moved away
 - If tied, check secondary metrics (dimensions) for tiebreaker
 
 **On KEEP:**
+
 - Advance skill files
 - Continue to Phase 7 (LOG)
 
 **On DISCARD:**
+
 ```bash
 git revert HEAD --no-edit
 git log --oneline -1  # Confirm revert
 ```
 
 **On RETRY (crash/timeout):**
+
 - Revert any partial modifications
 - Re-run Phase 3 (MODIFY) again
 - Re-run Phase 4 (COMMIT) with retry suffix
@@ -389,6 +425,7 @@ git log --oneline -1  # Confirm revert
 - Increment retry counter (max 2)
 
 **Output:**
+
 ```
 === Phase 6: DECIDE (iteration 5) ===
 Experiment: exp-005
@@ -414,6 +451,7 @@ Record the iteration result and create history snapshot.
 ```
 
 **JSONL schema (one JSON object per line):**
+
 - `iteration`: sequential iteration number (1, 2, 3...)
 - `experiment`: exp-NNN identifier
 - `commit`: git commit hash (first 7 chars)
@@ -431,6 +469,7 @@ Record the iteration result and create history snapshot.
 ```
 
 Format enables quick filtering:
+
 ```bash
 grep "status=keep" .schliff/experiment-log.txt
 grep "delta=+" .schliff/experiment-log.txt | awk -F'|' '{print $3}' | sort -t= -k2 -rn
@@ -439,6 +478,7 @@ grep "delta=+" .schliff/experiment-log.txt | awk -F'|' '{print $3}' | sort -t= -
 **History snapshot (Olelehmann's feature):**
 
 Save complete skill state at each kept iteration:
+
 ```bash
 mkdir -p .schliff/history/exp-005/
 cp -r . .schliff/history/exp-005/  # (exclude .git, .schliff)
@@ -446,6 +486,7 @@ echo "exp-005 | 2026-03-19T14:35:22Z | score 69.7" > .schliff/history/exp-005/ME
 ```
 
 Enables diffing between iterations:
+
 ```bash
 diff -u .schliff/history/exp-004/SKILL.md .schliff/history/exp-005/SKILL.md
 ```
@@ -477,6 +518,7 @@ Experiments on efficiency: 6 keeps, 8 discards (75% discard rate)
 ```
 
 **Output:**
+
 ```
 === Phase 7: LOG (iteration 5) ===
 Experiment: exp-005
@@ -517,6 +559,7 @@ Return to Phase 1 (REVIEW) for the next iteration.
 5. **Stuck protocol** (Phase 9, below)
 
 **Output:**
+
 ```
 === Phase 8: REPEAT ===
 Iteration 5 complete.
@@ -568,6 +611,7 @@ Triggered after 5 consecutive discards with zero metric improvement.
    - Exit with status code 2
 
 **Output:**
+
 ```
 === Phase 9: STUCK PROTOCOL (iteration 18) ===
 Detected: 5 consecutive discards (exp-014 through exp-018)
@@ -592,30 +636,35 @@ Resuming main loop...
 ## Error Handling & Crash Recovery
 
 **YAML/frontmatter errors:**
+
 - Log error, set structure_score = 0
 - Repair YAML (fix formatting, validate syntax)
 - Don't count repair as iteration
 - Retry Phase 5 (VERIFY)
 
 **Eval script crash:**
+
 - Log full error message and traceback
 - Check script syntax
 - If fixable: fix and retry (up to 3 times total)
 - If not fixable: skip that dimension, score others
 
 **Git conflicts:**
+
 - This should not occur; if it does:
   - Reset to last known good state: `git reset --hard HEAD~1`
   - Log incident
   - Retry from Phase 3 (MODIFY)
 
 **Skill too large for context:**
+
 - If SKILL.md exceeds token limit:
   - Split into SKILL.md + `references/detailed.md`
   - Add pointer in SKILL.md
   - Retry Phase 5 (VERIFY)
 
 **Timeout (Phase 5):**
+
 - Kill evaluation process
 - Log timeout event
 - Treat as recoverable error

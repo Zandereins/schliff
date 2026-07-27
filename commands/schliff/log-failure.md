@@ -18,12 +18,15 @@ Manually log a skill failure for later triage and analysis.
    - **Context** (optional): Any additional details (input that caused it, expected vs actual behavior)
 
 2. Validate the failure type is one of the known types:
+
    ```
    trigger | quality | edge | crash
    ```
+
    If unknown, suggest the closest match.
 
 3. Construct the failure entry:
+
    ```json
    {
      "skill": "skill-name",
@@ -36,18 +39,21 @@ Manually log a skill failure for later triage and analysis.
    ```
 
 4. Append to the failure log:
+
    ```bash
    mkdir -p .schliff
    echo '<JSON_ENTRY>' >> .schliff/failures.jsonl
    ```
 
 5. If the file exceeds 1 MB, warn the user:
+
    ```
    Warning: failures.jsonl is getting large. Consider running /schliff:triage
    to process and archive resolved failures.
    ```
 
 6. Confirm the log entry:
+
    ```
    Failure logged:
    - Skill: [name]

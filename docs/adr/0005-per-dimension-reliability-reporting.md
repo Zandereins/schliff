@@ -27,11 +27,13 @@ The reporting-shape question is separate. Going per-dimension-only optimises for
 ## Consequences
 
 **Positive:**
+
 - Per-dim drilldown earns measurement-layer credibility with eval-literate readers (the Hamel/Shreya/Eugene audience).
 - Composite anchor satisfies first-glance scan on README and HN comment threads; removes the "what is this number" friction.
 - Threshold suppression ("preview" flag) is a built-in honesty mechanism for dimensions still calibrating.
 
 **Negative:**
+
 - Two-layer reporting is more documentation surface to maintain (methodology page must stay in sync with the headline computation).
 - Macro-averaging in the composite hides class imbalance across dimensions; mitigated only by the per-dim drilldown one click away.
 

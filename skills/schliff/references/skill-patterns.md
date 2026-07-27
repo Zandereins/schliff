@@ -23,12 +23,14 @@ description: >
 Replace long explanations with input/output examples.
 
 Bad:
+
 ```markdown
 When generating commit messages, ensure they follow the conventional
 commits specification. The type should be one of feat, fix, chore...
 ```
 
 Good:
+
 ```markdown
 ## Commit message format
 Follow conventional commits. Examples:
@@ -58,30 +60,37 @@ State what the skill does NOT do.
 ## Anti-Patterns to Fix
 
 ### Anti-Pattern 1: The Kitchen Sink
+
 **Symptom:** SKILL.md is 1000+ lines with everything inline.
 **Fix:** Extract to references/. Keep SKILL.md as an index + core workflow.
 
 ### Anti-Pattern 2: The Invisible Skill
+
 **Symptom:** Skill exists but never triggers because description is too narrow.
 **Fix:** Add synonyms, rephrase with user language, include concrete trigger phrases.
 
 ### Anti-Pattern 3: The Chatty Instructor
+
 **Symptom:** Instructions explain things Claude already knows.
 **Fix:** Delete. Focus instructions on what's UNIQUE to this skill.
 
 ### Anti-Pattern 4: The Hedger
+
 **Symptom:** Instructions full of "might", "could", "consider", "possibly".
 **Fix:** Use imperative voice with WHY-based reasoning.
 
 ### Anti-Pattern 5: Missing Failure Mode
+
 **Symptom:** Skill only describes the happy path. No guidance for errors.
 **Fix:** Add an explicit "When things go wrong" section.
 
 ### Anti-Pattern 6: The Duplicate
+
 **Symptom:** Skill overlaps significantly with another skill's scope.
 **Fix:** Either merge, or add explicit boundary markers.
 
 ### Anti-Pattern 7: No Examples
+
 **Symptom:** Lots of rules, zero examples.
 **Fix:** Add at least 2-3 input/output examples.
 

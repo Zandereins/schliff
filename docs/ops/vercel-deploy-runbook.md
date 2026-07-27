@@ -2,6 +2,7 @@
 
 > Status as of 2026-06-03: **DEPLOYED**. Both projects are live and public in
 > team `zaneins-projects`:
+>
 > - Playground: https://schliff-playground.vercel.app (`POST /api/score`)
 > - Leaderboard: https://schliff-leaderboard.vercel.app (`GET /api/query`, `POST /api/submit`)
 >

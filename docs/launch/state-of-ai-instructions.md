@@ -220,6 +220,7 @@ schliff report <file>       # markdown quality report
 ```
 
 The full data-collection pipeline is in `scripts/launch/`:
+
 - `collect_corpus.py` — fetches files via GitHub search
 - `score_corpus.py` — runs `schliff score --json` on each file
 - `aggregate_stats.py` — produces all numbers above

@@ -29,11 +29,13 @@ Local-only was rejected on capability: published Cohen's κ vs human for Prometh
 ## Consequences
 
 **Positive:**
+
 - Cost stays inside the v8.0 budget; calibration cycles can be re-run cheaply when the corpus or rubric shifts.
 - N=5 self-consistency directly addresses the documented variance failure mode.
 - Cross-family fallback path exists and is invoked exactly where it adds signal (disagreement, validation pass) — not as a flat tax.
 
 **Negative:**
+
 - Self-preference bias remains a known limitation; methodology page must disclose it explicitly with the validation-pass result.
 - Adding a new family (e.g., Gemini-3 when it ships) requires re-running the validation pass before publishing.
 
