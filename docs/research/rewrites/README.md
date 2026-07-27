@@ -35,4 +35,3 @@ session synthesis.
 - All three verified genuinely better than their originals, with no gutting of legitimate function and no new beyond-linter defects.
 - **Skill 09 safety audit passed:** no destructive command left unguarded; the safe-path additions are technically correct (REISUB `s→u→b` ordering + sync-wait, timestamped `cp -a` GRUB backups, correct GRUB2 `grub2-mkconfig` path vs Legacy hand-edit).
 - **03 nit (patched):** the original luminance rule presented a flat `0.5` cutoff with WCAG-formula authority it didn't have — softened to a contrast-ratio-preferred rule with the `0.5`-is-not-WCAG-accurate caveat, removing a mild false-precision (`#confident-but-unsourced`) artifact.
-

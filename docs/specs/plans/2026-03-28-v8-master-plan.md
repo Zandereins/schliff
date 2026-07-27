@@ -591,6 +591,7 @@ git tag v7.1.0-pre-v8                         # Snapshot taggen
 ### Per-Phase Completion
 
 Fuer JEDE Phase vor Merge:
+
 1. Alle bestehenden Tests bestehen (zero regression)
 2. Alle neuen Tests bestehen
 3. `ruff check skills/schliff/` bestanden

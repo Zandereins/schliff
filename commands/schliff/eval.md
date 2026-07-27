@@ -26,7 +26,7 @@ The eval system operates in two modes that can be combined:
    - Run against actual skill outputs
    - Produce pass rate: X/Y assertions (percentage)
 
-The `composite_score` is a weighted average of measured dimensions. The `pass_rate` 
+The `composite_score` is a weighted average of measured dimensions. The `pass_rate`
 tracks binary assertion success independently.
 
 ## Usage
@@ -45,21 +45,25 @@ tracks binary assertion success independently.
 ### Examples
 
 #### Standard evaluation (all dimensions + assertions)
+
 ```
 /schliff:eval .claude/skills/my-skill/SKILL.md
 ```
 
 #### Quick pass/fail check
+
 ```
 /schliff:eval .claude/skills/my-skill/SKILL.md --quick
 ```
 
 #### Compare to previous run
+
 ```
 /schliff:eval .claude/skills/my-skill/SKILL.md --compare .schliff-eval/exp-15.json
 ```
 
 #### With custom timeout
+
 ```
 /schliff:eval .claude/skills/my-skill/SKILL.md --timeout 600
 ```
@@ -71,11 +75,13 @@ tracks binary assertion success independently.
 Read the SKILL.md to extract the skill name and location.
 
 Look for `eval-suite.json` in the skill directory:
+
 ```bash
 ls <skill_dir>/eval-suite.json
 ```
 
 If no eval suite exists, offer to generate one from the template:
+
 ```
 Would you like me to generate an eval suite from the template?
 I'll create triggers, test cases, and edge cases for <skill_name>.
@@ -90,12 +96,14 @@ python3 scripts/score-skill.py <SKILL.md> --eval-suite <eval-suite.json> --json
 ```
 
 This produces:
+
 - `composite_score` (weighted average, 0-100)
 - `dimensions` (per-dimension breakdown)
 - `confidence` (how many dimensions were measured)
 
-**Note:** Some dimensions (`quality`, `edges`) require runtime eval. If unmeasured, 
+**Note:** Some dimensions (`quality`, `edges`) require runtime eval. If unmeasured,
 the confidence will be lower. Static dimensions that always work:
+
 - `structure` (code organization)
 - `triggers` (description matching)
 - `efficiency` (token efficiency)
@@ -146,11 +154,13 @@ Edge cases stress-test error handling and boundary conditions.
 ### 4. Produce unified results
 
 Use `/schliff:eval`'s internal runner (`run-eval.sh`), which orchestrates:
+
 - Python scorer
 - Binary assertion runner
 - Results compilation
 
 Output JSON structure:
+
 ```json
 {
   "experiment_id": 42,
@@ -228,10 +238,12 @@ RECOMMENDATIONS
 ### 6. Save results and tracking
 
 Results are saved to:
+
 - **JSON**: `.schliff-eval/exp-<N>.json` (full details)
 - **JSONL log**: `.schliff-eval/results.jsonl` (one line per run, for graphing)
 
 The results log format (JSONL):
+
 ```jsonl
 {"experiment_id": 42, "skill_name": "my-skill", "pass_rate": 80, "composite_score": 85.3, "timestamp": "2026-03-19T15:30:45Z"}
 {"experiment_id": 43, "skill_name": "my-skill", "pass_rate": 85, "composite_score": 86.8, "timestamp": "2026-03-19T15:45:20Z"}
@@ -252,6 +264,7 @@ If `--compare` is provided:
    - `✗` = regressed
 
 Example:
+
 ```
 COMPARISON TO BASELINE [exp #38]
 
@@ -267,10 +280,9 @@ COMPARISON TO BASELINE [exp #38]
 
 - **Quick iterations**: Use `--quick` mode during skill development (assertions only).
 - **Full validation**: Run the full eval before committing improvements.
-- **Baseline tracking**: Save a baseline after each major improvement, then use 
+- **Baseline tracking**: Save a baseline after each major improvement, then use
   `--compare` to verify that refactoring didn't regress quality.
-- **Minimal evals**: A skill with just 3-4 positive triggers + 2-3 test cases is 
+- **Minimal evals**: A skill with just 3-4 positive triggers + 2-3 test cases is
   usually enough to catch regressions.
-- **Timeout strategy**: Set `--timeout 600` for complex skills with many assertions 
+- **Timeout strategy**: Set `--timeout 600` for complex skills with many assertions
   (default 300s is usually sufficient).
-

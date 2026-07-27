@@ -18,6 +18,7 @@ Update Schliff to the latest version.
    - Ask the user for the path if not found
 
 2. **Pull latest changes:**
+
    ```bash
    cd <repo_root>
    git fetch origin main
@@ -28,12 +29,15 @@ Update Schliff to the latest version.
 3. **Show version diff** — compare the CHANGELOG.md before and after pull to highlight new features.
 
 4. **Re-install if using copy mode** (not symlinks):
+
    ```bash
    bash install.sh
    ```
+
    If symlink mode is detected (skills dir is a symlink), skip this step — git pull already updated everything.
 
 5. **Verify installation:**
+
    ```bash
    cd skills/schliff/scripts
    python3 score-skill.py ../SKILL.md --json 2>&1 | python3 -c "import sys,json;d=json.load(sys.stdin);print(f'Schliff v5.1 — Score: {d[\"composite_score\"]}/100')"

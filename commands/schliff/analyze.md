@@ -17,6 +17,7 @@ Perform a comprehensive analysis of a skill and identify top improvements.
    "Which skill should I analyze? Give me the path to its SKILL.md."
 
 2. Check if an eval suite exists. If not, suggest initialization:
+
    ```
    No eval suite found at eval-suite.json.
    Run /schliff:init first to auto-generate one, then I can give you detailed metrics.
@@ -32,11 +33,13 @@ Perform a comprehensive analysis of a skill and identify top improvements.
 4. If a references/ directory exists, list and read each file for additional context.
 
 5. Run structural analysis:
+
    ```bash
    bash scripts/analyze-skill.sh /path/to/SKILL.md
    ```
 
 6. If eval suite exists, run comprehensive scoring:
+
    ```bash
    python3 scripts/score-skill.py \
      /path/to/SKILL.md \
@@ -45,6 +48,7 @@ Perform a comprehensive analysis of a skill and identify top improvements.
    ```
 
 7. If eval suite exists, run assertion checks:
+
    ```bash
    bash scripts/run-eval.sh \
      /path/to/SKILL.md \
@@ -54,7 +58,7 @@ Perform a comprehensive analysis of a skill and identify top improvements.
 
 8. Score each dimension manually for nuance:
 
-   - **Structure (15% weight)**: 
+   - **Structure (15% weight)**:
      * Frontmatter completeness, header organization, length proportionality
      * Examples and progressive disclosure (simple → complex)
      * Readability and logical flow

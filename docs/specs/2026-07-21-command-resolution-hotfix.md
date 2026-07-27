@@ -94,6 +94,7 @@ package-manager block (`command_resolution.py:324`): if the script is not in the
 `unknown` instead of `dangling`.
 
 "Repo declares workspaces" =
+
 - root `package.json` has a `workspaces` key (array, or `{ "packages": [...] }`), **or**
 - `pnpm-workspace.yaml` / `pnpm-workspace.yml` exists in the repo root.
 
@@ -142,6 +143,7 @@ path inside the checkout is an existence oracle / weak escape. Use `os.path.real
 
 `_find_line` (`command_resolution.py:383-389`) recovers the report line by scanning
 for a substring match. Three defects:
+
 - **quadratic DoS** — O(distinct-cmds × lines) substring scan.
 - **cd-taint puncture** — a command that appears on two lines resolves the line to
   the *first* match, which may not be the tainted one, so the `dangling → unknown`

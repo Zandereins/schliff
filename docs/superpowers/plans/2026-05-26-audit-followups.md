@@ -35,6 +35,7 @@
 ## Task 1: Composite guards (write first, RED)
 
 **Files:**
+
 - Create: `skills/schliff/tests/unit/test_composite_unified.py`
 - Create: `benchmarks/anti-gaming/skills/clean-reference.md`
 
@@ -42,7 +43,7 @@
 
 Create `benchmarks/anti-gaming/skills/clean-reference.md` — a well-formed skill with real sections, no gaming:
 
-```markdown
+````text
 ---
 name: changelog-updater
 description: Use when adding a release entry to CHANGELOG.md, before tagging a version, to keep the changelog consistent with Keep-a-Changelog format.
@@ -62,18 +63,28 @@ Do NOT use for editing release notes on the GitHub releases page — that is a s
 
 ## Example
 Before:
+
 ```
+
 ## [Unreleased]
+
 ### Fixed
+
 - Crash on empty input
+
 ```
 After:
+
 ```
+
 ## [Unreleased]
 
 ## [1.4.0] - 2026-05-26
+
 ### Fixed
+
 - Crash on empty input
+
 ```
 
 ## Edge cases
@@ -82,7 +93,7 @@ After:
 
 ## Handoff
 After updating, hand off to the tagging step; this skill does not run git commands.
-```
+````
 
 - [ ] **Step 2: Write the failing guard tests**
 
@@ -200,6 +211,7 @@ git commit -m "test: composite unification + anti-gaming separation guards (red)
 ## Task 2: Unified full-denominator composite (GREEN)
 
 **Files:**
+
 - Modify: `skills/schliff/scripts/scoring/composite.py:49-169`
 
 - [ ] **Step 1: Replace the aggregation in `compute_composite`**
@@ -336,6 +348,7 @@ git commit -m "feat: unified full-denominator composite — one basis, security 
 ## Task 3: Evolve loop uses the unified headline
 
 **Files:**
+
 - Modify: `skills/schliff/scripts/evolve/engine.py:45-52`
 
 - [ ] **Step 1: Write the failing test**
@@ -388,6 +401,7 @@ git commit -m "test: pin evolve headline == CLI headline (unification end-to-end
 ## Task 4: Surface-dim gaming penalty (lever 2 — conditional)
 
 **Files:**
+
 - Modify: `benchmarks/anti-gaming/run.py:81-138`
 - Modify: a measured-dim scorer (decided after reproduction)
 
@@ -434,6 +448,7 @@ def main():
 
 Run: `/usr/bin/python3 benchmarks/anti-gaming/run.py`
 Expected: prints the table + clean composite. Note exit status: `echo $?`.
+
 - If exit 0 (no violations): 7.2.0 + the full-denominator change already separate gamed from clean. **Record this as a finding in the spec; lever 2 is unnecessary.** Skip to Step 5.
 - If exit 1: a gamed file reaches clean. Identify which dimension inflates it (compare `all_scores`); that names the lever.
 
@@ -481,6 +496,7 @@ git commit -m "feat: anti-gaming composite-separation gate + surface-dim stuffin
 ## Task 5: Re-baseline golden scores + docs + CHANGELOG
 
 **Files:**
+
 - Modify: any failing test fixtures encoding composite values; `benchmarks/anti-gaming` doc numbers; `CHANGELOG.md`
 
 - [ ] **Step 1: Run the full suite to surface the blast radius**
@@ -500,7 +516,7 @@ Run: `/usr/bin/python3 benchmarks/anti-gaming/run.py --json > /tmp/ag.json` and 
 
 In `CHANGELOG.md` under `## [Unreleased]`, add:
 
-```markdown
+```text
 ### Changed
 - **BREAKING (scoring):** Composite is now computed over a single canonical 7-dimension basis
   with a full denominator — unmeasured dimensions are uncredited (not silently renormalized away).
@@ -525,6 +541,7 @@ git commit -m "refactor: re-baseline golden scores for unified composite + CHANG
 ## Task 6: Housekeeping — remove dead cap, verify 7/7
 
 **Files:**
+
 - Modify: `skills/schliff/scripts/scoring/security.py:231-239`
 - Modify: `skills/schliff/tests/unit/test_security.py` (reference to `get_composite_cap`)
 
@@ -563,6 +580,7 @@ git commit -m "chore: remove dead get_composite_cap; assert 7/7 default reportin
 ## Task 7: Measure the deterministic-patch ratio
 
 **Files:**
+
 - Create: `skills/schliff/scripts/measure_patch_ratio.py`
 - Create: `skills/schliff/tests/unit/test_patch_ratio.py`
 
@@ -687,6 +705,7 @@ git commit -m "feat: measure_patch_ratio.py — canonical deterministic-patch-ra
 ## Task 8: Correct the "60-70%" claim everywhere
 
 **Files:**
+
 - Modify: `README.md:199,266`; `docs/ARCHITECTURE.md:79`; `skills/schliff/SKILL.md:6-7`; `docs/specs/2026-03-28-v8-design.md:213`; `skills/schliff/scripts/auto-improve.py:7`; `docs/specs/plans/v8-session-prompts.md:789`
 
 - [ ] **Step 1: Locate every occurrence**
@@ -721,6 +740,7 @@ git commit -m "docs: correct deterministic-patch ratio to measured value with ca
 ## Task 9: Version single source of truth
 
 **Files:**
+
 - Modify: `skills/schliff/__init__.py`
 - Modify: `.claude-plugin/plugin.json:3`
 - Create: `skills/schliff/tests/unit/test_version_consistency.py`
@@ -795,6 +815,7 @@ git commit -m "fix: single-source version + drift guard (plugin.json 6.1.0 -> 7.
 ## Task 10: Episodic-memory unit test
 
 **Files:**
+
 - Create: `skills/schliff/tests/unit/test_episodic_store.py`
 
 - [ ] **Step 1: Write the test (covers persistence, locking path, atomic rename, ranking, size cap)**
@@ -890,6 +911,7 @@ git commit -m "test: dedicated episodic-store unit coverage (persistence, rankin
 ## Task 11: pytest as the default runner
 
 **Files:**
+
 - Modify: `Makefile:1,9-10,18`
 
 - [ ] **Step 1: Add a pytest target and route `make test` through it**
@@ -900,10 +922,10 @@ In `Makefile`, update the `.PHONY` line to include `test-unit`, and change the t
 .PHONY: test test-unit test-self test-proof test-all score lint install install-dev clean help
 
 test-unit: ## Run the pytest unit suite (1100+ tests)
-	/usr/bin/python3 -m pytest skills/schliff/tests -q
+ /usr/bin/python3 -m pytest skills/schliff/tests -q
 
 test: test-unit ## Run unit tests (pytest) then integration tests
-	cd $(SKILL_DIR) && bash scripts/test-integration.sh --no-runtime-auto
+ cd $(SKILL_DIR) && bash scripts/test-integration.sh --no-runtime-auto
 ```
 
 Update `test-all` to include unit explicitly (it already chains `test`):
@@ -936,6 +958,7 @@ git commit -m "build: wire pytest into make test (default runner)"
 /usr/bin/python3 skills/schliff/scripts/measure_patch_ratio.py
 make test-unit 2>&1 | tail -3
 ```
+
 Expected: all tests PASS; anti-gaming `exit=0`; measurement prints the canonical ratio.
 
 - [ ] **Step 2: Confirm no stale artifacts**
@@ -945,6 +968,7 @@ grep -rn "60-70\|60–70" README.md docs/ skills/ || echo "claim clean"
 grep -rn "get_composite_cap" skills/ || echo "dead code clean"
 git -C . log --oneline bc8269e..HEAD
 ```
+
 Expected: "claim clean", "dead code clean", and the workstream commits listed.
 
 ---

@@ -16,16 +16,19 @@ Establish or update a quality baseline benchmark for the target skill.
 1. Identify the target skill path from the user's message.
 
 2. If no eval suite exists and the user hasn't run `/schliff:init` yet, suggest it:
+
    ```
    No eval suite found. Run /schliff:init first to auto-generate one.
    ```
 
 3. Run structural analysis:
+
    ```bash
    bash scripts/analyze-skill.sh /path/to/SKILL.md
    ```
 
 4. Run the Python scorer to get all 7 dimensions:
+
    ```bash
    python3 scripts/score-skill.py \
      /path/to/SKILL.md \
@@ -34,6 +37,7 @@ Establish or update a quality baseline benchmark for the target skill.
    ```
 
 5. Run binary eval assertions (if eval suite exists):
+
    ```bash
    bash scripts/run-eval.sh \
      /path/to/SKILL.md \
@@ -48,6 +52,7 @@ Establish or update a quality baseline benchmark for the target skill.
    - Pass rate: (assertions_passed / assertions_total)
 
 7. Record the benchmark in schliff-results.jsonl:
+
    ```bash
    echo '{"exp": N, "timestamp": "ISO-8601", "trigger": "bench", \
      "composite_score": XX, "pass_rate": "X/Y", "scores": {...}}' \
@@ -55,6 +60,7 @@ Establish or update a quality baseline benchmark for the target skill.
    ```
 
 8. Create a history snapshot of the current SKILL.md:
+
    ```bash
    cp /path/to/SKILL.md /path/to/skill/schliff-history/exp-NNN-benchmark.md
    ```

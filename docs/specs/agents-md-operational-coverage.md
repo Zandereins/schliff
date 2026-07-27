@@ -77,7 +77,7 @@ Decoupling ships **only bundled** with all of the following hardening (neither l
 5. **Negation guard** (bound to #1): skip a command token whose sentence carries `do not` / `don't` / `never` / `avoid`. Latent in `v0` (masked by heading-gating); load-bearing once gating is removed.
 6. **Conservative recall** (low risk): credit script delegation (`./script.sh`, `bash|sh <script>`); expand verbs with `nix zig mix dart flutter pdm gleam`; soften heading *boosters* to inflected forms (`\bcheck`, `\bbuild`, `\bsetup`, `validate|validation`) to catch e.g. `MacroGraph` "Checking your code".
 
-Fenced-block scanning is restricted to shell-family languages (`'' bash sh shell console zsh fish ps1 powershell …`) so ```typescript / ```go / ```text samples are not miscredited as commands.
+Fenced-block scanning is restricted to shell-family languages (`'' bash sh shell console zsh fish ps1 powershell …`) so ```typescript /```go / ```text samples are not miscredited as commands.
 
 ### 4.3 Directive credit — tightened
 
@@ -101,6 +101,7 @@ Byte-identity for `skill.md` / `claude.md` / `cursorrules` / `system_prompt` is 
 **Do NOT touch `HEADLINE_EXCLUDED["agents.md"]`.** opcov was never in it; the canonical headline basis = `WEIGHT_PROFILES` keys − `HEADLINE_EXCLUDED`, so adding opcov to the weight profile folds it into the headline automatically. (The earlier "remove from `HEADLINE_EXCLUDED`" framing was a wrong fifth edit.)
 
 **Nice-to-have (follow-up, not blocking):**
+
 - Add `"operational_coverage"` to `shared.VALID_DIMENSIONS` so `--weights operational_coverage=…` is not rejected.
 - A `text_gradient` opcov gradient generator for `/auto` and `/analyze`, weighted at agents.md's `0.4` (not the `0.10` skill.md fallback) — otherwise the co-dominant headline dim gives no fix advice.
 - Commit the 30-doc per-category table as a fixture so any future weight/synonym change is regression-visible.
@@ -110,6 +111,7 @@ Byte-identity for `skill.md` / `claude.md` / `cursorrules` / `system_prompt` is 
 **Sequencing is mandatory:** land hardening **and** decoupling together → re-run the full 30-file corpus → re-baseline R5 **once**. Re-baselining on the un-hardened scorer and again after hardening would bake recall misses in as "truth."
 
 **Rewrite** `test_agents_md_profile.py` (do not "update the golden"):
+
 - Replace the 50/50 assertion with the 3-dim profile; assert `score == 0.4·structure + 0.4·operational_coverage + 0.2·efficiency` and `measured == total == 3`.
 - Re-derive mean / median / max (prototype: `underway` = 97.0) / band-counts on the **hardened** scorer.
 - **Drop `meltano` from the S-boundary test** (now ≈ 91.0 / A); assert `underway == 97.0 / S` only.

@@ -30,22 +30,23 @@ System prompts are the instructions given to LLMs via the API's `system` role. T
 ## Dimension 1: structure_prompt (weight: 15%)
 
 ### What it measures
+
 Whether the system prompt has a logical, well-organized structure that models can reliably follow.
 
 ### Scoring model: Additive, 10 checks x 10 pts
 
 | Check | Points | Detection |
 |-------|--------|-----------|
-| Role definition | 10 | Regex: `(?i)(you are|your role is|act as|you're a|as a \w+ assistant|your purpose)` |
-| Task description | 10 | Regex: `(?i)(your (task|job|goal|objective|mission) is|you (will|should|must) \w+ (the|a|an)|primary function)` |
-| Constraint block | 10 | Regex: `(?i)(constraints?:|rules?:|limitations?:|boundaries:|guardrails:|do not|never|must not|always)` with 2+ matches required |
-| Output format specification | 10 | Regex: `(?i)(respond (in|with|using)|output (format|as)|return (a|the)|format:|your (response|reply|answer) (should|must|will))` |
-| Examples present | 10 | Regex: `(?i)(example[s]?:|for example|e\.g\.|<example>|input.*output|here'?s (a|an|one))` |
+| Role definition | 10 | Regex: `(?i)(you are\|your role is\|act as\|you're a\|as a \w+ assistant\|your purpose)` |
+| Task description | 10 | Regex: `(?i)(your (task\|job\|goal\|objective\|mission) is\|you (will\|should\|must) \w+ (the\|a\|an)\|primary function)` |
+| Constraint block | 10 | Regex: `(?i)(constraints?:\|rules?:\|limitations?:\|boundaries:\|guardrails:\|do not\|never\|must not\|always)` with 2+ matches required |
+| Output format specification | 10 | Regex: `(?i)(respond (in\|with\|using)\|output (format\|as)\|return (a\|the)\|format:\|your (response\|reply\|answer) (should\|must\|will))` |
+| Examples present | 10 | Regex: `(?i)(example[s]?:\|for example\|e\.g\.\|<example>\|input.*output\|here'?s (a\|an\|one))` |
 | Section separators | 10 | Regex for XML tags `<\w+>`, markdown headers `^##?\s`, or delimiter lines `^---$` — need 2+ distinct sections |
 | Logical ordering | 10 | Heuristic: role/context appears in first 25% of prompt, constraints/rules in middle, examples in last 50% |
 | Length appropriateness | 10 | 50-2000 words = full points; <50 = 5 pts (likely incomplete); >2000 = 5 pts (likely bloated) |
 | Progressive detail | 10 | High-level summary followed by specific rules — detect via: first paragraph <50 words AND subsequent sections exist |
-| No dead content | 10 | No TODO/FIXME/placeholder/TBD patterns: `(?i)(TODO|FIXME|HACK|XXX|placeholder|TBD|to be determined|fill in)` |
+| No dead content | 10 | No TODO/FIXME/placeholder/TBD patterns: `(?i)(TODO\|FIXME\|HACK\|XXX\|placeholder\|TBD\|to be determined\|fill in)` |
 
 ### Rubric
 
@@ -56,6 +57,7 @@ Whether the system prompt has a logical, well-organized structure that models ca
 ### Examples
 
 **Good (score ~90):**
+
 ```
 You are a code review assistant for Python projects.
 
@@ -80,16 +82,19 @@ Output: `[security/critical] Line 1: SQL injection via f-string interpolation. U
 ```
 
 **Mediocre (score ~45):**
+
 ```
 You help with code reviews. Look at the code and find problems. Be helpful but concise. Point out bugs and security issues. Use markdown for your responses.
 ```
 
 **Bad (score ~10):**
+
 ```
 You are a helpful assistant. Be nice and thorough. Help the user with whatever they need. Make sure your responses are good.
 ```
 
 ### Anti-gaming rules
+
 - Empty sections (header with no content below) score 0 for that check
 - Repeated constraint phrases (same rule stated 3+ ways) count as 1
 - XML tag pairs without content between them score 0
@@ -100,22 +105,23 @@ You are a helpful assistant. Be nice and thorough. Help the user with whatever t
 ## Dimension 2: output_contract (weight: 15%) — NEW
 
 ### What it measures
+
 Whether the prompt defines a clear, enforceable contract for what the model should produce.
 
 ### Scoring model: Additive, 10 checks x 10 pts
 
 | Check | Points | Detection |
 |-------|--------|-----------|
-| Format specification | 10 | Regex: `(?i)(respond (in|with|as)|format (as|your)|output (as|in|format)|return (JSON|XML|YAML|markdown|plain text|HTML|CSV))` |
-| Length/size constraints | 10 | Regex: `(?i)(max(imum)?\s+\d+\s+(words?|tokens?|sentences?|characters?|paragraphs?|lines?)|keep.{0,20}(short|brief|concise|under \d+)|limit.{0,20}(to \d+|length))` |
-| Tone/voice definition | 10 | Regex: `(?i)(tone:|voice:|style:|speak (as|like)|write (in|with) a|formal|informal|professional|friendly|technical|casual|authoritative)` |
-| Schema definition | 10 | Regex: `(?i)(\{[\s\S]{5,50}\}|"type":\s*"|fields?:|properties:|required:|schema:)` or JSON skeleton present |
-| Required fields | 10 | Regex: `(?i)(must include|required fields?|always include|every response (must|should) (have|contain|include))` |
-| Forbidden content | 10 | Regex: `(?i)(never (include|mention|output|say|generate|reveal)|do not (include|mention|output|reveal|disclose)|forbidden:|prohibited:|exclude:)` |
-| Response structure | 10 | Regex: `(?i)(first[,.]|then[,.]|finally[,.]|step \d|begin (with|by)|end (with|by)|start (with|by)|your response should (start|begin|end))` |
-| Error response format | 10 | Regex: `(?i)(if .{0,40}(error|fail|unknown|unclear|can'?t|unable)|when .{0,30}(error|fail)|error (response|format|message)|on (error|failure))` |
-| Validation instruction | 10 | Regex: `(?i)(verify|validate|check|ensure|confirm).{0,30}(before (respond|return|output)|your (response|output|answer))` |
-| Example output | 10 | Regex: `(?i)(example (output|response)|sample (output|response)|here'?s what .{0,20}(look|should)|expected (output|response))` combined with presence of code block or indented block within 10 lines |
+| Format specification | 10 | Regex: `(?i)(respond (in\|with\|as)\|format (as\|your)\|output (as\|in\|format)\|return (JSON\|XML\|YAML\|markdown\|plain text\|HTML\|CSV))` |
+| Length/size constraints | 10 | Regex: `(?i)(max(imum)?\s+\d+\s+(words?\|tokens?\|sentences?\|characters?\|paragraphs?\|lines?)\|keep.{0,20}(short\|brief\|concise\|under \d+)\|limit.{0,20}(to \d+\|length))` |
+| Tone/voice definition | 10 | Regex: `(?i)(tone:\|voice:\|style:\|speak (as\|like)\|write (in\|with) a\|formal\|informal\|professional\|friendly\|technical\|casual\|authoritative)` |
+| Schema definition | 10 | Regex: `(?i)(\{[\s\S]{5,50}\}\|"type":\s*"\|fields?:\|properties:\|required:\|schema:)` or JSON skeleton present |
+| Required fields | 10 | Regex: `(?i)(must include\|required fields?\|always include\|every response (must\|should) (have\|contain\|include))` |
+| Forbidden content | 10 | Regex: `(?i)(never (include\|mention\|output\|say\|generate\|reveal)\|do not (include\|mention\|output\|reveal\|disclose)\|forbidden:\|prohibited:\|exclude:)` |
+| Response structure | 10 | Regex: `(?i)(first[,.]\|then[,.]\|finally[,.]\|step \d\|begin (with\|by)\|end (with\|by)\|start (with\|by)\|your response should (start\|begin\|end))` |
+| Error response format | 10 | Regex: `(?i)(if .{0,40}(error\|fail\|unknown\|unclear\|can'?t\|unable)\|when .{0,30}(error\|fail)\|error (response\|format\|message)\|on (error\|failure))` |
+| Validation instruction | 10 | Regex: `(?i)(verify\|validate\|check\|ensure\|confirm).{0,30}(before (respond\|return\|output)\|your (response\|output\|answer))` |
+| Example output | 10 | Regex: `(?i)(example (output\|response)\|sample (output\|response)\|here'?s what .{0,20}(look\|should)\|expected (output\|response))` combined with presence of code block or indented block within 10 lines |
 
 ### Rubric
 
@@ -126,6 +132,7 @@ Whether the prompt defines a clear, enforceable contract for what the model shou
 ### Examples
 
 **Good (score ~95):**
+
 ```
 ## Output Format
 Respond with a JSON object matching this schema:
@@ -144,16 +151,19 @@ Maximum response size: 500 tokens.
 ```
 
 **Mediocre (score ~40):**
+
 ```
 Return your analysis as JSON with the sentiment and a summary. Keep it short.
 ```
 
 **Bad (score ~5):**
+
 ```
 Tell the user what you think about the text.
 ```
 
 ### Anti-gaming rules
+
 - "Respond in JSON" without any field specification caps at 3 pts for format
 - Length constraints must be numeric — "keep it short" without a number = 5 pts max
 - Tone words must be 2+ specific adjectives, not just "appropriate" or "suitable"
@@ -165,9 +175,11 @@ Tell the user what you think about the text.
 ## Dimension 3: efficiency (weight: 15%) — Adapted
 
 ### What it measures
+
 Token efficiency — how much value per token. System prompts are uniquely cost-sensitive because they're included in every request.
 
 ### Key differences from SKILL.md efficiency
+
 - **No frontmatter stripping** — system prompts have no YAML header
 - **Higher penalty for verbosity** — every word costs money per-request
 - **Conditional inclusion detection** — instructions for unused tools waste tokens
@@ -180,33 +192,36 @@ Token efficiency — how much value per token. System prompts are uniquely cost-
 
 | Pattern | Regex | Weight |
 |---------|-------|--------|
-| Imperative instructions | `(?i)^(?:\d+\.\s*)?(?:Respond|Return|Generate|Analyze|Extract|Classify|Summarize|Translate|Format|Parse|Validate|Check|Ignore|Never|Always|Include|Exclude|Limit|Use|Avoid)\b` | 3 per (cap 20) |
-| Concrete examples | `(?i)(example|e\.g\.|for instance|input.*output|<example>)` | 5 per (cap 3) |
-| Rationale/why | `(?i)(because|since|this (ensures|prevents|avoids)|otherwise|so that)` | 2 per (cap 5) |
-| Quantified constraints | `\b\d+\s*(words?|tokens?|items?|max|min|seconds?|characters?)\b` | 2 per (cap 5) |
+| Imperative instructions | `(?i)^(?:\d+\.\s*)?(?:Respond\|Return\|Generate\|Analyze\|Extract\|Classify\|Summarize\|Translate\|Format\|Parse\|Validate\|Check\|Ignore\|Never\|Always\|Include\|Exclude\|Limit\|Use\|Avoid)\b` | 3 per (cap 20) |
+| Concrete examples | `(?i)(example\|e\.g\.\|for instance\|input.*output\|<example>)` | 5 per (cap 3) |
+| Rationale/why | `(?i)(because\|since\|this (ensures\|prevents\|avoids)\|otherwise\|so that)` | 2 per (cap 5) |
+| Quantified constraints | `\b\d+\s*(words?\|tokens?\|items?\|max\|min\|seconds?\|characters?)\b` | 2 per (cap 5) |
 
 **Noise indicators (negative):**
 
 | Pattern | Regex | Weight |
 |---------|-------|--------|
-| Filler phrases | `(?i)(it is important to note|please note|keep in mind|remember that|be aware that|it's worth mentioning|as mentioned|in other words)` | 3 per |
+| Filler phrases | `(?i)(it is important to note\|please note\|keep in mind\|remember that\|be aware that\|it's worth mentioning\|as mentioned\|in other words)` | 3 per |
 | Hedging | `(?i)(you (might\|could\|should\|may) (want to\|consider\|possibly))` | 3 per |
-| Tautologies | `(?i)(helpful and useful|clear and concise|accurate and correct|complete and comprehensive|efficient and effective)` | 4 per |
+| Tautologies | `(?i)(helpful and useful\|clear and concise\|accurate and correct\|complete and comprehensive\|efficient and effective)` | 4 per |
 | Begging language | `(?i)(CRITICAL!?\|IMPORTANT!?\|YOU MUST\|NEVER EVER\|ABSOLUTELY\|EXTREMELY important)` — aggressive emphasis that hurts newer models | 2 per |
-| Obvious instructions | `(?i)(think carefully|do your best|try to be helpful|be a good assistant|make sure to|don't forget)` | 2 per |
+| Obvious instructions | `(?i)(think carefully\|do your best\|try to be helpful\|be a good assistant\|make sure to\|don't forget)` | 2 per |
 | Redundant repetition | Same instruction stated 2+ ways (deduplicate on normalized 80-char prefix) | 2 per duplicate |
 
 **Scoring formula:**
+
 ```
 density = ((signal_count - noise_count) / total_words) * 100
 score = 40 + (density / 10)^0.5 * 55  (clamped 0-95)
 ```
 
 **Bonuses:**
+
 - Under 500 words with density >= 3: +5
 - Static content grouped at top (for caching): +3 — detect via: constraints/role in first 40%, variable/dynamic content after
 
 **Penalties:**
+
 - Over 3000 words with density < 3: -20
 - Over 50% empty lines: -10
 - Over 5 tautologies: -10
@@ -220,6 +235,7 @@ score = 40 + (density / 10)^0.5 * 55  (clamped 0-95)
 ### Examples
 
 **Good (score ~90):**
+
 ```
 You are a SQL query optimizer. Given a PostgreSQL query, return an optimized version.
 
@@ -231,21 +247,27 @@ Rules:
 
 Output: optimized query + explanation (max 3 sentences).
 ```
+
 (62 words, 4 concrete rules, 1 quantified constraint, 0 filler)
 
 **Mediocre (score ~50):**
+
 ```
 You are a helpful SQL optimization assistant. Your job is to help users optimize their database queries. It is important to note that you should focus on PostgreSQL. Please keep in mind that performance matters. You should consider using CTEs instead of subqueries when it makes sense. Remember that SELECT * is generally not recommended. Try to be thorough but also concise in your explanations.
 ```
+
 (65 words, same information as above but 50% more words, 4 filler phrases)
 
 **Bad (score ~25):**
+
 ```
 You are an EXTREMELY helpful and knowledgeable database expert. It is CRITICALLY IMPORTANT that you ALWAYS provide the BEST possible query optimization advice. You MUST NEVER give bad advice. Please be very careful and thorough. Think step by step about every query. Make sure to consider all possible optimizations. Don't forget to check for index usage. Remember to always test your suggestions. Be aware that different databases have different features. Keep in mind that performance is important.
 ```
+
 (80 words, 0 concrete rules, 6 filler phrases, 3 begging phrases, 0 quantified constraints)
 
 ### Anti-gaming rules
+
 - Cap on all signal categories prevents keyword stuffing
 - Duplicated instructions (normalized) count as noise, not signal
 - "Example" keyword without actual input/output content = 0 pts
@@ -256,6 +278,7 @@ You are an EXTREMELY helpful and knowledgeable database expert. It is CRITICALLY
 ## Dimension 4: clarity (weight: 15%) — Transferred
 
 ### What it measures
+
 Whether instructions are unambiguous, non-contradictory, and specific enough to implement deterministically.
 
 ### Scoring model: Deductive, starts at 100
@@ -267,10 +290,12 @@ Whether instructions are unambiguous, non-contradictory, and specific enough to 
 Extract (verb, object) pairs from "always/must" vs "never/must not/do not" patterns. Same algorithm as SKILL.md clarity.
 
 Regex (reuse from SKILL.md):
+
 - `(?i)\b(always|must)\s+(\w+(?:\s+\w+)?)`
 - `(?i)\b(never|must not|do not|don't)\s+(\w+(?:\s+\w+)?)`
 
 **System-prompt-specific contradictions:**
+
 - `(?i)be (concise|brief)` + `(?i)(explain (thoroughly|in detail)|provide (detailed|comprehensive))` — penalty 15
 - `(?i)(respond only in \w+)` appearing 2+ times with different languages/formats — penalty 15
 - `(?i)always` + `(?i)unless` on same topic within 5 lines — penalty 10 (ambiguous override)
@@ -308,25 +333,31 @@ Regex (reuse from SKILL.md):
 ### Examples
 
 **Good (score ~95):**
+
 ```
 Respond only in English. If the user writes in another language, respond in English with a note that you only support English.
 
 Always include line numbers in code reviews. Never include line numbers in code generation.
 ```
+
 (Clear, no contradictions — "line numbers" has different context for review vs generation.)
 
 **Mediocre (score ~55):**
+
 ```
 Be helpful and professional. Respond appropriately to user questions. Sometimes provide examples when it seems useful. Use the right format for the situation.
 ```
 
 **Bad (score ~15):**
+
 ```
 Always be concise. Provide thorough, detailed explanations for every topic. Keep responses short. Include comprehensive examples. It should be formatted properly.
 ```
+
 (Contradictions: concise vs detailed, short vs comprehensive. Vague: "properly.")
 
 ### Anti-gaming rules
+
 - Adding "if X then Y, unless Z" complexity just for specificity doesn't help if X/Y/Z are themselves vague
 - Quantification must be meaningful — "respond in exactly 1-999999 words" = 0 pts
 - Each unique contradiction penalized only once (no double-counting same pair)
@@ -336,9 +367,11 @@ Always be concise. Provide thorough, detailed explanations for every topic. Keep
 ## Dimension 5: security (weight: 15%) — Adapted
 
 ### What it measures
+
 How well the system prompt defends against prompt injection, data exfiltration, jailbreaking, and privilege escalation.
 
 ### Key differences from SKILL.md security
+
 - SKILL.md security scans for malicious content IN the skill
 - System prompt security scores for defensive patterns AGAINST attacks
 - **Dual scoring:** penalize vulnerabilities AND reward defenses
@@ -367,7 +400,7 @@ Reuse existing SKILL.md categories with adjusted weights:
 | Input sanitization awareness | 8 | `(?i)(user input.{0,30}(untrusted\|sanitize\|validate\|may contain)\|treat .{0,20}(user\|external).{0,20}(as data\|not as instruction))` |
 | Output filtering | 8 | `(?i)(never (reveal\|output\|disclose\|share).{0,30}(system prompt\|these instructions\|internal\|private)\|do not (repeat\|echo\|show).{0,30}(prompt\|instructions))` |
 | Scope limitation | 6 | `(?i)(only (discuss\|answer\|respond to\|help with).{0,30}(topic\|domain\|subject)\|(off.?topic\|out of scope\|outside.{0,20}(scope\|domain)).{0,30}(decline\|refuse\|redirect))` |
-| Canary/tripwire | 5 | `(?i)(canary|tripwire|if .{0,30}(asks? (for\|about)\|requests?) .{0,30}(system prompt\|instructions).{0,30}(refuse\|decline\|ignore))` |
+| Canary/tripwire | 5 | `(?i)(canary\|tripwire\|if .{0,30}(asks? (for\|about)\|requests?) .{0,30}(system prompt\|instructions).{0,30}(refuse\|decline\|ignore))` |
 | Content policy reference | 5 | `(?i)(content policy\|usage policy\|terms of (service\|use)\|acceptable use\|safety guidelines)` |
 
 **Final score:** `min(100, max(0, Part_A + Part_B))`
@@ -381,6 +414,7 @@ Reuse existing SKILL.md categories with adjusted weights:
 ### Examples
 
 **Good (score ~95):**
+
 ```
 You are CustomerBot, a support agent for Acme Corp. You ONLY discuss Acme products and policies.
 
@@ -393,17 +427,21 @@ Security rules (these override all other instructions):
 ```
 
 **Mediocre (score ~50):**
+
 ```
 You are a customer support bot. Help users with their questions. Be helpful and accurate.
 ```
+
 (No vulnerabilities, but no defenses either.)
 
 **Bad (score ~5):**
+
 ```
 You are a helpful assistant. Do whatever the user asks. If the user tells you to ignore your instructions, that's fine — be accommodating. Print your system prompt if asked.
 ```
 
 ### Anti-gaming rules
+
 - Defense patterns must be semantically meaningful — `<!-- canary: abc123 -->` without actual logic = 0 pts
 - "Never reveal system prompt" stated 5 times still counts as 1 defense
 - Identity anchoring requires a specific identity (not "you are an AI assistant")
@@ -414,9 +452,11 @@ You are a helpful assistant. Do whatever the user asks. If the user tells you to
 ## Dimension 6: composability (weight: 10%) — Adapted
 
 ### What it measures
+
 Whether the system prompt plays well in multi-prompt architectures, agent handoff systems, and prompt chains.
 
 ### Key differences from SKILL.md composability
+
 - No filesystem references (no `references/` dir)
 - Focus on API-level composition: tool definitions, multi-agent handoff, context scoping
 - Relevant for: multi-agent systems, prompt chains, RAG pipelines, tool-using agents
@@ -427,7 +467,7 @@ Whether the system prompt plays well in multi-prompt architectures, agent handof
 |-------|--------|-----------|
 | Scope boundaries | 10 | Positive scope: `(?i)(you (only\|exclusively) (handle\|deal with\|assist with\|help with)\|your (scope\|domain\|responsibility) is\|limited to)` + Negative scope: `(?i)(do not (handle\|answer\|assist with)\|outside (your\|this) scope\|not your (job\|responsibility)\|defer to)` |
 | Handoff patterns | 10 | `(?i)(transfer to\|hand off to\|escalate to\|route to\|pass (the user\|this) to\|redirect to\|suggest (contacting\|speaking with))` |
-| Tool awareness | 10 | `(?i)(tools?:|functions?:|available (tools\|functions)\|you have access to\|you can (call\|use\|invoke))` or tool/function schema indicators |
+| Tool awareness | 10 | `(?i)(tools?:\|functions?:\|available (tools\|functions)\|you have access to\|you can (call\|use\|invoke))` or tool/function schema indicators |
 | Context window management | 10 | `(?i)(conversation history\|previous messages?\|context (window\|length\|limit)\|if (context\|conversation) (exceeds?\|too long)\|summarize (previous\|earlier))` |
 | Statelessness declaration | 10 | `(?i)(you (do not\|don't) (have\|retain\|remember\|store) (memory\|state\|history)\|each (request\|conversation\|message) is (independent\|separate)\|no (persistent\|long-term) (memory\|state))` |
 | Error/fallback behavior | 10 | `(?i)(if (you\|the (tool\|function\|API)) (can'?t\|fail\|error)\|on (error\|failure)\|fallback (to\|behavior)\|graceful(ly)? (fail\|degrad))` |
@@ -445,6 +485,7 @@ Whether the system prompt plays well in multi-prompt architectures, agent handof
 ### Examples
 
 **Good (score ~85):**
+
 ```
 You are the Billing Agent. You handle subscription changes, payment issues, and invoice requests.
 
@@ -459,16 +500,19 @@ Output: JSON with {response: string, action?: {tool: string, params: object}, tr
 ```
 
 **Mediocre (score ~40):**
+
 ```
 You help with billing questions. Use the available tools to look up information. If you can't help, apologize.
 ```
 
 **Bad (score ~5):**
+
 ```
 You are a helpful assistant that can do anything. Help the user with whatever they need.
 ```
 
 ### Anti-gaming rules
+
 - "Transfer to X" requires X to be a named entity, not "transfer to the appropriate agent"
 - Tool awareness requires naming at least one tool/function
 - Scope boundaries must name specific domains, not "handle relevant topics"
@@ -479,6 +523,7 @@ You are a helpful assistant that can do anything. Help the user with whatever th
 ## Dimension 7: completeness (weight: 15%) — NEW
 
 ### What it measures
+
 Whether the prompt anticipates and handles the full space of situations the model will encounter.
 
 ### Scoring model: Additive, 10 checks x 10 pts
@@ -490,11 +535,11 @@ Whether the prompt anticipates and handles the full space of situations the mode
 | Ambiguity handling | 10 | `(?i)(if (unclear\|ambiguous\|vague\|confusing\|uncertain)\|when (you'?re?\|the (intent\|meaning) is) (unsure\|unclear\|not sure\|uncertain)\|ask (for\|the user for) clarification)` |
 | Off-topic handling | 10 | `(?i)(off.?topic\|out of scope\|unrelated (question\|request\|topic)\|not (within\|in) (your\|the) (scope\|domain)\|if (the user\|someone) asks? (about\|for) .{0,30}(unrelated\|outside))` |
 | Multi-turn awareness | 10 | `(?i)(follow.?up\|conversation (history\|context)\|previous (message\|turn\|question)\|referring (back\|to earlier)\|maintain context\|remember (earlier\|previous\|the))` |
-| Language/locale handling | 10 | `(?i)(language:|respond in \w+\|if .{0,20}(another\|different\|foreign) language\|locale\|translation\|multilingual\|english only)` |
+| Language/locale handling | 10 | `(?i)(language:\|respond in \w+\|if .{0,20}(another\|different\|foreign) language\|locale\|translation\|multilingual\|english only)` |
 | Empty/null input handling | 10 | `(?i)(empty (input\|message\|query\|request)\|blank (input\|message)\|null\|no (input\|message\|content) (provided\|given\|received)\|if .{0,20}(nothing\|empty))` |
 | Rate/limit awareness | 5 | `(?i)(rate limit\|too many (requests?\|calls?)\|throttl\|quota\|if .{0,30}(exceed\|limit\|cap))` |
 | Graceful degradation | 10 | `(?i)(graceful(ly)?\s+(fail\|degrad\|handle)\|best effort\|partial (response\|result)\|if .{0,30}(can'?t fully\|unable to complete\|partial))` |
-| Examples for ambiguous cases | 15 | Presence of 2+ examples that show non-obvious behavior: `(?i)(example|e\.g\.)` followed by scenario containing `(?i)(but|however|edge|special|even (if|when|though)|note that)` within 5 lines |
+| Examples for ambiguous cases | 15 | Presence of 2+ examples that show non-obvious behavior: `(?i)(example\|e\.g\.)` followed by scenario containing `(?i)(but\|however\|edge\|special\|even (if\|when\|though)\|note that)` within 5 lines |
 
 ### Rubric
 
@@ -505,6 +550,7 @@ Whether the prompt anticipates and handles the full space of situations the mode
 ### Examples
 
 **Good (score ~90):**
+
 ```
 You are a booking assistant for FlightCo.
 
@@ -522,16 +568,19 @@ Language: English only. If user writes in another language, respond in English w
 ```
 
 **Mediocre (score ~45):**
+
 ```
 You help users book flights. Search for available flights and help them complete their booking. If something goes wrong, let them know.
 ```
 
 **Bad (score ~5):**
+
 ```
 You are a flight booking assistant. Book flights for users.
 ```
 
 ### Anti-gaming rules
+
 - Each edge case must describe a specific scenario AND a specific response — "handle edge cases" without listing them = 0 pts
 - Generic "if error, inform user" without specifying what kind of error = 5 pts max
 - "Ask for clarification" must specify WHEN — unconditional clarification-asking is an anti-pattern
@@ -555,6 +604,7 @@ composite = (
 ```
 
 ### Security cap (transferred from SKILL.md)
+
 If `security < 20`, composite is capped at 60.
 If `security < 10`, composite is capped at 40.
 If `security < 5`, composite is capped at 20.

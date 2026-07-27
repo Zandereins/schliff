@@ -106,6 +106,7 @@ Based on analysis of kept experiments:
 ### Parsing JSONL Format
 
 Each line in `schliff-results.jsonl` is a JSON object:
+
 ```json
 {
   "exp": 0,
@@ -131,6 +132,7 @@ Each line in `schliff-results.jsonl` is a JSON object:
 ### Computing Trends
 
 For each dimension across kept iterations:
+
 - Split experiments into early half and late half
 - Calculate average score for each half
 - Classify as: improving (+2% or more), stable (within 2%), declining (-2% or more)
@@ -138,6 +140,7 @@ For each dimension across kept iterations:
 ### Top Impactful Improvements
 
 Sort kept iterations by `delta` field (composite score change from previous kept baseline):
+
 1. Select top 5 by magnitude
 2. Display in order of experiment number (chronological)
 3. Include commit hash for traceability
@@ -145,6 +148,7 @@ Sort kept iterations by `delta` field (composite score change from previous kept
 ### Experiment Velocity
 
 Calculate as:
+
 ```
 velocity = (total_experiments) / (total_duration_seconds / 3600)
 ```
@@ -159,4 +163,3 @@ Shows how many experiments per hour the improvement loop is achieving.
 4. **If stable across dimensions:** Consider novel approaches
 5. **If high crash rate (>10%):** Review crash logs, simplify hypotheses
 6. **If low keep rate (<25%):** Improve hypothesis generation or scoring
-

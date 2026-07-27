@@ -21,6 +21,7 @@ description: "Prompt injection defense for OpenClaw agents. Provides real-time a
 ## Active Hooks (v0.3)
 
 When installed as a plugin, 4 hooks automatically scan tool inputs, outputs, and outgoing messages at zero token cost:
+
 - `before_tool_call`: Blocks tool calls with CRITICAL injection patterns in parameters
 - `tool_result_persist`: Prepends warnings to tool outputs containing injection patterns
 - `after_tool_call`: Logs findings from tool outputs for audit trail

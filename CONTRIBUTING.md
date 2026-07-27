@@ -58,6 +58,7 @@ All tests must pass before submitting a PR.
 ## Adding a New Scoring Dimension
 
 1. Create `scripts/scoring/your_dimension.py`:
+
    ```python
    """scoring/your_dimension.py — Your Dimension scoring."""
    from shared import read_skill_safe
@@ -74,6 +75,7 @@ All tests must pass before submitting a PR.
    ```
 
 2. Register in `scripts/scoring/__init__.py`:
+
    ```python
    from scoring.your_dimension import score_your_dimension
    ```
