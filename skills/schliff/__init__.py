@@ -1,3 +1,3 @@
 """Schliff — deterministic SKILL.md linter and scoring engine."""
 
-__version__ = "8.7.0"
+__version__ = "8.8.0"

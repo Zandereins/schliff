@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.8.0] - 2026-07-27
+
 ### Changed
 
 - **An unrecognised `<runner> run <target>` no longer counts as a build command
@@ -800,7 +802,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.6.3...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.8.0...HEAD
+[8.8.0]: https://github.com/Zandereins/schliff/compare/v8.7.0...v8.8.0
+[8.7.0]: https://github.com/Zandereins/schliff/compare/v8.6.3...v8.7.0
 [8.6.3]: https://github.com/Zandereins/schliff/compare/v8.6.2...v8.6.3
 [8.6.2]: https://github.com/Zandereins/schliff/compare/v8.6.1...v8.6.2
 [8.6.1]: https://github.com/Zandereins/schliff/compare/v8.6.0...v8.6.1
