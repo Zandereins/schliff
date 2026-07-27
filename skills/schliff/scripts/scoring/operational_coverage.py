@@ -90,6 +90,9 @@ _SHELL_LANGS = {
 # --------------------------------------------------------------------------- #
 # Command classification token sets (§4.2 hardening)
 # --------------------------------------------------------------------------- #
+# A real, runnable command whose operational family could not be determined.
+UNCLASSIFIED = "unclassified"
+
 _JUNK = {
     "echo", "ls", "pwd", "cd", "true", "false", ":", "exit", "cat", "whoami",
     "date", "clear", "sleep", "head", "tail", "sort", "which",
@@ -101,6 +104,11 @@ _WRAPPERS = {"sudo", "command", "exec", "time", "env", "xargs", "nohup", "then",
 _TEST_INTRINSIC = {
     "pytest", "vitest", "jest", "mocha", "tox", "nox", "ruff", "eslint", "mypy",
     "prettier", "black", "flake8", "isort", "pyright", "nextest", "pre-commit",
+    # `lint` is already a _TEST_TOKEN, so the tools that perform it belong here.
+    # pylint was the only linter a 259-file sweep found missing (#133); without
+    # this entry the UNCLASSIFIED change below would move `uv run pylint` from
+    # one wrong family to no family at all.
+    "pylint",
 }
 # tsc sits in the build family per spec §4.2 ("build / compile / ... / tsc / vite").
 _BUILD_INTRINSIC = {"vite", "webpack", "tsc"}
@@ -292,8 +300,8 @@ def _runner_family(verb: str, nonflag):
     # Runner-in-runner delegation: `uv pip install ...` -> pip's family.
     if a0 in _RUNNER:
         return _runner_family(a0, nonflag[nonflag.index(a0) + 1:])
-    # `npm run <unknown-script>` -> generic build/run
-    return "build" if consumed_run else None
+    # `npm run <unknown-script>` -> real command, unclassifiable family.
+    return UNCLASSIFIED if consumed_run else None
 
 
 def _classify(seg: str, inline: bool):
