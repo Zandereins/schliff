@@ -1,3 +1,11 @@
+> **Historical record — these figures do not reproduce on the current release.**
+> Measured 2026-04-17 with schliff **v7.1.0** (7 dimensions). The engine has since gained
+> an eighth dimension, changed its headline weights per format, and re-derived its corpus
+> goldens. Re-running the pipeline against a current release will produce different
+> numbers. Kept as a dated snapshot of what was measured then, not as a present-tense
+> claim — the same convention used for the [hydra case study](../case-studies/hydra/),
+> which is pinned to `schliff==8.4.0`.
+
 # State of AI Instructions 2026
 
 > We scored 120 public AI instruction files with schliff. **Mean grade: D. 59% below C.** Adding an eval suite — which zero of 60 sampled source repos ship — would lift the mean **+22 points**. Here's the data.

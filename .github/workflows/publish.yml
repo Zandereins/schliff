@@ -101,7 +101,13 @@ jobs:
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install dist/*.whl
           # Verify the published import surface and the console-script entry point resolve.
-          /tmp/smoke/bin/python -c "import skills.schliff; from skills.schliff.scripts.cli import main; print('import ok')"
+          # -P (PYTHONSAFEPATH, 3.11+; this job pins 3.12) is load-bearing, not hygiene:
+          # without it Python prepends the cwd — the repo checkout — to sys.path, so the
+          # import resolves against the SOURCE TREE and the gate passes even when the wheel
+          # ships nothing. Verified: in a venv WITHOUT schliff installed, the un-flagged
+          # command exits 0; with -P it exits 1 (ModuleNotFoundError), and still exits 0
+          # once the wheel is really installed. Same doctrine as action.yml's `python3 -P`.
+          /tmp/smoke/bin/python -P -c "import skills.schliff; from skills.schliff.scripts.cli import main; print('import ok')"
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1

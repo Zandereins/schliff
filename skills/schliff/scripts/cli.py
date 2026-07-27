@@ -395,9 +395,10 @@ def cmd_check_commands(args: argparse.Namespace) -> None:
             print(f"DANGLING  {args.skill_path}{loc}  `{r['command']}` — {r['evidence']}")
         resolved = sum(1 for r in results if r["status"] == "resolved")
         unknown = sum(1 for r in results if r["status"] == "unknown")
+        noun = "command" if len(results) == 1 else "commands"
         print(
             f"\n{len(dangling)} dangling, {resolved} resolved, {unknown} unknown "
-            f"(of {len(results)} commands)."
+            f"(of {len(results)} {noun})."
         )
 
     sys.exit(1 if dangling else 0)
