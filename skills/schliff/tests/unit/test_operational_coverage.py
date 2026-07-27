@@ -16,7 +16,11 @@ from pathlib import Path
 import pytest
 
 from scoring.composite import compute_composite
-from scoring.operational_coverage import _extract_commands, score_operational_coverage
+from scoring.operational_coverage import (
+    UNCLASSIFIED,
+    _extract_commands,
+    score_operational_coverage,
+)
 from scoring.registry import (
     _INSTRUCTION_FILE_SCORERS,
     WEIGHT_PROFILES,
@@ -882,21 +886,26 @@ class TestRunnerClassificationCharacterization:
         ("yarn test-unit", None),
     ]
 
-    # DEFECT B (#133, to be fixed): once a `run`-like token is consumed, an
-    # unrecognised target is credited `build` without the target ever being
-    # inspected. Note `yarn test-unit` above vs `yarn run test-unit` here —
-    # same tool, same script, opposite outcome.
-    FALSE_BUILD_CREDIT = [
-        ("yarn run test-unit", "build"),
-        ("npm run test-unit", "build"),      # a test script credited as build
-        ("npm run lint-fix", "build"),       # a lint script credited as build
-        ("npm run wibble", "build"),         # nothing at all credited as build
-        ("npm run db:push", "build"),
-        ("pnpm run test-unit", "build"),
-        ("uv run pylint pkg tests", "build"),  # pylint is a linter -> test
-        ("uv run tool -- --help", "build"),    # --help is inspection junk -> nothing
-        ("bun run scripts/x.ts", "build"),
-        ("cargo run examples/a/Cargo.toml", "build"),
+    # DEFECT B — FIXED (#133). A consumed `run` token no longer manufactures a
+    # `build` credit for a target that was never inspected. These are real,
+    # runnable commands whose family the engine cannot determine, so it now says
+    # exactly that: UNCLASSIFIED credits no category, while the row itself stays
+    # extracted so `check-commands` still resolves it against the repo.
+    #
+    # `lint-fix` and `db:push` stay UNCLASSIFIED on purpose. Reading them as
+    # test/setup would need boundary matching (`test-*`, `lint-*`), which is
+    # deliberately out of scope here — a second mechanism in the same change
+    # would confound the golden re-derivation.
+    UNCLASSIFIED_TARGETS = [
+        ("yarn run test-unit", UNCLASSIFIED),
+        ("npm run test-unit", UNCLASSIFIED),
+        ("npm run lint-fix", UNCLASSIFIED),
+        ("npm run wibble", UNCLASSIFIED),
+        ("npm run db:push", UNCLASSIFIED),
+        ("pnpm run test-unit", UNCLASSIFIED),
+        ("uv run tool -- --help", UNCLASSIFIED),
+        ("bun run scripts/x.ts", UNCLASSIFIED),
+        ("cargo run examples/a/Cargo.toml", UNCLASSIFIED),
     ]
 
     @pytest.mark.parametrize("command,family", CORRECT_TODAY)
@@ -907,9 +916,27 @@ class TestRunnerClassificationCharacterization:
     def test_guarded_verbs_drop_unknown_targets(self, command, family):
         assert self._family(command) == family
 
-    @pytest.mark.parametrize("command,family", FALSE_BUILD_CREDIT)
-    def test_consumed_run_credits_build_without_inspecting_target(self, command, family):
+    @pytest.mark.parametrize("command,family", UNCLASSIFIED_TARGETS)
+    def test_unknown_delegated_target_is_unclassified(self, command, family):
         assert self._family(command) == family
+
+    @pytest.mark.parametrize("command", [c for c, _ in UNCLASSIFIED_TARGETS])
+    def test_unclassified_credits_no_category(self, command, tmp_path):
+        """UNCLASSIFIED must never reach a scored category. It is not in
+        ("setup", "build", "test"), so `cat in credited_fams` cannot match — this
+        pins that invariant against a future rename or a stray membership test."""
+        result = _op(tmp_path, f"# P\n\n## Test\n\n```bash\n{command}\n```\n")
+        assert not any(
+            c["credited"] for k, c in result["details"]["categories"].items()
+            if k in ("setup", "build", "test")
+        )
+
+    def test_pylint_is_a_test_tool(self):
+        """`pylint` joined `_TEST_INTRINSIC` alongside the 16 linters already
+        there. Without it the UNCLASSIFIED change would move `uv run pylint` from
+        a wrong family to no family — one error traded for another."""
+        assert self._family("uv run pylint pkg tests") == "test"
+        assert self._family("pylint pkg tests") == "test"
 
     def test_prose_never_credits(self):
         """The reason DEFECT A is accepted. `Make sure` occurs inside a bash
