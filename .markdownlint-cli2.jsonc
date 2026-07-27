@@ -75,7 +75,7 @@
   // third-party snapshots, and regenerable corpora. The proof suite asserts
   // that a bad skill scores badly, so linting these would be a category error.
   "ignores": [
-    "benchmarks/corpus/**",
+    "benchmarks/**",
     "demo/**",
     "skills/schliff/tests/**",
     "docs/launch/corpus/**",
