@@ -128,10 +128,6 @@ jobs:
     needs: [test, test-macos]
     permissions:
       contents: read
-    outputs:
-      test_passed: ${{ steps.integration.outputs.test_passed }}
-      test_total: ${{ steps.integration.outputs.test_total }}
-      composite_score: ${{ steps.scorer.outputs.composite_score }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -184,57 +180,3 @@ jobs:
       - name: Run eval suite
         working-directory: skills/schliff
         run: bash scripts/run-eval.sh SKILL.md eval-suite.json --no-runtime-auto 2>/dev/null
-
-  # Badge generation using dynamic badges
-  # Setup steps:
-  #   1. Create a public GitHub Gist (https://gist.github.com) — content doesn't matter
-  #   2. Copy the Gist ID from the URL (e.g., https://gist.github.com/user/130bb61237b5b9b1536718e6a2296d4a)
-  #   3. Create a repository secret named GIST_TOKEN with a PAT that has gist scope
-  #   4. Replace 130bb61237b5b9b1536718e6a2296d4a below with your actual Gist ID
-  badges:
-    needs: [test, test-macos, test-report]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - name: Tests badge
-        uses: schneegans/dynamic-badges-action@28b0fa8bdeb46170ac397105ece0c1fe58f68910 # v1.9.0
-        with:
-          auth: ${{ secrets.GIST_TOKEN }}
-          gistID: 130bb61237b5b9b1536718e6a2296d4a
-          filename: schliff-tests.json
-          label: tests
-          message: "${{ needs.test-report.outputs.test_passed }}/${{ needs.test-report.outputs.test_total }} passed"
-          color: ${{ needs.test-report.outputs.test_passed == needs.test-report.outputs.test_total && 'brightgreen' || 'red' }}
-
-      - name: Compute grade
-        id: grade
-        shell: bash
-        env:
-          SCORE: ${{ needs.test-report.outputs.composite_score }}
-        run: |
-          if [ "$(echo "$SCORE >= 95" | bc -l)" -eq 1 ]; then GRADE="S";
-          elif [ "$(echo "$SCORE >= 85" | bc -l)" -eq 1 ]; then GRADE="A";
-          elif [ "$(echo "$SCORE >= 75" | bc -l)" -eq 1 ]; then GRADE="B";
-          elif [ "$(echo "$SCORE >= 65" | bc -l)" -eq 1 ]; then GRADE="C";
-          elif [ "$(echo "$SCORE >= 50" | bc -l)" -eq 1 ]; then GRADE="D";
-          elif [ "$(echo "$SCORE >= 35" | bc -l)" -eq 1 ]; then GRADE="E";
-          else GRADE="F"; fi
-          echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
-
-      - name: Score badge
-        uses: schneegans/dynamic-badges-action@28b0fa8bdeb46170ac397105ece0c1fe58f68910 # v1.9.0
-        with:
-          auth: ${{ secrets.GIST_TOKEN }}
-          gistID: 130bb61237b5b9b1536718e6a2296d4a
-          filename: schliff-score.json
-          label: Schliff
-          message: "${{ needs.test-report.outputs.composite_score }}/100 [${{ steps.grade.outputs.grade }}]"
-          color: >-
-            ${{
-              needs.test-report.outputs.composite_score >= 95 && 'brightgreen' ||
-              needs.test-report.outputs.composite_score >= 90 && 'green' ||
-              needs.test-report.outputs.composite_score >= 80 && 'yellow' ||
-              'red'
-            }}
