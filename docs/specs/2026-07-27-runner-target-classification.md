@@ -1,8 +1,8 @@
 # Runner-target classification (#133) — retire the `consumed_run` build fallback
 
-- Status: **spec — decisions settled 2026-07-27, implementation not started**
+- Status: **implemented** (PR #139, main `1cde925`) — see As-built deviations
 - Issue: [#133](https://github.com/Zandereins/schliff/issues/133)
-- Branch: `spec/133-runner-target-classification`
+- Branch: `spec/133-runner-target-classification` (spec), `fix/133-unclassified-sentinel` (implementation)
 
 ## Goal
 
@@ -82,13 +82,21 @@ directions.
 
 ## Proposal
 
-Replace the flag-driven fallback with three ordered checks on the delegated
-target. Only the last line changes behaviour; the earlier ones already exist and
-simply were never reached.
+> **As-built, 2026-07-27 (PR #139).** Two of the three steps below changed during
+> implementation, both because a measurement contradicted the proposal. Step 1
+> was dropped; step 3 ships a sentinel instead of `None`. The reasoning is in
+> [As-built deviations](#as-built-deviations) — read that section with this one.
 
-1. **Honour the existing read-only guard.** `_is_readonly` already recognises
+Replace the flag-driven fallback with three ordered checks on the delegated
+target. ~~Only the last line changes behaviour; the earlier ones already exist and
+simply were never reached.~~ — **wrong.** `_extract_commands` is shared with
+`command_resolution`, so changing what it emits changes `check-commands` too; that
+is what deviation 2 is about.
+
+1. ~~**Honour the existing read-only guard.** `_is_readonly` already recognises
    `--help` / `--version` as inspection junk. Apply it to the delegated target so
-   `uv run databricks-mcp -- --help` credits nothing. Today the fallback bypasses it.
+   `uv run databricks-mcp -- --help` credits nothing. Today the fallback bypasses
+   it.~~ — **DROPPED, not implemented.** See deviation 1.
 
 2. **Add `pylint` to `_TEST_INTRINSIC` — and nothing else.** Scope settled by
    reading the set rather than by judgement: `_TEST_INTRINSIC` already carries 16
@@ -98,9 +106,10 @@ simply were never reached.
    so the tool that performs it belongs there too. The earlier worry that step 3
    would wrongly drop `uv run ruff` was unfounded — `ruff` is already covered.
 
-3. **Then fall through to `None`, not `build`.** An unrecognised target is
-   unmeasured, which is what "we could not determine this" has always meant
-   everywhere else in this engine. `npm run wibble` credits nothing.
+3. **Then fall through to ~~`None`~~ `UNCLASSIFIED`, not `build`.** An
+   unrecognised target is unmeasured, which is what "we could not determine this"
+   has always meant everywhere else in this engine. `npm run wibble` credits
+   nothing. **Shipped as a sentinel family rather than `None`** — see deviation 2.
 
 Boundary matching (`test-*`, `test_*`, `test:*`) is deliberately **not** proposed
 for `_RUNNER` verbs in this round. It is defensible there — `npm run` cannot occur
@@ -150,6 +159,74 @@ line rather than skimmed, and any row that moves unexpectedly is a finding.
 Those tests exist because analysing this issue produced three successive causal
 explanations of the module, each derived by reading it, and all three were wrong.
 The implementation must not assert a score movement it has not measured.
+
+## As-built deviations
+
+Recorded because both were forced by a measurement, and a spec that quietly
+matches whatever shipped is worth nothing as a record.
+
+### 1 — step 1 (read-only guard) dropped
+
+It does not fire where the spec assumed, and it has no field case.
+
+`_is_readonly` tests `args[0] in {"--version", "--help"}` — a *positional* check.
+For the motivating command the delegated args begin with the `--` separator, so:
+
+```python
+_is_readonly("databricks-mcp", ["--"], ["--", "--help"])   # False
+_is_readonly("databricks-mcp", [],     ["--help"])         # True
+```
+
+Making it fire would have meant threading `args` through `_runner_family` (four
+call sites, one recursive) *and* teaching it to skip a leading `--`. Measured
+first instead: across the 259-file sweep there are **83** delegated *known* tools
+and **none** is followed by `--help`/`--version`. The isolated simulation had
+already shown step 1 at **+0.00** on the corpus.
+
+So it was plumbing for a case that does not occur, and step 3 covers the
+motivating command anyway — an unknown target credits nothing regardless of its
+flags. Not implemented; no code carries a dead guard.
+
+### 2 — step 3 ships `UNCLASSIFIED`, not `None`
+
+`None` was implemented, broke nine `command_resolution` tests, and was reverted.
+
+`_extract_commands` is a **shared seam**: the scorer and `command_resolution` both
+consume it, and it collects only `if fam:`. A falsy family therefore does not mean
+"uncredited", it means "not extracted" — which silently removed the command from
+the dangling check as well. Measured on the shipped fixture:
+
+```
+before:  3 dangling, 2 resolved, 0 unknown
+after:   1 dangling                      <- npm run evals + the injection vector, gone
+```
+
+That is worse than the defect being fixed: a linter that stops reporting is more
+dangerous than a scorer that mis-credits one dimension. `"build"` was truthy and
+`UNCLASSIFIED` is truthy, so the sentinel leaves the resolver's input untouched —
+verified set-identical over the 259 files (**409** `(file|command|status)` tuples,
+zero difference, zero new `dangling` claims).
+
+**Lesson for the next scorer change:** `_extract_commands` serves two consumers
+with different questions — "which family is this?" and "should this target exist
+in the repo?". Any change to what it *emits* is a change to `check-commands`, and
+the module docstring's "reuses … (DRY)" is the load-bearing sentence. The spec's
+claim that "only the last line changes behaviour" was wrong for exactly this
+reason.
+
+### As-built numbers
+
+The spec predicted the opcov corpus mean 37.17 → 36.50; that held. The golden the
+suite actually pins is the composite, re-derived from the engine:
+
+| | before | after |
+| --- | --- | --- |
+| mean | 61.79 | 61.53 |
+| median / min / max | 61.70 / 35.0 / 91.0 | unchanged |
+| bands | B 4, C 8 | B 3, C 9 |
+
+One of 30 files moves: `markov-kernel__databricks-mcp` 80.6 → 72.6 = opcov −20 ×
+the agents.md weight 0.4. This repo's own score is unchanged at 95.8 (opcov 100).
 
 ## Verification plan
 
