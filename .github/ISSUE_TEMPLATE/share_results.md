@@ -8,6 +8,7 @@ labels: community
 <!-- What skill did you improve? -->
 
 ## Before / After
+
 | Metric | Before | After |
 |--------|--------|-------|
 | Score  |        |       |

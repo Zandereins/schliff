@@ -37,6 +37,7 @@ silently dropped, so without an eval suite the composite is computed from gameab
 only. One correct aggregation definition fixes both.
 
 **Unified composite definition (decided — AI-evals best practice, Husain/Shankar):**
+
 1. **Canonical composite = the 7 default dims** (security/runtime excluded), weights renormalized
    to sum 1.0. Every entrypoint (CLI, evolve, doctor, bench) computes this identically.
 2. **Full-denominator aggregation (Path B): unmeasured = uncredited, not failed.**
@@ -55,6 +56,7 @@ only. One correct aggregation definition fixes both.
    optimize a single aggregate; read the failure-mode vector).
 
 **W1a — Guards (write first, expect red).**
+
 - Add a genuine clean-reference skill to `benchmarks/anti-gaming/skills/`.
 - **Guard 1 (separation):** every gamed skill's composite MUST be `< clean_composite` under the
   no-eval-suite condition. Real gate (non-zero exit) + pytest wrapper.
@@ -66,6 +68,7 @@ only. One correct aggregation definition fixes both.
   reproduction not observed.
 
 **W1b — Fix until green (two orthogonal levers).**
+
 - **Lever 1 — aggregation:** implement the unified full-denominator composite (def. 1-4 above).
   Fixes dual-scale entirely and removes the misleading-high-magnitude half of anti-gaming.
 - **Lever 2 — surface-dim gaming penalty:** make `gamed_composite < clean_composite` at *equal*
@@ -74,6 +77,7 @@ only. One correct aggregation definition fixes both.
   reproducing the inversion in W1a.
 
 **Impact / blast radius (the safety accounting).**
+
 - Full-denominator rescales no-eval-suite composites downward (~×coverage). Affects: deterministic
   golden-score fixtures, doc example numbers, and **threshold semantics** (`fail if score<70` in the
   GitHub Action / pre-commit) — a documented scale change at the v8 major boundary; CHANGELOG must

@@ -362,10 +362,12 @@ Hamel's question is never "is this skill good?" — it is "what does this specim
 ### Final scored judge scope (human-ratified)
 
 **3 core + 1 opt-in + deterministic helpers:**
+
 1. `verifiable_success` (B) — rock-solid; incl. `#reflexivity` sub-tag. Members 01/02/03/05/07.
 2. `assumption_completeness` (C) — solid; scoped to the *unstated-assumption* core, disjoint from `composability`. Members 01/03/04/06. (`#externalized-content` = harness meta-property, not a member.)
 3. `capability_fidelity` (A) — ⚠ probationary; sole clean anchor 03; lead with `#capability-overclaim`. **Gated on counter-samples.**
 4. `harmful_downstream_instruction` (F) — opt-in; 02 + 09.
+
 - **Deterministic (not LLM):** destructive-command detector → human-review flag (09); mixed-script frontmatter check (10); the **gating invariant** (judge runs only above a linter-completeness floor).
 - **Retained annotation, NOT scored:** `#process-overhead` (proportionality/absolutism, 06/07) — Hamel 4-bar fail; revisit only on cross-archetype recurrence with measurable κ.
 
@@ -383,6 +385,7 @@ Hamel's question is never "is this skill good?" — it is "what does this specim
 **Optimal minimal anchor set (keep + feature):** `02` (F+B), `03` (A), `07` (B/false-precision), `04` (C/owner-coupled), `01` (C/clean-high-band), `09` (F/safety). **Controls:** `08` (stub floor), `10` (hypertrophy floor). **Secondary:** `05` (B/reflexivity, license-gated). **Most droppable as a calibration anchor:** `06` (de-scored, redundant) — retain only as a `#process-overhead` annotation example.
 
 **The three corpus gaps that matter more than any single skill (Hamel):**
+
 1. **A is a one-specimen anchor** → `capability_fidelity` cannot be aligned/validated. **Add ≥2 more A specimens (one procedural, one non-procedural)** before A scores anything.
 2. **The set is fail-heavy with zero clean PASS controls** → the judge's **TNR / false-positive rate is unmeasurable**. **Add known-GOOD specimens per scored dim** (reserve candidates: `mcp-builder` 79.1, `claude-api` 68.4 K1-positive, `doc-coauthoring` K4-positive) as negative controls.
 3. **Representativeness of the *scored* dims:** the probes (08/09/10) are mostly *floor/control*, not mid-band messy production skills that fail B/C/A. Schliff's users live at mean composite 61.7 — **add mid-band community probes that exhibit B/C/A failures**, not just stubs and dumps.
@@ -402,6 +405,7 @@ Phase-0 open-coding ran as a Claude 10-council **third-opinion advisory**, then 
 **KILL-GATE 1: PASS (conditional, disciplined scope)** — confirmed by cross-family GPT-5 sub-reviewer (+ corroborating Claude interim). AI-Eval pillar proceeds to Phase 1.
 
 **Locked Phase-1 judge scope — 4 dimensions:**
+
 1. `capability_fidelity` — *narrowed:* only "skill looks formally clean but doesn't deliver its claimed capability"; empty-body/missing-procedure cases are excluded (linter territory).
 2. `verifiable_success` — unrestricted; strongest dim.
 3. `assumption_completeness` — scoped disjoint from `composability` (judge the *unstated* assumption + *missing fallback*, not whether a dependency is declared).

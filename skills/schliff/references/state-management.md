@@ -17,6 +17,7 @@ Files created during improvement iterations for a specific skill:
 ### Per-Skill Results (`<skill_dir>/schliff-results.jsonl`)
 
 Append-only log of experiment results. Each line is a JSON object:
+
 ```json
 {"exp": 0, "timestamp": "...", "trigger": "init", "composite_score": 72, "pass_rate": "5/8", "scores": {...}}
 ```
@@ -43,11 +44,13 @@ Cross-project learning data that persists across all Schliff sessions:
 ## Cleanup
 
 To purge all global meta-learning data:
+
 ```bash
 rm -rf ~/.schliff/meta/
 ```
 
 To reset a specific skill's improvement state:
+
 ```bash
 rm -rf <skill_dir>/.schliff/
 rm -f <skill_dir>/schliff-results.jsonl

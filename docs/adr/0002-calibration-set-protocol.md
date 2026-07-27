@@ -25,11 +25,13 @@ The practitioner-mainstream evidence converged decisively against the upfront pl
 ## Consequences
 
 **Positive:**
+
 - Calibration cost stays inside one sprint; no labelling sweatshop phase.
 - Binary scale forces taxonomy clarity (any "it depends" item exposes a missing failure mode rather than hiding inside a 3-of-5).
 - Re-grade pass institutionalises drift handling instead of pretending drift does not happen.
 
 **Negative:**
+
 - Single labeller = single point of bias; mitigated only by ADR-0005's cross-family validation pass and public methodology disclosure.
 - Holdout < 200 limits statistical power for thin-sliced sub-analyses; acceptable at v8.0 scope.
 

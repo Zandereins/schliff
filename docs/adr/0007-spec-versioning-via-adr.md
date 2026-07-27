@@ -27,11 +27,13 @@ The cultural reference points (IETF RFCs, Rust RFC process) are governance patte
 ## Consequences
 
 **Positive:**
+
 - ADRs are the smaller, debate-ready unit — cheaper to write, cheaper to revise, cheaper to argue about than a versioned monolith.
 - Avoids the "spec lags reality" failure mode common when both ADRs and a master spec must co-evolve.
 - Clear bump-trigger conditions prevent the question from re-arising at every ADR; future-proofs the decision.
 
 **Negative:**
+
 - New readers must follow the addendum-pointer chain to reconstruct the current view; v0.3 read alone is incomplete.
 - ADR-archaeology becomes the onboarding cost when condition (a) eventually fires; mitigated by the addendum index and ADR cross-references.
 

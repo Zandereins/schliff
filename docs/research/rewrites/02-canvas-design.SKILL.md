@@ -7,6 +7,7 @@ license: Complete terms in LICENSE.txt
 These are instructions for creating design philosophies — aesthetic movements that are then EXPRESSED VISUALLY. Output only .md files, .pdf files, and .png files.
 
 Complete this in two steps:
+
 1. Design Philosophy Creation (.md file)
 2. Express it on a canvas (.pdf file or .png file)
 
@@ -15,16 +16,19 @@ First, undertake this task:
 ## DESIGN PHILOSOPHY CREATION
 
 To begin, create a VISUAL PHILOSOPHY (not layouts or templates) that will be interpreted through:
+
 - Form, space, color, composition
 - Images, graphics, shapes, patterns
 - Minimal text as visual accent
 
 ### THE CRITICAL UNDERSTANDING
+
 - What is received: Some subtle input or instructions by the user that should be taken into account as a foundation; it should not constrain creative freedom.
 - What is created: A design philosophy/aesthetic movement.
 - What happens next: Then, the same version receives the philosophy and EXPRESSES IT VISUALLY — creating artifacts that are 90% visual design, 10% essential text.
 
 Consider this approach:
+
 - Write a manifesto for an art movement
 - The next phase involves making the artwork
 
@@ -37,6 +41,7 @@ The philosophy must emphasize: Visual expression. Spatial communication. Artisti
 **Articulate the philosophy** (4-6 paragraphs — concise but complete):
 
 To capture the VISUAL essence, express how the philosophy manifests through:
+
 - Space and form
 - Color and material
 - Scale and rhythm
@@ -44,6 +49,7 @@ To capture the VISUAL essence, express how the philosophy manifests through:
 - Visual hierarchy
 
 **CRITICAL GUIDELINES:**
+
 - **Avoid redundancy**: Each design aspect should be mentioned once. Do not repeat points about color theory, spatial relationships, or typographic principles unless adding new depth.
 - **State the quality bar once**: The philosophy should frame the work as the product of deep expertise and master-level execution — work that rewards close attention and reads as deliberate, not incidental. State this aspiration clearly and move on; do not pad the prose with repeated craftsmanship superlatives. The quality bar is enforced by the acceptance checklist in CANVAS CREATION, not by repetition.
 - **Leave creative space**: Remain specific about the aesthetic direction, but concise enough that the next Claude has room to make interpretive choices, also at a high level of craftsmanship.
@@ -75,6 +81,7 @@ Visual expression: Grid-based precision, bold photography or stark graphics, dra
 *These are condensed examples. The actual design philosophy should be 4-6 substantial paragraphs.*
 
 ### ESSENTIAL PRINCIPLES
+
 - **VISUAL PHILOSOPHY**: Create an aesthetic worldview to be expressed through design
 - **MINIMAL TEXT**: Text is sparse, essential-only, integrated as a visual element — never lengthy
 - **SPATIAL EXPRESSION**: Ideas communicate through space, form, color, composition — not paragraphs

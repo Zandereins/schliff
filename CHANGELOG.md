@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Changed
+
 - **An unrecognised `<runner> run <target>` no longer counts as a build command
   (#133).** `operational_coverage` credited the `build` category whenever a
   `run`/`r`/`exec`/`dlx` keyword had been consumed — without ever inspecting the
@@ -41,6 +42,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [8.7.0] - 2026-07-22
 
 ### Changed
+
 - **The `structure` score is now reproducible — a pure function of the file's
   bytes (#10).** It previously depended on the file's on-disk neighbourhood (a
   sibling `references/` directory and whether declared references resolved on
@@ -67,6 +69,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
     its on-disk siblings.
 
 ### Fixed
+
 - **The terminal no longer silently drops score warnings (#22).** The calibrated-
   weights "not comparable" notice and the "no weighted dimensions" warning — both
   already present in the JSON output — were dropped from the terminal rendering.
@@ -78,6 +81,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [8.6.3] - 2026-07-22
 
 ### Security
+
 - **Hardened the engine against untrusted input in third-party CI.** A pre-launch
   adversarial audit reproduced these before fixing; no golden score changes
   (`operational_coverage`/profile byte-identical).
@@ -94,6 +98,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
     oracle. Added a `realpath`+`commonpath` containment guard at each manifest read.
 
 ### Fixed
+
 - **`--format <alias>` token budget.** The short aliases (`cursor`, `agents`,
   `claude`, `skill`, `system-prompt`) fell back to the unknown=1500 budget instead
   of their real one, flipping the within-budget verdict. They now resolve via
@@ -104,6 +109,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [8.6.2] - 2026-07-21
 
 ### Added
+
 - **GitHub Action surfaces dangling commands.** The `AGENTS.md Lint` action now
   runs `check-commands` for `AGENTS.md`/`CLAUDE.md` and renders any dangling
   commands as a section in its existing PR comment. New opt-in `fail-on-dangling`
@@ -111,6 +117,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   for false-positive-safe behavior; older engines degrade silently.
 
 ### Fixed
+
 - **`check-commands` workspace false positives + resolver hardening.** A large
   adversarial review + council + a field sweep of 135 real repos found the 8.6.1
   check still reporting working commands as `dangling` on monorepos. Every change
@@ -135,6 +142,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [8.6.1] - 2026-07-21
 
 ### Fixed
+
 - **`check-commands` false positives on real repos.** An adversarial review plus a
   field sweep of real monorepos (palantir/blueprint, remotion, remix, swc) found
   the 8.6.0 check reporting working commands as `dangling` — the exact
@@ -166,6 +174,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [8.6.0] - 2026-07-20
 
 ### Added
+
 - **`check-commands`** — a deterministic CI gate that flags setup/build/test
   commands in an `AGENTS.md`/`CLAUDE.md` that don't resolve to a real make
   target, npm script, or path in the repo (exit 1 if dangling). Reuses the
@@ -174,12 +183,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   ~70 real repos. schliff dogfoods it against its own `AGENTS.md` in CI. (#112)
 
 ### Fixed
+
 - **`operational_coverage` object-first prohibitions**, badge temp-dir leak, and
   badge error caching (#110).
 
 ## [8.5.0] - 2026-07-07
 
 ### Fixed
+
 - **`verify` scores under the detected format profile** (#102, closes #101).
   It previously hand-rolled the SKILL scorer set, so `schliff verify AGENTS.md`
   scored the file under the wrong profile and failed spuriously (27.7/F on a
@@ -194,17 +205,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   prose no longer false-positive. Corpus goldens re-derived.
 
 ### Security
+
 - **Runtime scorer prompt hardened** (#99): skill content is nonce-wrapped
   (`<skill_context_NONCE>`) so crafted files cannot forge the prompt
   structure. Defense-in-depth — the dimension remains opt-in and gated off.
 
 ### Added
+
 - Instant star-count notify workflow for the profile-repo badge (#98).
 - Theme-aware README hero (light/dark SVG) + social-preview asset (#106).
 - Dependabot now groups github-actions bumps into one PR — split bumps of
   lockstep actions (codeql init/analyze) could never pass CI (#107).
 
 ### Docs
+
 - **README redesigned** (#100): AGENTS.md-first, every number ground-truthed
   against the released engine, ShieldClaw case-study table disambiguated
   (ceiling vs quality), hydra field study added, new "What the score does not
@@ -213,6 +227,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [8.4.0] - 2026-07-03
 
 ### Added
+
 - **`operational_coverage` dimension for AGENTS.md** (PR #83). Measures whether
   an AGENTS.md actually equips a coding agent to operate the repo: real
   setup/build/test commands (command-family classification, doc-wide, headings
@@ -221,6 +236,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   and accepted by the leaderboard submit API.
 
 ### Changed
+
 - **BREAKING (scores): AGENTS.md headline profile is now
   `structure 0.40 / operational_coverage 0.40 / efficiency 0.20`** (was
   0.5/0.5). `efficiency` was a validated gameable proxy — a junk-fence-stuffed
@@ -229,6 +245,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   SKILL.md / CLAUDE.md / .cursorrules / system-prompt scoring is byte-identical.
 
 ### Security
+
 - Fixed a ReDoS in the operational_coverage heading regex (quadratic on
   whitespace-only heading lines; playground/Action/leaderboard take untrusted
   input). Found and fixed pre-release by a 75-agent adversarial review, along
@@ -239,6 +256,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [8.3.0] - 2026-06-25
 
 ### Added
+
 - **AGENTS.md scoring profile.** `AGENTS.md` is project context for coding agents,
   not a reusable skill, so it is now scored on a dedicated headline
   (`0.5·structure + 0.5·efficiency`) instead of the SKILL.md rubric. The
@@ -256,12 +274,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `uses: Zandereins/schliff@v1`. (#66, #68, #69)
 
 ### Fixed
+
 - The Action's PR comment no longer renders unmeasured (`null`) dimensions as a
   misleading `0/100`; they are omitted, matching the engine's terminal output. (#68)
 
 ## [8.2.0] - 2026-06-11
 
 ### Added
+
 - Public **Vercel deployments**: an interactive playground (`POST /api/score`, real scoring
   engine) and a community leaderboard (`/api/submit`, `/api/query`). (#50, #54)
 - Leaderboard **durable storage on Upstash Redis (Vercel KV, $0)** — atomic dedup upsert that
@@ -271,6 +291,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Machine-readable version output / agentic-integration groundwork. (#57)
 
 ### Changed
+
 - **BREAKING: drop Python 3.9 support** — minimum supported version is now Python 3.10
   (`requires-python = ">=3.10"`). Python 3.9 reached end-of-life on 2025-10-31. The CI test
   matrix and ruff `target-version` were updated accordingly. (#55)
@@ -280,6 +301,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   dimensions) instead of a coverage-capped composite; removed a phantom `sync` dimension. (#54)
 
 ### Fixed
+
 - Leaderboard submit read-modify-write **race + non-atomic write** (now flock-serialized +
   atomic `os.replace`). (#58)
 - Vercel deployability (score.py `sys.path` bootstrap, `framework:null`, build-artifact
@@ -287,6 +309,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   a11y/contrast/keyboard + Google-Fonts CSP. (#50, #53, #55, #56)
 
 ### Security
+
 - **Fix ReDoS / remote CPU-DoS in the scoring engine.** `_RE_REAL_EXAMPLES` / `_RE_DIFF_EXAMPLE`
   used an unbounded `input.*output` (O(n²) under `findall`); a ~256KB single-line payload via the
   public playground pegged a serverless function's CPU for ~90s. Bounded to `input.{0,200}?output`
@@ -304,6 +327,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [8.1.0] - 2026-06-03
 
 ### Added
+
 - Multi-agent correctness/security/determinism hardening (PR #46): calibrated weights gated
   behind `SCHLIFF_CALIBRATED_WEIGHTS` (off by default) so `verify`/`badge`/leaderboard stay
   reproducible; `weight_source`/`weights_hash` provenance; BOM-invariant scoring at the read
@@ -313,6 +337,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   issue-template `config.yml`. Top-level `--version`/`-V` flag.
 
 ### Changed
+
 - README + `docs/` redesign: accurate full-denominator composite model (replaces the previously
   inverted description in `SCORING.md`), correct dimension/weight tables, single-sourced version,
   current architecture with diagrams. Web playground/leaderboard corrected to the canonical model
@@ -321,12 +346,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Performance: `doctor` single tree-walk, O(n) header lookup in `structure`, cached regexes/MinHash.
 
 ### Removed
+
 - Internal launch corpus and marketing drafts from the public tree (regenerable via
   `skills/schliff/scripts/launch/`); untracked local tooling artifacts.
 
 ## [8.0.0] - 2026-05-29
 
 ### Added
+
 - Failure-mode-first AI-Eval foundation: sprint spec + 7 ADRs, Phase-0 open-coded failure-mode
   taxonomy (10 snapshotted skills), Phase-1 calibration scaffold.
 - Deterministic judge guards (`scoring/guards.py`): destructive-command, gating-invariant
@@ -342,6 +369,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `?score_model=N` selects a scale (default = the latest epoch present).
 
 ### Changed
+
 - **BREAKING (scoring):** Composite is now computed over a single canonical 7-dimension basis
   with a full denominator — unmeasured dimensions are uncredited (not silently renormalized away).
   Scores for skills without an eval suite are lower and now reflect coverage. This unifies the
@@ -360,6 +388,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - README leads with native install (`/plugin marketplace add`, `npx skills add`); pip demoted to CLI/CI.
 
 ### Fixed
+
 - `missing_refs` (structure): referenced files resolve skill-local OR against an enclosing
   plugin/.git root (fixes false-positives on plugin-monorepo layouts), with full paths in the
   message; plus path-traversal confinement (reject `..`, resolve-confine) so an untrusted SKILL.md
@@ -372,12 +401,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - `commands/schliff/mesh.md` registered as `/mesh` instead of `/schliff:mesh`.
 
 ### Security
+
 - Pre-launch audit (3 parallel lenses + Hydra closing council): removed tracked internal docs that
   contradicted the pitch; SECURITY.md version table + network/exec claims scoped to the zero-dep core.
 
 ## [7.2.0] - 2026-04-24
 
 ### Security
+
 - **Prompt-injection hardening in `schliff evolve`**: user-authored skill
   content is wrapped in explicit XML tags with a per-call random nonce
   before being passed to LLM prompts. Earlier versions fed raw content
@@ -392,6 +423,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   line on stderr and exits 1.
 
 ### Fixed
+
 - **Scoring robustness across all dimensions**: all five scorers that
   consume user-authored eval-suite JSON (`edges`, `triggers`, `quality`,
   `runtime`, `coherence`) now guard their list-valued fields with
@@ -414,6 +446,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `terminal_art.score_to_grade`; previously each surface drifted.
 
 ### Changed
+
 - **E-band grade now emitted in badge/CI output.** Consumers that parse
   a grade field with a closed set of `{S, A, B, C, D, F}` must now accept
   `E` as well. **Breaking for JSON consumers** that did exhaustive grade
@@ -429,6 +462,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   duplicate, keeping grade mapping in one place.
 
 ### Added
+
 - **`RELEASING.md` pre-release checklist** documents the full release
   procedure (version bump, CHANGELOG draft, tag, publish, badge cache-bust).
 - **Cross-platform CI expansion**: GitHub Actions matrix covers Python
@@ -442,6 +476,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   breakage from future major releases; test files excluded from the wheel.
 
 ### Test coverage
+
 - Total: 1017 → 1117 (+100) / 0 skipped / 0 failed
 - New files: `test_scoring_type_guards.py`, `test_cli_error_handling.py`,
   `test_install_version.py`; expanded `test_scoring_edges_malformed.py`
@@ -450,12 +485,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [7.1.1] - 2026-04-18
 
 ### Fixed
+
 - **List-marker support in actionable-line patterns**: `_RE_ACTIONABLE_LINES` and three sibling patterns (`_RE_RUN_PATTERN`, `_RE_DIFF_SIGNAL`, `_RE_IMPERATIVE_INSTRUCTION`) previously only matched numbered list prefixes (`1. Run X`) or bare imperatives, silently dropping markdown bullets (`- Run X`, `* Use Y`, `+ Install Z`). A shared `_LIST_MARKER` alternation is now applied to all four. Impact on a real public CLAUDE.md (root file merged into `modelcontextprotocol/servers`): efficiency 57 → 64, composite 59.2 → 61.0.
 - **10 new regression and false-positive tests** in `TestListMarkerSupport` covering supported markers, bare-imperative regression, nested indentation, word-boundary guards, and marker-without-verb cases. Full suite: 1017 passed (up from 1007).
 
 ## [7.1.0] - 2026-03-27
 
 ### Added
+
 - **`schliff report`**: Generate Markdown quality reports with dimension breakdown, shareable via `--gist` (GitHub Gist API)
 - **`schliff drift`**: Stale reference scanner — detects paths, scripts, and make targets referenced in instruction files that no longer exist on disk
 - **`schliff sync`**: Cross-file instruction consistency analysis — finds contradictions, gaps, and redundancies across all instruction files in a repository
@@ -467,6 +504,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - 140 new tests (592 → 732 total), 4 audit iterations on core branch, 1 audit iteration each on intelligence and web branches
 
 ### Security
+
 - Path traversal prevention in drift detector (normpath + containment check, absolute/parent path rejection)
 - Control character and bidirectional override rejection in leaderboard skill_name validation
 - Content-Security-Policy headers on playground and leaderboard
@@ -475,6 +513,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Version field length bound (max 50 chars) on leaderboard submissions
 
 ### Fixed
+
 - Token budget severity/within_budget contradiction at exactly 100% utilization
 - Doctor relpath used process cwd instead of scan_root (wrong paths when invoked from different directory)
 - `find_redundancies` O(n²) performance — capped at 150 directives
@@ -484,6 +523,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [7.0.0] - 2026-03-26
 
 ### Added
+
 - **Multi-format support**: Score CLAUDE.md, .cursorrules, AGENTS.md alongside SKILL.md
   - Auto-detection from filename, `--format` override flag
   - Content normalization (synthetic frontmatter for non-SKILL.md formats)
@@ -500,6 +540,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - 52 new tests (540 → 592 total), 4 rounds × 6 agents security review per feature branch
 
 ### Security
+
 - SSRF redirect protection (`_SafeRedirectHandler`)
 - YAML injection prevention in content normalization
 - Path traversal guard in playground API
@@ -510,6 +551,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [6.3.0] - 2026-03-26
 
 ### Added
+
 - `schliff diff <path>` command — show score delta vs. previous commit (or any `--ref`)
   - Ref validation (prevents git flag injection), path containment check, size limit guard
   - Human-readable and `--json` output formats
@@ -521,6 +563,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - README: "Where Schliff fits" ecosystem diagram moved to Quick Start section
 
 ### Fixed
+
 - Scoring: trigger precision/recall reported 100.0 when no predictions existed (now 0.0)
 - Scoring: clarity scorer skipped ambiguous pronoun detection on first line (i==0 case)
 - Scoring: efficiency scorer returned float instead of int (inconsistent with other dimensions)
@@ -534,6 +577,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [6.2.0] - 2026-03-25
 
 ### Added
+
 - `schliff demo` command — score a built-in bad skill to see schliff in action instantly
 - `schliff badge <path>` command — generate copy-paste markdown badge for READMEs
 - Pre-commit hook support (`.pre-commit-hooks.yaml`) for automatic skill quality gates
@@ -543,6 +587,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Show HN launch draft (`docs/specs/show-hn-draft.md`)
 
 ### Fixed
+
 - Security: ReDoS in `_RE_ERROR_BEHAVIOR` — bounded `[\w\s]+` to `\w[\w ]{0,80}`
 - Security: OOM-safe eval-suite loading — `stat().st_size` check before `read_text()`
 - Security: symlink rejection on `references/` directory and files in `estimate_token_cost`
@@ -557,6 +602,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Fixed stale BUG DOCUMENTED comments in test_edge_cases.py
 
 ### Changed
+
 - Quick Start: reordered to demo → doctor → score for better onboarding
 - README: GIF uses absolute GitHub raw URL (fixes broken image on PyPI)
 - README: Mermaid diagram section includes "view on GitHub" hint for PyPI
@@ -566,6 +612,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [6.1.0] - 2026-03-24
 
 ### Added
+
 - Description-aware trigger generation in init-skill (Issue #13)
 - Precision/recall reporting in trigger scorer
 - `schliff verify` command for CI integration (exit 0/1/2, --min-score, --regression)
@@ -576,10 +623,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - 10 new eval-suite test cases (tc-8..tc-17) with 66 coherence-covering assertions
 
 ### Changed
+
 - SKILL.md compressed by 13% (1676→1455 words) without information loss
 - Self-score: 95.7 → 99.0/100 [S] (quality 91→99 via coherence, efficiency 88→92 via compression)
 
 ### Fixed
+
 - Init script no longer generates Schliff-specific triggers for non-Schliff skills
 - Structural markers (code fences, headers, horizontal rules) excluded from repetition count
 - Code block content excluded from repetition counting (prevents false positives on examples)
@@ -592,11 +641,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [6.0.0] - 2026-03-24
 
 ### Changed
+
 - **Rebrand: SkillForge → Schliff** — "the finishing cut" (German: den letzten Schliff geben)
 - All `/skillforge:*` commands renamed to `/schliff:*`
 - All internal references, paths, demo files updated
 
 ### Added
+
 - **Clarity as default dimension** — 7th dimension always active (5% weight, opt-out via `--no-clarity`)
 - **Token cost estimation** — Doctor shows per-skill token cost + fleet total
 - **GitHub Action** — `Zandereins/schliff@v6` scores skills in CI, comments on PRs
@@ -613,16 +664,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - 3 new unit tests (token estimation, context contradictions)
 
 ### Fixed
+
 - Trigger threshold floor prevents false positives on small eval suites
 - Missing dimension warnings always shown (except opt-in runtime)
 - Clarity false positives on same verb with different context
 
 ### Breaking
+
 - `--clarity` flag removed (clarity is now default; use `--no-clarity` to opt out)
 
 ## [5.1.1] - 2026-03-22
 
 ### Fixed
+
 - Atomic file writes in text-gradient.py (prevents skill corruption on crash)
 - `re.error` guard on all user-controlled regex patterns
 - Path traversal validation before skill file writes
@@ -639,6 +693,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [5.1.0] - 2026-03-22
 
 ### Added
+
 - **Honest Scoring** — "Structural Score" label everywhere, replacing misleading "Quality Score"
 - **Stemming Tokenizer** — suffix-stripping replaces fixed synonym tables for better keyword matching
 - **Beam Search** — top-3 exploration instead of greedy top-1 from iteration 4 onward
@@ -653,6 +708,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **Underscore Alias Modules** — `score_skill.py`, `text_gradient.py`, `skill_mesh.py`, `parallel_runner.py` for Python import compatibility
 
 ### Fixed
+
 - State truncation bug in auto-improve loop
 - EMA indexing off-by-one in plateau detection
 - Deterministic hash for MinHash reproducibility
@@ -660,6 +716,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [5.0.0] - 2026-03-21
 
 ### Added — The Self-Driving Engine
+
 - **Auto-Apply** (`text-gradient.py --apply`) — deterministic patches apply themselves without LLM
 - **Auto-Improve** (`auto-improve.py`) — autonomous loop driver: score → gradient → apply → keep/revert → repeat
 - **Strategy Predictor** (`meta-report.py predict_best_strategy()`) — predicts P(keep) before trying
@@ -675,6 +732,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - New subcommands: `/schliff:auto`, `/schliff:mesh-evolve`, `/schliff:predict`, `/schliff:recall`
 
 ### Changed
+
 - Dimension weights redistributed: triggers 25%→20%, quality 25%→20%, composability 10%→5%, new runtime 15%
 - `compute_composite()` auto-loads `calibrated-weights.json` when available
 - Scorer test updated: 7 dimensions (6 core + runtime opt-in)
@@ -682,16 +740,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [4.1.0] - 2026-03-21
 
 ### Fixed
+
 - 3 critical + 4 high security issues from 4-agent code review
 - CI stability with `--no-runtime-auto` in self-tests
 
 ## [3.1.0] - 2026-03-20
 
 ### Fixed
+
 - `--since` flag now correctly scopes all 11 methods in `progress.py`
 - Consistent score capping across all scoring functions
 
 ### Added
+
 - Cost tracking: real `duration_ms`, `tokens_estimated`, `delta`, computed `status`
 - 25 new integration tests (51 total)
 - `explain_score_change()` wired into `--diff` output
@@ -699,12 +760,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - CHANGELOG.md, SECURITY.md, GitHub CI workflow
 
 ### Removed
+
 - Dead code: `history/results.tsv`
 - Shell expansion risk: replaced `xargs` with `sed` in `run-eval.sh`
 
 ## [3.0.0] - 2026-03-20
 
 ### Added
+
 - Runtime evaluator — invoke Claude with test prompts
 - Diff-aware scoring (`--diff` flag)
 - Strategy meta-learning in `progress.py`
@@ -713,6 +776,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - 26-test integration suite + 12-test self-test suite
 
 ### Fixed
+
 - 7 critical bugs found by sparring agents
 - 3 assertion type mismatches
 - 2 crash bugs, clarity false positives
@@ -720,17 +784,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [2.3.0] - 2026-03-19
 
 ### Added
+
 - Bidirectional synonym expansion, plateau guard, interaction effect detection
 
 ## [2.0.0] - 2026-03-18
 
 ### Added
+
 - TF-IDF trigger scoring, composability analysis, 9-phase protocol
 - Discovery mode, parallel experimentation, noisy metric handling
 
 ## [1.0.0] - 2026-03-17
 
 ### Added
+
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
 [Unreleased]: https://github.com/Zandereins/schliff/compare/v8.6.3...HEAD

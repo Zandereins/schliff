@@ -71,6 +71,7 @@ The original plan defined 7 LLM-judge dimensions before observing data. **This w
 - **F3** `metrics-contract`: `ScoreDelta`, `JudgeAgreement`, `FixOutcome` typed records — single source for all four pillars
 
 ### P1 — Success Stories
+
 - A1 corpus selection (Anthropic 13 + Rezvani 108 + Schliff dogfood ~20 + Synthetic ~50 ≈ 191 skills)
 - A2 baseline benchmark run
 - A3 improvement campaigns (consumes P4)
@@ -78,6 +79,7 @@ The original plan defined 7 LLM-judge dimensions before observing data. **This w
 - A5 publication: `docs/case-studies/`, links from README
 
 ### P2 — Closed-corpus benchmark
+
 - B1 corpus contract: `benchmarks/corpus/v1/manifest.jsonl` with per-skill SHA, license, included-flag
 - B2 baseline scoring infra (consumes F1, F3)
 - B3 determinism test: `f(x)==f(x)` across runs (Vision-Spec §9 Principle 4)
@@ -85,6 +87,7 @@ The original plan defined 7 LLM-judge dimensions before observing data. **This w
 - B5 public report generator: HTML/MD with score histograms + commit hash
 
 ### P3 — AI-Eval (LLM-as-judge, dims emerge from Phase 0)
+
 - C1 judge harness: `evaluate(..., judge="llm")` with deterministic prompt template + pinned model + temp 0.3
 - C2 calibration set: 100–150 binary pass/fail with critique (grow iteratively from Phase-0 30-set, Solo Franz benevolent dictator)
 - C3 self-consistency probe: N=5 plurality vote, dual-order for position bias
@@ -93,6 +96,7 @@ The original plan defined 7 LLM-judge dimensions before observing data. **This w
 - C6 cost ledger: tokens/run, budget guard, cross-family fallback only on disagreement
 
 ### P4 — Auto-fix loop (both modes, Goodhart-hardened)
+
 - D1 audit existing `schliff:auto` (`auto-improve.py` is real, **~620 LOC**, has 15pt-regression-guard via `_has_dimension_regression()` but missing explicit Goodhart guards)
 - D2 hallucination bound + Goodhart guardrail stack (see §7)
 - D3 autonomous mode: run-to-plateau, single end-verify, N=10 sampling-gate to human
@@ -131,6 +135,7 @@ The original plan defined 7 LLM-judge dimensions before observing data. **This w
 **Trunk:** `trunk-v8` (long-lived integration off `main`). Worktrees PR into `trunk-v8`; only Phase-4 close merges `trunk-v8 → main`.
 
 **Conflict-zone ownership:**
+
 - Top-level `schliff/__init__.py`, `schliff/api.py`, `pyproject.toml` `packages.find` → wt-foundation only until Day 5
 - `skills/schliff/scripts/auto-improve.py` → wt-autoloop only
 - `pyproject.toml` (deps for `schliff[judge]` extra) → wt-judge proposes, foundation merges
@@ -214,6 +219,7 @@ Concrete numbers from Goodhart-Researcher Agent + Manheim/Garrabrant 2018 + Kwa 
 **Sub-reviewer pattern (mitigates Solo confirmation bias):** for each of the four output-based kill-gates, a separate subagent (not the one performing the work) reviews the artifacts (taxonomy / TPR holdout / CI math / Goodhart-anomaly check / case-studies) and confirms or denies the gate-pass. Cheap insurance (~30min per gate) against confirmation bias on solo-judgment decisions.
 
 **Sub-reviewer hardening (R3 v0.3):**
+
 - Sub-reviewers must be **cross-family** (different model family from the artifact producer; mitigates Panickssery 2024 self-preference where same-family judges hallucinate PASS on artifacts they see).
 - Sub-reviewer must surface **at least one concrete artifact-element it would have rejected** (forces grounded judgment vs. vibes-PASS).
 - Sub-reviewer's verdict is advisory in form but **quasi-binding in process**: if Franz overrides a sub-reviewer FAIL, override requires (1) **written rationale committed to CHANGELOG**, (2) **24h cooldown** before re-running gate, (3) the override **auto-flips the affected pillar to descope-defer in v8.1** (cannot be reversed mid-sprint). This prevents Franz-in-confirmation-bias-mode from papering over a FAIL with one sentence.
@@ -221,6 +227,7 @@ Concrete numbers from Goodhart-Researcher Agent + Manheim/Garrabrant 2018 + Kwa 
 ## 12. Cost Budget
 
 LLM call estimate:
+
 - Judge calibration: 3 iters × 100 holdout × 5 self-consistency = ~1500 calls
 - Korpus auto-loop: 100 skills × ~10 iters × 2 calls/iter = ~2000 calls
 - Cross-family fallback: ~10% disagreement × Gemini = ~350 calls
@@ -245,10 +252,12 @@ Cross-family-everywhere alternative would have been ~$500+. Saved by ADR-0006.
 ## 14. References
 
 **Internal:**
+
 - Vision Spec v0.3 — `docs/specs/2026-04-25-measurement-layer-vision.md`
 - ADRs — `docs/adr/0001-*.md` through `0007-*.md`
 
 **External:**
+
 - Husain & Shankar, "LLM Evals: Everything You Need to Know" — https://hamel.dev/blog/posts/evals-faq/
 - Hamel Husain, "Creating an LLM-as-Judge That Drives Business Results" — https://hamel.dev/blog/posts/llm-judge/
 - Shankar et al., "Who Validates the Validators?" UIST 2024 — https://arxiv.org/abs/2404.12272

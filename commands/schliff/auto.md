@@ -23,11 +23,13 @@ Run the autonomous, script-driven improvement loop on a skill.
    If eval suite is missing: "Run `/schliff:init <path>` first to generate an eval suite."
 
 3. Run the autonomous improvement loop:
+
    ```bash
    python3 scripts/auto-improve.py /path/to/SKILL.md --json
    ```
 
 4. Monitor output and present progress as it runs:
+
    ```
    === Schliff Auto-Improve ===
    Skill: [name]
@@ -52,6 +54,7 @@ Run the autonomous, script-driven improvement loop on a skill.
 ## Stopping Conditions
 
 The loop stops automatically when:
+
 - Composite score reaches 98+
 - All dimensions reach 90+
 - EMA-based ROI drops below 0.1 for 5 consecutive iterations

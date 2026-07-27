@@ -29,7 +29,7 @@ Was bereits existiert und worauf wir aufbauen:
 | Web Playground | Live | Vercel serverless, POST /api/score |
 | Leaderboard API | Live | Vercel, /api/submit + /api/query, /tmp storage |
 | Leaderboard Web | Live | Static HTML, vercel.json |
-| Grade System | S(>=95) A(>=85) B(>=75) C(>=65) D(>=50) E(>=35) F(<35) |
+| Grade System | Live | S(>=95) A(>=85) B(>=75) C(>=65) D(>=50) E(>=35) F(<35) |
 
 ---
 
@@ -38,6 +38,7 @@ Was bereits existiert und worauf wir aufbauen:
 ### 1.1 Current `schliff badge` Command
 
 Aktueller Output:
+
 ```
 [![Schliff: 87 [A]](https://img.shields.io/badge/Schliff-87%2F100_%5BA%5D-green)](https://github.com/Zandereins/schliff)
 ```
@@ -47,14 +48,17 @@ Das ist ein **statischer** shields.io Badge. Funktioniert, ist aber nach dem Gen
 ### 1.2 Badge Formats (zu implementieren)
 
 **Format 1: Static shields.io (existiert)**
+
 - Pro: Zero infra, sofort verwendbar
 - Contra: Veraltet nach jedem Commit, manuelles Re-Generieren noetig
 - Verwendung: Lokale Nutzung, Einmal-Badge
 
 **Format 2: shields.io Endpoint Badge (Phase 1b)**
+
 - shields.io fetcht JSON von einem Endpoint und rendert den Badge
 - URL: `https://img.shields.io/endpoint?url=<encoded-json-url>`
 - JSON-Schema das shields.io erwartet:
+
   ```json
   {
     "schemaVersion": 1,
@@ -63,12 +67,14 @@ Das ist ein **statischer** shields.io Badge. Funktioniert, ist aber nach dem Gen
     "color": "green"
   }
   ```
+
 - Endpoint-Optionen fuer das JSON:
   - **GitHub Gist** (kostenlos, Zero Backend): `schliff badge --gist` aktualisiert ein Gist via GitHub API
   - **Vercel Edge Function** (bereits deployed): neuer Endpoint `/api/badge/<owner>/<repo>`
   - **Cloudflare Worker + KV** (guenstigste Skalierung): eigener badge service
 
 **Format 3: Custom SVG (Phase 2)**
+
 - Eigenes SVG mit Schliff-Branding, generiert vom Badge-Endpoint
 - Erlaubt Schliff-Logo, Gradient-Farben, Dimension-Breakdown
 - Beispiel: `https://schliff.dev/badge/owner/repo.svg`
@@ -109,12 +115,14 @@ GitHub Action runs nightly or on push:
 ```
 
 **Vorteile:**
+
 - Vollstaendig kostenlos
 - Kein eigener Server noetig
 - shields.io cached mit `cacheSeconds` (min 300s)
 - GitHub Gist ist hochverfuegbar
 
 **Nachteile:**
+
 - Braucht GitHub Token (fuer Gist-Updates)
 - Ein Gist pro Badge (oder ein Gist mit mehreren Files)
 - Nicht zentral aggregierbar
@@ -140,6 +148,7 @@ jobs:
 ```
 
 Alternativer Ansatz mit dem `Dynamic Badges` GitHub Action:
+
 ```yaml
       - id: score
         run: |
@@ -186,6 +195,7 @@ README Badge Request:
 
 **GET `/api/badge/:owner/:repo`**
 Returns shields.io-kompatibles JSON:
+
 ```json
 {
   "schemaVersion": 1,
@@ -204,6 +214,7 @@ Direkt-SVG (Custom Rendering, kein shields.io Umweg).
 
 **GET `/api/score/:owner/:repo`**
 Vollstaendiges Score-JSON:
+
 ```json
 {
   "composite": 87.3,
@@ -234,6 +245,7 @@ Score einreichen + im Cache speichern (authenticated via GitHub Token).
 | **GitHub Pages + GitHub Actions** | Zero cost, scores in Repo gespeichert | Keine dynamische Berechnung, nur statisch | $0 |
 
 **Empfehlung: Hybrid-Ansatz**
+
 1. **Phase 2a**: Vercel erweitern (existiert bereits) — neuer `/api/badge/` Endpoint, Upstash Redis fuer Cache statt /tmp
 2. **Phase 2b**: Cloudflare Worker als Badge-Proxy vor Vercel (CDN + KV Cache)
 3. Migration zu Cloudflare komplett wenn Vercel-Limits erreicht werden
@@ -252,6 +264,7 @@ Score Lifecycle:
 ```
 
 Kein Server-seitiges Scoring noetig — der Score wird **lokal berechnet und verifiziert**:
+
 - Manipulation? Ja, moeglich. Aber: das ist auch bei Codecov so.
 - Mitigation: `schliff verify` in CI, oeffentlich einsehbarer Workflow
 - Langfristig: Attestation via GitHub Actions OIDC Token
@@ -282,6 +295,7 @@ schliff.dev/registry
 ### 3.2 Quality Gate
 
 **Minimum-Anforderungen fuer Veroeffentlichung:**
+
 - Composite Score >= 75 (Grade B)
 - Keine Dimension unter 50 (kein D/E/F in Einzeldimensionen)
 - Muss `schliff verify` bestehen
@@ -289,6 +303,7 @@ schliff.dev/registry
 - Keine bekannten Security-Issues (security dimension >= 70)
 
 **Warum B und nicht A?**
+
 - A (>=85) wuerde zu viele Skills ausschliessen → Adoptions-Huerden
 - B (>=75) ist "gut genug" — zeigt aktive Qualitaetsbemühungen
 - S/A Skills bekommen "Schliff Certified" Badge (siehe Section 5)
@@ -354,24 +369,28 @@ schliff update deploy-aws
 ### 3.5 Storage Architecture
 
 **Phase 3a — Minimal (SQLite + Litestream)**
+
 - SQLite-Datenbank auf Fly.io oder Railway (Single Node)
 - Litestream fuer kontinuierliche Backups zu S3/R2
 - Skill-Dateien in Cloudflare R2 (S3-kompatibel)
 - Cost: $0-5/mo (Fly.io Free Tier + R2 Free Tier)
 
 **Phase 3b — Skalierbar (Turso/libSQL)**
+
 - Turso: gehostetes libSQL (SQLite-Fork), edge-replicated
 - Free Tier: 9GB storage, 500M rows read/mo
 - Skill-Dateien weiterhin in R2
 - Cost: $0-29/mo
 
 **Phase 3c — Full (Supabase)**
+
 - PostgreSQL + Edge Functions + Auth + Realtime
 - Free Tier: 500MB DB, 1GB storage, 50k MAU
 - Vorteil: Auth, Realtime Updates, Dashboard out of the box
 - Cost: $0-25/mo
 
 **Empfehlung: Phase 3a (SQLite + Litestream).**
+
 - Einfachste Migration von /tmp-JSON (existierender Leaderboard-Code)
 - Kein ORM noetig, SQL direkt
 - Backup automatisch
@@ -428,6 +447,7 @@ CREATE INDEX idx_categories_cat ON categories(category);
 ### 4.1 Bestand
 
 Es existiert bereits:
+
 - `web/leaderboard/` mit Vercel deployment
 - `api/submit.py` — POST-Endpoint, validiert, speichert in /tmp JSON
 - `api/query.py` — GET mit sort, filter, pagination
@@ -455,17 +475,20 @@ schliff leaderboard --format .cursorrules
 Fuer Szenarien ohne eigenen Server:
 
 **Option A: GitHub-based (Dezentral)**
+
 - Jeder User hat ein `schliff-scores.json` in seinem Repo
 - GitHub Action aktualisiert es bei jedem Push
 - Leaderboard aggregiert ueber GitHub API (Search Code API)
 - Problem: Rate Limits, langsam
 
 **Option B: GitHub Discussions (Semi-zentral)**
+
 - Scores werden als GitHub Discussion Comments gepostet
 - Bot aggregiert periodisch
 - Problem: Formatierung, Parsing
 
 **Option C: Vercel + persistent storage (Empfohlen)**
+
 - Migration von /tmp zu Upstash Redis oder Turso
 - Existierender submit/query Code bleibt fast gleich
 - Cost: $0 (Upstash Free: 10k commands/day = ~300 submissions/day)
@@ -497,11 +520,13 @@ Ein Skill ist "Schliff Certified" wenn:
 ### 5.2 Badge Varianten
 
 **Regular Score Badge:**
+
 ```
 [![Schliff: 91 [A]](https://img.shields.io/badge/Schliff-91%2F100_%5BA%5D-green)](https://schliff.dev)
 ```
 
 **Certified Badge:**
+
 ```
 [![Schliff Certified](https://img.shields.io/badge/Schliff_Certified-%E2%9C%93_91%2F100-brightgreen?logo=data:...)](https://schliff.dev/certified/skill-name)
 ```
@@ -513,6 +538,7 @@ Ein Skill ist "Schliff Certified" wenn:
 ### 5.3 Marketplace-Adoption
 
 **SkillsMP Integration:**
+
 - SkillsMP hat eine API (`skillsmp.com/docs/api`)
 - Vision: SkillsMP zeigt Schliff-Scores neben jedem Skill
 - Implementierung:
@@ -521,6 +547,7 @@ Ein Skill ist "Schliff Certified" wenn:
   3. Langfristig: SkillsMP sortiert/filtert nach Schliff-Score
 
 **ClawHub / andere Marktplaetze:**
+
 - Gleicher API-Endpunkt
 - Badge-Standard macht Adoption trivial (nur Markdown-Image)
 
@@ -666,6 +693,7 @@ Output:
 ## Implementierungs-Reihenfolge
 
 ### Week 1 (sofort)
+
 1. `schliff score --json` — JSON-Output fuer CI/Automatisierung
 2. `schliff badge --format endpoint` — shields.io Endpoint Badge Support
 3. `schliff badge --gist` — Auto-Update via GitHub Gist
@@ -673,23 +701,27 @@ Output:
 5. Docs: "Add a Schliff Badge to Your README"
 
 ### Week 2
+
 6. `/api/badge/:owner/:repo` Endpoint auf Vercel
 7. Leaderboard Storage-Migration: /tmp → Upstash Redis
 8. `schliff score --publish` — Score an API senden
 9. `schliff leaderboard` CLI-Command (existierender API-Client)
 
 ### Week 3-4
+
 10. `schliff doctor --share` — Share-Link generieren
 11. Share-Page mit OG-Image (Vercel OG)
 12. Community Challenge Launch: "Score Your Stack Week"
 
 ### Month 2
+
 13. Registry MVP: publish, search, install
 14. Turso-Datenbank + Schema
 15. `schliff certify` Command
 16. Certified Badge System
 
 ### Month 3
+
 17. Registry Web UI (Browse, Detail-Seiten)
 18. SkillsMP Integration (Badge in Listings)
 19. Custom SVG Badges mit Schliff-Branding

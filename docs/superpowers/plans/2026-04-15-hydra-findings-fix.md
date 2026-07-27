@@ -56,6 +56,7 @@
   - `test_estimate_tokens_uses_prompt_length`: verify estimation accounts for prompt overhead
 
 - [ ] In `evolve/engine.py`, move token estimation AFTER prompt construction (line ~264→~290):
+
   ```python
   estimated = int((len(user_prompt.split()) + len(best_content.split())) * 1.3 + 800)
   ```
@@ -69,6 +70,7 @@
   - `test_cost_estimate_default_sonnet`: backward-compat with current behavior
 
 - [ ] Add `MODEL_PRICING` dict to `evolve/budget.py`:
+
   ```python
   MODEL_PRICING = {
       "anthropic/claude-sonnet-4-20250514": (3.0, 15.0),
@@ -78,6 +80,7 @@
       "ollama/llama3": (0.0, 0.0),
   }
   ```
+
   Update `estimate_cost_usd()` to accept optional `model` param, lookup pricing.
 
 - [ ] Run full test suite, commit
@@ -102,6 +105,7 @@
 ### Task 2.2: Fix Registry Weights to Sum to 1.0
 
 - [ ] Fix `scoring/registry.py` `_INSTRUCTION_FILE_WEIGHTS`: adjust to sum exactly 1.0 (currently 1.03)
+
   ```python
   _INSTRUCTION_FILE_WEIGHTS = {
       "structure": 0.15, "triggers": 0.20, "quality": 0.20,
@@ -164,12 +168,14 @@
 ### Task 3.2: Hoist re.compile() to Module Level (Performance)
 
 - [ ] In `shared.py`, move 3 regex patterns from inside `validate_regex_complexity()` to module level:
+
   ```python
   # Module level (after other re.compile calls)
   _RE_NESTED_QUANT = re.compile(r'[+*]\)?[+*?{]')
   _RE_OVERLAP_QUANT = re.compile(r'\((?!\?:)[^)]*\|[^)]*\)[+*]{1,2}')
   _RE_GROUP_INNER_QUANT = re.compile(r'\([^)]*[.][*+][^)]*\)[+*?{]')
   ```
+
   Update function body to reference module-level names.
 
 - [ ] Run full test suite, commit
