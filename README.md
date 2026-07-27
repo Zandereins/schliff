@@ -33,17 +33,17 @@ schliff v8.7.0
 
   structure             ██████████  100/100  perfect
   operational_coverage  ██████████  100/100  perfect
-  efficiency            ████████░░   79/100  good
+  efficiency            ████████░░   78/100  good
   composability         ██████████   95/100  excellent
   clarity               ██████████  100/100  perfect
 
-  Structural Score  ███████████████████░  95.8/100  [S]
+  Structural Score  ███████████████████░  95.6/100  [S]
 
-  Tokens: 996 / 3,000 (ok)
+  Tokens: 1,065 / 3,000 (ok)
   Format: agents.md (normalized)
 ```
 
-No model produced that number. Run it on another laptop and you get 95.8 again — **a score you can't reproduce isn't a measurement, it's a vibe.** And we hold *ourselves* to that: this repo's own badge (scored in isolation) once disagreed with its own CLI (scored in-repo) by ~15 points on the *same bytes*, because `structure` was crediting an on-disk `references/` neighbourhood instead of the file's content. We fixed the engine, not the file ([#10](https://github.com/Zandereins/schliff/pull/129)) — now `cp AGENTS.md /tmp && schliff score /tmp/AGENTS.md` returns the same number as CI and the badge. (The `agents.md` headline weights `structure`·`operational_coverage`·`efficiency` at 0.4/0.4/0.2; `composability` and `clarity` are shown for information, not counted.)
+No model produced that number. Run it on another laptop and you get 95.6 again — **a score you can't reproduce isn't a measurement, it's a vibe.** And we hold *ourselves* to that: this repo's own badge (scored in isolation) once disagreed with its own CLI (scored in-repo) by ~15 points on the *same bytes*, because `structure` was crediting an on-disk `references/` neighbourhood instead of the file's content. We fixed the engine, not the file ([#10](https://github.com/Zandereins/schliff/pull/129)) — now `cp AGENTS.md /tmp && schliff score /tmp/AGENTS.md` returns the same number as CI and the badge. (The `agents.md` headline weights `structure`·`operational_coverage`·`efficiency` at 0.4/0.4/0.2; `composability` and `clarity` are shown for information, not counted.)
 
 *The quick-start and case-study numbers here are reproducible from released `schliff==8.7.0` (`pip install schliff==8.7.0`); the hydra field run below is dated to the version it was measured on. No install? Paste your file into the [playground](https://schliff-playground.vercel.app) — same engine, with AGENTS.md and SKILL.md tabs.*
 
