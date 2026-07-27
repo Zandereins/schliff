@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from scoring.composite import compute_composite
-from scoring.operational_coverage import score_operational_coverage
+from scoring.operational_coverage import _extract_commands, score_operational_coverage
 from scoring.registry import (
     _INSTRUCTION_FILE_SCORERS,
     WEIGHT_PROFILES,
@@ -821,3 +821,103 @@ Always follow the `eslint.config.js` rules. Never use `var` in new code.
     )
     assert r["details"]["categories"]["setup"]["credited"] is True
     assert r["details"]["categories"]["test"]["credited"] is True
+
+
+# ---------------------------------------------------------------------------
+# Characterization: runner -> family classification matrix (#133)
+# ---------------------------------------------------------------------------
+
+
+class TestRunnerClassificationCharacterization:
+    """Pins what `_extract_commands` ACTUALLY assigns per runner + target.
+
+    This is a characterization test, not an endorsement: several rows below are
+    the defects tracked in #133 and are marked as such. They are pinned anyway,
+    because the alternative is what happened while #133 was being analysed —
+    three successive causal explanations were derived from *reading* this module
+    and all three were wrong. Behaviour that is only ever reconstructed by
+    reading gets reconstructed wrongly. Written down, it is checkable.
+
+    Expected values are literals, deliberately not derived from the engine at
+    run time: a self-generating table would assert nothing.
+
+    When #133 lands, the rows marked DEFECT change. That diff IS the review
+    surface for the change — it should be read line by line, not skimmed.
+    """
+
+    @staticmethod
+    def _family(command: str):
+        found = _extract_commands(["## Test", "", "```bash", command, "```"])
+        return found[0][0] if found else None
+
+    # (command, current family) — None means "not extracted at all"
+    CORRECT_TODAY = [
+        # Exact vocabulary hits resolve correctly for every runner.
+        ("make test", "test"),
+        ("make lint", "test"),
+        ("make build", "build"),
+        ("just test", "test"),
+        ("cargo test", "test"),
+        ("yarn test", "test"),
+        ("npm run test", "test"),
+        # Intrinsic tools are recognised through a runner.
+        ("uv run pytest", "test"),
+        ("uv run ruff check .", "test"),
+        # Non-runner shapes are unaffected by any of this.
+        ("pip install -e .", "setup"),
+        ("python -m build", "build"),
+    ]
+
+    # DEFECT A (#133, accepted as won't-fix): a `_GUARDED` verb with a target
+    # outside the vocabulary is dropped entirely. The guard is what keeps
+    # English prose ("make sure the tests pass") from counting as a command;
+    # measured over 259 real files, loosening it would catch 2 genuine commands
+    # and 14 non-commands. Pinned to keep the tradeoff visible, not to bless it.
+    DROPPED_BY_PROSE_GUARD = [
+        ("make test-unit", None),
+        ("make test-all", None),
+        ("make build-docs", None),
+        ("just test-unit", None),
+        ("cargo test-unit", None),
+        ("yarn test-unit", None),
+    ]
+
+    # DEFECT B (#133, to be fixed): once a `run`-like token is consumed, an
+    # unrecognised target is credited `build` without the target ever being
+    # inspected. Note `yarn test-unit` above vs `yarn run test-unit` here —
+    # same tool, same script, opposite outcome.
+    FALSE_BUILD_CREDIT = [
+        ("yarn run test-unit", "build"),
+        ("npm run test-unit", "build"),      # a test script credited as build
+        ("npm run lint-fix", "build"),       # a lint script credited as build
+        ("npm run wibble", "build"),         # nothing at all credited as build
+        ("npm run db:push", "build"),
+        ("pnpm run test-unit", "build"),
+        ("uv run pylint pkg tests", "build"),  # pylint is a linter -> test
+        ("uv run tool -- --help", "build"),    # --help is inspection junk -> nothing
+        ("bun run scripts/x.ts", "build"),
+        ("cargo run examples/a/Cargo.toml", "build"),
+    ]
+
+    @pytest.mark.parametrize("command,family", CORRECT_TODAY)
+    def test_correct_today(self, command, family):
+        assert self._family(command) == family
+
+    @pytest.mark.parametrize("command,family", DROPPED_BY_PROSE_GUARD)
+    def test_guarded_verbs_drop_unknown_targets(self, command, family):
+        assert self._family(command) == family
+
+    @pytest.mark.parametrize("command,family", FALSE_BUILD_CREDIT)
+    def test_consumed_run_credits_build_without_inspecting_target(self, command, family):
+        assert self._family(command) == family
+
+    def test_prose_never_credits(self):
+        """The reason DEFECT A is accepted. `Make sure` occurs inside a bash
+        fence in the real corpus, so fence context is not a licence to relax."""
+        for prose in (
+            "Always make sure the tests pass before pushing.",
+            "Please make test-driven development a habit.",
+            "Just run the linter when convenient.",
+            "Go build a habit of checking coverage.",
+        ):
+            assert _extract_commands(["## Test", "", prose]) == []
