@@ -237,3 +237,29 @@ class TestCanonicalUnderCalibrationFlag:
         off = self._run(args, home_with_calib, False)
         on = self._run(args, home_with_calib, True)
         assert off.returncode == on.returncode, "verify pass/fail flipped under the env flag"
+
+
+# ---------------------------------------------------------------------------
+# check-commands — summary line grammar
+# ---------------------------------------------------------------------------
+
+class TestCheckCommandsSummary:
+    """The summary line is a documented, user-facing surface (README example),
+    so its grammar is pinned: one command must not read "of 1 commands"."""
+
+    def _repo(self, tmp_path, agents_body):
+        (tmp_path / "Makefile").write_text("lint:\n\truff check .\n", encoding="utf-8")
+        agents = tmp_path / "AGENTS.md"
+        agents.write_text(agents_body, encoding="utf-8")
+        return str(agents), str(tmp_path)
+
+    def test_singular_for_one_command(self, tmp_path):
+        agents, repo = self._repo(tmp_path, "# Example\n\n## Test\n\n```bash\nmake test\n```\n")
+        result = _run_cli("check-commands", agents, "--repo", repo)
+        assert "(of 1 command)." in result.stdout, f"got: {result.stdout!r}"
+        assert "1 commands" not in result.stdout
+
+    def test_plural_for_several_commands(self, tmp_path):
+        agents, repo = self._repo(tmp_path, "# Example\n\n## Test\n\n```bash\nmake test\nmake lint\n```\n")
+        result = _run_cli("check-commands", agents, "--repo", repo)
+        assert "(of 2 commands)." in result.stdout, f"got: {result.stdout!r}"

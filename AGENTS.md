@@ -38,7 +38,7 @@ Pure-Python wheel; nothing to compile.
 ## Test
 
 ```bash
-make test-unit          # pytest suite (1,347 tests) — run this before every commit
+make test-unit          # pytest unit suite — run this before every commit
 make lint               # ruff check skills/schliff/scripts/
 make test-all           # unit + integration + self + proof suites
 ```

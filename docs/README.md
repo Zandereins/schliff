@@ -24,7 +24,7 @@ LLM-judge and evolve features are optional extras (`[judge]`, `[evolve]`); the c
 
 ## See it on real files
 - **[case-studies/shieldclaw/](case-studies/shieldclaw/)** — before/after of a real skill optimization, with baseline and optimized score artifacts and the eval suite.
-- **[launch/state-of-ai-instructions.md](launch/state-of-ai-instructions.md)** — the public report: 120 instruction files scored across 60 repos. The corpus itself is not bundled (third-party files, varying licenses); regenerate it locally with the pipeline in [`../skills/schliff/scripts/launch/`](../skills/schliff/scripts/launch/) (`collect_corpus.py` → `score_corpus.py` → `aggregate_stats.py`).
+- **[launch/state-of-ai-instructions.md](launch/state-of-ai-instructions.md)** — the public report: 120 instruction files scored across 60 repos. **Historical:** measured 2026-04-17 on schliff v7.1.0; the figures do not reproduce on the current engine (see the header note in the file). The corpus itself is not bundled (third-party files, varying licenses); regenerate it locally with the pipeline in [`../skills/schliff/scripts/launch/`](../skills/schliff/scripts/launch/) (`collect_corpus.py` → `score_corpus.py` → `aggregate_stats.py`).
 
 ## Internal / working docs (not part of the public guide)
 `specs/`, `research/`, `ops/`, and `superpowers/` hold in-progress design specs,

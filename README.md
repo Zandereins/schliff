@@ -134,13 +134,62 @@ Schliff does **not** quietly renormalize across whatever you happened to measure
 
 ## What the score does not measure
 
-- **Structure, not truth.** Schliff cannot verify that a documented command exists or runs. A syntactically plausible fabrication — invented-but-real-looking commands in well-formed sections — scores in the S range. This is a documented, test-pinned limit ([`test_known_limit_plausible_fabrication_scores_high`](skills/schliff/tests/unit/test_operational_coverage.py), spec §11).
+- **Structure, not truth.** The *score* cannot verify that a documented command exists or runs. A syntactically plausible fabrication — invented-but-real-looking commands in well-formed sections — scores in the S range. This is a documented, test-pinned limit ([`test_known_limit_plausible_fabrication_scores_high`](skills/schliff/tests/unit/test_operational_coverage.py), spec §11). The `check-commands` subcommand closes part of this gap outside the score — see [Catching command drift](#catching-command-drift) below.
 - **Not agent behavior.** A high score doesn't prove your agent gets better — validity evidence today is case-study-level (the two dated before/afters above), not benchmark-level.
 - **Token counts are estimates.** stdlib `len//4`, not a tokenizer.
 - **Coverage is on you.** `triggers`/`quality`/`edges` need an eval suite (`/schliff:init`) or the ceiling warning caps the score. AGENTS.md has no such gap.
 - **Informed declines are valid.** A low dimension can be a deliberate tradeoff (hydra left efficiency at 47 rather than gut a 14k-token file).
 
 A high Schliff score is necessary, not sufficient.
+
+---
+
+## Catching command drift
+
+The score reads structure. `check-commands` reads your repo: for every setup/build/test
+command in an `AGENTS.md` or `CLAUDE.md`, it asks whether the thing actually exists.
+
+Given this `AGENTS.md`:
+
+````markdown
+# Example
+
+## Test
+
+```bash
+make test
+```
+````
+
+and a `Makefile` that only defines `lint:`:
+
+```console
+$ schliff check-commands AGENTS.md --repo .
+DANGLING  AGENTS.md:6  `make test` — make target 'test' is not defined in Makefile
+
+1 dangling, 0 resolved, 0 unknown (of 1 command).
+$ echo $?
+1
+```
+
+Non-zero exit makes it a CI gate. Schliff runs it against its own `AGENTS.md` on every
+pull request and every push to `main` ([`test.yml`](.github/workflows/test.yml)), which is
+the only adoption claim made here.
+
+**What it resolves, precisely** — the honest scope matters more than the headline:
+
+- **Make targets** and **npm/pnpm/yarn scripts**, plus referenced script paths on disk.
+- **Conservative by design:** a command is reported `dangling` only when absence is
+  *provable* (the manifest exists and the target is definitively missing). Anything
+  unprovable is `unknown`, never `dangling` — one false accusation would burn the tool.
+- **Known gap:** make targets are matched against a fixed vocabulary while npm scripts
+  use prefix matching, so a hyphenated target like `make test-unit` is currently not
+  examined at all ([#133](https://github.com/Zandereins/schliff/issues/133)). It stays
+  silent rather than guessing — but silence here is a coverage limit, not a clean bill.
+
+It is a drift guard, not a bug finder: across a sweep of real repositories most findings
+were in small or unmaintained projects, because well-maintained repos generally keep
+their documented commands working.
 
 ---
 
