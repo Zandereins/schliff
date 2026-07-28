@@ -200,14 +200,26 @@ runs:
     - name: Comment on PR
       if: inputs.comment-on-pr == 'true' && github.event_name == 'pull_request'
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        # Values reach the script through the environment, never spliced into
+        # its source. `minimum-score` is the one that matters: it is workflow-
+        # author input, so a quote in it would have closed the string literal
+        # and everything after it would have been evaluated as code. RESULT_B64
+        # and GRADE are engine output with safe charsets, moved along with it so
+        # the step has no interpolation left to audit. Same reasoning as the
+        # `env: MINIMUM` + `os.environ` pattern in "Check minimum score" above.
+        RESULT_B64: ${{ steps.score.outputs.result_b64 }}
+        GRADE: ${{ steps.score.outputs.grade }}
+        MINIMUM_SCORE: ${{ inputs.minimum-score }}
+        DANGLING_B64: ${{ steps.dangling.outputs.dangling_b64 }}
       with:
         script: |
-          const b64 = '${{ steps.score.outputs.result_b64 }}';
+          const b64 = process.env.RESULT_B64 || '';
           const result = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
           const score = result.composite_score;
           const dims = result.dimensions;
-          const grade = '${{ steps.score.outputs.grade }}';
-          const minimum = parseFloat('${{ inputs.minimum-score }}') || 0;
+          const grade = process.env.GRADE || '';
+          const minimum = parseFloat(process.env.MINIMUM_SCORE) || 0;
           const passed = minimum === 0 || score >= minimum;
           const icon = score >= 95 ? '🟢' : score >= 75 ? '🟡' : '🔴';
 
@@ -266,7 +278,7 @@ runs:
           // db64 is EMPTY in the common case (no danglings, step skipped, or old
           // engine); a bare JSON.parse(Buffer.from('',...)) throws SyntaxError and
           // would abort this whole step, killing the score comment too. Guard it.
-          const db64 = '${{ steps.dangling.outputs.dangling_b64 }}';
+          const db64 = process.env.DANGLING_B64 || '';
           let dangling = [];
           if (db64) {
             try {
