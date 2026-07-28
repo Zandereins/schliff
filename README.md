@@ -20,9 +20,13 @@
 Schliff scores `AGENTS.md` — and the rest of the family (`SKILL.md`, `CLAUDE.md`, `.cursorrules`, system prompts) — against an explicit, versioned rubric. No LLM judge in the critical path. No network. No randomness. A rule engine you can read, pin, and gate CI on.
 
 ```bash
+# no venv, no commitment — needs uv (https://docs.astral.sh/uv/):
+uvx schliff score AGENTS.md   # or any SKILL.md / CLAUDE.md / .cursorrules
+uvx schliff demo              # no instruction file handy? score a built-in bad one
+
+# or install it:
 pip install schliff
-schliff score AGENTS.md   # or any SKILL.md / CLAUDE.md / .cursorrules
-schliff demo              # no instruction file handy? score a built-in bad one
+schliff score AGENTS.md
 ```
 
 This is the real, current output of `schliff score AGENTS.md` on this repo's own
@@ -45,7 +49,7 @@ schliff v8.8.0
 
 No model produced that number. Run it on another laptop and you get 95.6 again — **a score you can't reproduce isn't a measurement, it's a vibe.** And we hold *ourselves* to that: this repo's own badge (scored in isolation) once disagreed with its own CLI (scored in-repo) by ~15 points on the *same bytes*, because `structure` was crediting an on-disk `references/` neighbourhood instead of the file's content. We fixed the engine, not the file ([#10](https://github.com/Zandereins/schliff/pull/129)) — now `cp AGENTS.md /tmp && schliff score /tmp/AGENTS.md` returns the same number as CI and the badge. (The `agents.md` headline weights `structure`·`operational_coverage`·`efficiency` at 0.4/0.4/0.2; `composability` and `clarity` are shown for information, not counted.)
 
-*The quick-start and case-study numbers here are reproducible from released `schliff==8.8.0` (`pip install schliff==8.8.0`); the hydra field run below is dated to the version it was measured on. No install? Paste your file into the [playground](https://schliff-playground.vercel.app) — same engine, with AGENTS.md and SKILL.md tabs.*
+*The quick-start and case-study numbers here are reproducible from released `schliff==8.8.0` (`pip install schliff==8.8.0` or `uvx schliff@8.8.0`); the hydra field run below is dated to the version it was measured on. Prefer the browser? Paste your file into the [playground](https://schliff-playground.vercel.app) — same engine, with AGENTS.md and SKILL.md tabs.*
 
 ---
 
