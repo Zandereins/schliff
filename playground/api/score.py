@@ -14,6 +14,7 @@ cost of a single scoring run.
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 from http.server import BaseHTTPRequestHandler
@@ -123,11 +124,10 @@ def _run_scoring(content: str, filename: str) -> dict:
             "engine_version": _ENGINE_VERSION,
         }
     finally:
-        try:
-            os.unlink(skill_path)
-            os.rmdir(tmp_dir)
-        except OSError:
-            pass
+        # rmtree, not unlink+rmdir: if the file write itself failed (e.g.
+        # ENOSPC), unlink raises and rmdir never runs, leaking the mkdtemp dir
+        # on a warm instance's persistent /tmp. Same pattern as badge.py.
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 class handler(BaseHTTPRequestHandler):
