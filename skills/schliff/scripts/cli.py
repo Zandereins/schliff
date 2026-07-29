@@ -410,8 +410,18 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 
     verbose = getattr(args, "verbose", False)
     repo_root = getattr(args, "repo", None)
+
+    # Positional dirs are an alias for --skill-dirs. Refuse both rather than merge
+    # them: a silent union would make the scanned set depend on argument order.
+    positional = getattr(args, "dirs", None) or None
+    flagged = getattr(args, "skill_dirs", None) or None
+    if positional and flagged:
+        print("schliff doctor: give directories positionally or via --skill-dirs, "
+              "not both", file=sys.stderr)
+        raise SystemExit(2)
+
     report = doctor_mod.run_doctor(
-        skill_dirs=getattr(args, "skill_dirs", None),
+        skill_dirs=flagged or positional,
         verbose=verbose,
         repo_root=repo_root,
     )
@@ -1058,6 +1068,12 @@ def main():
     # doctor command
     doctor_parser = subparsers.add_parser("doctor", help="Scan all installed skills")
     doctor_parser.add_argument("--json", action="store_true", help="JSON output")
+    # A bare directory is what people actually type — schliff's only external adopter
+    # documented `schliff doctor <dir>` as his step 1 and it exited 2 with
+    # "unrecognized arguments". Positional dirs are an alias for --skill-dirs; giving
+    # both is an error rather than a silent merge, so the scanned set is never ambiguous.
+    doctor_parser.add_argument("dirs", nargs="*", default=None, metavar="DIR",
+                               help="Directories to scan (same as --skill-dirs)")
     doctor_parser.add_argument("--skill-dirs", nargs="+", default=None,
                                help="Directories to scan")
     doctor_parser.add_argument("--verbose", "-v", action="store_true",
