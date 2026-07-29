@@ -5,6 +5,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Three security patterns fired on ordinary prose.** They were found by running the
+  shipped scorer over a frozen corpus of 670 SKILL.md files from 134 public community
+  hubs and hand-adjudicating every hit. The scan produced 144 matches and **zero** true
+  positives; two of these defects accounted for 68 of them, and the third is the same
+  class caught while fixing them.
+
+  `_RE_SEC_DATA_EXFIL` had no word-boundary anchor, so the short `nc` alternative matched
+  the **tail of any word ending in "nc"** followed by whitespace. Markdown is full of
+  them — "async ops", "sync primitives", "CNC tool-path generation", and
+  `go test -bench=BenchmarkMyFunc -benchmem ./pkg/... | tee report.txt`. The anchor is
+  applied to the two alternatives that begin with a verb, not to the whole group: the
+  middle alternative starts with a subshell, where a word boundary could never hold.
+
+  `_RE_SEC_DANGEROUS_CMD` treated `rm -rf /` as a prefix, so it matched
+  `rm -rf /<any absolute path>` and reported the canonical Docker layer cleanup
+  `rm -rf /var/lib/apt/lists/*` as a root wipe. The recursive-force alternatives now
+  require the target to be root itself.
+
+  `_RE_SEC_ENV_LEAK` had the identical missing anchor as the exfil pattern — `cat` and
+  `log` are the tails of `concat`/`logcat` and `catalog`/`changelog`/`blog`. **Unlike the
+  other two this one is latent, not observed:** it produced zero false positives in the
+  corpus, where all 17 of its matches were genuine verb invocations. It is fixed for
+  consistency and because the exposure is broad — the same corpus carries 290 occurrences
+  of 27 distinct carrier words, each one nearby secret token away from firing. Its match
+  count on the corpus is unchanged at 17, confirming no genuine match was lost.
+
+  **Impact, measured on the same 670-file corpus:** stock matches 144 → 89. `exfil`
+  106 → 51 (−55); `dangerous_cmd` 13 → 0 (every hit was a scoped delete). Every other
+  category is unchanged (`injection`, `obfuscation`, `overpermission`, `boundaries` all
+  ±0), and no file gained a match. The four genuinely hostile files in the corpus — all
+  positive-control fixtures inside competing scanners' test suites — are still detected
+  with **byte-identical match counts**, so the detector was narrowed, not disarmed.
+
+  **Not affected:** schliff's own `AGENTS.md` and `README.md` match neither pattern
+  before or after, so the published hero score and badge do not move. Golden scores are
+  unchanged.
+
+  **For external files:** security scores can only rise, never fall — the change removes
+  penalties, it never adds them.
+
+  Both defects are pinned as repo-named regressions in
+  `tests/unit/test_security_field_false_positives.py`, each false-positive case paired
+  with a guard asserting the genuine attack shape still matches, so a future change
+  cannot silence a detector instead of narrowing it.
+
 ## [8.8.0] - 2026-07-28
 
 ### Changed
