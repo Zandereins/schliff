@@ -15,7 +15,7 @@
       "clarity": 100,
       "security": 100
     },
-    "version": "8.8.0",
+    "version": "8.8.1",
     "submitted_at": "2026-03-25T10:00:00Z"
   },
   {
@@ -34,7 +34,7 @@
       "clarity": 100,
       "security": 75
     },
-    "version": "8.8.0",
+    "version": "8.8.1",
     "submitted_at": "2026-03-24T15:30:00Z"
   }
 ]
