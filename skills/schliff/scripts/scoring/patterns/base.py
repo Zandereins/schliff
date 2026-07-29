@@ -149,10 +149,17 @@ _RE_SEC_INSTRUCTION_OVERRIDE = re.compile(
 # made the greedy form O(n^2) (~1h CPU at the cap; reachable ungated via a .txt that
 # auto-detects as a system_prompt). A real exfil/leak command fits well inside 200
 # chars between the verb and the sink. Same bound already used by _RE_DIFF_EXAMPLE.
+# The verb alternations are word-boundary anchored (`\b`). Without it the short `nc`
+# alternative matches the TAIL of any word ending in "nc" followed by whitespace, and
+# markdown is full of them: a field scan of 670 community skills found 55 of 103 exfil
+# hits were `async ops`, `sync primitives`, `CNC tool-path`, `BenchmarkMyFunc`. The
+# anchor goes on the two alternatives that START with a verb, NOT in front of the whole
+# group — the middle alternative starts with `$(`, and `\b` before a non-word character
+# would never hold there.
 _RE_SEC_DATA_EXFIL = re.compile(
-    r"(?:(?:curl|wget|fetch|nc|ncat|netcat)\s+[^\n]{0,200}(?:\$\(|`[^`]*`|<\(|\|)|"
+    r"(?:\b(?:curl|wget|fetch|nc|ncat|netcat)\s+[^\n]{0,200}(?:\$\(|`[^`]*`|<\(|\|)|"
     r"\$\(cat\s[^\)]+\)\s*\|\s*(?:curl|wget|nc|netcat)|"
-    r"(?:curl|wget)\s+[^\n]{0,200}(?:--data|--upload|-d\s|-F\s|-T\s)[^\n]{0,200}(?:https?://|ftp://))",
+    r"\b(?:curl|wget)\s+[^\n]{0,200}(?:--data|--upload|-d\s|-F\s|-T\s)[^\n]{0,200}(?:https?://|ftp://))",
     re.IGNORECASE,
 )
 _RE_SEC_ENV_LEAK = re.compile(
@@ -163,9 +170,15 @@ _RE_SEC_ENV_LEAK = re.compile(
 )
 
 # Category: dangerous_cmd
+# The recursive-force `rm` alternatives require the target to be root ITSELF, via a
+# negative lookahead for a path character after the slash. Without it `rm -rf /` matched
+# as a prefix of `rm -rf /<any absolute path>`, so the canonical Docker layer cleanup
+# `rm -rf /var/lib/apt/lists/*` was reported as a root wipe (all 13 dangerous_cmd hits in
+# a 670-skill field scan were this). `rm -rf /` and `rm -rf /*` still match; a scoped
+# delete no longer does.
 _RE_SEC_DANGEROUS_CMD = re.compile(
-    r"(?:rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/|"
-    r"rm\s+-[a-z]*f[a-z]*r[a-z]*\s+/|"
+    r"(?:rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/(?![A-Za-z0-9_.-])|"
+    r"rm\s+-[a-z]*f[a-z]*r[a-z]*\s+/(?![A-Za-z0-9_.-])|"
     r"chmod\s+777\s|"
     r"dd\s+if=/dev/(?:zero|random|urandom)\s+of=/dev/|"
     r"mkfs\.\w+\s+/dev/|"
