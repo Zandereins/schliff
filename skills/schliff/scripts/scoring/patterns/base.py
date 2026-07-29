@@ -176,17 +176,26 @@ _RE_SEC_INSTRUCTION_OVERRIDE = re.compile(
 # so a bounded wrapper chain and an optional path prefix are allowed before the
 # interpreter. Every quantifier here is bounded and the chain is non-nullable: this file
 # has a ReDoS history and the widening must not reintroduce one.
+# The wrapper set and the four shapes below were not guessed — they come from
+# differencing every verb x sink combination against the pre-narrowing (8.8.0) pattern
+# and keeping only the losses that are genuine exfil. The same differential showed
+# `| jq`, `| grep`, `| less`, `| column -t`, `| head` no longer matching, which is the
+# narrowing working as intended rather than a regression.
 _RE_SEC_SINK_WRAPPER = (
-    r"(?:(?:/[^\s|]{0,120}/)?(?:sudo|env|command|nohup)\s+|(?:-{1,2}\w+|\w+=[^\s|]{0,64})\s+)*"
+    r"(?:(?:/[^\s|]{0,120}/)?(?:sudo|env|command|nohup|busybox)\s+"
+    r"|(?:-{1,2}\w+|\w+=[^\s|]{0,64})\s+)*"
 )
+# An interpreter named through a variable (`| $SHELL`) is a command position, so the
+# name itself carries no information — the position does.
 _RE_SEC_SINK_EXEC = (
     r"sh|bash|zsh|dash|ksh|fish|python3?|perl|ruby|node|php|pwsh|powershell|iex|"
-    r"eval|exec|source|nc|ncat|netcat|curl|wget|tee|xargs|dd|base64|openssl"
+    r"eval|exec|source|nc|ncat|netcat|curl|wget|tee|xargs|dd|base64|openssl|"
+    r"\$[A-Za-z_]\w{0,63}"
 )
 
 _RE_SEC_DATA_EXFIL = re.compile(
     r"(?:\b(?:curl|wget|fetch|nc|ncat|netcat)\s+[^\n]{0,200}"
-    r"(?:\$\(|<\(|\|\s*" + _RE_SEC_SINK_WRAPPER + r"(?:/[^\s|]{0,120}/)?"
+    r"(?:\$\(|<\(|\|&?\s*" + _RE_SEC_SINK_WRAPPER + r"[\"']?(?:/[^\s|]{0,120}/)?"
     r"(?:" + _RE_SEC_SINK_EXEC + r")\b)|"
     r"\$\(cat\s[^\)]+\)\s*\|\s*(?:curl|wget|nc|netcat)|"
     r"\b(?:curl|wget)\s+[^\n]{0,200}(?:--data|--upload|-d\s|-F\s|-T\s)[^\n]{0,200}(?:https?://|ftp://))",
