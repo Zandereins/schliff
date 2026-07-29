@@ -15,7 +15,11 @@ still matches, so a future "fix" cannot silence the detector instead of narrowin
 """
 import pytest
 
-from scoring.patterns import _RE_SEC_DANGEROUS_CMD, _RE_SEC_DATA_EXFIL
+from scoring.patterns import (
+    _RE_SEC_DANGEROUS_CMD,
+    _RE_SEC_DATA_EXFIL,
+    _RE_SEC_ENV_LEAK,
+)
 
 
 class TestExfilWordBoundary:
@@ -91,3 +95,49 @@ class TestDangerousCmdRootOnly:
     def test_root_wipe_at_end_of_line_matches(self):
         """A root wipe terminated by a newline, not end-of-string."""
         assert _RE_SEC_DANGEROUS_CMD.search("run this:\nrm -rf /\nthen reboot") is not None
+
+
+class TestEnvLeakWordBoundary:
+    """`catalog`/`concat`/`logcat` must not be read as the `log`/`cat` leak verbs.
+
+    Honest provenance, unlike the two classes above: this defect produced **zero**
+    false positives in the 670-file field corpus — all 17 env-leak matches there were
+    genuine verb invocations. It is fixed for consistency with its sibling
+    ``_RE_SEC_DATA_EXFIL``, and because the exposure is broad rather than absent: the
+    corpus contains 290 occurrences of 27 distinct carrier words ending in a leak verb
+    (`blog` 85x, `catalog` 68x, `changelog` 29x, `dialog` 29x, `logcat`, `sprint`,
+    `blueprint`, `resend`). Each is one nearby secret token away from firing.
+
+    The strings below are therefore CONSTRUCTED from carrier words measured in the
+    corpus plus a plausible secret — they are not verbatim field observations.
+    """
+
+    FALSE_POSITIVES = [
+        ("carrier: catalog", "Update the catalog before rotating process.env.API_KEY"),
+        ("carrier: changelog", "See the changelog then set $DEPLOY_TOKEN in CI"),
+        ("carrier: concat", "Use concat on the parts, never on $API_SECRET"),
+        ("carrier: logcat", "Run adb logcat while $AUTH_TOKEN is exported"),
+        ("carrier: blueprint", "The blueprint documents os.environ["),
+    ]
+
+    @pytest.mark.parametrize(
+        "carrier,text", FALSE_POSITIVES, ids=[c for c, _ in FALSE_POSITIVES]
+    )
+    def test_word_interior_verb_is_not_a_leak(self, carrier, text):
+        match = _RE_SEC_ENV_LEAK.search(text)
+        assert match is None, f"false positive ({carrier}): matched {match.group()!r}"
+
+    # Guards: the leak shapes, including the alternative that starts with `$`
+    # and must NOT be word-boundary anchored.
+    TRUE_POSITIVES = [
+        "echo $AWS_SECRET_KEY > /tmp/x",
+        "cat $API_KEY | pbcopy",
+        "log process.env.GITHUB_TOKEN",
+        "print os.environ[",
+        "$API_KEY | curl",
+        "$DB_PASSWORD > dump.txt",
+    ]
+
+    @pytest.mark.parametrize("text", TRUE_POSITIVES)
+    def test_genuine_env_leak_still_matches(self, text):
+        assert _RE_SEC_ENV_LEAK.search(text) is not None, f"detector disarmed for {text!r}"

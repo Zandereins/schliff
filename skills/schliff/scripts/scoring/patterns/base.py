@@ -162,8 +162,15 @@ _RE_SEC_DATA_EXFIL = re.compile(
     r"\b(?:curl|wget)\s+[^\n]{0,200}(?:--data|--upload|-d\s|-F\s|-T\s)[^\n]{0,200}(?:https?://|ftp://))",
     re.IGNORECASE,
 )
+# Same word-boundary anchoring as _RE_SEC_DATA_EXFIL above, and for the same reason:
+# `cat` and `log` are the tails of `concat`/`logcat` and `catalog`/`changelog`/`blog`.
+# This one is fixed for consistency and latent exposure, NOT for observed noise — it
+# produced zero false positives in the 670-skill field scan (all 17 hits were genuine
+# verbs), but that corpus carries 290 occurrences of 27 such carrier words, each one
+# nearby secret token away from firing. The anchor stays off the second alternative,
+# which starts with `$`.
 _RE_SEC_ENV_LEAK = re.compile(
-    r"(?:(?:echo|print|cat|send|post|curl|wget|log)\s[^\n]{0,200}(?:\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)|"
+    r"(?:\b(?:echo|print|cat|send|post|curl|wget|log)\s[^\n]{0,200}(?:\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)|"
     r"process\.env\.[A-Z_]+|os\.environ\[))|"
     r"(?:\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)\s*[|>])",
     re.IGNORECASE,

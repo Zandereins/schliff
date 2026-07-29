@@ -7,10 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
-- **Two security patterns fired on ordinary prose.** Both were found by running the
+- **Three security patterns fired on ordinary prose.** They were found by running the
   shipped scorer over a frozen corpus of 670 SKILL.md files from 134 public community
   hubs and hand-adjudicating every hit. The scan produced 144 matches and **zero** true
-  positives; these two defects accounted for 68 of them.
+  positives; two of these defects accounted for 68 of them, and the third is the same
+  class caught while fixing them.
 
   `_RE_SEC_DATA_EXFIL` had no word-boundary anchor, so the short `nc` alternative matched
   the **tail of any word ending in "nc"** followed by whitespace. Markdown is full of
@@ -23,6 +24,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `rm -rf /<any absolute path>` and reported the canonical Docker layer cleanup
   `rm -rf /var/lib/apt/lists/*` as a root wipe. The recursive-force alternatives now
   require the target to be root itself.
+
+  `_RE_SEC_ENV_LEAK` had the identical missing anchor as the exfil pattern — `cat` and
+  `log` are the tails of `concat`/`logcat` and `catalog`/`changelog`/`blog`. **Unlike the
+  other two this one is latent, not observed:** it produced zero false positives in the
+  corpus, where all 17 of its matches were genuine verb invocations. It is fixed for
+  consistency and because the exposure is broad — the same corpus carries 290 occurrences
+  of 27 distinct carrier words, each one nearby secret token away from firing. Its match
+  count on the corpus is unchanged at 17, confirming no genuine match was lost.
 
   **Impact, measured on the same 670-file corpus:** stock matches 144 → 89. `exfil`
   106 → 51 (−55); `dangerous_cmd` 13 → 0 (every hit was a scoped delete). Every other
