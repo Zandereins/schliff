@@ -281,14 +281,28 @@ def test_dot_git_spelling_is_reserved():
     assert submit._is_reserved_identity("https://github.com/zandereins/schliff.git", "schliff")
 
 
-def test_real_seed_both_same_repo_rows_survive_union(kv, monkeypatch):
-    # Both shipped seed rows now canonicalize to the same repo (zandereins/schliff)
-    # but have distinct skill_names (schliff, shieldclaw); they must NOT collapse in
-    # the seed-union, or a repo_url-only dedup regression would silently drop one.
-    real_seed = Path(__file__).resolve().parents[4] / "web" / "leaderboard" / "data" / "submissions.json"
-    monkeypatch.setattr(query, "SEED_PATH", str(real_seed))
+def test_same_repo_distinct_skills_survive_union(kv, monkeypatch, tmp_path):
+    """Two rows from the SAME repo with distinct skill_names must not collapse.
+
+    Anchored on a synthetic seed, not the shipped one. It used to read
+    web/leaderboard/data/submissions.json directly, so emptying that file — done
+    deliberately, because both rows were self-submitted from this repo and one
+    carried a self-awarded S — broke a dedup-mechanism test that has nothing to do
+    with which rows ship. Same coupling defect as anchoring scorer tests on the live
+    SKILL.md: the invariant is about the code, so its input must not move.
+    """
+    seed = tmp_path / "submissions.json"
+    seed.write_text(json.dumps([
+        {"skill_name": "alpha", "repo_url": "https://github.com/acme/tools",
+         "composite": 90.0, "grade": "A", "dimensions": {}, "version": "1.0.0"},
+        {"skill_name": "beta", "repo_url": "https://github.com/acme/tools",
+         "composite": 80.0, "grade": "B", "dimensions": {}, "version": "1.0.0"},
+    ]), encoding="utf-8")
+    monkeypatch.setattr(query, "SEED_PATH", str(seed))
     loaded = query._kv_load_all(query._kv_config())  # empty KV -> seed only
-    assert {"schliff", "shieldclaw"} <= {e["skill_name"] for e in loaded}
+    assert {"alpha", "beta"} <= {e["skill_name"] for e in loaded}, (
+        "repo_url-only dedup would silently drop one of two skills from one repo"
+    )
 
 
 # --- abuse hardening (audit 2026-07-22): #17 grief-downgrade, #18 spoofable IP ---

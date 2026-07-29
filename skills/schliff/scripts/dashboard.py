@@ -250,8 +250,6 @@ def format_dashboard(dashboard: dict) -> str:
             itype = issue.get("type", "unknown")
             if itype == "trigger_overlap":
                 lines.append(f"    [{sev}] Overlap with {issue.get('skill_b', '?')} ({issue.get('similarity', 0):.0%})")
-            elif itype == "broken_handoff":
-                lines.append(f"    [{sev}] Broken ref: '{issue.get('referenced', '?')}'")
             elif itype == "scope_collision":
                 lines.append(f"    [{sev}] Scope collision with {issue.get('skill_b', '?')}")
         lines.append("")

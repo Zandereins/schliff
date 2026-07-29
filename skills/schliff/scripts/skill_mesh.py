@@ -347,117 +347,6 @@ def _levenshtein_distance(s1: str, s2: str, threshold: int = 2) -> int:
     return prev_row[-1]
 
 
-def detect_broken_handoffs(skills: list[dict]) -> list[dict]:
-    """Detect references to skills that don't exist in the mesh."""
-    # Build name resolution table
-    name_table = {}
-    for skill in skills:
-        name = skill["name"].lower()
-        name_table[name] = skill
-        # Also register slug variants
-        slug = re.sub(r"[^a-z0-9]+", "-", name).strip("-")
-        name_table[slug] = skill
-        # And underscore variant
-        name_table[slug.replace("-", "_")] = skill
-
-    # Handoff patterns — only match structural skill references, not prose
-    # Bare "use" is excluded to prevent matching every English sentence.
-    # "use" only matches when followed by a quoted/backtick-delimited name.
-    handoff_pattern = re.compile(
-        r"(?:"
-        # Strong handoff verbs — almost always real skill references
-        r"hand\s*off\s*to|pass\s+to|chain\s+with|followed\s+by"
-        r"|then\s+use|instead\s+use|suggest\s+using"
-        r"|complementary\s+\w+\s+skill|works\s+with"
-        # "use" only when the name is backtick/quote-wrapped
-        r"|use\s+[`'\"]"
-        # "after/before <word> use" — anchored, no greedy wildcard
-        r"|after\s+\w+\s+use|before\s+\w+\s+use"
-        r")\s*"
-        r"[`'\"]?([a-zA-Z][a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+)?)[`'\"]?",
-        re.IGNORECASE
-    )
-
-    # Also match /slash-command references
-    slash_pattern = re.compile(r"/([a-zA-Z][a-zA-Z0-9_-]+(?::[a-zA-Z0-9_-]+)?)")
-
-    # Common words that aren't skill names — defined once, not per-skill
-    _false_positives = {
-        "this", "that", "the", "a", "an", "it", "your", "my",
-        "another", "other", "same", "different", "each", "all",
-        "first", "next", "last", "new", "old", "any", "every",
-        "results", "history", "data", "mode",
-    }
-
-    issues = []
-
-    for skill in skills:
-        content = skill.get("content", "")
-
-        # Find handoff references
-        refs = set()
-        for match in handoff_pattern.finditer(content):
-            ref = match.group(1).strip().lower()
-            if ref in _false_positives:
-                continue
-            # Skip refs that are too short or too generic
-            if len(ref) < 3 or ref.isdigit():
-                continue
-            refs.add(ref)
-
-        for match in slash_pattern.finditer(content):
-            ref = match.group(1).strip().lower()
-            # Only consider base skill name from slash commands (skip subcommands)
-            if ":" in ref:
-                base = ref.split(":")[0]
-            else:
-                base = ref
-            # Skip self-references via slash commands
-            if base == skill["name"].lower():
-                continue
-            # Skip refs that are too short or too generic
-            if len(base) < 3 or base.isdigit() or base in _false_positives:
-                continue
-            refs.add(base)
-
-        # Check each reference against name table
-        for ref in refs:
-            # Skip self-references
-            if ref == skill["name"].lower():
-                continue
-
-            if ref in name_table:
-                continue  # Valid reference
-
-            # Fuzzy match — collect all candidates within edit distance, then
-            # pick deterministically (smallest distance, then lexicographic name)
-            # so the suggestion does not depend on dict insertion order.
-            suggestion = None
-            best_key = None
-            for known_name in name_table:
-                dist = _levenshtein_distance(ref, known_name)
-                if dist <= 2:
-                    candidate_name = name_table[known_name]["name"]
-                    key = (dist, candidate_name)
-                    if best_key is None or key < best_key:
-                        best_key = key
-                        suggestion = candidate_name
-
-            issues.append({
-                "type": "broken_handoff",
-                "severity": "warning",
-                "skill": skill["name"],
-                "skill_path": skill["path"],
-                "referenced": ref,
-                "suggestion": suggestion,
-            })
-
-    return issues
-
-
-# --- Scope Collision Detection ---
-
-# Domain keyword mapping
 _DOMAIN_KEYWORDS = {
     "devops": ["deploy", "docker", "kubernetes", "ci/cd", "pipeline", "infrastructure", "terraform", "helm"],
     "testing": ["test", "spec", "assertion", "mock", "fixture", "coverage", "jest", "pytest"],
@@ -549,7 +438,6 @@ def generate_mesh_actions(issues: list[dict], skills: list[dict]) -> list[dict]:
     For each issue type, generates a specific remediation action:
     - trigger_overlap (critical): Negative-boundary additions for both skills
     - scope_collision: Domain-ownership proposal + scope-narrowing patches
-    - broken_handoff: Missing-skill stub or reference fix
 
     Returns list of MeshAction dicts with: type, target_path, instruction, patch, confidence.
     """
@@ -610,35 +498,6 @@ def generate_mesh_actions(issues: list[dict], skills: list[dict]) -> list[dict]:
                 "issue_ref": f"scope_collision:{skill_a}:{skill_b}",
             })
 
-        elif itype == "broken_handoff":
-            ref = issue.get("referenced", "")
-            suggestion = issue.get("suggestion")
-
-            if suggestion:
-                # Fix reference to point to correct skill
-                actions.append({
-                    "type": "fix_reference",
-                    "target_path": issue.get("skill_path", ""),
-                    "instruction": f"Replace reference to '{ref}' with '{suggestion}'",
-                    "patch": {
-                        "op": "remove_regex",
-                        "pattern": re.escape(ref),
-                        "replacement": suggestion,
-                    },
-                    "confidence": 0.7,
-                    "issue_ref": f"broken_handoff:{ref}",
-                })
-            else:
-                # Suggest creating a stub
-                actions.append({
-                    "type": "create_stub",
-                    "target_path": f"<new>/{ref}/SKILL.md",
-                    "instruction": f"Create missing skill '{ref}' referenced by {issue.get('skill', '?')}",
-                    "patch": None,
-                    "confidence": 0.3,
-                    "issue_ref": f"broken_handoff:{ref}",
-                })
-
     return actions
 
 
@@ -692,14 +551,11 @@ def compute_mesh_health(issues: list[dict]) -> dict:
     score = 100
 
     critical_conflicts = sum(1 for i in issues if i["type"] == "trigger_overlap" and i["severity"] == "critical")
-    # Exclude broken_handoffs from generic warning count to avoid double-counting
-    warnings = sum(1 for i in issues if i["severity"] == "warning" and i["type"] != "broken_handoff")
-    broken_handoffs = sum(1 for i in issues if i["type"] == "broken_handoff")
+    warnings = sum(1 for i in issues if i["severity"] == "warning")
     critical_collisions = sum(1 for i in issues if i["type"] == "scope_collision" and i["severity"] == "critical")
 
     score -= min(critical_conflicts * 15, 60)
     score -= min(warnings * 5, 30)
-    score -= min(broken_handoffs * 8, 40)
     score -= min(critical_collisions * 12, 48)
 
     return {
@@ -707,7 +563,6 @@ def compute_mesh_health(issues: list[dict]) -> dict:
         "total_issues": len(issues),
         "critical_conflicts": critical_conflicts,
         "warnings": warnings,
-        "broken_handoffs": broken_handoffs,
         "critical_collisions": critical_collisions,
     }
 
@@ -771,7 +626,6 @@ def run_mesh_analysis(
     # Run all detectors
     issues = []
     issues.extend(detect_trigger_overlaps(skills))
-    issues.extend(detect_broken_handoffs(skills))
     issues.extend(detect_scope_collisions(skills))
 
     # Generate evolution actions for issues
@@ -852,12 +706,6 @@ def format_mesh_report(result: dict) -> str:
                 )
                 if issue.get("common_terms"):
                     lines.append(f"         Common terms: {', '.join(issue['common_terms'][:5])}")
-            elif itype == "broken_handoff":
-                suggestion = f" (did you mean: {issue['suggestion']}?)" if issue.get("suggestion") else ""
-                lines.append(
-                    f"  [{sev}] Broken handoff: {issue['skill']} references '{issue['referenced']}'"
-                    f" — not found{suggestion}"
-                )
             elif itype == "scope_collision":
                 lines.append(
                     f"  [{sev}] Scope collision: {issue['skill_a']} <-> {issue['skill_b']}"
