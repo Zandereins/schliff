@@ -33,12 +33,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   of 27 distinct carrier words, each one nearby secret token away from firing. Its match
   count on the corpus is unchanged at 17, confirming no genuine match was lost.
 
-  **Impact, measured on the same 670-file corpus:** stock matches 144 → 89. `exfil`
-  106 → 51 (−55); `dangerous_cmd` 13 → 0 (every hit was a scoped delete). Every other
-  category is unchanged (`injection`, `obfuscation`, `overpermission`, `boundaries` all
-  ±0), and no file gained a match. The four genuinely hostile files in the corpus — all
-  positive-control fixtures inside competing scanners' test suites — are still detected
-  with **byte-identical match counts**, so the detector was narrowed, not disarmed.
+- **The exfil sink read markdown syntax as shell syntax.** `_RE_SEC_DATA_EXFIL` accepted
+  a bare `|` or any backtick span as evidence of a pipe or command substitution. The
+  input is markdown, which reuses both characters for entirely different things — `|`
+  separates table cells, backticks mark inline code — so ordinary API documentation
+  matched: a table row reading "Fetch full transcripts for source files", or the prose
+  "if the response `Content-Type` is". One skill was flagged on a passage **warning its
+  users not to pipe curl into bash**.
+
+  A pipe now counts only when it pipes into something that executes or transmits
+  (`sh`, `bash`, `python3`, `node`, `eval`, `nc`, `curl`, `tee`, `xargs`, `base64`, …).
+  The backtick span is removed. `$(` and `<(` stay, since markdown does not reuse those.
+
+  **Recall note, stated plainly:** the field corpus contains **zero** genuine exfil
+  detections — every one of its exfil hits was adjudicated a false positive, including
+  the hit on the genuinely malicious fixture, whose real payload is caught by
+  `obfuscation` rather than here. The corpus therefore cannot demonstrate that recall
+  was preserved; only the guard assertions in
+  `tests/unit/test_security_field_false_positives.py` do, and they were written to carry
+  that weight.
+
+  **Impact, measured on the same 670-file corpus, all four fixes together:** stock
+  matches **144 → 44** (−69%). `exfil` 106 → 6, `dangerous_cmd` 13 → 0, `env_leak`
+  unchanged. Files scoring a perfect 100 on security: **598 → 650**. Files tripping the
+  advisory gate (`SECURITY_GATE = 70`) — every one of them a false alarm, since the
+  corpus yielded zero true positives — **27 → 6**, and of the six that remain, one is
+  the genuinely malicious fixture and one an openly declared red-team skill. No file
+  gained a match.
+
+  **Narrowed, not disarmed.** The four genuinely hostile files keep every real
+  detection: `injection` and `obfuscation` counts are byte-identical, and the single
+  `exfil` hit that disappeared was itself the false positive "Check curl is installed:
+  `which curl`".
 
   **Not affected:** schliff's own `AGENTS.md` and `README.md` match neither pattern
   before or after, so the published hero score and badge do not move. Golden scores are
