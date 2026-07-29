@@ -328,8 +328,8 @@
           "description": "'tell me what's wrong with it' is answered by the ranked-fix command, not by the score alone"
         },
         {
-          "type": "pattern",
-          "value": "(?i)dimension",
+          "type": "contains",
+          "value": "dimension",
           "description": "schliff's answer to 'what is wrong' is per-dimension, so the card must say the readout is dimensional"
         },
         {
@@ -395,7 +395,7 @@
         },
         {
           "type": "pattern",
-          "value": "(?i)(apply|fix)",
+          "value": "[Aa]pply|[Ff]ix",
           "description": "The prompt asks to run an iteration, not just to read one — the card must say a change gets applied"
         },
         {
@@ -445,8 +445,8 @@
           "description": "'Benchmark my skill at <path>' — the card must name the command that scores a file"
         },
         {
-          "type": "pattern",
-          "value": "(?i)dimension",
+          "type": "contains",
+          "value": "dimension",
           "description": "The prompt asks for all six dimensions, so the card must present scores as per-dimension"
         },
         {
@@ -502,7 +502,7 @@
         },
         {
           "type": "pattern",
-          "value": "(?i)(rank|impact|priorit|first)",
+          "value": "[Rr]ank|[Ii]mpact|[Pp]riorit|[Ff]irst",
           "description": "'first' asks for an ordering — the card must say the fixes come ordered, by impact"
         }
       ]
