@@ -423,6 +423,22 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         print(formatted)
 
 
+def cmd_manifest(args: argparse.Namespace) -> None:
+    """Report the resolved artifact set. Emits no score — this reports state."""
+    import manifest as manifest_mod
+
+    m = manifest_mod.build_manifest(
+        claude_dir=getattr(args, "claude_dir", None),
+        project_dir=getattr(args, "project", None),
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(manifest_mod.manifest_to_dict(m), indent=2))
+    else:
+        print(manifest_mod.format_manifest(m))
+    if getattr(args, "strict", False) and m.findings:
+        raise SystemExit(1)
+
+
 def cmd_badge(args: argparse.Namespace) -> None:
     """Generate a markdown badge for a skill's score."""
     import urllib.parse
@@ -1049,6 +1065,18 @@ def main():
     doctor_parser.add_argument("--repo", default=None,
                                help="Repository root for instruction file discovery")
 
+    # manifest command — resolved agent state, no score
+    manifest_parser = subparsers.add_parser(
+        "manifest",
+        help="Report what this Claude Code install actually loads and what it costs")
+    manifest_parser.add_argument("--json", action="store_true", help="JSON output")
+    manifest_parser.add_argument("--project", default=None, metavar="DIR",
+                                 help="Also resolve a project's .claude/ directory")
+    manifest_parser.add_argument("--claude-dir", default=None, metavar="DIR",
+                                 help="Override the Claude config dir (default ~/.claude)")
+    manifest_parser.add_argument("--strict", action="store_true",
+                                 help="Exit 1 if any finding is reported")
+
     # badge command
     badge_parser = subparsers.add_parser("badge", help="Generate markdown badge for a skill")
     badge_parser.add_argument("skill_path", help=_PATH_HELP)
@@ -1131,6 +1159,7 @@ def main():
         "verify": cmd_verify,
         "check-commands": cmd_check_commands,
         "doctor": cmd_doctor,
+        "manifest": cmd_manifest,
         "badge": cmd_badge,
         "suggest": cmd_suggest,
         "report": cmd_report,
