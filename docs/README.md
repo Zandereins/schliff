@@ -5,7 +5,7 @@ instruction files — the "Ruff for `SKILL.md`", now multi-format. Same input �
 same score, with zero core dependencies (stdlib-only, Python ≥ 3.9). For install
 and quick start, see the [project README](../README.md).
 
-**Current version: 8.8.1.**
+**Current version: 8.8.2.**
 
 ## Understand the tool
 

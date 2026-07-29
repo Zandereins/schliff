@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.8.2] - 2026-07-29
+
 ### Fixed
 
 - **The exfil sink could be walked around by wrapping the interpreter.** 8.8.1 narrowed
@@ -928,7 +930,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.8.1...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.8.2...HEAD
+[8.8.2]: https://github.com/Zandereins/schliff/compare/v8.8.1...v8.8.2
 [8.8.1]: https://github.com/Zandereins/schliff/compare/v8.8.0...v8.8.1
 [8.8.0]: https://github.com/Zandereins/schliff/compare/v8.7.0...v8.8.0
 [8.7.0]: https://github.com/Zandereins/schliff/compare/v8.6.3...v8.7.0
