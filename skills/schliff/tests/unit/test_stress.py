@@ -572,10 +572,17 @@ class TestRegressionBadSkillPinned:
 
 
 class TestRegressionRealSkillMd:
-    """Schliff's own SKILL.md structural-only composite must stay within 41.3 ± 1.5."""
+    """Scorer regression against a real, complex SKILL.md: composite within 41.3 ± 1.5.
+
+    Anchored on a FROZEN copy, not the live card. This asserts an ENGINE invariant —
+    that the scorer keeps producing the same number for the same bytes — so its input
+    must not move. Pointing it at the living artifact meant every legitimate edit to
+    the agent-facing card broke a scorer test, which is part of how a 241-line card
+    that no agent could execute stayed frozen in place for 132 days.
+    """
 
     SKILL_MD_PATH = str(
-        Path(__file__).resolve().parent.parent.parent / "SKILL.md"
+        Path(__file__).resolve().parent.parent / "fixtures" / "self-skill-baseline" / "SKILL.md"
     )
 
     def test_composite_within_tolerance(self):

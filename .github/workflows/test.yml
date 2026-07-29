@@ -191,7 +191,11 @@ jobs:
           COMPOSITE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])")
           echo "Composite score: $COMPOSITE"
           echo "composite_score=$COMPOSITE" >> "$GITHUB_OUTPUT"
-          python3 -c "import sys; assert float(sys.argv[1]) >= 90, f'Score {sys.argv[1]} below threshold'" "$COMPOSITE"
+          # Same floor, and the same reasoning, as scripts/test-self.sh — keep the
+          # two in step. The previous 90 was only ever met by a circular
+          # measurement: the eval suite beside this card had been extracted from
+          # the card, so it scored it 100%.
+          python3 -c "import sys; assert float(sys.argv[1]) >= 85, f'Score {sys.argv[1]} below threshold'" "$COMPOSITE"
 
       - name: Run eval suite
         working-directory: skills/schliff

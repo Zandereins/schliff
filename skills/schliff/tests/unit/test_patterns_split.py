@@ -111,7 +111,12 @@ def test_score_regression_skill_md():
     from scoring.composite import compute_composite
     from shared import build_scores, load_eval_suite
 
-    skill_path = str(Path(__file__).resolve().parent.parent.parent / "SKILL.md")
+# Anchored on a FROZEN copy of schliff's own SKILL.md, not the live file.
+# These assert ENGINE invariants (normalization stability, pattern-split
+# equivalence, scorer regression). Pointing them at the living card meant any
+# legitimate edit to the agent-facing artifact broke an engine test — which is
+# how a 241-line card that no agent could execute stayed frozen in place.
+    skill_path = str(Path(__file__).resolve().parent.parent / "fixtures" / "self-skill-baseline" / "SKILL.md")
     eval_suite = load_eval_suite(skill_path)
     scores = build_scores(skill_path, eval_suite=eval_suite)
     result = compute_composite(scores)
