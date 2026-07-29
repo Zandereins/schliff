@@ -276,7 +276,12 @@ class TestGoldenSelfScore:
         regression to paper over: the previous 241-line card scored HIGHER here while a
         real agent following it got 0 of 8 tasks right — every command in it was either
         a plugin-only slash command or a repo-relative path that exits 2 elsewhere. The
-        rewritten card measures 8 of 8 and scores 87.8 [A] on the full seven dimensions.
+        rewritten card measures 8 of 8 and scores 87.4 [A] on the full seven dimensions.
+
+        The 241-line card's own headline number, 98.9, was not a comparable figure: the
+        eval suite sitting beside it had been generated from it, all 108 of its
+        `contains` assertions appearing verbatim in the card, so it scored that card
+        100% by construction. The suite has since been re-derived from its prompts.
 
         What remains low is `composability`, which rewards cross-skill handoff phrasing.
         For a tool's own card that property matters less than whether its commands run,
