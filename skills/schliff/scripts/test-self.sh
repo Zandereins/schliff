@@ -40,10 +40,18 @@ SELF_SCORE=$(python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR/SKILL.md" --json 2
 MEASURED=$(echo "$SELF_SCORE" | python3 -c "import sys,json; print(json.load(sys.stdin)['confidence']['measured'])" 2>/dev/null)
 [[ "$MEASURED" == "7" ]] && pass "All 7 dimensions measured" || fail "Expected 7 dimensions, got $MEASURED"
 
-# Composite should be >= 90 (Schliff should practice what it preaches)
+# Composite floor. This was 90 until the card was rewritten to be executable.
+# The 90 was never met by an independent measurement: the old card scored 98.9
+# against an eval suite whose 108 `contains` assertions were, all 108 of them,
+# lifted verbatim out of that same card. A suite extracted from an artifact
+# scores that artifact 100% by construction, so the number measured nothing.
+# With the suite re-derived from its prompts the card earns 87.4, and the
+# remaining gap is composability — which schliff proposes to close by stuffing
+# eval-suite keywords into a linter's description. That was declined, so the
+# floor is set below the honest score rather than the artifact bent up to it.
 COMPOSITE=$(echo "$SELF_SCORE" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])" 2>/dev/null)
-python3 -c "import sys; exit(0 if float(sys.argv[1]) >= 90 else 1)" "$COMPOSITE" 2>/dev/null && \
-    pass "Composite >= 90 (got $COMPOSITE)" || fail "Composite $COMPOSITE < 90"
+python3 -c "import sys; exit(0 if float(sys.argv[1]) >= 85 else 1)" "$COMPOSITE" 2>/dev/null && \
+    pass "Composite >= 85 (got $COMPOSITE)" || fail "Composite $COMPOSITE < 85"
 
 # Each dimension should be >= 40 (D-grade floor)
 # Composability uses 10 granular checks since v6.0, so 50 is a valid mid-range score
@@ -134,15 +142,26 @@ print(len(c) if isinstance(c, list) else 0)
 [[ "$CONTRADICTIONS" == "0" ]] && pass "No contradictions in SKILL.md" || fail "$CONTRADICTIONS contradictions found"
 
 ##############################################################################
-section "Regression Guard: SKILL.md line count"
+section "Regression Guard: SKILL.md is not emptied out"
 ##############################################################################
 
 LINE_COUNT=$(wc -l < "$SKILL_DIR/SKILL.md" | tr -d ' ')
 python3 -c "import sys; exit(0 if int(sys.argv[1]) <= 300 else 1)" "$LINE_COUNT" 2>/dev/null && \
     pass "SKILL.md <= 300 lines ($LINE_COUNT)" || fail "SKILL.md has $LINE_COUNT lines (max 300)"
 
-python3 -c "import sys; exit(0 if int(sys.argv[1]) >= 100 else 1)" "$LINE_COUNT" 2>/dev/null && \
-    pass "SKILL.md >= 100 lines ($LINE_COUNT)" || fail "SKILL.md suspiciously short ($LINE_COUNT lines)"
+# The lower guard used to be ">= 100 lines". It measured length where it meant
+# completeness, and it proved it by rejecting a deliberate 99-line trim of a card
+# that a real agent could finally execute. `structure` measures the property
+# itself. Measured on this card and two degradations of it:
+#   full card 95  |  worked examples stripped 85  |  gutted to bare commands 75
+# so a floor of 90 catches both losses that the line count caught, and stops
+# rejecting a card for being short. Padding cannot satisfy it; content can.
+# Its twin lives in tests/unit/test_golden.py::test_self_structure_perfect — the
+# two run in separate CI steps and must be moved together.
+STRUCTURE=$(echo "$SELF_SCORE" | python3 -c "import sys,json; print(json.load(sys.stdin)['dimensions']['structure'])" 2>/dev/null)
+python3 -c "import sys; exit(0 if int(sys.argv[1]) >= 90 else 1)" "$STRUCTURE" 2>/dev/null && \
+    pass "SKILL.md structurally complete (structure=$STRUCTURE >= 90)" || \
+    fail "SKILL.md lost structure (structure=$STRUCTURE < 90) — sections or examples missing"
 
 ##############################################################################
 # --- Summary ---

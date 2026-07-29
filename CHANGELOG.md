@@ -5,6 +5,60 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The bundled eval suite measured its own source, so it measured nothing.** All 108
+  `contains` assertions in `skills/schliff/eval-suite.json` appear verbatim in the
+  241-line card the suite was generated from; only 54 of them appear in the prompt they
+  were filed under. A suite extracted from an artifact scores that artifact 100% by
+  construction — which is exactly what it did, reporting 119/119 and a composite of
+  98.9 for a card that a real agent scored 0 of 8 on.
+
+  The 44 trigger prompts and 14 edge cases are unchanged. The test cases are re-derived
+  from their prompts and from the public CLI surface: 4 cases, 13 assertions, each one
+  answering "what would a card need to contain for an agent to do what this prompt
+  asks". Against this card they pass 13/13; against a minimal placeholder card, 1/13 —
+  so they discriminate rather than describe.
+
+  Test cases whose prompts asked for things that do not exist were dropped rather than
+  satisfied: there is no `discovery mode` and no `high-ROI` ranking (zero occurrences
+  in `scripts/`), and no custom-metric interface. The 241-line card and its original
+  suite are kept intact as frozen fixtures under
+  `skills/schliff/tests/fixtures/self-skill-baseline/`.
+
+- **Loop documentation now lives with the loop.** Ten of the suite's test cases probed
+  the autonomous improvement loop but asserted against `SKILL.md`, forcing the
+  agent-facing card to carry the vocabulary of a subsystem reachable only through the
+  `/schliff:*` plugin commands. That coverage moved to
+  `tests/unit/test_command_docs_document_the_loop.py`, which gates the command docs
+  that actually own the behaviour.
+
+- **Self-test floors measure the property instead of a proxy.** `test-self.sh`'s
+  composite floor drops 90 → 85 (matching the same assert in `test.yml`, which was
+  skipped rather than passing on the red run), because the 90 was only ever met by the
+  circular measurement above. The `>= 100 lines` guard is replaced by `structure >= 90`:
+  it was rejecting a deliberate 99-line trim while accepting padding. Measured on this
+  card and two degradations — full 95, worked examples stripped 85, gutted to bare
+  commands 75 — so the replacement catches both losses the line count caught.
+
+### Fixed
+
+- **`/schliff:auto` documented a flag that does not exist and a state file it does not
+  write.** `commands/schliff/auto.md` listed `--resume`, which `auto-improve.py` rejects
+  with `unrecognized arguments` and exit 2 — the same defect class as the `doctor <dir>`
+  fix above it. It attributed the loop's history to `.schliff/history.jsonl`, which
+  belongs to `verify --history`; the loop writes `.schliff/auto-improve-state.jsonl`.
+  Its invocation assumed a working directory of `skills/schliff`.
+
+  It also implied parallel worktree experimentation. `auto-improve.py` detects the stuck
+  condition and prints `Triggering parallel branching…`, then continues in-process — no
+  branch, no worktree. The doc now says so, and a test asserts it keeps saying so.
+
+  Added, all verified by running the driver first: the cross-session episode store
+  (`~/.schliff/meta/episodes.jsonl`, recalled before iterating and written after), the
+  per-iteration record shape, the undocumented three-consecutive-errors stop, and the
+  real output format.
+
 ## [8.8.2] - 2026-07-29
 
 ### Fixed

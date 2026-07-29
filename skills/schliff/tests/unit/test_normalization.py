@@ -15,7 +15,12 @@ from scoring import compute_composite
 # Absolute path to the baseline fixture
 FIXTURE_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "v630_baseline.json"
 # Absolute path to schliff's own SKILL.md
-SKILL_MD_PATH = Path(__file__).resolve().parent.parent.parent / "SKILL.md"
+# Anchored on a FROZEN copy of schliff's own SKILL.md, not the live file.
+# These assert ENGINE invariants (normalization stability, pattern-split
+# equivalence, scorer regression). Pointing them at the living card meant any
+# legitimate edit to the agent-facing artifact broke an engine test — which is
+# how a 241-line card that no agent could execute stayed frozen in place.
+SKILL_MD_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "self-skill-baseline" / "SKILL.md"
 
 
 # ---------------------------------------------------------------------------
