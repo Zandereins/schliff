@@ -156,8 +156,21 @@ _RE_SEC_INSTRUCTION_OVERRIDE = re.compile(
 # anchor goes on the two alternatives that START with a verb, NOT in front of the whole
 # group — the middle alternative starts with `$(`, and `\b` before a non-word character
 # would never hold there.
+#
+# The sink alternation is shell syntax, but the input is MARKDOWN, which reuses the same
+# characters for entirely different things: `|` separates table cells and backticks mark
+# inline code. Accepting a bare `|` or any backtick span meant ordinary API documentation
+# read as exfiltration — "| Fetch full transcripts for source files |" (a table row), or
+# "if the response `Content-Type` is". In the 670-skill field scan those two sinks were 39
+# of the 51 remaining exfil hits, and EVERY exfil hit in that corpus was adjudicated a
+# false positive — including the one on the genuinely malicious fixture, whose real
+# payload is caught by `obfuscation`, not here. So a pipe now only counts when it pipes
+# into something that executes or transmits, and the backtick span is gone; `$(` and `<(`
+# stay, since markdown does not reuse those.
 _RE_SEC_DATA_EXFIL = re.compile(
-    r"(?:\b(?:curl|wget|fetch|nc|ncat|netcat)\s+[^\n]{0,200}(?:\$\(|`[^`]*`|<\(|\|)|"
+    r"(?:\b(?:curl|wget|fetch|nc|ncat|netcat)\s+[^\n]{0,200}"
+    r"(?:\$\(|<\(|\|\s*(?:sh|bash|zsh|dash|ksh|python3?|perl|ruby|node|eval|exec|source|"
+    r"nc|ncat|netcat|curl|wget|tee|xargs|base64|openssl)\b)|"
     r"\$\(cat\s[^\)]+\)\s*\|\s*(?:curl|wget|nc|netcat)|"
     r"\b(?:curl|wget)\s+[^\n]{0,200}(?:--data|--upload|-d\s|-F\s|-T\s)[^\n]{0,200}(?:https?://|ftp://))",
     re.IGNORECASE,
