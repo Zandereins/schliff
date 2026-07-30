@@ -1,8 +1,16 @@
-"""Tests for token budget estimation in formats.py."""
+"""Tests for token estimation, the format budget table, and the severity bands.
+
+Also holds the gate that keeps the budget tables in `docs/` matching the constant they
+were hand-copied from — a duplicated value with no gate is how a shipped doc came to
+state a budget the code no longer used.
+"""
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add scripts directory to path so we can import scoring.formats
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
@@ -32,6 +40,24 @@ class TestEstimateTokens:
         assert estimate_tokens("a" * 100) == 25
 
 
+#: Docs that hand-maintain a copy of FORMAT_TOKEN_BUDGETS as a markdown table.
+_BUDGET_DOCS = ("docs/SCORING.md", "docs/ARCHITECTURE.md")
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_TABLE_ROW = re.compile(r"^\|\s*([A-Za-z0-9_.-]+)\s*\|\s*(\d+)\s*\|\s*$", re.M)
+
+
+def _documented_budgets(doc: str) -> dict[str, int]:
+    """Budget rows from the section headed '... token budgets' in `doc`."""
+    text = (_REPO_ROOT / doc).read_text(encoding="utf-8")
+    heading = re.search(r"^#+ .*token budgets.*$", text, re.M | re.I)
+    assert heading, f"{doc} has no token-budget section to check"
+    section = text[heading.end():]
+    nxt = re.search(r"^#+ |^---\s*$", section, re.M)
+    if nxt:
+        section = section[: nxt.start()]
+    return {m.group(1): int(m.group(2)) for m in _TABLE_ROW.finditer(section)}
+
+
 class TestFormatTokenBudgets:
     """Tests for the FORMAT_TOKEN_BUDGETS constant."""
 
@@ -44,48 +70,88 @@ class TestFormatTokenBudgets:
             assert isinstance(budget, int), f"{fmt} budget is not int"
             assert budget > 0, f"{fmt} budget is not positive"
 
+    @pytest.mark.parametrize("doc", _BUDGET_DOCS)
+    def test_docs_table_matches_this_constant(self, doc: str) -> None:
+        """`docs/` hand-copies this table, and nothing gated the copy.
+
+        Recalibrating `skill.md` left both docs stating the old number; markdownlint
+        checks form, not content, so a doc claiming what the code does not do shipped
+        unnoticed. Both directions are checked: a stale value fails, and so does adding
+        a format here without documenting it.
+        """
+        documented = _documented_budgets(doc)
+        assert documented, f"{doc}: parsed no budget rows — the table moved or changed shape"
+        for fmt, value in documented.items():
+            assert fmt in FORMAT_TOKEN_BUDGETS, f"{doc} documents unknown format {fmt!r}"
+            assert value == FORMAT_TOKEN_BUDGETS[fmt], (
+                f"{doc} says {fmt} is {value}, code says {FORMAT_TOKEN_BUDGETS[fmt]}"
+            )
+        # `unknown` is the internal fallback, not a format a user selects, so it is the
+        # one entry the docs deliberately omit. Everything else must be listed.
+        missing = set(FORMAT_TOKEN_BUDGETS) - set(documented) - {"unknown"}
+        assert not missing, f"{doc} does not document these formats: {sorted(missing)}"
+
 
 class TestCheckTokenBudget:
-    """Tests for the check_token_budget function."""
+    """Tests for the check_token_budget function.
+
+    These pin the *mechanism* — the severity bands and the ratio — so any size that has to
+    sit at a particular point in a band is derived from the budget table rather than
+    restated from it. They used to hardcode the numbers and all broke together when one
+    entry was recalibrated against measured data, which is a test reporting on the table
+    instead of on the function. The one remaining absolute size is deliberate: 25 tokens
+    is far below any plausible budget, so it needs no derivation to stay in the `ok` band.
+    """
+
+    def _content_of(self, tokens: int) -> str:
+        """Content that `estimate_tokens` reports as exactly `tokens`.
+
+        The chars-per-token ratio is derived from `estimate_tokens` rather than restated:
+        its own docstring says real tokenizers vary, and a restated 4 would silently
+        mis-size this content if the estimator ever changed — the band assertions below
+        would then measure the wrong ratios without going red. The result is checked
+        against the estimator so a bad derivation fails loudly instead.
+        """
+        probe = "x" * 4096
+        chars_per_token = len(probe) // estimate_tokens(probe)
+        content = "x" * (tokens * chars_per_token)
+        assert estimate_tokens(content) == tokens, "content sizing derivation is off"
+        return content
+
+    def _content_at(self, fraction: float) -> str:
+        """Content sized at `fraction` of the skill.md budget."""
+        return self._content_of(int(FORMAT_TOKEN_BUDGETS["skill.md"] * fraction))
 
     def test_within_budget_small_content(self) -> None:
-        # skill.md budget is 1000 tokens = ~4000 chars
-        content = "x" * 100  # 25 tokens, well within 1000
+        content = "x" * 100  # 25 tokens, far below any plausible budget
         result = check_token_budget(content, "skill.md")
         assert result["within_budget"] is True
         assert result["tokens"] == 25
-        assert result["budget"] == 1000
+        assert result["budget"] == FORMAT_TOKEN_BUDGETS["skill.md"]
         assert result["severity"] == "ok"
 
     def test_over_budget(self) -> None:
-        # cursorrules budget is 500 tokens = ~2000 chars
-        content = "x" * 8000  # 2000 tokens, way over 500
+        """A second format, so the bands are not only exercised through skill.md."""
+        budget = FORMAT_TOKEN_BUDGETS["cursorrules"]
+        content = self._content_of(budget * 4)
         result = check_token_budget(content, "cursorrules")
         assert result["within_budget"] is False
-        assert result["tokens"] == 2000
-        assert result["budget"] == 500
+        assert result["tokens"] == budget * 4
+        assert result["budget"] == budget
         assert result["severity"] == "over"
 
     def test_severity_ok(self) -> None:
-        # 10% of budget -> ok
-        content = "x" * 400  # 100 tokens out of 1000
-        result = check_token_budget(content, "skill.md")
+        result = check_token_budget(self._content_at(0.10), "skill.md")
         assert result["severity"] == "ok"
         assert result["ratio"] < 0.8
 
     def test_severity_warning(self) -> None:
-        # 90% of budget -> warning
-        # skill.md budget = 1000 tokens, 900 tokens = 3600 chars
-        content = "x" * 3600
-        result = check_token_budget(content, "skill.md")
+        result = check_token_budget(self._content_at(0.90), "skill.md")
         assert result["severity"] == "warning"
         assert 0.8 <= result["ratio"] <= 1.0
 
     def test_severity_over(self) -> None:
-        # 150% of budget -> over
-        # skill.md budget = 1000, 1500 tokens = 6000 chars
-        content = "x" * 6000
-        result = check_token_budget(content, "skill.md")
+        result = check_token_budget(self._content_at(1.50), "skill.md")
         assert result["severity"] == "over"
         assert result["ratio"] > 1.0
 
@@ -95,9 +161,8 @@ class TestCheckTokenBudget:
         assert result["budget"] == FORMAT_TOKEN_BUDGETS["unknown"]
 
     def test_ratio_calculation(self) -> None:
-        # 4000 chars = 1000 tokens, skill.md budget = 1000 -> ratio 1.0
-        content = "x" * 4000
-        result = check_token_budget(content, "skill.md")
+        """Exactly at budget is ratio 1.0 and still within — `over` starts above it."""
+        result = check_token_budget(self._content_at(1.0), "skill.md")
         assert result["ratio"] == 1.0
         assert result["within_budget"] is True
 

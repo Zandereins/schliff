@@ -155,7 +155,7 @@ agents.md family**.
 
 | Format | Budget (tokens) |
 | --- | --- |
-| skill.md | 1000 |
+| skill.md | 2000 |
 | claude.md | 2000 |
 | cursorrules | 500 |
 | agents.md | 3000 |

@@ -65,13 +65,26 @@ def test_format_alias_resolves_to_correct_token_budget():
     """`--format cursor`/`agents`/`claude`/`skill`/`system-prompt` must map to their
     real budget, not silently fall back to the unknown=1500 default (which flips the
     within_budget verdict on the exact spellings the docs tell users to type)."""
-    from scoring.formats import check_token_budget
+    from scoring.formats import FORMAT_TOKEN_BUDGETS, check_token_budget
     content = "word " * 300
-    assert check_token_budget(content, "cursor")["budget"] == 500
-    assert check_token_budget(content, "cursorrules")["budget"] == 500
-    assert check_token_budget(content, "agents")["budget"] == 3000
-    assert check_token_budget(content, "claude")["budget"] == 2000
-    assert check_token_budget(content, "skill")["budget"] == 1000
-    assert check_token_budget(content, "system-prompt")["budget"] == 1500
+    # Compared against the table rather than restated as literals: what is under test is
+    # that the alias resolves, not what each budget happens to be. Restating them made
+    # this test fail for an unrelated recalibration of one entry.
+    for alias, canonical in (
+        ("cursor", "cursorrules"),
+        ("cursorrules", "cursorrules"),
+        ("agents", "agents.md"),
+        ("claude", "claude.md"),
+        ("skill", "skill.md"),
+        ("system-prompt", "system_prompt"),
+    ):
+        expected = FORMAT_TOKEN_BUDGETS[canonical]
+        assert check_token_budget(content, alias)["budget"] == expected, (
+            f"alias {alias!r} did not resolve to {canonical!r}"
+        )
+        # The original bug was a silent fall-through to the unknown default, so an alias
+        # whose real budget differs from that default must not land on it.
+        if expected != FORMAT_TOKEN_BUDGETS["unknown"]:
+            assert check_token_budget(content, alias)["budget"] != FORMAT_TOKEN_BUDGETS["unknown"]
     # unknown/garbage still falls back safely
-    assert check_token_budget(content, "totally-bogus")["budget"] == 1500
+    assert check_token_budget(content, "totally-bogus")["budget"] == FORMAT_TOKEN_BUDGETS["unknown"]
