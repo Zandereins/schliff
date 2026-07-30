@@ -164,7 +164,8 @@ class TestFrontmatterParseIsBoundedAndLinear:
         """A 4MB SKILL.md must not be pulled into memory to read its frontmatter.
 
         This asserts the READ, not just the result. A first version of this test only
-        checked that `_FM_READ_BYTES` was small and that parsing still worked — and it
+        checked that `_FM_READ_BYTES` (as it was then named) was small and that parsing
+        still worked — and it
         passed with the bounded read reverted to a full `read_text()`, because a full read
         produces the same mapping. A test that cannot fail on the defect it names is not a
         test. Found by mutation.
@@ -254,7 +255,7 @@ class TestFrontmatterParseIsBoundedAndLinear:
     def test_real_shapes_parse_unchanged(self, tmp_path, label, text, expected):
         from manifest import parse_frontmatter
         p = tmp_path / "SKILL.md"
-        p.write_text(text, encoding="utf-8")
+        p.write_bytes(text.encode("utf-8"))   # exact bytes, no platform translation
         assert parse_frontmatter(p) == expected, label
 
 
@@ -304,7 +305,9 @@ class TestFrontmatterWhitespaceClassIsNotNarrowed:
     def test_every_whitespace_separator_still_parses(self, tmp_path, label, sep):
         from manifest import parse_frontmatter
         p = tmp_path / "SKILL.md"
-        p.write_text(f"---{sep}name: a{sep}description: b{sep}---{sep}body", encoding="utf-8")
+        # write_bytes: on WRITE, newline=None maps '\n' to os.linesep, so write_text would
+        # put a platform-dependent separator on disk instead of the one named above.
+        p.write_bytes(f"---{sep}name: a{sep}description: b{sep}---{sep}body".encode("utf-8"))
         fm = parse_frontmatter(p)
         assert fm.get("name") == "a", (
             f"separator {label!r} no longer parses — the whitespace class was narrowed "
@@ -319,9 +322,9 @@ class TestFrontmatterWhitespaceClassIsNotNarrowed:
         root = tmp_path / ".claude"
         d = root / "skills" / "off"
         d.mkdir(parents=True)
-        (d / "SKILL.md").write_text(
-            f"---{sep}name: off{sep}disable-model-invocation: true{sep}---{sep}body",
-            encoding="utf-8")
+        (d / "SKILL.md").write_bytes(
+            f"---{sep}name: off{sep}disable-model-invocation: true{sep}---{sep}body"
+            .encode("utf-8"))
         m = build_manifest(claude_dir=root)
         assert [a.name for a in m.loaded] == [], (
             f"separator {label!r}: a disabled skill was reported as LOADED because its "
@@ -333,28 +336,50 @@ class TestFrontmatterWhitespaceClassIsNotNarrowed:
 class TestUniversalNewlineContract:
     """`parse_frontmatter` reads through `path.open("r")`, so CR never reaches the regex.
 
-    This is load-bearing and was invisible until a mutation test disagreed with a
-    hand-run enumeration: the enumeration used in-memory strings and reported six lost
-    shapes, the mutation reported four, and the read path was the difference. Pinned so
-    the next person does not have to rediscover it — and so switching to `newline=""`,
-    which would make CR reachable and change which separators are equivalent, fails here.
+    Load-bearing, and invisible until a mutation test disagreed with a hand-run
+    enumeration: the enumeration used in-memory strings and reported six lost shapes, the
+    mutation reported four, and the read path was the difference. Pinned so the next person
+    does not rediscover it, and so switching to `newline=""` — which would make CR
+    reachable and change which separators are equivalent — fails here.
     """
 
-    def test_carriage_returns_never_reach_the_regex(self, tmp_path):
+    def test_carriage_returns_never_reach_the_regex(self, tmp_path, monkeypatch):
+        """Asserts what PARSE_FRONTMATTER reads, not what this test reads.
+
+        The first version of this test opened the file itself and asserted no CR appeared
+        in its own buffer — a property of the test's read, not the production one. It
+        stayed GREEN when the production read was switched to `newline=""`, the exact
+        mutation it exists to catch. Third instance of that class this branch: an assertion
+        one layer away from the code proves nothing about the code.
+        """
+        import pathlib as _pathlib
+
         from manifest import parse_frontmatter
         p = tmp_path / "SKILL.md"
-        # Written as CRLF bytes on purpose — not via write_text, which would translate.
+        # write_bytes, not write_text: on WRITE, newline=None maps '\n' to os.linesep, so
+        # write_text would put a platform-dependent separator on disk rather than the one
+        # named here. Same substrate mistake as this class documents, one layer down.
         p.write_bytes(b"---\r\nname: a\r\ndescription: b\r\n---\r\nbody")
-        with p.open("r", encoding="utf-8", errors="replace") as fh:
-            seen = fh.read(4096)
-        assert "\r" not in seen, (
-            "a literal CR reached the reader — the file is no longer opened in universal-"
-            "newline mode, so the CR-bearing separators in "
-            "TestFrontmatterWhitespaceClassIsNotNarrowed are no longer equivalent to their "
-            "LF forms and need re-enumerating against this substrate"
+
+        opens: list = []
+        real_open = _pathlib.Path.open
+
+        def recording_open(self, *args, **kwargs):
+            opens.append(kwargs.get("newline", "__absent__"))
+            return real_open(self, *args, **kwargs)
+
+        monkeypatch.setattr(_pathlib.Path, "open", recording_open)
+        result = parse_frontmatter(p)
+
+        assert opens, "parse_frontmatter did not read through Path.open"
+        assert all(n == "__absent__" or n is None for n in opens), (
+            f"parse_frontmatter opened with newline={opens!r}. Universal-newline mode is "
+            f"off, so a literal CR now reaches the regex: the CR-bearing separators in "
+            f"TestFrontmatterWhitespaceClassIsNotNarrowed stop being equivalent to their "
+            f"LF forms and the enumeration needs re-running against this substrate."
         )
         # ...and the values still parse, through the translation.
-        assert parse_frontmatter(p) == {"name": "a", "description": "b"}
+        assert result == {"name": "a", "description": "b"}
 
     def test_lone_cr_line_endings_are_translated_not_dropped(self, tmp_path):
         """Classic-Mac CR-only endings become LF, so they parse rather than reading as
