@@ -1,6 +1,6 @@
 # Bounded quantifiers: closing the ReDoS class found by the 2026-07-30 audit
 
-Status: D1, D1a, D2, D5, D6 implemented (PR 1). D3, D7, D8 pending.
+Status: D1, D1a, D2, D5, D6 implemented (PR 1). D3 implemented (PR 2). D7, D8 pending.
 Date: 2026-07-30
 Baseline: `main` @ `ab41827`
 
@@ -149,9 +149,33 @@ unnecessary.
 ### D3 — `manifest.py`: read the head, drop the unused body
 
 `_FM = r"^---\s*\n(.*?)\n---\s*\n"` is O(n²) because `\s*` may consume newlines:
-every `\s*` length restarts the lazy `(.*?)` scan. `^---[ \t]*\r?\n…` is 32,823×
-faster at 64 KB with a byte-identical verdict **and** `group(1)` on every real shape
-including CRLF and unterminated frontmatter.
+every `\s*` length restarts the lazy `(.*?)` scan.
+
+**The class must exclude the newline — and nothing else.** Review of this fix caught the
+first attempt, `[ \t]*\r?`, losing **four** shapes 8.8.2 parsed: form feed, vertical tab,
+NBSP and em space. Material rather than cosmetic, because
+`manifest` reports resolved state: frontmatter it fails to parse makes a
+`disable-model-invocation: true` skill read as **LOADED** and drops the description that
+carries the per-turn cost. That is D1a's rule violated a second time, in a different file
+— narrowing a class without enumerating the dimension.
+
+`[^\S\n]*` — whitespace except newline — is the class that keeps every shape and still
+cannot restart the lazy scan: **0 divergences** from 8.8.2 across all 14 enumerated
+separators (the first attempt had 4), 1.5 ms at 64 KB, linear.
+
+**The first count published for this was six, and it was wrong.** That enumeration ran
+against in-memory strings; `parse_frontmatter` reads through `path.open("r")`, i.e.
+universal newlines, which collapses every CR-based shape before the regex sees it. The
+mutation test disagreed with the hand-run enumeration — four red, not six — and the read
+path was the difference. A probe against a substrate the code does not use is not a probe,
+and the error went in the direction that flattered the finding. Consequence recorded in
+code and pinned by `TestUniversalNewlineContract`: the `\r` inside `[^\S\n]` is harmless
+but not load-bearing here, and `newline=""` would change which separators are equivalent. Every code point the class
+admits was probed individually for a revived blowup (`\r`, `\f`, `\v`, U+2028, U+2029,
+U+0085, NBSP, U+001C, mixed): 1.97–2.07× per doubling, none above the 3.0 threshold.
+Gated by `TestFrontmatterWhitespaceClassIsNotNarrowed`, which asserts both the parse and
+the disabled-skill consequence for all 14; re-introducing the over-narrowing turns 8
+assertions red.
 
 Independently, `manifest.py:54` reads with a raw `read_text()` — no
 `MAX_SKILL_SIZE`, unlike every other reader in the engine. Both call sites do
@@ -159,6 +183,42 @@ Independently, `manifest.py:54` reads with a raw `read_text()` — no
 not a size cap on a full read — it is to read a bounded head and drop the body from
 the signature. That removes the unbounded read, the quadratic trigger, and a dead
 return value at once.
+
+Head size calibrated, not guessed: across 248 real skills, commands and plugin payloads
+the frontmatter block runs a median of 694 characters, p95 4,476, max 15,711 (vercel's
+`ai-sdk`). 65,536 carries 100% of them with 4× headroom, and a test pins it above that
+maximum — truncating a real artifact's frontmatter would make its description silently
+read as empty.
+
+**Characters, not bytes.** `read(n)` on a text handle counts code points, so on CJK
+frontmatter this reads up to 4× as many bytes — still bounded. The constant was first
+named `_FM_READ_BYTES`, which promised a guarantee the call does not make; renamed
+`_FM_READ_CHARS`, and the calibration figures above are character counts because that is
+what `m.end()` measured.
+
+**Measured:** through the shipping CLI on one hostile 64 KB skill, 30.77 s → 0.22 s.
+`manifest --json` over the real install is byte-identical to `main` (same sha256, 109
+artifacts, 8,240 resident tokens, 19 findings).
+
+**Three of this fix's own tests were non-discriminating**, every one found by mutation
+rather than by rereading it, and one of them twice:
+
+1. `test_oversized_file_is_not_read_whole` asserted only that the constant was small and
+   that parsing still worked, so it passed with the bounded read reverted to a full
+   `read_text()` — a full read yields the same mapping. It now instruments `Path.open` and
+   asserts the actual `read(n)` argument.
+2. Nothing pinned the head against the corpus maximum, so shrinking it to 8 KB passed.
+   That assertion now exists, mirroring D1's bound checks.
+3. `test_carriage_returns_never_reach_the_regex`, written specifically to catch a switch to
+   `newline=""`, opened the file *itself* and asserted no CR in its own buffer — a property
+   of the test's read, not the production one. It stayed green on that exact mutation. The
+   repair inspected `kwargs` only, so it stayed green a **second** time for the same
+   mutation spelled positionally. Arguments are now normalised through
+   `inspect.signature(...).bind(...)`; both spellings turn it red.
+
+A test that cannot fail on the defect it names is not a test — and an assertion a spelling
+can walk around is not an assertion. Across this whole spec, every instance of this class
+was found by a mutation test and none by rereading the test.
 
 ### D4 — F3 is a reachability correction, not a gate change
 

@@ -86,6 +86,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   certain false positive. A gate whose allowlist is longer than its findings is the thing
   it exists to prevent.
 
+- **`schliff manifest` parsed third-party frontmatter quadratically and read files with
+  no size cap at all.** `manifest` walks every SKILL.md under `~/.claude/skills`, every
+  command under `~/.claude/commands`, the project's `.claude/`, and the payload of every
+  enabled plugin — all third-party content — and its frontmatter regex opened with
+  `^---\s*\n`. `\s` matches the newline itself, so every possible `\s*` length restarted
+  the lazy body scan: 25.6 s at 64 KB, 4.04× per doubling, ~1.9 h extrapolated at 1 MB.
+  Through the shipping CLI on one hostile 64 KB skill: **30.77 s → 0.22 s**.
+
+  Fixed with `[^\S\n]*` — whitespace except the newline. A class that cannot span the
+  record separator cannot restart that scan: 1.5 ms at 64 KB, linear, and every code point
+  the class admits was probed individually for a revived blowup (1.97–2.07× per doubling).
+  **0 divergences from 8.8.2 across 14 enumerated separators.** The narrower `[ \t]*\r?`
+  tried first lost four of them — form feed, vertical tab, NBSP, em space — which for a
+  tool that reports resolved state means a `disable-model-invocation: true` skill reads as
+  LOADED. Caught in review by enumerating the dimension, not sampling it; gated for all 14
+  shapes including that consequence. The count was first published as six, from an
+  enumeration run against in-memory strings — `parse_frontmatter` reads with universal
+  newlines, which collapses the CR-based shapes before the regex sees them, so `\r` is
+  harmless but not load-bearing on this path. The translation is now pinned by a test.
+
+  Separately, the read was a raw `read_text()` with no `MAX_SKILL_SIZE` — the only reader
+  in the engine without one. Both call sites did `fm, _ = parse_frontmatter(...)`, so the
+  body was the only reason a whole file had to be in memory: the fix reads a bounded
+  65,536-character head and drops the body from the signature, which removes the unbounded
+  read, the quadratic trigger and a dead return value together. The bound is calibrated,
+  not guessed — across 248 real skills, commands and plugin payloads the frontmatter block
+  runs a median of 694 characters, p95 4,476, max 15,711, so it carries 100% with 4×
+  headroom. Characters, not bytes: `read(n)` on a text handle counts code points, so the
+  constant is named `_FM_READ_CHARS` rather than promising a byte guarantee the call does
+  not make.
+
+  Verified against the real install: `manifest --json` output is byte-identical to `main`
+  (same sha256, 109 artifacts, 8,240 resident tokens, 19 findings). The empirical ReDoS
+  gate gained the frontmatter-shaped fillers that were the documented blind spot, so this
+  defect is now caught by the gate rather than by hand.
+
 - **`clarity`'s function docstring contradicted its own module docstring**, claiming a
   zero default weight and a `--clarity` opt-in. Both were stale — clarity runs in the
   default scorer set for every format — and that contradiction is exactly what made two
