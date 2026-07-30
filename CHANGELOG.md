@@ -59,16 +59,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   *second* branch — the first fails fast on digits, which is why an early probe against
   one branch showed nothing), and `_RE_SKILL_AS_OBJECT`.
 
-- **Two gates so a sixth one cannot land.** `test_patterns_scale_linearly.py` times
-  every compiled pattern against 25 pathological filler alphabets at doubling lengths
-  and fails on super-linear growth — it found `_RE_SKILL_AS_OBJECT`, which was not on
-  the audit's fix list, on its first run. It confirms an offender at two consecutive
-  doublings with more repetitions before failing, because the healthy margin is
-  1.3–2.4× against a 3.0× threshold and a single sample under load did flake once
-  during development; verified red-capable (4.20×, 4.02× confirmed) and green four
-  times over under four busy cores. `test_patterns_are_bounded.py` is its deterministic
+- **Two gates against a recurrence.** `test_patterns_scale_linearly.py` times all 224
+  compiled patterns across 30 modules against 25 pathological filler alphabets at
+  doubling lengths and fails on super-linear growth — it found `_RE_SKILL_AS_OBJECT`,
+  which was not on the audit's fix list, on its first run. It confirms an offender at two
+  consecutive doublings with more repetitions before failing, because the healthy margin
+  is 1.3–2.4× against a 3.0× threshold and a single sample under load did flake once
+  during development; verified red-capable (4.20×, 4.02× confirmed) and green four times
+  over under four busy cores. `test_patterns_are_bounded.py` is its deterministic
   companion: it pins each bounded spelling and pins each bound above the corpus maximum
   it was calibrated from, so tightening one below the real data fails too.
+
+  **What these gates do not cover, stated rather than implied:** the empirical one reaches
+  exactly as far as its filler alphabet. Its first draft also covered only 11 modules and
+  138 patterns while the harness that found the defects covered 25 and 224 — a gate
+  narrower than the harness it replaces is not a regression guard, so the module list was
+  widened (0 additional findings, so the coverage was free) and a count assertion now
+  fails if it ever shrinks. The remaining blind spot is real and documented in the test:
+  `manifest._FM` is quadratic on a frontmatter-shaped input and none of the generic
+  fillers trip it. A shape nobody thought of stays invisible.
 
   A repo-wide *static* rule was prototyped and rejected on measurement: "any unbounded
   quantifier on a character class" flagged 45 of 102 patterns, and the refinement "…with

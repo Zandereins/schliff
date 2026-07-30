@@ -11,6 +11,13 @@ filler alphabets at two sizes one doubling apart. Linear patterns come in near 2
 the measured defects were 3.9x-4.1x. The threshold is 3.0x with an absolute floor, so
 a loaded CI runner cannot flake it while the 4.0x class is still caught with margin.
 
+Known limit, stated rather than glossed: this gate reaches exactly as far as its filler
+alphabet. `manifest._FM` is quadratic on a frontmatter-shaped input (`"---" + "\n" * n`,
+3.95x per doubling) and NONE of the generic fillers below trip it — they come in at
+1.85x, below the absolute floor. So a shape nobody thought of stays invisible here. The
+`_MIN_ABS_SECONDS` floor has the same character: it suppresses noise, and it would also
+suppress a quadratic with a very small constant at this input size.
+
 Cost: ~10-25s. That is the price of the only gate here that does not depend on a
 heuristic being right. Its deterministic companion is `test_patterns_are_bounded.py`.
 See docs/specs/2026-07-30-redos-audit-fixes.md (D6).
@@ -21,19 +28,48 @@ import time
 
 import pytest
 
-# Every module that compiles patterns applied to untrusted instruction-file content.
+# Every module that compiles a regex applied to untrusted content — instruction files,
+# eval suites, or foreign directory trees. The list is deliberately WIDER than "the
+# scoring dimensions": the first draft of this gate covered 11 modules and 138 patterns
+# while the audit harness that actually found the defects covered 25 and 224, and a gate
+# narrower than the harness it replaces is not a regression guard. Expanding it to the
+# list below found 0 additional super-linear patterns, so the coverage is free.
 _PATTERN_MODULES = [
+    # pattern data
     "scoring.patterns.base",
     "scoring.patterns.skill_md",
     "scoring.patterns.system_prompt",
-    "scoring.output_contract",
-    "scoring.structure_prompt",
-    "scoring.completeness",
-    "scoring.security",
-    "scoring.clarity",
-    "scoring.composability",
+    # skill.md-family dimensions
+    "scoring.structure",
+    "scoring.triggers",
+    "scoring.quality",
+    "scoring.edges",
     "scoring.efficiency",
+    "scoring.composability",
+    "scoring.clarity",
+    "scoring.security",
+    "scoring.operational_coverage",
+    "scoring.runtime",
+    # system_prompt dimensions
+    "scoring.structure_prompt",
+    "scoring.output_contract",
+    "scoring.completeness",
+    "scoring.coherence",
+    # engine plumbing that also compiles content-facing patterns
+    "scoring.formats",
+    "scoring.composite",
+    "scoring.diff",
     "scoring.guards",
+    "scoring.registry",
+    "shared",
+    "nlp",
+    # consumers that read foreign trees / foreign files
+    "manifest",
+    "doctor",
+    "verify",
+    "drift",
+    "sync",
+    "text_gradient",
 ]
 
 # Filler alphabets. Each one is the worst case for a different quantifier shape:
@@ -92,6 +128,8 @@ def _collect_patterns():
                 walk(v, f"{path}[{k!r}]", depth + 1)
 
     for mod_name in _PATTERN_MODULES:
+        # No try/except: a module that stops importing must fail this gate loudly, not
+        # silently shrink its coverage.
         mod = importlib.import_module(mod_name)
         short = mod_name.rsplit(".", 1)[-1]
         for attr in dir(mod):
@@ -105,9 +143,13 @@ _PATTERNS = _collect_patterns()
 
 
 def test_the_gate_actually_sees_the_patterns():
-    """A gate that collects nothing passes vacuously. The engine had 169 compiled
-    patterns at the time of the audit; anything near zero means the walker broke."""
-    assert len(_PATTERNS) > 80, f"only collected {len(_PATTERNS)} patterns"
+    """A gate that collects nothing passes vacuously — and one that collects less than it
+    used to has quietly stopped guarding part of the engine. 224 unique compiled patterns
+    were reachable across `_PATTERN_MODULES` when this was written."""
+    assert len(_PATTERNS) > 200, (
+        f"only collected {len(_PATTERNS)} patterns; the audit harness saw 224 across "
+        f"these modules. A shrinking count means the walker or an import broke."
+    )
 
 
 def _best_of(rx, text, reps=2):
