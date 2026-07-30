@@ -98,11 +98,16 @@ _RE_BACKTICK_REF = re.compile(r"`[^`]+`")
 # Bounds come from the longest run each quantifier actually consumes across 380 real
 # instruction files (installed skills, plugin payloads, benchmarks/, docs/, this
 # project's own files): `[\w/]+` 58, `[\w/.-]+` 118, a backtick span 1151, `\w+`
-# after the dot 50. A first guess of 120 would have sat one character above a real
-# 118-char token and truncated a real 1151-char span — the failure mode of a guessed
-# bound is a silent score change, so calibrate. Verified score-neutral: 0 of 250 real
-# files move. See docs/specs/2026-07-30-redos-audit-fixes.md (D1).
-_RE_SPECIFIC_REF = re.compile(r"(`[^`]{1,2000}`|[\w/]{1,256}\.\w{1,64}|/[\w/]{1,256})")
+# after the dot 50. The bounds below carry 4.4x / 2.2x / 1.7x / 2.6x headroom over those.
+#
+# A first guess of 120 would have sat one character above a real 118-char token and
+# truncated a real 1151-char span; a first pass at the dot suffix used 64, only 1.28x
+# over the measured 50. The failure mode of a guessed bound is a silent score change, so
+# calibrate and keep the headroom generous — widening a bound costs nothing here, since
+# the cost per start position is O(bound) either way and the pattern stays linear.
+# Verified score-neutral: 0 of 250 real files move.
+# See docs/specs/2026-07-30-redos-audit-fixes.md (D1).
+_RE_SPECIFIC_REF = re.compile(r"(`[^`]{1,2000}`|[\w/]{1,256}\.\w{1,128}|/[\w/]{1,256})")
 _RE_AMBIGUOUS_PRONOUN = re.compile(
     r"^\s*(It|This|That)\s+(is|does|will|can|should|has|was|means)\b"
 )
@@ -114,7 +119,7 @@ _RE_CONCEPTUAL = re.compile(
     r"the\s+(?:process|workflow|pipeline|approach|system|loop|strategy)\s+(?:on|for|to|with|against))"
 )
 # Same shape, same bounds, same reason as _RE_SPECIFIC_REF above.
-_RE_CONCRETE_CMD = re.compile(r"(`[^`]{1,2000}`|[\w/.-]{1,256}\.\w{1,64}|/[\w/]{1,256})")
+_RE_CONCRETE_CMD = re.compile(r"(`[^`]{1,2000}`|[\w/.-]{1,256}\.\w{1,128}|/[\w/]{1,256})")
 _RE_CODE_BLOCK_START = re.compile(r"^```")
 
 # ---------------------------------------------------------------------------
@@ -240,12 +245,22 @@ _RE_SEC_ENV_LEAK = re.compile(
 # `rm -rrrr...r` they can split the run in many ways before the match fails.
 # Measured 2.7s at 16KB; bounded it is linear (12,946x faster) with 0 verdict
 # differences across 380 real files. Longest real flag run is 2 chars (`rf`), so 12
-# is 6x headroom; `\s{1,8}` likewise covers every real spelling of `rm  -rf  /`.
+# is 6x headroom.
+#
+# The surrounding `\s+` runs are deliberately NOT bounded. They are prefixed by the
+# literal `rm`, which limits how many start positions they are reachable from, so they
+# never contributed to the blowup — and bounding them to `\s{1,8}` in the first draft of
+# this fix cost five detections 8.8.2 caught (`rm` + >=9 spaces or tabs + `-rf /`).
+# Verified linear without the bound (1.92-2.04x per doubling on a whitespace-run
+# payload). Narrowing a detector without enumerating its evasion classes is the #149
+# defect; the enumeration is TestDangerousCmdWhitespaceIsNotBounded in
+# tests/unit/test_security_field_false_positives.py.
+#
 # Reachable from the shipping CLI via the system_prompt format, where `security` is a
 # core headline dimension — see the reachability pin in tests/unit/test_scoring_redos.py.
 _RE_SEC_DANGEROUS_CMD = re.compile(
-    r"(?:rm\s{1,8}-[a-z]{0,12}r[a-z]{0,12}f[a-z]{0,12}\s{1,8}/(?![A-Za-z0-9_.-])|"
-    r"rm\s{1,8}-[a-z]{0,12}f[a-z]{0,12}r[a-z]{0,12}\s{1,8}/(?![A-Za-z0-9_.-])|"
+    r"(?:rm\s+-[a-z]{0,12}r[a-z]{0,12}f[a-z]{0,12}\s+/(?![A-Za-z0-9_.-])|"
+    r"rm\s+-[a-z]{0,12}f[a-z]{0,12}r[a-z]{0,12}\s+/(?![A-Za-z0-9_.-])|"
     r"chmod\s+777\s|"
     r"dd\s+if=/dev/(?:zero|random|urandom)\s+of=/dev/|"
     r"mkfs\.\w+\s+/dev/|"

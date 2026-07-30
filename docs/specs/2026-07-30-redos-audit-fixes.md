@@ -72,6 +72,40 @@ A first guess of 120 would have sat one character above a real 118-char token an
 would have **truncated** a real 1151-char backtick span. That is the whole argument
 for calibrating: the failure mode of a guessed bound is a silent score change.
 
+### D1a — Bound ONLY the quantifier that causes the blowup, never whitespace
+
+Found in self-review of the first commit, before it was pushed. That commit also bounded
+`rm\s+` to `rm\s{1,8}`, `\s*` to `\s{0,8}` and similar, "for consistency" with the flag
+runs and digit runs that were the real quadratic source. Enumerating the evasion classes
+rather than sampling them showed the cost:
+
+| whitespace run between `rm` and `-rf /` | 8.8.2 | first commit |
+| --- | --- | --- |
+| 1–8 spaces or tabs | detected | detected |
+| **9, 10, 16, 40, 100** spaces | detected | **missed** |
+| **9+ tabs** | detected | **missed** |
+
+Five detections lost in a security detector, for no gain: that whitespace run is prefixed
+by the literal `rm`, which limits how many start positions it is reachable from, so it
+never contributed to the blowup. Verified after reverting it — `_RE_SEC_DANGEROUS_CMD`
+stays linear (1.92–2.04× per doubling) even with a whitespace-run payload, and 0
+detections are lost against 8.8.2.
+
+This is the #149 defect class reproduced by me: narrowing a matcher without enumerating
+its evasion classes, then checking only that the corpus verdict did not move. A corpus
+check cannot see an evasion the corpus does not contain. The rule that follows:
+
+> Bound the quantifier the measurement blames. Leave every other quantifier alone, and
+> prove the bound costs nothing by walking the evasion dimension, not by sampling it.
+
+Gate: `TestDangerousCmdWhitespaceIsNotBounded` walks whitespace-run length 1…100 for
+spaces and tabs, on both sides of the flag cluster. Mutation-tested — re-introducing the
+exact `\s{1,8}` mistake turns 11 assertions red.
+
+Also refuted in the same review, by measurement rather than by argument: `\d{1,12}` in
+`_RE_LENGTH_EXTENDED` does **not** lose the 27-digit case, because the match may start
+anywhere inside the digit run. The suspicion was reasonable and wrong.
+
 ### D2 — The bound alone is NOT sufficient for `clarity` check #2
 
 Measured on the 162 s payload:

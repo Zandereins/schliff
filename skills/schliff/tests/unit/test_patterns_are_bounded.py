@@ -44,8 +44,10 @@ BOUNDED_SPELLINGS = [
      [r"\[\^`\]\{1,\d+\}", r"\[\\w/\]\{1,\d+\}", r"\\w\{1,\d+\}"]),
     (_RE_CONCRETE_CMD, "_RE_CONCRETE_CMD",
      [r"\[\^`\]\{1,\d+\}", r"\[\\w/\.-\]\{1,\d+\}", r"\\w\{1,\d+\}"]),
+    # Only the flag runs — the whitespace around them is deliberately unbounded, see
+    # TestDangerousCmdWhitespaceIsNotBounded in test_security_field_false_positives.py.
     (_RE_SEC_DANGEROUS_CMD, "_RE_SEC_DANGEROUS_CMD",
-     [r"rm\\s\{1,\d+\}-\[a-z\]\{0,\d+\}"]),
+     [r"rm\\s\+-\[a-z\]\{0,\d+\}r\[a-z\]\{0,\d+\}f\[a-z\]\{0,\d+\}"]),
     (_RE_LENGTH_EXTENDED, "_RE_LENGTH_EXTENDED",
      [r"\\d\{1,\d+\}"]),
     (_RE_SKILL_AS_OBJECT, "_RE_SKILL_AS_OBJECT",
@@ -73,6 +75,12 @@ CORPUS_MAXIMA = {
     "_RE_SPECIFIC_REF word/slash run": (_RE_SPECIFIC_REF, r"\[\\w/\]\{1,(\d+)\}", 58),
     "_RE_CONCRETE_CMD word/slash/dot run": (
         _RE_CONCRETE_CMD, r"\[\\w/\.-\]\{1,(\d+)\}", 118),
+    # The suffix after the dot. Widened from 64 to 128 in self-review: 64 carried only
+    # 1.28x headroom over the measured 50, which is too thin for a value that moves
+    # scores when it is wrong. Verified linear at 128 and 0 corpus differences.
+    "_RE_SPECIFIC_REF dot suffix": (_RE_SPECIFIC_REF, r"\\w\{1,(\d+)\}", 50),
+    "_RE_CONCRETE_CMD dot suffix": (_RE_CONCRETE_CMD, r"\\w\{1,(\d+)\}", 50),
+    "_RE_SKILL_AS_OBJECT word run": (_RE_SKILL_AS_OBJECT, r"\[\\w-\]\{1,(\d+)\}", 19),
 }
 
 

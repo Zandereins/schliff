@@ -21,12 +21,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   and `GET /api/badge?repo=`, from the CLI at the 1 MB cap, and — the worst blast
   radius — from the GitHub Action on a fork PR's AGENTS.md, i.e. in other people's CI.
 
-  Fixed by bounding each quantifier, with every bound **calibrated against the longest
-  run it actually consumes across 380 real instruction files** rather than guessed: 58
-  for `[\w/]+`, 118 for `[\w/.-]+`, 1,151 for a backtick span, 19 for `[\w-]+` in a
-  trigger prompt. A first guessed bound of 120 would have sat one character above a
-  real 118-character token and truncated a real 1,151-character span; the failure mode
-  of a guessed bound is a silent score change, which is why they are measured.
+  Fixed by bounding **only the quantifier the measurement blames**, with every bound
+  **calibrated against the longest run it actually consumes across 380 real instruction
+  files** rather than guessed: 58 for `[\w/]+`, 118 for `[\w/.-]+`, 1,151 for a backtick
+  span, 19 for `[\w-]+` in a trigger prompt. A first guessed bound of 120 would have sat
+  one character above a real 118-character token and truncated a real 1,151-character
+  span; the failure mode of a guessed bound is a silent score change.
+
+  Whitespace runs are deliberately left unbounded. Self-review of the first commit
+  caught it bounding `rm\s+` to `rm\s{1,8}` "for consistency" with the flag runs that
+  were the real quadratic source — which cost **five detections that 8.8.2 caught**
+  (`rm` plus 9 or more spaces or tabs, then `-rf /`), for no gain: that run is prefixed
+  by the literal `rm`, which limits how many start positions it is reachable from, so it
+  never contributed to the blowup. The pattern is linear without the whitespace bound
+  (1.92–2.04× per doubling, measured on a whitespace-run payload). This is the #149
+  defect class reproduced internally — narrowing a matcher without enumerating its
+  evasion classes, then checking only that the corpus verdict did not move, which a
+  corpus cannot show for an evasion it does not contain. Gated by
+  `TestDangerousCmdWhitespaceIsNotBounded`, which walks whitespace-run length 1…100 for
+  spaces and tabs on both sides of the flag cluster; re-introducing the mistake turns 11
+  assertions red.
 
   `clarity` needed a second, independent fix: bounding its regexes alone only took the
   worst case from 162.6 s to 11.9 s, because the match-independent context build and

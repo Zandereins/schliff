@@ -148,8 +148,8 @@ _RE_ANTI_DOMAIN_SIGNAL = re.compile(
 # Found by tests/unit/test_patterns_scale_linearly.py, not by the audit's fix list —
 # which is the reason that gate exists.
 _RE_SKILL_AS_OBJECT = re.compile(
-    r"(?i)(?:my|this|the|our|your|a|an)\s{1,8}(?:[\w-]{1,64}\s{1,8}){0,3}skills?\b|"
-    r"[\w-]{1,64}\s{1,8}skills?\b\s{1,8}(?:conflicts?|needs?|works?|is\b|when\b|that\b)"
+    r"(?i)(?:my|this|the|our|your|a|an)\s+(?:[\w-]{1,64}\s+){0,3}skills?\b|"
+    r"[\w-]{1,64}\s+skills?\b\s+(?:conflicts?|needs?|works?|is\b|when\b|that\b)"
 )
 
 

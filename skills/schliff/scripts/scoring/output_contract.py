@@ -40,10 +40,10 @@ _RE_JSON_KEY = re.compile(r'"(\w+)"\s*:')
 # digits. Measured 11.7s at 16KB, bounded 18ms (636x), linear, 0 verdict differences
 # across the corpus. See docs/specs/2026-07-30-redos-audit-fixes.md (D5).
 _RE_LENGTH_EXTENDED = re.compile(
-    r"(?i)(max(imum)?\s{1,8}.{0,30}\d{1,12}\s{0,8}(words?|tokens?|sentences?|characters?"
+    r"(?i)(max(imum)?\s+.{0,30}\d{1,12}\s*(words?|tokens?|sentences?|characters?"
     r"|paragraphs?|lines?)"
-    r"|\d{1,12}\s{0,8}(words?|tokens?|sentences?|characters?|paragraphs?|lines?)"
-    r"\s{0,8}(max|limit|cap))"
+    r"|\d{1,12}\s*(words?|tokens?|sentences?|characters?|paragraphs?|lines?)"
+    r"\s*(max|limit|cap))"
 )
 
 # Extended example pattern: "Example N:" or "Example:" with code block nearby
