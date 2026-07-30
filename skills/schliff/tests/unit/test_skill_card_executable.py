@@ -13,6 +13,7 @@ test stays offline — what is being guarded is command-surface drift, not uvx i
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -71,9 +72,17 @@ def test_every_documented_command_executes(arg: str, sandbox):
     argv = _placeholders(arg, tmp, target)
     assert argv is not None, f"card has an unresolvable placeholder: {arg!r}"
 
+    # Run from the sandbox, not from the package directory. Two reasons, and the second
+    # one was a real defect: the card's whole promise is that these commands work from
+    # anywhere, so executing them elsewhere is the more faithful test — and `verify`
+    # appends to `.schliff/history.jsonl` **relative to the working directory**, so with
+    # cwd set to the package this suite wrote three throwaway entries per run into the
+    # repo's own score history, each recording 32.7 [F] for a tmpdir copy of the card.
+    # That is the data `progress.py`, `diff` and /schliff:report read.
     proc = subprocess.run(
         [sys.executable, "-m", "scripts.cli", *argv],
-        cwd=SCRIPTS.parent, capture_output=True, text=True, timeout=120,
+        cwd=tmp, capture_output=True, text=True, timeout=120,
+        env={**os.environ, "PYTHONPATH": str(SCRIPTS.parent)},
     )
     # 0 = ran, 1 = ran and reported a verdict (`verify` is a gate; exiting 1 below the
     # threshold IS its documented contract). 2 = argparse rejected it, which is exactly
