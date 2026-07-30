@@ -122,3 +122,136 @@ def test_output_is_renderable_and_serialisable(install: Path):
 def test_empty_install_says_so(tmp_path: Path):
     out = format_manifest(build_manifest(claude_dir=tmp_path))
     assert "0 artifacts loaded" in out
+
+
+class TestFrontmatterParseIsBoundedAndLinear:
+    """`schliff manifest` reads third-party content, so its parser is a trust boundary.
+
+    It walks every SKILL.md under `~/.claude/skills`, every `*.md` under
+    `~/.claude/commands`, the project's `.claude/`, and the payload of every enabled
+    plugin. Two defects from the 2026-07-30 audit met there:
+
+    1. `_FM = r"^---\\s*\\n(.*?)\\n---\\s*\\n"` is O(n^2) because `\\s*` may consume
+       newlines: every `\\s*` length restarts the lazy body scan. 25.6s at 64KB, 4.04x
+       per doubling; ~1.9h extrapolated at 1MB.
+    2. The read had no size cap at all — a raw `read_text()`, unlike every other reader
+       in the engine, which goes through `read_skill_safe` at MAX_SKILL_SIZE.
+
+    Both call sites do `fm, _ = parse_frontmatter(...)`: the body was never used. So the
+    fix reads a bounded HEAD rather than capping a full read nobody needed.
+    """
+
+    def test_unterminated_frontmatter_parses_in_linear_time(self, tmp_path):
+        import time
+
+        from manifest import parse_frontmatter
+        p = tmp_path / "SKILL.md"
+        prev = None
+        for n in (16_000, 32_000, 64_000):
+            p.write_text("---" + "\n" * n, encoding="utf-8")
+            start = time.perf_counter()
+            parse_frontmatter(p)
+            elapsed = time.perf_counter() - start
+            if prev is not None:
+                assert elapsed / prev < 3.0, (
+                    f"parse_frontmatter is super-linear: {prev * 1000:.1f}ms -> "
+                    f"{elapsed * 1000:.1f}ms at n={n} ({elapsed / prev:.2f}x per doubling)"
+                )
+            prev = elapsed
+        assert prev < 1.0, f"parse_frontmatter took {prev:.2f}s on a 64KB file"
+
+    def test_oversized_file_is_not_read_whole(self, tmp_path, monkeypatch):
+        """A 4MB SKILL.md must not be pulled into memory to read its frontmatter.
+
+        This asserts the READ, not just the result. A first version of this test only
+        checked that `_FM_READ_BYTES` was small and that parsing still worked — and it
+        passed with the bounded read reverted to a full `read_text()`, because a full read
+        produces the same mapping. A test that cannot fail on the defect it names is not a
+        test. Found by mutation.
+        """
+        import pathlib as _pathlib
+
+        from manifest import parse_frontmatter
+        p = tmp_path / "SKILL.md"
+        p.write_text("---\nname: big\ndescription: fine\n---\n" + "x" * (4 * 1024 * 1024),
+                     encoding="utf-8")
+
+        requested: list = []
+        real_open = _pathlib.Path.open
+
+        def recording_open(self, *args, **kwargs):
+            handle = real_open(self, *args, **kwargs)
+            real_read = handle.read
+
+            def read(n=-1):
+                requested.append(n)
+                return real_read(n)
+
+            handle.read = read
+            return handle
+
+        monkeypatch.setattr(_pathlib.Path, "open", recording_open)
+        fm = parse_frontmatter(p)
+
+        assert fm.get("name") == "big"
+        assert fm.get("description") == "fine"
+        assert requested, (
+            "parse_frontmatter did not go through Path.open — a full-file read path "
+            "(read_text, read_bytes) bypasses the bound entirely"
+        )
+        assert all(n is not None and n > 0 for n in requested), (
+            f"parse_frontmatter issued an unbounded read: read({requested}). "
+            f"read(-1) or read() pulls the whole 4MB file into memory."
+        )
+        assert max(requested) <= 64 * 1024, f"read too much at once: {max(requested)} bytes"
+
+    # Largest frontmatter block measured across 248 real skills, commands and plugin
+    # payloads (vercel's ai-sdk SKILL.md). The head read must stay above it or the
+    # frontmatter of a real artifact gets truncated and its description silently reads
+    # as empty — the same "calibrate the bound, do not guess it" rule as the pattern
+    # bounds in PR 1, and it needs its own assertion for the same reason.
+    CORPUS_MAX_FRONTMATTER_BYTES = 15_711
+
+    def test_head_read_stays_above_the_measured_frontmatter_maximum(self):
+        from manifest import _FM_READ_BYTES
+        assert _FM_READ_BYTES > self.CORPUS_MAX_FRONTMATTER_BYTES, (
+            f"head read {_FM_READ_BYTES} is not above the largest real frontmatter block "
+            f"({self.CORPUS_MAX_FRONTMATTER_BYTES}); a real artifact would parse as if it "
+            f"had no frontmatter. Re-measure before changing this."
+        )
+        assert _FM_READ_BYTES < 1024 * 1024, (
+            "the head read must stay well under MAX_SKILL_SIZE (1MB) or it is not a bound"
+        )
+
+    def test_returns_only_the_frontmatter_mapping(self, tmp_path):
+        """Both call sites discarded the body. Returning it invited a full read for
+        nothing, so the signature drops it."""
+        from manifest import parse_frontmatter
+        p = tmp_path / "SKILL.md"
+        p.write_text("---\nname: x\ndescription: y\n---\n\nbody text\n", encoding="utf-8")
+        result = parse_frontmatter(p)
+        assert isinstance(result, dict), f"expected a mapping, got {type(result).__name__}"
+        assert result == {"name": "x", "description": "y"}
+
+    # Shapes that must keep parsing byte-identically after the anchor change.
+    EQUIVALENCE = [
+        ("plain", "---\nname: a\ndescription: b\n---\nbody", {"name": "a", "description": "b"}),
+        ("crlf", "---\r\nname: a\r\ndescription: b\r\n---\r\nbody",
+         {"name": "a", "description": "b"}),
+        ("trailing spaces on delimiters", "---  \nname: a\n---  \nbody", {"name": "a"}),
+        ("no frontmatter", "# just a heading\n", {}),
+        ("unterminated", "---\nname: a\n", {}),
+        ("block scalar", "---\nname: a\ndescription: >\n  one\n  two\n---\nbody",
+         {"name": "a", "description": "one two"}),
+        ("quoted value", '---\nname: "a b"\n---\nbody', {"name": "a b"}),
+        ("boolean", "---\nname: a\ndisable-model-invocation: true\n---\nbody",
+         {"name": "a", "disable-model-invocation": True}),
+    ]
+
+    @pytest.mark.parametrize("label,text,expected", EQUIVALENCE,
+                             ids=[c[0] for c in EQUIVALENCE])
+    def test_real_shapes_parse_unchanged(self, tmp_path, label, text, expected):
+        from manifest import parse_frontmatter
+        p = tmp_path / "SKILL.md"
+        p.write_text(text, encoding="utf-8")
+        assert parse_frontmatter(p) == expected, label

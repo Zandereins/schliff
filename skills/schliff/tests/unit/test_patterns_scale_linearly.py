@@ -12,11 +12,15 @@ the measured defects were 3.9x-4.1x. The threshold is 3.0x with an absolute floo
 a loaded CI runner cannot flake it while the 4.0x class is still caught with margin.
 
 Known limit, stated rather than glossed: this gate reaches exactly as far as its filler
-alphabet. `manifest._FM` is quadratic on a frontmatter-shaped input (`"---" + "\n" * n`,
-3.95x per doubling) and NONE of the generic fillers below trip it — they come in at
-1.85x, below the absolute floor. So a shape nobody thought of stays invisible here. The
-`_MIN_ABS_SECONDS` floor has the same character: it suppresses noise, and it would also
-suppress a quadratic with a very small constant at this input size.
+alphabet. That is not hypothetical — `manifest._FM` was quadratic on a frontmatter-shaped
+input at 3.95x per doubling while every generic filler came in at 1.85x, below the
+absolute floor, so the gate shipped blind to a live defect for one commit. The two
+`frontmatter_*` fillers close that specific shape; a shape nobody has thought of yet
+still stays invisible. The `_MIN_ABS_SECONDS` floor has the same character: it suppresses
+noise, and it would also suppress a quadratic with a very small constant at this size.
+
+The lesson generalises: when a defect is found by hand, add the filler that would have
+found it. The alphabet is the gate.
 
 Cost: ~10-25s. That is the price of the only gate here that does not depend on a
 heuristic being right. Its deterministic companion is `test_patterns_are_bounded.py`.
@@ -101,6 +105,11 @@ _FILLERS = {
     "the_file": lambda n: "the file " * (n // 9),
     "urlish": lambda n: "http://a/" * (n // 9),
     "md_link": lambda n: "- [x](y.md) " * (n // 12),
+    # Frontmatter-shaped. Added when the blind spot documented below turned out to hide a
+    # live quadratic: `manifest._FM` opens with `^---\s*\n`, so only an input that STARTS
+    # with the delimiter reaches its lazy body scan. None of the fillers above do.
+    "frontmatter_unterminated": lambda n: "---" + "\n" * (n - 3),
+    "frontmatter_open": lambda n: "---\n" + "\n" * (n - 4),
 }
 
 _N = 2000                 # base size; the comparison runs at 2*_N

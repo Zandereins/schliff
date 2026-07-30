@@ -86,6 +86,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   certain false positive. A gate whose allowlist is longer than its findings is the thing
   it exists to prevent.
 
+- **`schliff manifest` parsed third-party frontmatter quadratically and read files with
+  no size cap at all.** `manifest` walks every SKILL.md under `~/.claude/skills`, every
+  command under `~/.claude/commands`, the project's `.claude/`, and the payload of every
+  enabled plugin — all third-party content — and its frontmatter regex opened with
+  `^---\s*\n`. `\s` matches the newline itself, so every possible `\s*` length restarted
+  the lazy body scan: 25.6 s at 64 KB, 4.04× per doubling, ~1.9 h extrapolated at 1 MB.
+  Through the shipping CLI on one hostile 64 KB skill: **30.77 s → 0.22 s**.
+
+  Anchoring the whitespace class away from the record separator (`[ \t]*\r?\n`) is
+  32,823× faster at 64 KB with a byte-identical verdict *and* body on every real shape,
+  including CRLF and unterminated frontmatter.
+
+  Separately, the read was a raw `read_text()` with no `MAX_SKILL_SIZE` — the only reader
+  in the engine without one. Both call sites did `fm, _ = parse_frontmatter(...)`, so the
+  body was the only reason a whole file had to be in memory: the fix reads a bounded
+  64 KB head and drops the body from the signature, which removes the unbounded read, the
+  quadratic trigger and a dead return value together. 64 KB is calibrated, not guessed —
+  across 248 real skills, commands and plugin payloads the frontmatter block runs a median
+  of 694 bytes, p95 4,476, max 15,711, so it carries 100% with 4× headroom.
+
+  Verified against the real install: `manifest --json` output is byte-identical to `main`
+  (same sha256, 109 artifacts, 8,240 resident tokens, 19 findings). The empirical ReDoS
+  gate gained the frontmatter-shaped fillers that were the documented blind spot, so this
+  defect is now caught by the gate rather than by hand.
+
 - **`clarity`'s function docstring contradicted its own module docstring**, claiming a
   zero default weight and a `--clarity` opt-in. Both were stale — clarity runs in the
   default scorer set for every format — and that contradiction is exactly what made two

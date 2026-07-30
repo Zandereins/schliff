@@ -1,6 +1,6 @@
 # Bounded quantifiers: closing the ReDoS class found by the 2026-07-30 audit
 
-Status: D1, D1a, D2, D5, D6 implemented (PR 1). D3, D7, D8 pending.
+Status: D1, D1a, D2, D5, D6 implemented (PR 1). D3 implemented (PR 2). D7, D8 pending.
 Date: 2026-07-30
 Baseline: `main` @ `ab41827`
 
@@ -159,6 +159,24 @@ Independently, `manifest.py:54` reads with a raw `read_text()` — no
 not a size cap on a full read — it is to read a bounded head and drop the body from
 the signature. That removes the unbounded read, the quadratic trigger, and a dead
 return value at once.
+
+Head size calibrated, not guessed: across 248 real skills, commands and plugin payloads
+the frontmatter block runs a median of 694 bytes, p95 4,476, max 15,711 (vercel's
+`ai-sdk`). 64 KB carries 100% of them with 4× headroom, and a test pins it above that
+maximum — truncating a real artifact's frontmatter would make its description silently
+read as empty.
+
+**Measured:** through the shipping CLI on one hostile 64 KB skill, 30.77 s → 0.22 s.
+`manifest --json` over the real install is byte-identical to `main` (same sha256, 109
+artifacts, 8,240 resident tokens, 19 findings).
+
+Two of this fix's own tests were **non-discriminating on first write**, found by mutation
+and fixed: `test_oversized_file_is_not_read_whole` asserted only that the constant was
+small and that parsing still worked, so it passed with the bounded read reverted to a full
+`read_text()` — a full read yields the same mapping. It now instruments `Path.open` and
+asserts the actual `read(n)` argument. And nothing pinned the head against the corpus
+maximum, so shrinking it to 8 KB passed; that assertion now exists, mirroring D1's bound
+checks. A test that cannot fail on the defect it names is not a test.
 
 ### D4 — F3 is a reachability correction, not a gate change
 
