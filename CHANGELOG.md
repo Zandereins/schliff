@@ -94,17 +94,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   the lazy body scan: 25.6 s at 64 KB, 4.04× per doubling, ~1.9 h extrapolated at 1 MB.
   Through the shipping CLI on one hostile 64 KB skill: **30.77 s → 0.22 s**.
 
-  Anchoring the whitespace class away from the record separator (`[ \t]*\r?\n`) is
-  32,823× faster at 64 KB with a byte-identical verdict *and* body on every real shape,
-  including CRLF and unterminated frontmatter.
+  Fixed with `[^\S\n]*` — whitespace except the newline. A class that cannot span the
+  record separator cannot restart that scan: 1.5 ms at 64 KB, linear, and every code point
+  the class admits was probed individually for a revived blowup (1.97–2.07× per doubling).
+  **0 divergences from 8.8.2 across 14 enumerated separators.** The narrower `[ \t]*\r?`
+  tried first lost six of them — form feed, vertical tab, `\r\r\n`, NBSP, em space, a
+  mixed run — which for a tool that reports resolved state means a
+  `disable-model-invocation: true` skill reads as LOADED. Caught in review by enumerating
+  the dimension, not sampling it; gated for all 14 shapes including that consequence.
 
   Separately, the read was a raw `read_text()` with no `MAX_SKILL_SIZE` — the only reader
   in the engine without one. Both call sites did `fm, _ = parse_frontmatter(...)`, so the
   body was the only reason a whole file had to be in memory: the fix reads a bounded
-  64 KB head and drops the body from the signature, which removes the unbounded read, the
-  quadratic trigger and a dead return value together. 64 KB is calibrated, not guessed —
-  across 248 real skills, commands and plugin payloads the frontmatter block runs a median
-  of 694 bytes, p95 4,476, max 15,711, so it carries 100% with 4× headroom.
+  65,536-character head and drops the body from the signature, which removes the unbounded
+  read, the quadratic trigger and a dead return value together. The bound is calibrated,
+  not guessed — across 248 real skills, commands and plugin payloads the frontmatter block
+  runs a median of 694 characters, p95 4,476, max 15,711, so it carries 100% with 4×
+  headroom. Characters, not bytes: `read(n)` on a text handle counts code points, so the
+  constant is named `_FM_READ_CHARS` rather than promising a byte guarantee the call does
+  not make.
 
   Verified against the real install: `manifest --json` output is byte-identical to `main`
   (same sha256, 109 artifacts, 8,240 resident tokens, 19 findings). The empirical ReDoS

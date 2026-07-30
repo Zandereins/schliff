@@ -149,9 +149,24 @@ unnecessary.
 ### D3 — `manifest.py`: read the head, drop the unused body
 
 `_FM = r"^---\s*\n(.*?)\n---\s*\n"` is O(n²) because `\s*` may consume newlines:
-every `\s*` length restarts the lazy `(.*?)` scan. `^---[ \t]*\r?\n…` is 32,823×
-faster at 64 KB with a byte-identical verdict **and** `group(1)` on every real shape
-including CRLF and unterminated frontmatter.
+every `\s*` length restarts the lazy `(.*?)` scan.
+
+**The class must exclude the newline — and nothing else.** Review of this fix caught the
+first attempt, `[ \t]*\r?`, losing **six** shapes 8.8.2 parsed: form feed, vertical tab,
+`\r\r\n`, NBSP, em space, and a mixed run. Material rather than cosmetic, because
+`manifest` reports resolved state: frontmatter it fails to parse makes a
+`disable-model-invocation: true` skill read as **LOADED** and drops the description that
+carries the per-turn cost. That is D1a's rule violated a second time, in a different file
+— narrowing a class without enumerating the dimension.
+
+`[^\S\n]*` — whitespace except newline — is the class that keeps every shape and still
+cannot restart the lazy scan: **0 divergences** from 8.8.2 across all 14 enumerated
+separators (the first attempt had 6), 1.5 ms at 64 KB, linear. Every code point the class
+admits was probed individually for a revived blowup (`\r`, `\f`, `\v`, U+2028, U+2029,
+U+0085, NBSP, U+001C, mixed): 1.97–2.07× per doubling, none above the 3.0 threshold.
+Gated by `TestFrontmatterWhitespaceClassIsNotNarrowed`, which asserts both the parse and
+the disabled-skill consequence for all 14; re-introducing the over-narrowing turns 8
+assertions red.
 
 Independently, `manifest.py:54` reads with a raw `read_text()` — no
 `MAX_SKILL_SIZE`, unlike every other reader in the engine. Both call sites do
@@ -161,10 +176,16 @@ the signature. That removes the unbounded read, the quadratic trigger, and a dea
 return value at once.
 
 Head size calibrated, not guessed: across 248 real skills, commands and plugin payloads
-the frontmatter block runs a median of 694 bytes, p95 4,476, max 15,711 (vercel's
-`ai-sdk`). 64 KB carries 100% of them with 4× headroom, and a test pins it above that
+the frontmatter block runs a median of 694 characters, p95 4,476, max 15,711 (vercel's
+`ai-sdk`). 65,536 carries 100% of them with 4× headroom, and a test pins it above that
 maximum — truncating a real artifact's frontmatter would make its description silently
 read as empty.
+
+**Characters, not bytes.** `read(n)` on a text handle counts code points, so on CJK
+frontmatter this reads up to 4× as many bytes — still bounded. The constant was first
+named `_FM_READ_BYTES`, which promised a guarantee the call does not make; renamed
+`_FM_READ_CHARS`, and the calibration figures above are character counts because that is
+what `m.end()` measured.
 
 **Measured:** through the shipping CLI on one hostile 64 KB skill, 30.77 s → 0.22 s.
 `manifest --json` over the real install is byte-identical to `main` (same sha256, 109

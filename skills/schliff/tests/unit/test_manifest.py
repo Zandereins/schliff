@@ -206,20 +206,21 @@ class TestFrontmatterParseIsBoundedAndLinear:
         assert max(requested) <= 64 * 1024, f"read too much at once: {max(requested)} bytes"
 
     # Largest frontmatter block measured across 248 real skills, commands and plugin
-    # payloads (vercel's ai-sdk SKILL.md). The head read must stay above it or the
+    # payloads (vercel's ai-sdk SKILL.md), in CHARACTERS — `read(n)` on a text handle
+    # counts code points. The head read must stay above it or the
     # frontmatter of a real artifact gets truncated and its description silently reads
     # as empty — the same "calibrate the bound, do not guess it" rule as the pattern
     # bounds in PR 1, and it needs its own assertion for the same reason.
-    CORPUS_MAX_FRONTMATTER_BYTES = 15_711
+    CORPUS_MAX_FRONTMATTER_CHARS = 15_711
 
     def test_head_read_stays_above_the_measured_frontmatter_maximum(self):
-        from manifest import _FM_READ_BYTES
-        assert _FM_READ_BYTES > self.CORPUS_MAX_FRONTMATTER_BYTES, (
-            f"head read {_FM_READ_BYTES} is not above the largest real frontmatter block "
-            f"({self.CORPUS_MAX_FRONTMATTER_BYTES}); a real artifact would parse as if it "
+        from manifest import _FM_READ_CHARS
+        assert _FM_READ_CHARS > self.CORPUS_MAX_FRONTMATTER_CHARS, (
+            f"head read {_FM_READ_CHARS} is not above the largest real frontmatter block "
+            f"({self.CORPUS_MAX_FRONTMATTER_CHARS}); a real artifact would parse as if it "
             f"had no frontmatter. Re-measure before changing this."
         )
-        assert _FM_READ_BYTES < 1024 * 1024, (
+        assert _FM_READ_CHARS < 1024 * 1024, (
             "the head read must stay well under MAX_SKILL_SIZE (1MB) or it is not a bound"
         )
 
@@ -255,3 +256,64 @@ class TestFrontmatterParseIsBoundedAndLinear:
         p = tmp_path / "SKILL.md"
         p.write_text(text, encoding="utf-8")
         assert parse_frontmatter(p) == expected, label
+
+
+class TestFrontmatterWhitespaceClassIsNotNarrowed:
+    """The ReDoS fix replaced `\\s*` with a class that cannot span the newline. That is a
+    NARROWING of the whitespace class, and the first attempt narrowed too far.
+
+    `[ \\t]*\\r?` lost six shapes 8.8.2 parsed — form feed, vertical tab, `\\r\\r\\n`,
+    NBSP, em space, and a mixed run. Material, not cosmetic: `manifest` reports resolved
+    state, so frontmatter it fails to parse makes a `disable-model-invocation: true` skill
+    read as LOADED, and drops the description that carries the per-turn cost.
+
+    `[^\\S\\n]*` — whitespace except newline — is the class that keeps every shape and
+    still cannot restart the lazy body scan. This enumerates the dimension rather than
+    sampling it, which is the only way the six losses became visible.
+    """
+
+    SEPARATORS = [
+        ("lf", "\n"),
+        ("crlf", "\r\n"),
+        ("space_lf", " \n"),
+        ("tab_lf", "\t\n"),
+        ("two_spaces_lf", "  \n"),
+        ("formfeed_lf", "\f\n"),
+        ("vtab_lf", "\v\n"),
+        ("cr_cr_lf", "\r\r\n"),
+        ("lf_lf", "\n\n"),
+        ("space_cr_lf", " \r\n"),
+        ("nbsp_lf", "\u00a0\n"),
+        ("emspace_lf", "\u2003\n"),
+        ("tab_cr_lf", "\t\r\n"),
+        ("mixed_ws_lf", "\t \r\f\v\n"),
+    ]
+
+    @pytest.mark.parametrize("label,sep", SEPARATORS, ids=[s[0] for s in SEPARATORS])
+    def test_every_whitespace_separator_still_parses(self, tmp_path, label, sep):
+        from manifest import parse_frontmatter
+        p = tmp_path / "SKILL.md"
+        p.write_text(f"---{sep}name: a{sep}description: b{sep}---{sep}body", encoding="utf-8")
+        fm = parse_frontmatter(p)
+        assert fm.get("name") == "a", (
+            f"separator {label!r} no longer parses — the whitespace class was narrowed "
+            f"past what 8.8.2 accepted. A frontmatter this parser misses makes a disabled "
+            f"skill report as loaded."
+        )
+
+    @pytest.mark.parametrize("label,sep", SEPARATORS, ids=[s[0] for s in SEPARATORS])
+    def test_disabled_skill_is_never_reported_as_loaded(self, tmp_path, label, sep):
+        """The consequence that makes the above material, asserted directly."""
+        from manifest import build_manifest
+        root = tmp_path / ".claude"
+        d = root / "skills" / "off"
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text(
+            f"---{sep}name: off{sep}disable-model-invocation: true{sep}---{sep}body",
+            encoding="utf-8")
+        m = build_manifest(claude_dir=root)
+        assert [a.name for a in m.loaded] == [], (
+            f"separator {label!r}: a disabled skill was reported as LOADED because its "
+            f"frontmatter did not parse"
+        )
+        assert any(f.kind == "disabled" for f in m.findings), f"separator {label!r}"

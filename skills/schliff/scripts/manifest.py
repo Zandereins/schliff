@@ -29,17 +29,24 @@ from pathlib import Path
 
 HOME = Path.home()
 
-# `[ \t]*\r?\n`, not `\s*\n`: `\s` matches the newline itself, so every possible
-# `\s*` length restarted the lazy `(.*?)` body scan — O(n^2) on a file that opens the
-# delimiter and never closes it. Measured 25.6s at 64KB, 4.04x per doubling, ~1.9h
-# extrapolated at 1MB. Anchoring the whitespace class away from the record separator is
-# 32,823x faster at 64KB with a byte-identical verdict and body on every real shape,
-# including CRLF and unterminated frontmatter.
+# `[^\S\n]*`, not `\s*`: the quadratic came from `\s` matching the newline ITSELF, so
+# every possible `\s*` length restarted the lazy `(.*?)` body scan — O(n^2) on a file that
+# opens the delimiter and never closes it. Measured 25.6s at 64KB, 4.04x per doubling,
+# ~1.9h extrapolated at 1MB. A class that cannot span the record separator cannot restart
+# that scan: 1.5ms at 64KB, linear.
+#
+# `[^\S\n]` is "whitespace except newline" and is deliberately NOT the narrower
+# `[ \t]*\r?`. The first attempt at this fix used `[ \t]*\r?` and lost six shapes 8.8.2
+# parsed: form feed, vertical tab, `\r\r\n`, NBSP, em space, and a mixed run. That is
+# not cosmetic here — this tool reports resolved state, so a frontmatter it fails to parse
+# makes a `disable-model-invocation: true` skill read as LOADED. Enumerating the
+# whitespace dimension instead of sampling it is what caught it; the enumeration lives in
+# tests/unit/test_manifest.py and covers all 14 shapes with 0 divergence from 8.8.2.
 #
 # This parser reads THIRD-PARTY content: `schliff manifest` walks every SKILL.md under
 # ~/.claude/skills, every command under ~/.claude/commands, the project's .claude/, and
 # the payload of every enabled plugin. See docs/specs/2026-07-30-redos-audit-fixes.md (D3).
-_FM = re.compile(r"^---[ \t]*\r?\n(.*?)\n---[ \t]*\r?\n", re.S)
+_FM = re.compile(r"^---[^\S\n]*\n(.*?)\n---[^\S\n]*\n", re.S)
 _KV = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):[ \t]*(.*)$")
 
 # Frontmatter lives at the top of the file, so only a head read is needed — and a head
@@ -48,9 +55,14 @@ _KV = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):[ \t]*(.*)$")
 # this one used a raw `read_text()` with no cap at all.
 #
 # Calibrated, not guessed: across 248 real skills, commands and plugin payloads the
-# frontmatter block runs a median of 694 bytes, p95 4,476, max 15,711 (vercel's ai-sdk
-# skill). 64KB carries 100% of them with 4x headroom over the largest.
-_FM_READ_BYTES = 64 * 1024
+# frontmatter block runs a median of 694 characters, p95 4,476, max 15,711 (vercel's
+# ai-sdk skill). 65,536 carries 100% of them with 4x headroom over the largest.
+#
+# CHARACTERS, not bytes — `read(n)` on a text handle counts code points, so on CJK
+# frontmatter this reads up to 4x as many bytes. Still bounded, and named for what it
+# actually limits: the first version of this constant was called `_FM_READ_BYTES`, which
+# promised a guarantee the call does not make.
+_FM_READ_CHARS = 64 * 1024
 
 # Rough chars-per-token. schliff uses the same approximation elsewhere; the number
 # only needs to be stable and honest about being an estimate.
@@ -77,7 +89,7 @@ def parse_frontmatter(path: Path) -> dict:
     """
     try:
         with path.open("r", encoding="utf-8", errors="replace") as fh:
-            text = fh.read(_FM_READ_BYTES)
+            text = fh.read(_FM_READ_CHARS)
     except OSError:
         return {}
     m = _FM.match(text)
