@@ -135,6 +135,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   production. Defence in depth and a fixed asymmetry between two sibling endpoints, not a
   demonstrated live exploit.
 
+- **`run-eval.sh`'s 2-second regex timeout guard could be silently inactive.**
+  `_GREP_TIMEOUT` is set only when `gtimeout` or `timeout` resolves on PATH, and neither
+  ships with a stock macOS — so there the guard is inert *and* its `124) pattern timed out`
+  branch is dead code, with nothing in the output saying so. A guard you cannot tell apart
+  from a working one is worse than a documented absence. It now prints a one-time note
+  naming the consequence and the remedy.
+
+  Deliberately not replaced by a portable Python fallback: measured, the sink does not
+  backtrack — GNU grep, BSD grep 2.6.0 and ugrep 7.5.0 are all DFA-based and stayed flat
+  (0.044–0.050 s) on the patterns the complexity guard accepts. This is defence in depth,
+  while swapping ERE for Python `re` would re-run the dialect regression that left six
+  assertions dead on CI for months.
+
 - **`clarity`'s function docstring contradicted its own module docstring**, claiming a
   zero default weight and a `--clarity` opt-in. Both were stale — clarity runs in the
   default scorer set for every format — and that contradiction is exactly what made two
