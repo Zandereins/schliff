@@ -152,8 +152,8 @@ unnecessary.
 every `\s*` length restarts the lazy `(.*?)` scan.
 
 **The class must exclude the newline — and nothing else.** Review of this fix caught the
-first attempt, `[ \t]*\r?`, losing **six** shapes 8.8.2 parsed: form feed, vertical tab,
-`\r\r\n`, NBSP, em space, and a mixed run. Material rather than cosmetic, because
+first attempt, `[ \t]*\r?`, losing **four** shapes 8.8.2 parsed: form feed, vertical tab,
+NBSP and em space. Material rather than cosmetic, because
 `manifest` reports resolved state: frontmatter it fails to parse makes a
 `disable-model-invocation: true` skill read as **LOADED** and drops the description that
 carries the per-turn cost. That is D1a's rule violated a second time, in a different file
@@ -161,7 +161,16 @@ carries the per-turn cost. That is D1a's rule violated a second time, in a diffe
 
 `[^\S\n]*` — whitespace except newline — is the class that keeps every shape and still
 cannot restart the lazy scan: **0 divergences** from 8.8.2 across all 14 enumerated
-separators (the first attempt had 6), 1.5 ms at 64 KB, linear. Every code point the class
+separators (the first attempt had 4), 1.5 ms at 64 KB, linear.
+
+**The first count published for this was six, and it was wrong.** That enumeration ran
+against in-memory strings; `parse_frontmatter` reads through `path.open("r")`, i.e.
+universal newlines, which collapses every CR-based shape before the regex sees it. The
+mutation test disagreed with the hand-run enumeration — four red, not six — and the read
+path was the difference. A probe against a substrate the code does not use is not a probe,
+and the error went in the direction that flattered the finding. Consequence recorded in
+code and pinned by `TestUniversalNewlineContract`: the `\r` inside `[^\S\n]` is harmless
+but not load-bearing here, and `newline=""` would change which separators are equivalent. Every code point the class
 admits was probed individually for a revived blowup (`\r`, `\f`, `\v`, U+2028, U+2029,
 U+0085, NBSP, U+001C, mixed): 1.97–2.07× per doubling, none above the 3.0 threshold.
 Gated by `TestFrontmatterWhitespaceClassIsNotNarrowed`, which asserts both the parse and

@@ -36,12 +36,18 @@ HOME = Path.home()
 # that scan: 1.5ms at 64KB, linear.
 #
 # `[^\S\n]` is "whitespace except newline" and is deliberately NOT the narrower
-# `[ \t]*\r?`. The first attempt at this fix used `[ \t]*\r?` and lost six shapes 8.8.2
-# parsed: form feed, vertical tab, `\r\r\n`, NBSP, em space, and a mixed run. That is
-# not cosmetic here — this tool reports resolved state, so a frontmatter it fails to parse
-# makes a `disable-model-invocation: true` skill read as LOADED. Enumerating the
-# whitespace dimension instead of sampling it is what caught it; the enumeration lives in
+# `[ \t]*\r?`. The first attempt at this fix used `[ \t]*\r?` and lost four shapes 8.8.2
+# parsed: form feed, vertical tab, NBSP and em space. Not cosmetic here — this tool
+# reports resolved state, so frontmatter it fails to parse makes a
+# `disable-model-invocation: true` skill read as LOADED. Enumerating the whitespace
+# dimension instead of sampling it is what caught it; the enumeration lives in
 # tests/unit/test_manifest.py and covers all 14 shapes with 0 divergence from 8.8.2.
+#
+# The `\r` that `[^\S\n]` admits is NOT load-bearing on this path: the read below opens
+# in universal-newline mode, so CR is translated to LF before the regex sees it. It is
+# kept because removing a class member for no measured reason is how the first attempt
+# went wrong. `TestUniversalNewlineContract` pins the translation, since `newline=""`
+# would make CR reachable and change which separators are equivalent.
 #
 # This parser reads THIRD-PARTY content: `schliff manifest` walks every SKILL.md under
 # ~/.claude/skills, every command under ~/.claude/commands, the project's .claude/, and

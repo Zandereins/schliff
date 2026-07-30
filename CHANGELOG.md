@@ -98,10 +98,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   record separator cannot restart that scan: 1.5 ms at 64 KB, linear, and every code point
   the class admits was probed individually for a revived blowup (1.97–2.07× per doubling).
   **0 divergences from 8.8.2 across 14 enumerated separators.** The narrower `[ \t]*\r?`
-  tried first lost six of them — form feed, vertical tab, `\r\r\n`, NBSP, em space, a
-  mixed run — which for a tool that reports resolved state means a
-  `disable-model-invocation: true` skill reads as LOADED. Caught in review by enumerating
-  the dimension, not sampling it; gated for all 14 shapes including that consequence.
+  tried first lost four of them — form feed, vertical tab, NBSP, em space — which for a
+  tool that reports resolved state means a `disable-model-invocation: true` skill reads as
+  LOADED. Caught in review by enumerating the dimension, not sampling it; gated for all 14
+  shapes including that consequence. The count was first published as six, from an
+  enumeration run against in-memory strings — `parse_frontmatter` reads with universal
+  newlines, which collapses the CR-based shapes before the regex sees them, so `\r` is
+  harmless but not load-bearing on this path. The translation is now pinned by a test.
 
   Separately, the read was a raw `read_text()` with no `MAX_SKILL_SIZE` — the only reader
   in the engine without one. Both call sites did `fm, _ = parse_frontmatter(...)`, so the

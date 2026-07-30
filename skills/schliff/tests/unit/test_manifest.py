@@ -262,14 +262,25 @@ class TestFrontmatterWhitespaceClassIsNotNarrowed:
     """The ReDoS fix replaced `\\s*` with a class that cannot span the newline. That is a
     NARROWING of the whitespace class, and the first attempt narrowed too far.
 
-    `[ \\t]*\\r?` lost six shapes 8.8.2 parsed — form feed, vertical tab, `\\r\\r\\n`,
-    NBSP, em space, and a mixed run. Material, not cosmetic: `manifest` reports resolved
-    state, so frontmatter it fails to parse makes a `disable-model-invocation: true` skill
-    read as LOADED, and drops the description that carries the per-turn cost.
+    `[ \\t]*\\r?` lost FOUR shapes 8.8.2 parsed, measured through the real read path: form
+    feed, vertical tab, NBSP and em space. Material, not cosmetic: `manifest` reports
+    resolved state, so frontmatter it fails to parse makes a `disable-model-invocation:
+    true` skill read as LOADED, and drops the description that carries the per-turn cost.
 
     `[^\\S\\n]*` — whitespace except newline — is the class that keeps every shape and
-    still cannot restart the lazy body scan. This enumerates the dimension rather than
-    sampling it, which is the only way the six losses became visible.
+    still cannot restart the lazy body scan. Enumerating the dimension rather than sampling
+    it is the only way the losses became visible.
+
+    The first count published for this was SIX, and it was wrong. That enumeration ran
+    against in-memory strings while `parse_frontmatter` reads through `path.open("r")`,
+    i.e. universal newlines — which collapses every CR-based shape before the regex sees
+    it. A mutation test disagreed with the hand-run enumeration (four red, not six) and the
+    read path was the difference. A probe against a substrate the code does not use is not
+    a probe, and the error went in the direction that flattered the finding.
+
+    The CR-bearing separators below are kept deliberately: they pin the translated
+    behaviour, and `TestUniversalNewlineContract` pins the translation itself, because the
+    day someone opens the file with `newline=""` those shapes stop being equivalent.
     """
 
     SEPARATORS = [
@@ -317,3 +328,38 @@ class TestFrontmatterWhitespaceClassIsNotNarrowed:
             f"frontmatter did not parse"
         )
         assert any(f.kind == "disabled" for f in m.findings), f"separator {label!r}"
+
+
+class TestUniversalNewlineContract:
+    """`parse_frontmatter` reads through `path.open("r")`, so CR never reaches the regex.
+
+    This is load-bearing and was invisible until a mutation test disagreed with a
+    hand-run enumeration: the enumeration used in-memory strings and reported six lost
+    shapes, the mutation reported four, and the read path was the difference. Pinned so
+    the next person does not have to rediscover it — and so switching to `newline=""`,
+    which would make CR reachable and change which separators are equivalent, fails here.
+    """
+
+    def test_carriage_returns_never_reach_the_regex(self, tmp_path):
+        from manifest import parse_frontmatter
+        p = tmp_path / "SKILL.md"
+        # Written as CRLF bytes on purpose — not via write_text, which would translate.
+        p.write_bytes(b"---\r\nname: a\r\ndescription: b\r\n---\r\nbody")
+        with p.open("r", encoding="utf-8", errors="replace") as fh:
+            seen = fh.read(4096)
+        assert "\r" not in seen, (
+            "a literal CR reached the reader — the file is no longer opened in universal-"
+            "newline mode, so the CR-bearing separators in "
+            "TestFrontmatterWhitespaceClassIsNotNarrowed are no longer equivalent to their "
+            "LF forms and need re-enumerating against this substrate"
+        )
+        # ...and the values still parse, through the translation.
+        assert parse_frontmatter(p) == {"name": "a", "description": "b"}
+
+    def test_lone_cr_line_endings_are_translated_not_dropped(self, tmp_path):
+        """Classic-Mac CR-only endings become LF, so they parse rather than reading as
+        one unterminated line."""
+        from manifest import parse_frontmatter
+        p = tmp_path / "SKILL.md"
+        p.write_bytes(b"---\rname: a\r---\rbody")
+        assert parse_frontmatter(p) == {"name": "a"}
