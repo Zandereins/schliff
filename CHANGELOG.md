@@ -122,6 +122,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   gate gained the frontmatter-shaped fillers that were the documented blind spot, so this
   defect is now caught by the gate rather than by hand.
 
+- **The playground's byte cap was bypassable with a negative `Content-Length`.**
+  `read_len = min(content_length, MAX_CONTENT_SIZE)` is `-1` when the header is `-1`, and
+  `rfile.read(-1)` reads to EOF — so the cap that line's own comment promises did not hold.
+  Measured by driving `do_POST` with an instrumented socket: **3,145,832 bytes read against
+  a 512,000-byte cap.** The leaderboard's `submit.py` already had the `< 0` half of its
+  guard; the playground did not. Now rejected as `400 Invalid Content-Length header`, the
+  same reason the endpoint already gives for an unparseable one.
+
+  Honest scope: bounded in practice by Vercel's own body limit, and whether the edge
+  forwards a negative `Content-Length` at all is unverified — checking would mean probing
+  production. Defence in depth and a fixed asymmetry between two sibling endpoints, not a
+  demonstrated live exploit.
+
 - **`clarity`'s function docstring contradicted its own module docstring**, claiming a
   zero default weight and a `--clarity` opt-in. Both were stale — clarity runs in the
   default scorer set for every format — and that contradiction is exactly what made two

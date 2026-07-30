@@ -1,6 +1,7 @@
 # Bounded quantifiers: closing the ReDoS class found by the 2026-07-30 audit
 
-Status: D1, D1a, D2, D5, D6 implemented (PR 1). D3 implemented (PR 2). D7, D8 pending.
+Status: D1, D1a, D2, D5, D6 implemented (PR 1). D3 implemented (PR 2).
+D9 implemented, D10 declined (PR 3). D7 pending, D8 declined.
 Date: 2026-07-30
 Baseline: `main` @ `ab41827`
 
@@ -294,6 +295,54 @@ absolute floor. The frontmatter filler therefore lands **with** the D3 fix, wher
 red-before-green rather than red-on-main. The `_MIN_ABS_SECONDS` floor has the same
 character: it suppresses noise, and would also suppress a quadratic with a very small
 constant at this input size.
+
+### D9 — `score.py`: a negative Content-Length is an invalid header, not a small one
+
+`read_len = min(content_length, MAX_CONTENT_SIZE)` evaluates to `-1` when the header is
+`-1`, and `rfile.read(-1)` reads to EOF — so the cap the line's own comment promises
+("Read at most MAX_CONTENT_SIZE bytes regardless of the declared Content-Length") is
+bypassed. Measured by driving `do_POST` with an instrumented `rfile`: **3,145,832 bytes
+read against a 512,000-byte cap.** `web/leaderboard/api/submit.py` already had the `< 0`
+half of its guard; this endpoint did not.
+
+Rejected as `400 Invalid Content-Length header` rather than folded into the `413` branch:
+the endpoint already has that exact 400 for an unparseable header, and a negative length
+is the same category of defect.
+
+Bounded in practice by Vercel's own body limit, and whether the edge forwards a negative
+Content-Length at all is **unverified** — establishing that would mean probing production.
+So this is defence in depth and an asymmetry between two sibling endpoints, not a
+demonstrated live exploit.
+
+Tests drive `do_POST` rather than grepping the source, and each asserts the **reason**, not
+just the status: before the guard a negative length already returned 400, from the
+truncated-JSON branch, so a status-only assertion would have passed on the unfixed code.
+An over-broad `<= 0` guard is caught too — it keeps every status identical and only steals
+the empty-body message, which a status-only assertion cannot see. Both were found by
+mutation.
+
+### D10 — F7 (badge cache-buster) DECLINED, with the measurement
+
+`badge.py` reads only `repo` from the query string; other parameters are ignored by the
+handler but are part of the CDN cache key, so `?repo=o/n&x=N` mints unlimited distinct keys
+that each re-run the scorer. The proposed fix was to reject unknown parameters.
+
+Declined, because the severity was derived from D1. Post-fix cost of the worst payload an
+attacker can put in an AGENTS.md at the 32 KB cap:
+
+| payload | before D1 | after D1 |
+| --- | --- | --- |
+| benign 32 KB | — | 87.9 ms |
+| the 4.75 s shape | 4,750 ms | 122.7 ms |
+| the 162 s shape | 162,600 ms | 96.0 ms |
+
+120 ms per request is ordinary request cost, not amplification. And the marginal harm over
+"attacker enumerates real public repos" is about zero: the CDN cache only ever protected a
+*single* repo key, and there is no shortage of repos. Changing public behaviour — a URL with
+a stray parameter would start returning a grey badge — is not worth that.
+
+Recorded rather than silently dropped, so the decline is auditable. Revisit if D1 is ever
+relaxed, since this finding's severity is a function of that one.
 
 ### D7 — `run-eval.sh`: make the missing guard visible, do not touch the matcher
 
