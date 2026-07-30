@@ -171,6 +171,13 @@ def estimate_tokens(content: str) -> int:
 # a SKILL.md held at least as tight as a CLAUDE.md and tighter than an AGENTS.md, and it
 # still flags `brainstorming` at 2,649 — context paid on every trigger is worth naming.
 #
+# The same boundary falls out of an independent measurement this project already
+# published, `docs/launch/state-of-ai-instructions.md` "Length Has a Sweet Spot": across
+# 120 files, the 300–2000 token band averaged composite 64.5, under 300 averaged 51.3,
+# and over 2000 averaged 59.9. 2000 is where files start scoring measurably worse — so
+# the threshold marks a point where quality turns, not merely where the distribution sits.
+# Two unrelated methods, one number; that is the strongest part of this calibration.
+#
 # The other entries here are NOT measured. Do not adjust them by analogy.
 FORMAT_TOKEN_BUDGETS: dict[str, int] = {
     "skill.md": 2000,

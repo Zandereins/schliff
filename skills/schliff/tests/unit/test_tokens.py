@@ -1,4 +1,9 @@
-"""Tests for token budget estimation in formats.py."""
+"""Tests for token estimation, the format budget table, and the severity bands.
+
+Also holds the gate that keeps the budget tables in `docs/` matching the constant they
+were hand-copied from — a duplicated value with no gate is how a shipped doc came to
+state a budget the code no longer used.
+"""
 from __future__ import annotations
 
 import re
@@ -35,19 +40,6 @@ class TestEstimateTokens:
         assert estimate_tokens("a" * 100) == 25
 
 
-class TestFormatTokenBudgets:
-    """Tests for the FORMAT_TOKEN_BUDGETS constant."""
-
-    def test_has_all_expected_keys(self) -> None:
-        expected = {"skill.md", "claude.md", "cursorrules", "agents.md", "system_prompt", "unknown"}
-        assert set(FORMAT_TOKEN_BUDGETS.keys()) == expected
-
-    def test_values_are_positive_ints(self) -> None:
-        for fmt, budget in FORMAT_TOKEN_BUDGETS.items():
-            assert isinstance(budget, int), f"{fmt} budget is not int"
-            assert budget > 0, f"{fmt} budget is not positive"
-
-
 #: Docs that hand-maintain a copy of FORMAT_TOKEN_BUDGETS as a markdown table.
 _BUDGET_DOCS = ("docs/SCORING.md", "docs/ARCHITECTURE.md")
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -66,33 +58,49 @@ def _documented_budgets(doc: str) -> dict[str, int]:
     return {m.group(1): int(m.group(2)) for m in _TABLE_ROW.finditer(section)}
 
 
-@pytest.mark.parametrize("doc", _BUDGET_DOCS)
-def test_docs_budget_table_matches_the_code(doc: str) -> None:
-    """These tables are hand-copied from FORMAT_TOKEN_BUDGETS and nothing gated them.
+class TestFormatTokenBudgets:
+    """Tests for the FORMAT_TOKEN_BUDGETS constant."""
 
-    Recalibrating `skill.md` left both docs stating the old number; markdownlint checks
-    form, not content, so a doc claiming what the code does not do shipped unnoticed.
-    """
-    documented = _documented_budgets(doc)
-    assert documented, f"{doc}: parsed no budget rows — the table moved or changed shape"
-    for fmt, value in documented.items():
-        assert fmt in FORMAT_TOKEN_BUDGETS, f"{doc} documents unknown format {fmt!r}"
-        assert value == FORMAT_TOKEN_BUDGETS[fmt], (
-            f"{doc} says {fmt} is {value}, code says {FORMAT_TOKEN_BUDGETS[fmt]}"
-        )
-    # `unknown` is the internal fallback, not a format a user selects, so it is the one
-    # entry the docs deliberately omit. Everything else must be listed.
-    missing = set(FORMAT_TOKEN_BUDGETS) - set(documented) - {"unknown"}
-    assert not missing, f"{doc} does not document these formats: {sorted(missing)}"
+    def test_has_all_expected_keys(self) -> None:
+        expected = {"skill.md", "claude.md", "cursorrules", "agents.md", "system_prompt", "unknown"}
+        assert set(FORMAT_TOKEN_BUDGETS.keys()) == expected
+
+    def test_values_are_positive_ints(self) -> None:
+        for fmt, budget in FORMAT_TOKEN_BUDGETS.items():
+            assert isinstance(budget, int), f"{fmt} budget is not int"
+            assert budget > 0, f"{fmt} budget is not positive"
+
+    @pytest.mark.parametrize("doc", _BUDGET_DOCS)
+    def test_docs_table_matches_this_constant(self, doc: str) -> None:
+        """`docs/` hand-copies this table, and nothing gated the copy.
+
+        Recalibrating `skill.md` left both docs stating the old number; markdownlint
+        checks form, not content, so a doc claiming what the code does not do shipped
+        unnoticed. Both directions are checked: a stale value fails, and so does adding
+        a format here without documenting it.
+        """
+        documented = _documented_budgets(doc)
+        assert documented, f"{doc}: parsed no budget rows — the table moved or changed shape"
+        for fmt, value in documented.items():
+            assert fmt in FORMAT_TOKEN_BUDGETS, f"{doc} documents unknown format {fmt!r}"
+            assert value == FORMAT_TOKEN_BUDGETS[fmt], (
+                f"{doc} says {fmt} is {value}, code says {FORMAT_TOKEN_BUDGETS[fmt]}"
+            )
+        # `unknown` is the internal fallback, not a format a user selects, so it is the
+        # one entry the docs deliberately omit. Everything else must be listed.
+        missing = set(FORMAT_TOKEN_BUDGETS) - set(documented) - {"unknown"}
+        assert not missing, f"{doc} does not document these formats: {sorted(missing)}"
 
 
 class TestCheckTokenBudget:
     """Tests for the check_token_budget function.
 
-    These pin the *mechanism* — the severity bands and the ratio — so the sizes below
-    are derived from whatever `skill.md` is budgeted at rather than restated. They used
-    to hardcode 1000 and all broke together when that constant was recalibrated against
-    measured data, which is a test telling you about the table rather than the function.
+    These pin the *mechanism* — the severity bands and the ratio — so any size that has to
+    sit at a particular point in a band is derived from the budget table rather than
+    restated from it. They used to hardcode the numbers and all broke together when one
+    entry was recalibrated against measured data, which is a test reporting on the table
+    instead of on the function. The one remaining absolute size is deliberate: 25 tokens
+    is far below any plausible budget, so it needs no derivation to stay in the `ok` band.
     """
 
     def _content_of(self, tokens: int) -> str:
