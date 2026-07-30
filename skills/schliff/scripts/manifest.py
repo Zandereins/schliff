@@ -29,8 +29,46 @@ from pathlib import Path
 
 HOME = Path.home()
 
-_FM = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.S)
+# `[^\S\n]*`, not `\s*`: the quadratic came from `\s` matching the newline ITSELF, so
+# every possible `\s*` length restarted the lazy `(.*?)` body scan — O(n^2) on a file that
+# opens the delimiter and never closes it. Measured 25.6s at 64KB, 4.04x per doubling,
+# ~1.9h extrapolated at 1MB. A class that cannot span the record separator cannot restart
+# that scan: 1.5ms at 64KB, linear.
+#
+# `[^\S\n]` is "whitespace except newline" and is deliberately NOT the narrower
+# `[ \t]*\r?`. The first attempt at this fix used `[ \t]*\r?` and lost four shapes 8.8.2
+# parsed: form feed, vertical tab, NBSP and em space. Not cosmetic here — this tool
+# reports resolved state, so frontmatter it fails to parse makes a
+# `disable-model-invocation: true` skill read as LOADED. Enumerating the whitespace
+# dimension instead of sampling it is what caught it; the enumeration lives in
+# tests/unit/test_manifest.py and covers all 14 shapes with 0 divergence from 8.8.2.
+#
+# The `\r` that `[^\S\n]` admits is NOT load-bearing on this path: the read below opens
+# in universal-newline mode, so CR is translated to LF before the regex sees it. It is
+# kept because removing a class member for no measured reason is how the first attempt
+# went wrong. `TestUniversalNewlineContract` pins the translation, since `newline=""`
+# would make CR reachable and change which separators are equivalent.
+#
+# This parser reads THIRD-PARTY content: `schliff manifest` walks every SKILL.md under
+# ~/.claude/skills, every command under ~/.claude/commands, the project's .claude/, and
+# the payload of every enabled plugin. See docs/specs/2026-07-30-redos-audit-fixes.md (D3).
+_FM = re.compile(r"^---[^\S\n]*\n(.*?)\n---[^\S\n]*\n", re.S)
 _KV = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):[ \t]*(.*)$")
+
+# Frontmatter lives at the top of the file, so only a head read is needed — and a head
+# read is what keeps a hostile or merely huge artifact from being pulled into memory.
+# Every other reader in the engine goes through `read_skill_safe` at MAX_SKILL_SIZE (1MB);
+# this one used a raw `read_text()` with no cap at all.
+#
+# Calibrated, not guessed: across 248 real skills, commands and plugin payloads the
+# frontmatter block runs a median of 694 characters, p95 4,476, max 15,711 (vercel's
+# ai-sdk skill). 65,536 carries 100% of them with 4x headroom over the largest.
+#
+# CHARACTERS, not bytes — `read(n)` on a text handle counts code points, so on CJK
+# frontmatter this reads up to 4x as many bytes. Still bounded, and named for what it
+# actually limits: the first version of this constant was called `_FM_READ_BYTES`, which
+# promised a guarantee the call does not make.
+_FM_READ_CHARS = 64 * 1024
 
 # Rough chars-per-token. schliff uses the same approximation elsewhere; the number
 # only needs to be stable and honest about being an estimate.
@@ -43,20 +81,26 @@ def _tilde(p: str | Path) -> str:
     return "~" + s[len(h):] if s.startswith(h) else s
 
 
-def parse_frontmatter(path: Path) -> tuple[dict, str]:
-    """Flat-key frontmatter parse with block-scalar support.
+def parse_frontmatter(path: Path) -> dict:
+    """Flat-key frontmatter parse with block-scalar support. Returns the mapping only.
 
     Deliberately regex-based rather than pyyaml: pyyaml is absent from a stock
     Python and from schliff's own environment, and schliff parses frontmatter this
     way everywhere else. A silent ImportError here would make findings vanish.
+
+    Returns the mapping and nothing else. It used to return `(mapping, body)` and both
+    call sites discarded the body with `fm, _ = ...` — so the body was the only reason a
+    whole file had to be in memory. Dropping it is what makes the bounded head read below
+    a simplification rather than a truncation.
     """
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
+        with path.open("r", encoding="utf-8", errors="replace") as fh:
+            text = fh.read(_FM_READ_CHARS)
     except OSError:
-        return {}, ""
+        return {}
     m = _FM.match(text)
     if not m:
-        return {}, text
+        return {}
 
     out: dict[str, object] = {}
     block_key: str | None = None
@@ -83,7 +127,7 @@ def parse_frontmatter(path: Path) -> tuple[dict, str]:
             out[key] = val
     if block_key is not None:
         out[block_key] = " ".join(block)
-    return out, text[m.end():]
+    return out
 
 
 def invoke_cost_chars(skill_md: Path) -> int:
@@ -164,7 +208,7 @@ def _scan_skill_root(root: Path, prefix: str, source: str, out: Manifest) -> Non
             out.findings.append(Finding(
                 "no-skill-md", name, "directory has no SKILL.md — it never loads"))
             continue
-        fm, _ = parse_frontmatter(skill_md)
+        fm = parse_frontmatter(skill_md)
         if fm.get("disable-model-invocation") is True:
             out.findings.append(Finding(
                 "disabled", name, "frontmatter disable-model-invocation: true"))
@@ -194,7 +238,7 @@ def _scan_command_root(root: Path, prefix: str, source: str, out: Manifest) -> N
         if segments[-1].startswith("_"):
             continue  # leading underscore is the partial/include convention
         name = prefix + ":".join(segments)
-        fm, _ = parse_frontmatter(path)
+        fm = parse_frontmatter(path)
         if fm.get("disable-model-invocation") is True:
             out.findings.append(Finding(
                 "disabled", name, "frontmatter disable-model-invocation: true"))
