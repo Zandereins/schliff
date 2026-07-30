@@ -46,11 +46,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **The card-executable test wrote into the repo's own score history.** It ran each
   documented command with the working directory set to the package, and `verify` appends
   to `.schliff/history.jsonl` *relative to the working directory* — so every test run
-  added three throwaway entries recording `32.7 [F]` for a tmpdir copy of the card. That
-  is the data `progress.py`, `diff` and `/schliff:report` read; 212 of the 233 entries
-  in this repo's history had accumulated that way. The commands now run from the sandbox,
-  which also makes the test more faithful: the card's promise is that they work from
-  anywhere.
+  added three throwaway entries recording `32.7 [F]` for a tmpdir copy of the card — the
+  data `progress.py`, `diff` and `/schliff:report` read. It accounted for 61 of the 212
+  throwaway rows in this repo's history; the rest are older residue from tests that stopped
+  doing this in June. The commands now run from the sandbox, which also makes the test more
+  faithful: the card's promise is that they work from anywhere.
 
 - **An assertion the evaluator could not run counted as one the skill failed.**
   `run-eval.sh` evaluated patterns with `grep -qiE … 2>/dev/null` inside an `if`, and

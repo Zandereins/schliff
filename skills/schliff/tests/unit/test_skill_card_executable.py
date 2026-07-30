@@ -82,7 +82,10 @@ def test_every_documented_command_executes(arg: str, sandbox):
     proc = subprocess.run(
         [sys.executable, "-m", "scripts.cli", *argv],
         cwd=tmp, capture_output=True, text=True, timeout=120,
-        env={**os.environ, "PYTHONPATH": str(SCRIPTS.parent)},
+        # Prepend rather than replace — same idiom as the shell callers in scripts/.
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(
+            p for p in (str(SCRIPTS.parent), os.environ.get("PYTHONPATH", "")) if p
+        )},
     )
     # 0 = ran, 1 = ran and reported a verdict (`verify` is a gate; exiting 1 below the
     # threshold IS its documented contract). 2 = argparse rejected it, which is exactly
