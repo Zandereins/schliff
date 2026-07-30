@@ -200,13 +200,25 @@ what `m.end()` measured.
 `manifest --json` over the real install is byte-identical to `main` (same sha256, 109
 artifacts, 8,240 resident tokens, 19 findings).
 
-Two of this fix's own tests were **non-discriminating on first write**, found by mutation
-and fixed: `test_oversized_file_is_not_read_whole` asserted only that the constant was
-small and that parsing still worked, so it passed with the bounded read reverted to a full
-`read_text()` — a full read yields the same mapping. It now instruments `Path.open` and
-asserts the actual `read(n)` argument. And nothing pinned the head against the corpus
-maximum, so shrinking it to 8 KB passed; that assertion now exists, mirroring D1's bound
-checks. A test that cannot fail on the defect it names is not a test.
+**Three of this fix's own tests were non-discriminating**, every one found by mutation
+rather than by rereading it, and one of them twice:
+
+1. `test_oversized_file_is_not_read_whole` asserted only that the constant was small and
+   that parsing still worked, so it passed with the bounded read reverted to a full
+   `read_text()` — a full read yields the same mapping. It now instruments `Path.open` and
+   asserts the actual `read(n)` argument.
+2. Nothing pinned the head against the corpus maximum, so shrinking it to 8 KB passed.
+   That assertion now exists, mirroring D1's bound checks.
+3. `test_carriage_returns_never_reach_the_regex`, written specifically to catch a switch to
+   `newline=""`, opened the file *itself* and asserted no CR in its own buffer — a property
+   of the test's read, not the production one. It stayed green on that exact mutation. The
+   repair inspected `kwargs` only, so it stayed green a **second** time for the same
+   mutation spelled positionally. Arguments are now normalised through
+   `inspect.signature(...).bind(...)`; both spellings turn it red.
+
+A test that cannot fail on the defect it names is not a test — and an assertion a spelling
+can walk around is not an assertion. Across this whole spec, every instance of this class
+was found by a mutation test and none by rereading the test.
 
 ### D4 — F3 is a reachability correction, not a gate change
 

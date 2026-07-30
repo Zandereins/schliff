@@ -349,9 +349,15 @@ class TestUniversalNewlineContract:
         The first version of this test opened the file itself and asserted no CR appeared
         in its own buffer — a property of the test's read, not the production one. It
         stayed GREEN when the production read was switched to `newline=""`, the exact
-        mutation it exists to catch. Third instance of that class this branch: an assertion
-        one layer away from the code proves nothing about the code.
+        mutation it exists to catch. An assertion one layer away from the code proves
+        nothing about the code.
+
+        It then stayed green a SECOND time, for the same mutation spelled positionally
+        (`open("r", -1, "utf-8", "replace", "")`), because the repair inspected `kwargs`
+        only. So the arguments are now normalised through the real signature instead of
+        being guessed at: an assertion a spelling can walk around is not an assertion.
         """
+        import inspect
         import pathlib as _pathlib
 
         from manifest import parse_frontmatter
@@ -361,19 +367,22 @@ class TestUniversalNewlineContract:
         # named here. Same substrate mistake as this class documents, one layer down.
         p.write_bytes(b"---\r\nname: a\r\ndescription: b\r\n---\r\nbody")
 
-        opens: list = []
         real_open = _pathlib.Path.open
+        signature = inspect.signature(real_open)
+        newlines: list = []
 
         def recording_open(self, *args, **kwargs):
-            opens.append(kwargs.get("newline", "__absent__"))
+            bound = signature.bind(self, *args, **kwargs)
+            bound.apply_defaults()
+            newlines.append(bound.arguments.get("newline"))
             return real_open(self, *args, **kwargs)
 
         monkeypatch.setattr(_pathlib.Path, "open", recording_open)
         result = parse_frontmatter(p)
 
-        assert opens, "parse_frontmatter did not read through Path.open"
-        assert all(n == "__absent__" or n is None for n in opens), (
-            f"parse_frontmatter opened with newline={opens!r}. Universal-newline mode is "
+        assert newlines, "parse_frontmatter did not read through Path.open"
+        assert all(n is None for n in newlines), (
+            f"parse_frontmatter opened with newline={newlines!r}. Universal-newline mode is "
             f"off, so a literal CR now reaches the regex: the CR-bearing separators in "
             f"TestFrontmatterWhitespaceClassIsNotNarrowed stop being equivalent to their "
             f"LF forms and the enumeration needs re-running against this substrate."
