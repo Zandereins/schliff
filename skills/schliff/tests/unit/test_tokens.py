@@ -46,15 +46,28 @@ class TestFormatTokenBudgets:
 
 
 class TestCheckTokenBudget:
-    """Tests for the check_token_budget function."""
+    """Tests for the check_token_budget function.
+
+    These pin the *mechanism* — the severity bands and the ratio — so the sizes below
+    are derived from whatever `skill.md` is budgeted at rather than restated. They used
+    to hardcode 1000 and all broke together when that constant was recalibrated against
+    measured data, which is a test telling you about the table rather than the function.
+    """
+
+    #: One token is estimated as four characters (`estimate_tokens` is `len // 4`).
+    CHARS_PER_TOKEN = 4
+
+    def _content_at(self, fraction: float) -> str:
+        """Content sized at `fraction` of the skill.md budget."""
+        tokens = int(FORMAT_TOKEN_BUDGETS["skill.md"] * fraction)
+        return "x" * (tokens * self.CHARS_PER_TOKEN)
 
     def test_within_budget_small_content(self) -> None:
-        # skill.md budget is 1000 tokens = ~4000 chars
-        content = "x" * 100  # 25 tokens, well within 1000
+        content = "x" * 100  # 25 tokens, far below any plausible budget
         result = check_token_budget(content, "skill.md")
         assert result["within_budget"] is True
         assert result["tokens"] == 25
-        assert result["budget"] == 1000
+        assert result["budget"] == FORMAT_TOKEN_BUDGETS["skill.md"]
         assert result["severity"] == "ok"
 
     def test_over_budget(self) -> None:
@@ -67,25 +80,17 @@ class TestCheckTokenBudget:
         assert result["severity"] == "over"
 
     def test_severity_ok(self) -> None:
-        # 10% of budget -> ok
-        content = "x" * 400  # 100 tokens out of 1000
-        result = check_token_budget(content, "skill.md")
+        result = check_token_budget(self._content_at(0.10), "skill.md")
         assert result["severity"] == "ok"
         assert result["ratio"] < 0.8
 
     def test_severity_warning(self) -> None:
-        # 90% of budget -> warning
-        # skill.md budget = 1000 tokens, 900 tokens = 3600 chars
-        content = "x" * 3600
-        result = check_token_budget(content, "skill.md")
+        result = check_token_budget(self._content_at(0.90), "skill.md")
         assert result["severity"] == "warning"
         assert 0.8 <= result["ratio"] <= 1.0
 
     def test_severity_over(self) -> None:
-        # 150% of budget -> over
-        # skill.md budget = 1000, 1500 tokens = 6000 chars
-        content = "x" * 6000
-        result = check_token_budget(content, "skill.md")
+        result = check_token_budget(self._content_at(1.50), "skill.md")
         assert result["severity"] == "over"
         assert result["ratio"] > 1.0
 
@@ -95,9 +100,8 @@ class TestCheckTokenBudget:
         assert result["budget"] == FORMAT_TOKEN_BUDGETS["unknown"]
 
     def test_ratio_calculation(self) -> None:
-        # 4000 chars = 1000 tokens, skill.md budget = 1000 -> ratio 1.0
-        content = "x" * 4000
-        result = check_token_budget(content, "skill.md")
+        """Exactly at budget is ratio 1.0 and still within — `over` starts above it."""
+        result = check_token_budget(self._content_at(1.0), "skill.md")
         assert result["ratio"] == 1.0
         assert result["within_budget"] is True
 

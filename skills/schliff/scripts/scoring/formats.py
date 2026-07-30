@@ -153,8 +153,27 @@ def estimate_tokens(content: str) -> int:
     return len(content) // 4
 
 
+# Advisory only — these never enter a score. They mark the point at which a file's
+# context cost is worth mentioning, so a useful budget must flag the heavy tail, not
+# the median.
+#
+# `skill.md` was 1000 until 2026-07-30, which put it at roughly the 12th percentile of
+# the population it measures. Measured then over 166 installed SKILL.md files: 75% were
+# over it, median 1,960, p75 2,934. Over schliff's own 16-file calibration corpus: 44%
+# over, median 942. The format's own reference implementations were 2–8× past it
+# (Anthropic's `skill-creator` 8,047, `writing-skills` 6,582, `brainstorming` 2,649) —
+# and so was schliff's own card, at 1,045, right after being trimmed from 11,700 to
+# 4,240 chars for exactly this reason. A threshold that fires on three quarters of the
+# population, including the exemplars, carries no information.
+#
+# 2000 sits just above the measured median, so it flags the upper half rather than the
+# upper three quarters, without adopting the population's bloat as the target. It keeps
+# a SKILL.md held at least as tight as a CLAUDE.md and tighter than an AGENTS.md, and it
+# still flags `brainstorming` at 2,649 — context paid on every trigger is worth naming.
+#
+# The other entries here are NOT measured. Do not adjust them by analogy.
 FORMAT_TOKEN_BUDGETS: dict[str, int] = {
-    "skill.md": 1000,
+    "skill.md": 2000,
     "claude.md": 2000,
     "cursorrules": 500,
     "agents.md": 3000,

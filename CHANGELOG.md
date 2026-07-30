@@ -7,6 +7,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- **The SKILL.md token budget was set below the median of what it measures.** It flagged
+  75% of a 166-file installed-skill population (median 1,960, p75 2,934) and 44% of
+  schliff's own 16-file calibration corpus — including the format's own reference
+  implementations (Anthropic's `skill-creator` 8,047, `writing-skills` 6,582,
+  `brainstorming` 2,649) and, pointedly, schliff's own card at `1,045 / 1,000 (over)`
+  immediately after being trimmed from 11,700 to 4,240 chars for exactly this reason.
+
+  A threshold at roughly the 12th percentile of its own population reports "yes" and
+  carries no information. Raised to **2000**, just above the measured median, so it flags
+  the upper half rather than the upper three quarters without adopting the population's
+  bloat as the target. A SKILL.md stays held at least as tight as a CLAUDE.md and tighter
+  than an AGENTS.md, and `brainstorming` at 2,649 is still flagged — context paid on every
+  trigger is worth naming. The derivation is recorded beside the constant so it stops
+  being a magic number; the other budgets in that table were not measured and are unchanged.
+
+  This is advisory only — token budgets never enter a score. `within_budget` does gate
+  whether a watch hook reports growth, which is where the missing selectivity actually
+  cost something.
+
+  A regression test now asserts schliff's own card satisfies the budget schliff
+  advertises for its format: a measurement tool must not flag its own exemplar.
+
 - **The bundled eval suite measured its own source, so it measured nothing.** All 108
   `contains` assertions in `skills/schliff/eval-suite.json` appear verbatim in the
   241-line card the suite was generated from; only 54 of them appear in the prompt they

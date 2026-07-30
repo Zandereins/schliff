@@ -121,3 +121,22 @@ def test_card_stays_small():
         f"card grew to {len(CARD_TEXT)} chars (~{len(CARD_TEXT)//4} tokens); "
         "it is loaded into context every time the skill fires"
     )
+
+
+def test_card_satisfies_the_budget_schliff_advertises():
+    """A measurement tool must not flag its own exemplar.
+
+    The char cap above happens to be tighter today, but it pins a size, not the
+    relationship: lower `FORMAT_TOKEN_BUDGETS["skill.md"]` and the card would start
+    reporting `(over)` on itself with nothing to catch it. That state shipped for
+    months — the card read `1,045 / 1,000 (over)` right after being trimmed from
+    11,700 to 4,240 chars for exactly this reason.
+    """
+    from scoring.formats import check_token_budget, detect_format
+
+    fmt = detect_format(str(CARD), CARD_TEXT)
+    info = check_token_budget(CARD_TEXT, fmt)
+    assert info["within_budget"], (
+        f"schliff's own card is over the budget schliff recommends for {fmt}: "
+        f"{info['tokens']} / {info['budget']} tokens ({info['severity']})"
+    )
