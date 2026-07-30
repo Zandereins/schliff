@@ -162,6 +162,17 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": "Invalid Content-Length header"})
             return
 
+        # A NEGATIVE Content-Length is an invalid header, not a small one. Without this
+        # branch it falls through both checks below and reaches
+        # `read_len = min(content_length, MAX_CONTENT_SIZE)`, which is -1 — and
+        # `rfile.read(-1)` reads to EOF, so the byte cap the next comment promises is
+        # bypassed entirely. Measured before the guard: a declared -1 read 3,145,832 bytes
+        # against a 512,000-byte cap. `web/leaderboard/api/submit.py` already had the
+        # `< 0` half of its guard; this endpoint did not.
+        if content_length < 0:
+            self._send_json(400, {"error": "Invalid Content-Length header"})
+            return
+
         if content_length > MAX_CONTENT_SIZE:
             self._send_json(413, {
                 "error": "Content too large",
