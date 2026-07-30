@@ -43,6 +43,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **An assertion the evaluator could not run counted as one the skill failed.**
+  `run-eval.sh` evaluated patterns with `grep -qiE … 2>/dev/null` inside an `if`, and
+  grep's exit status carries three outcomes rather than two: 0 matched, 1 did not match,
+  **2 could not compile the pattern**. `timeout` adds 124. All of them collapsed into
+  `passed: false` with the reason discarded.
+
+  What that cost, measured: six assertions in the previous suite were dead on CI for
+  months (`main` reported 113/119 there against 119/119 on a developer machine, whose
+  `grep` was a more permissive implementation), and the reason was unobtainable — which
+  is how a **wrong** diagnosis about the generator ended up published in a commit
+  message. The swallow does not only produce dead tests, it makes confident wrong
+  statements about them the only available move.
+
+  Unrunnable assertions are now reported as such: `pass_rate` gains an `errored` count,
+  the affected `binary_results` entry carries an `error` explaining which construct grep
+  refused, and a warning goes to stderr. They are **excluded from the pass-rate
+  denominator** and **not written to `.schliff/failures.jsonl`** — an assertion that
+  cannot execute is evidence about the suite, not about the skill, and `/schliff:triage`
+  clusters that file into proposed SKILL.md fixes.
+
+  Note the ReDoS guard above the call never covered this: it rejects *expensive*
+  patterns, not invalid ones — `validate_regex_complexity("[")` returns ok.
+
+  **Output contract:** `pass_rate.errored` is new; `binary_results[].error` appears only
+  on unrunnable assertions. Both additive.
+
+- **Two gates so the fix cannot rot.** Excluding errored assertions shrinks the
+  denominator, so a decaying suite could report a *rising* pass rate — one runnable
+  assertion out of thirteen reads 100%. `test-self.sh` therefore asserts `errored == 0`
+  on schliff's own suite (verified red by injecting `(` — the pass rate stayed at a
+  reassuring 100% while only the new assertion moved). And `test-integration.sh` now runs
+  a suite `init-skill.py` generated instead of only checking that its JSON parses, which
+  turns the generator's contract from shape into property.
+
 - **`/schliff:auto` documented a flag that does not exist and a state file it does not
   write.** `commands/schliff/auto.md` listed `--resume`, which `auto-improve.py` rejects
   with `unrecognized arguments` and exit 2 — the same defect class as the `doctor <dir>`

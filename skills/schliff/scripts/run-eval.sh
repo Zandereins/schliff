@@ -195,6 +195,7 @@ RUNTIME_ONLY_TYPES="response_contains|response_matches|response_excludes"
 BINARY_RESULTS="[]"
 ASSERTIONS_PASSED=0
 ASSERTIONS_TOTAL=0
+ASSERTIONS_ERRORED=0
 
 if jq -e '.test_cases' "$EVAL_SUITE" > /dev/null 2>&1; then
     echo "  Running binary assertions..." >&2
@@ -236,35 +237,56 @@ if jq -e '.test_cases' "$EVAL_SUITE" > /dev/null 2>&1; then
 
             ASSERTIONS_TOTAL=$((ASSERTIONS_TOTAL + 1))
 
-            # Evaluate assertion against skill content (static check)
+            # Evaluate assertion against skill content (static check).
+            #
+            # grep's exit status carries three outcomes, not two: 0 matched, 1 did not
+            # match, 2 could not compile the pattern at all. `timeout` adds 124. This
+            # used to collapse all of them into "failed", with the reason sent to
+            # /dev/null — which is how six assertions stayed dead on CI for months while
+            # reading as though the skill had failed them. An assertion that cannot run
+            # is a defect in the suite, so it is reported separately and kept out of the
+            # pass rate. See docs/specs/2026-07-29-eval-reports-unrunnable-assertions.md.
             assertion_passed="false"
+            assertion_error=""
+            rc=0
 
             case "$assertion_type" in
                 contains)
-                    if echo "$SKILL_CONTENT" | grep -qiF -- "$assertion_value" 2>/dev/null; then
-                        assertion_passed="true"
-                    fi
+                    echo "$SKILL_CONTENT" | grep -qiF -- "$assertion_value" 2>/dev/null || rc=$?
+                    case $rc in
+                        0) assertion_passed="true" ;;
+                        1) ;;
+                        *) assertion_error="fixed-string match failed to run (exit $rc)" ;;
+                    esac
                     ;;
                 excludes)
-                    if ! echo "$SKILL_CONTENT" | grep -qiF -- "$assertion_value" 2>/dev/null; then
-                        assertion_passed="true"
-                    fi
+                    echo "$SKILL_CONTENT" | grep -qiF -- "$assertion_value" 2>/dev/null || rc=$?
+                    case $rc in
+                        0) ;;
+                        1) assertion_passed="true" ;;
+                        *) assertion_error="fixed-string match failed to run (exit $rc)" ;;
+                    esac
                     ;;
                 pattern)
-                    # Validate regex complexity before execution (ReDoS prevention)
+                    # Validate regex complexity before execution (ReDoS prevention).
+                    # Note this guard rejects *expensive* patterns, not invalid ones:
+                    # validate_regex_complexity("[") returns ok. Syntax is grep's verdict.
                     if ! PYTHONPATH="$SCRIPT_DIR:${PYTHONPATH:-}" python3 -c "
 from shared import validate_regex_complexity
 import sys
 ok, reason = validate_regex_complexity(sys.argv[1])
 if not ok: sys.exit(1)
 " "$assertion_value" 2>/dev/null; then
-                        echo "  Warning: skipping unsafe regex in $tc_id" >&2
-                        assertion_passed="false"
+                        assertion_error="rejected by the complexity guard (possible ReDoS)"
                     else
                         # Regex passed complexity check — execute with timeout guard
-                        if echo "$SKILL_CONTENT" | $_GREP_TIMEOUT grep -qiE -- "$assertion_value" 2>/dev/null; then
-                            assertion_passed="true"
-                        fi
+                        echo "$SKILL_CONTENT" | $_GREP_TIMEOUT grep -qiE -- "$assertion_value" 2>/dev/null || rc=$?
+                        case $rc in
+                            0) assertion_passed="true" ;;
+                            1) ;;
+                            124) assertion_error="pattern timed out after 2s" ;;
+                            *) assertion_error="grep rejected this pattern (exit $rc) — POSIX ERE only, no (?i), \\d, \\b or lookarounds" ;;
+                        esac
                     fi
                     ;;
                 *)
@@ -278,10 +300,18 @@ if not ok: sys.exit(1)
                 ASSERTIONS_PASSED=$((ASSERTIONS_PASSED + 1))
             fi
 
-            # Append result as JSONL line (using jq for correct JSON escaping)
+            if [[ -n "$assertion_error" ]]; then
+                echo "  Warning: $tc_id assertion could not be run — $assertion_error" >&2
+            fi
+
+            # Append result as JSONL line (using jq for correct JSON escaping).
+            # `error` is present only when the assertion could not be run at all;
+            # its absence is what marks a result as a real pass/fail verdict.
             jq -n -c --arg tc "$tc_id" --arg type "$assertion_type" \
                 --arg desc "$assertion_desc" --argjson passed "$assertion_passed" \
-                '{"test_case":$tc,"type":$type,"description":$desc,"passed":$passed}' >> "$RESULTS_LINES"
+                --arg err "$assertion_error" \
+                '{"test_case":$tc,"type":$type,"description":$desc,"passed":$passed}
+                 + (if $err == "" then {} else {"error":$err} end)' >> "$RESULTS_LINES"
         done < "$ASSERTIONS_FILE"
 
         # Build the JSON array from collected JSONL results
@@ -296,7 +326,10 @@ if not ok: sys.exit(1)
 
     BINARY_RESULTS=$(cat "$BINARY_OUTPUT")
     ASSERTIONS_PASSED=$(echo "$BINARY_RESULTS" | jq '[.[] | select(.passed == true)] | length')
-    ASSERTIONS_TOTAL=$(echo "$BINARY_RESULTS" | jq 'length')
+    # Assertions that could not be run are not evidence about the skill, so they are
+    # counted separately and excluded from the pass-rate denominator.
+    ASSERTIONS_ERRORED=$(echo "$BINARY_RESULTS" | jq '[.[] | select(has("error"))] | length')
+    ASSERTIONS_TOTAL=$(echo "$BINARY_RESULTS" | jq '[.[] | select(has("error") | not)] | length')
 
     rm -f "$BINARY_OUTPUT"
 fi
@@ -367,6 +400,7 @@ RESULT_JSON=$(jq -n \
     --argjson pass_rate "$PASS_RATE" \
     --argjson assertions_passed "$ASSERTIONS_PASSED" \
     --argjson assertions_total "$ASSERTIONS_TOTAL" \
+    --argjson assertions_errored "$ASSERTIONS_ERRORED" \
     --argjson composite_score "$COMPOSITE_SCORE" \
     --argjson dimension_scores "$DIMENSION_SCORES" \
     --argjson binary_results "$BINARY_RESULTS" \
@@ -379,6 +413,7 @@ RESULT_JSON=$(jq -n \
         "pass_rate": {
             "passed": $assertions_passed,
             "total": $assertions_total,
+            "errored": $assertions_errored,
             "percentage": $pass_rate
         },
         "dimension_scores": $dimension_scores,
@@ -424,7 +459,10 @@ fi
 FAILURES_DIR="${SKILL_DIR}/.schliff"
 FAILURES_FILE="$FAILURES_DIR/failures.jsonl"
 if [[ "$BINARY_RESULTS" != "[]" ]]; then
-    FAILED_ASSERTIONS=$(echo "$BINARY_RESULTS" | jq -c '[.[] | select(.passed == false)]')
+    # Only real verdicts are failures. An assertion that could not be run says nothing
+    # about the skill, and /schliff:triage clusters this file into proposed SKILL.md
+    # fixes — feeding it a broken regex would generate advice about the wrong file.
+    FAILED_ASSERTIONS=$(echo "$BINARY_RESULTS" | jq -c '[.[] | select(.passed == false and (has("error") | not))]')
     FAILED_COUNT=$(echo "$FAILED_ASSERTIONS" | jq 'length')
     if [[ $FAILED_COUNT -gt 0 ]]; then
         mkdir -p "$FAILURES_DIR"
