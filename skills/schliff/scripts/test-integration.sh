@@ -838,11 +838,20 @@ REOF
 REGEX_RESULT=$(bash "$SCRIPT_DIR/run-eval.sh" "$SKILL_DIR/SKILL.md" "$REGEX_EVAL" --no-runtime-auto 2>/dev/null || true)
 REGEX_PASSED_CT=$(echo "$REGEX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['pass_rate']['passed'])" 2>/dev/null)
 REGEX_TOTAL_CT=$(echo "$REGEX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['pass_rate']['total'])" 2>/dev/null)
-# Bad regex should fail (grep -qiE returns non-zero), frontmatter should pass
-if [[ "$REGEX_PASSED_CT" == "1" ]] && [[ "$REGEX_TOTAL_CT" == "2" ]]; then
-    pass "Invalid regex → assertion fails gracefully (1/2 passed)"
+REGEX_ERRORED_CT=$(echo "$REGEX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['pass_rate'].get('errored','missing'))" 2>/dev/null)
+REGEX_HAS_REASON=$(echo "$REGEX_RESULT" | python3 -c "
+import sys,json
+print(any('error' in r for r in json.load(sys.stdin)['binary_results']))" 2>/dev/null)
+# The runner must not crash, and the sibling assertion must still be evaluated — that was
+# always this test's point. What changed: a pattern grep cannot compile is reported as
+# unrunnable rather than counted as a failure of the skill, so it leaves the denominator.
+# 1 runnable assertion, it passes, 1 errored, and the reason is recorded rather than lost.
+if [[ "$REGEX_PASSED_CT" == "1" ]] && [[ "$REGEX_TOTAL_CT" == "1" ]] \
+   && [[ "$REGEX_ERRORED_CT" == "1" ]] && [[ "$REGEX_HAS_REASON" == "True" ]]; then
+    pass "Invalid regex → reported unrunnable with a reason, not counted as a failure"
 else
-    fail "Invalid regex" "passed=$REGEX_PASSED_CT total=$REGEX_TOTAL_CT, expected 1/2"
+    fail "Invalid regex" \
+        "passed=$REGEX_PASSED_CT total=$REGEX_TOTAL_CT errored=$REGEX_ERRORED_CT reason=$REGEX_HAS_REASON, expected 1/1/1/True"
 fi
 
 # Test: unknown assertion type → passed (skipped)
@@ -1405,6 +1414,23 @@ if [[ -f "$_INIT_WRITE/eval-suite.json" ]]; then
     fi
 else
     fail "init-skill.py write" "eval-suite.json was not created"
+fi
+
+# 17.6b A generated suite must be RUNNABLE, not merely well-formed JSON.
+# 17.6 above checks the shape. Nothing checked the property, so a suite schliff wrote
+# could carry patterns the evaluator cannot execute and nobody would learn of it — the
+# assertions would just read as failures. Uses the suite 17.6 just generated.
+if [[ -f "$_INIT_WRITE/eval-suite.json" ]]; then
+    _GEN_EVAL=$(bash "$SCRIPT_DIR/run-eval.sh" "$_INIT_WRITE/SKILL.md" \
+        "$_INIT_WRITE/eval-suite.json" --no-runtime-auto 2>/dev/null || true)
+    _GEN_ERRORED=$(echo "$_GEN_EVAL" | python3 -c \
+        "import sys,json; print(json.load(sys.stdin)['pass_rate'].get('errored','?'))" 2>/dev/null)
+    if [[ "$_GEN_ERRORED" == "0" ]]; then
+        pass "init-skill.py: generated suite is runnable (0 unrunnable assertions)"
+    else
+        fail "init-skill.py generated suite" \
+            "$_GEN_ERRORED assertions in a schliff-generated suite cannot be run"
+    fi
 fi
 
 # 17.7 generate-report.py with synthetic JSONL
