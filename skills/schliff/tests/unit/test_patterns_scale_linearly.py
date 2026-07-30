@@ -1,10 +1,10 @@
 """Empirical ReDoS gate: no compiled scoring pattern may scale super-linearly.
 
 This is the test that would have found the 2026-07-30 audit's findings on its own.
-Static shape-triage did not: "any unbounded quantifier on a character class" flagged
-45 of 102 patterns and isolated neither of the two that mattered, because the shape
-that actually blew up has no nesting and no overlapping alternation — just an
-unbounded run before a required literal.
+Static shape-triage did not: "any unbounded quantifier on a character class" flagged 47
+of the 102 patterns in `scoring/patterns/*` and isolated neither of the two that mattered,
+because the shape that actually blew up has no nesting and no overlapping alternation —
+just an unbounded run before a required literal.
 
 Method: warm each pattern, then time `.search()` against a family of pathological
 filler alphabets at two sizes one doubling apart. Linear patterns come in near 2.0x;

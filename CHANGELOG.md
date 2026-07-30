@@ -8,10 +8,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Security
 
 - **Five scoring regexes were quadratic on untrusted input; the worst cost 162 seconds
-  of CPU for one unauthenticated request.** A trust-boundary audit of the whole repo
-  found the same defect in five places, and it is not the textbook ReDoS shape — no
-  nested quantifier, no overlapping alternation, just **an unbounded run followed by a
-  required literal**. `[\w/]+` before a required `\.` consumes to the end of the input,
+  of CPU for one unauthenticated request.** A trust-boundary audit of the whole repo found
+  the same defect in four of them; the new empirical gate found the fifth,
+  `_RE_SKILL_AS_OBJECT`, on its first run. It is not the textbook ReDoS shape — no nested
+  quantifier, no overlapping alternation, just **an unbounded run followed by a required
+  literal**. `[\w/]+` before a required `\.` consumes to the end of the input,
   fails on the dot, and gives back one character at a time, once per start position.
 
   The measured worst case sat *inside* the public playground's 32 KB input cap, whose
@@ -80,9 +81,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   fillers trip it. A shape nobody thought of stays invisible.
 
   A repo-wide *static* rule was prototyped and rejected on measurement: "any unbounded
-  quantifier on a character class" flagged 45 of 102 patterns, and the refinement "…with
-  no required literal prefix" still flagged 11, including one certain false positive. A
-  gate whose allowlist is longer than its findings is the thing it exists to prevent.
+  quantifier on a character class" flagged 47 of the 102 patterns in `scoring/patterns/*`,
+  and the refinement "…with no required literal prefix" still flagged 11, including one
+  certain false positive. A gate whose allowlist is longer than its findings is the thing
+  it exists to prevent.
 
 - **`clarity`'s function docstring contradicted its own module docstring**, claiming a
   zero default weight and a `--clarity` opt-in. Both were stale — clarity runs in the

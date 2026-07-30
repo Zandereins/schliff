@@ -1,23 +1,34 @@
 # Bounded quantifiers: closing the ReDoS class found by the 2026-07-30 audit
 
-Status: implementing
+Status: D1, D1a, D2, D5, D6 implemented (PR 1). D3, D7, D8 pending.
 Date: 2026-07-30
 Baseline: `main` @ `ab41827`
 
 ## Goal
 
 Close every reachable super-linear regex path found by the whole-repo security audit,
-without moving a single score, and add a gate so a fifth one cannot land.
+without moving a single score, and add a gate so the next one cannot land.
 
 ## Context
 
-A trust-boundary audit of `ab41827` produced seven findings. Four of them are the
-same defect, and it is not the textbook one: **an unbounded quantifier followed by
-a required literal**. No nesting, no overlapping alternation — which is why static
-shape-triage flagged 105 of 169 compiled patterns and isolated neither of the two
-that mattered. An empirical fuzz (warm each pattern, time `.search()` against ~25
-pathological filler alphabets at doubling lengths, keep ratio ≥ 3.0) narrowed 169
-patterns to 32 candidates and then to the reachable ones in a single run.
+A trust-boundary audit of `ab41827` produced seven findings. Three of them (F1, F2, F3)
+are the same defect in **five** patterns, and it is not the textbook one: **an unbounded
+quantifier followed by a required literal**. No nesting, no overlapping alternation.
+
+Four of those five are in this PR's scope; the fifth is `manifest._FM` (D3). A **sixth**
+pattern, `_RE_SKILL_AS_OBJECT`, was not an audit finding at all — the new empirical gate
+found it on its first run, which is the clearest evidence for that gate's value and is
+not credited to the audit.
+
+Both figures below use **one** denominator: the 167 unique compiled patterns reachable
+across the engine's 21 pattern-bearing modules, measured on `main`.
+
+- Static shape-triage flagged **62 of 167** and isolated neither of the two that
+  mattered. Restricted to `scoring/patterns/*` (102 patterns) a stricter rule still
+  flagged 47. Noise, not signal.
+- An empirical fuzz — warm each pattern, time `.search()` against 25 pathological filler
+  alphabets at doubling lengths, keep ratio ≥ 3.0 — narrowed the same 167 to **32
+  candidates** and then to the reachable ones, in a single run.
 
 `[\w/]+` before a required `\.` backtracks one character per start position, so it
 is O(n²) on its own. The same shape appears as `[a-z]*[a-z]*[a-z]*` before `/`, as
@@ -42,13 +53,21 @@ unbounded. **A per-sub-check fix does not generalise itself.**
 
 ## Requirements
 
-1. Every reachable super-linear path measured in the audit becomes linear
-   (ratio ≤ 2.5 per doubling).
+1. Every reachable super-linear path measured in the audit becomes linear. Two numbers,
+   deliberately different: the **measured** post-fix ratio must be ≈2.0 per doubling,
+   while the **gate** trips at 3.0 — the slack is flake margin for a loaded CI runner,
+   not tolerance for a slower fix. Actuals came in at 1.92–2.12.
 2. **Zero score movement** on real data — proven, not asserted.
 3. **Recall preserved** — every malicious shape that was detected before is still
    detected. Two-sided acceptance, because a one-sided "corpus byte-identical" gate
-   is what let the #149 regression through.
-4. A regression gate that fails CI on a new unbounded quantifier.
+   is what let the #149 regression through. D1a shows why this requirement is not
+   optional: the first attempt at this fix violated it.
+4. A regression gate. **Not** "fails CI on a new unbounded quantifier" — that was the
+   original wording and it describes the repo-wide static rule this spec later rejected
+   on measurement (D6). What ships instead: the empirical gate fails on super-linear
+   *growth* across 224 patterns, and the deterministic gate fails if any of the five
+   bounded spellings is removed or tightened below its corpus maximum. An unbounded
+   quantifier that happens to be harmless is not flagged by either, on purpose.
 5. No change to the `grep` matcher in `run-eval.sh` (dialect-regression risk).
 
 ## Technical decisions
@@ -64,7 +83,8 @@ project's own files):
 | `[\w/]+` (`_RE_SPECIFIC_REF`) | 58 | 256 | 4.4× |
 | `[\w/.-]+` (`_RE_CONCRETE_CMD`) | 118 | 256 | 2.2× |
 | `` [^`]+ `` (backtick span) | 1151 | 2000 | 1.7× |
-| `\w+` after a dot | 50 | 64 | 1.3× |
+| `\w+` after a dot | 50 | 128 | 2.6× |
+| `[\w-]+` (`_RE_SKILL_AS_OBJECT`) | 19 | 64 | 3.4× |
 | `[a-z]*` (`rm` flags) | 2 | 12 | 6× |
 | `\d+` (digit run) | 27 | 12 → see D5 | — |
 
@@ -174,16 +194,46 @@ differences) is the authority here, not the raw maximum.
 
 ### D6 — Two gates, static and empirical
 
-- `test_patterns_are_bounded.py` — deterministic, gates: no compiled pattern in
-  `scoring/patterns/*` carries an unbounded quantifier before a required literal.
-  Allowlist entries each carry a reason; no blank skips.
-- `test_patterns_scale_linearly.py` — empirical: every compiled pattern against the
-  filler alphabets at doubling lengths, ratio < 3.0. Generous threshold so a loaded
-  CI runner does not flake, while still catching the 4.0× class.
+**As built** (this section replaces an earlier draft that specified a repo-wide static
+rule with an allowlist; that design was prototyped and rejected on measurement — see
+"rejected" below. The spec is the source of truth, so it records what shipped):
 
-The static test alone is insufficient — the first heuristic written for this audit
-flagged 105 of 169 patterns and isolated neither real one. The empirical test alone
-is timing-based. Both, or the gate is theatre.
+- `test_patterns_are_bounded.py` — deterministic, zero false positives. For each of the
+  five bounded patterns it asserts (a) the **presence** of each bounded spelling, and
+  (b) that each bound stays **above the corpus maximum it was calibrated from** (58, 118,
+  1151, 50, 19). Every assertion mutation-tested: un-bounding a pattern, tightening a
+  bound below its measured maximum, and truncating the backtick span each turn it red.
+- `test_patterns_scale_linearly.py` — empirical, 224 compiled patterns across 30 modules
+  × 25 filler alphabets at doubling lengths, ratio < 3.0. Two-stage: a flagged filler is
+  re-measured with more repetitions **and at a second doubling**, and only fails if both
+  doublings are super-linear. The healthy margin is 1.3–2.4× against a 3.0× threshold,
+  which is too thin to rest on one sample — a single sample under load did flake once
+  during development. Verified red-capable (4.20×, 4.02× confirmed) and green four times
+  over under four busy cores.
+
+**Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
+quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
+(measured on `main`); the refinement "…with no
+required literal prefix, since a literal limits the number of start positions" still
+marked 11, including `_RE_BACKTICK_REF`, where a leading backtick does limit start
+positions. Each further refinement needs its own justification, and a gate whose
+allowlist is longer than its findings is the thing it exists to prevent. The repo-wide
+sweep is therefore the empirical test's job.
+
+**Coverage, and what it does not cover.** The first draft of the empirical gate covered
+11 modules and 138 patterns while the audit harness that found the defects covered 25
+and 224 — a gate narrower than the harness it replaces is not a regression guard. Widened
+to 30 modules (0 additional findings, so the coverage was free), imports no longer behind
+a `try/except` that could shrink coverage silently, and a count assertion that fails if
+the collection ever shrinks.
+
+The remaining blind spot is real: **the gate reaches exactly as far as its filler
+alphabet.** `manifest._FM` (D3) is quadratic on a frontmatter-shaped input at 3.95× per
+doubling and none of the 25 generic fillers trip it — they come in at 1.85×, below the
+absolute floor. The frontmatter filler therefore lands **with** the D3 fix, where it is
+red-before-green rather than red-on-main. The `_MIN_ABS_SECONDS` floor has the same
+character: it suppresses noise, and would also suppress a quadratic with a very small
+constant at this input size.
 
 ### D7 — `run-eval.sh`: make the missing guard visible, do not touch the matcher
 

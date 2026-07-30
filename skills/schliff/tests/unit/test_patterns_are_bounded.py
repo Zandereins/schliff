@@ -6,12 +6,12 @@ empirically. This file is the zero-false-positive half: it pins the exact patter
 the corpus measurements they were calibrated from.
 
 Scope note, recorded deliberately. A repo-wide static rule was prototyped and
-rejected on measurement: flagging "any unbounded quantifier on a character class"
-marked 45 of 102 patterns, and the refinement "…with no required literal prefix,
-since a literal limits the number of start positions" still marked 11 — including
-`_RE_BACKTICK_REF`, where a leading backtick does limit start positions. A gate whose
-allowlist is longer than its findings is the thing it is supposed to prevent, so the
-repo-wide sweep is left to the empirical test and this file stays exact.
+rejected on measurement: flagging "any unbounded quantifier on a character class" marked
+47 of the 102 patterns in `scoring/patterns/*`, and the refinement "…with no required
+literal prefix, since a literal limits the number of start positions" still marked 11 —
+including `_RE_BACKTICK_REF`, where a leading backtick does limit start positions. A gate
+whose allowlist is longer than its findings is the thing it is supposed to prevent, so
+the repo-wide sweep is left to the empirical test and this file stays exact.
 
 Why the bounds are load-bearing and not cosmetic: they were calibrated from the
 longest run each quantifier actually consumes across 380 real instruction files. Lower
