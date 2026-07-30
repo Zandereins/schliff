@@ -271,3 +271,46 @@ class TestEnvLeakWordBoundary:
     @pytest.mark.parametrize("text", TRUE_POSITIVES)
     def test_genuine_env_leak_still_matches(self, text):
         assert _RE_SEC_ENV_LEAK.search(text) is not None, f"detector disarmed for {text!r}"
+
+
+class TestDangerousCmdWhitespaceIsNotBounded:
+    """A ReDoS bound must not be placed on whitespace inside a detector.
+
+    Caught in self-review of the 2026-07-30 ReDoS commit, before it was pushed. That
+    commit bounded `rm\\s+` to `rm\\s{1,8}` "for consistency" while bounding the flag
+    runs that were the actual quadratic source. The flag runs needed it; the whitespace
+    did not — it is prefixed by the literal `rm`, which limits how many start positions
+    it is reachable from, so it never contributed to the blowup. Bounding it anyway cost
+    five detections that 8.8.2 caught.
+
+    This is the #149 defect class exactly: narrowing a matcher without enumerating its
+    evasion classes. The enumeration below is the gate — it walks the whitespace-run
+    length rather than sampling it, so any future bound on this run fails here.
+    """
+
+    @pytest.mark.parametrize("count", [1, 2, 3, 5, 8, 9, 10, 16, 40, 100])
+    @pytest.mark.parametrize("ws", [" ", "\t"], ids=["space", "tab"])
+    def test_any_whitespace_run_before_the_flags_still_matches(self, count, ws):
+        payload = "rm" + ws * count + "-rf /"
+        assert _RE_SEC_DANGEROUS_CMD.search(payload) is not None, (
+            f"detector disarmed by a {count}-char whitespace run — a bound was placed "
+            f"on whitespace that was never the quadratic source"
+        )
+
+    @pytest.mark.parametrize("count", [1, 2, 3, 5, 8, 9, 16, 40])
+    def test_any_whitespace_run_before_the_path_still_matches(self, count):
+        payload = "rm -rf" + " " * count + "/"
+        assert _RE_SEC_DANGEROUS_CMD.search(payload) is not None, (
+            f"detector disarmed by a {count}-char whitespace run before the path"
+        )
+
+    def test_the_flag_run_bound_is_wide_enough_for_real_flag_sets(self):
+        """The flag runs ARE bounded (they were the O(n^3) source). The bound must still
+        cover any plausible real flag spelling."""
+        # Long-form flags (`rm -recursive -force /`) are deliberately absent: 8.8.2
+        # did not match them either, because the pattern requires `r` and `f` in ONE
+        # flag cluster. Asserting a capability the detector never had would be a test
+        # written against an imagined feature.
+        for payload in ("rm -rf /", "rm -fr /", "rm -Rf /", "rm -rfv /", "rm -vrf /",
+                        "rm -rfvi /", "rm -rfvid /"):
+            assert _RE_SEC_DANGEROUS_CMD.search(payload) is not None, payload

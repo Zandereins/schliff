@@ -5,6 +5,94 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Security
+
+- **Five scoring regexes were quadratic on untrusted input; the worst cost 162 seconds
+  of CPU for one unauthenticated request.** A trust-boundary audit of the whole repo found
+  the same defect in four of them; the new empirical gate found the fifth,
+  `_RE_SKILL_AS_OBJECT`, on its first run. It is not the textbook ReDoS shape — no nested
+  quantifier, no overlapping alternation, just **an unbounded run followed by a required
+  literal**. `[\w/]+` before a required `\.` consumes to the end of the input,
+  fails on the dot, and gives back one character at a time, once per start position.
+
+  The measured worst case sat *inside* the public playground's 32 KB input cap, whose
+  own comment claimed that cap bounded "any residual O(n^2) hot path to well under a
+  second": 162.6 s at 25,883 bytes against 46 ms for a benign payload of the same
+  length, growing 4.01× per doubling. Reachable unauthenticated via `POST /api/score`
+  and `GET /api/badge?repo=`, from the CLI at the 1 MB cap, and — the worst blast
+  radius — from the GitHub Action on a fork PR's AGENTS.md, i.e. in other people's CI.
+
+  Fixed by bounding **only the quantifier the measurement blames**, with every bound
+  **calibrated against the longest run it actually consumes across 380 real instruction
+  files** rather than guessed: 58 for `[\w/]+`, 118 for `[\w/.-]+`, 1,151 for a backtick
+  span, 19 for `[\w-]+` in a trigger prompt. A first guessed bound of 120 would have sat
+  one character above a real 118-character token and truncated a real 1,151-character
+  span; the failure mode of a guessed bound is a silent score change.
+
+  Whitespace runs are deliberately left unbounded. Self-review of the first commit
+  caught it bounding `rm\s+` to `rm\s{1,8}` "for consistency" with the flag runs that
+  were the real quadratic source — which cost **five detections that 8.8.2 caught**
+  (`rm` plus 9 or more spaces or tabs, then `-rf /`), for no gain: that run is prefixed
+  by the literal `rm`, which limits how many start positions it is reachable from, so it
+  never contributed to the blowup. The pattern is linear without the whitespace bound
+  (1.92–2.04× per doubling, measured on a whitespace-run payload). This is the #149
+  defect class reproduced internally — narrowing a matcher without enumerating its
+  evasion classes, then checking only that the corpus verdict did not move, which a
+  corpus cannot show for an evasion it does not contain. Gated by
+  `TestDangerousCmdWhitespaceIsNotBounded`, which walks whitespace-run length 1…100 for
+  spaces and tabs on both sides of the flag cluster; re-introducing the mistake turns 11
+  assertions red.
+
+  `clarity` needed a second, independent fix: bounding its regexes alone only took the
+  worst case from 162.6 s to 11.9 s, because the match-independent context build and
+  search sat *inside* the per-match loop, turning O(n²) into O(m·n²). Hoisting them out
+  is output-identical by construction. Bound plus hoist: **58.9 ms**.
+
+  Two-sided acceptance, because a one-sided "is it fast now" check is how a narrowing
+  ships as a silent detection loss: **0 of 250 real files change their clarity result**,
+  the published hero score and every case-study number reproduce byte-identically
+  against a clean `main` worktree with identical commands, and every malicious shape is
+  still detected with the same finding counts. `rm -rf /` still matches and the Docker
+  layer-cleanup false positive stays fixed.
+
+  Patterns: `_RE_SPECIFIC_REF`, `_RE_CONCRETE_CMD`, `_RE_SEC_DANGEROUS_CMD` (three
+  consecutive unbounded flag runs before a required `/`), `_RE_LENGTH_EXTENDED` (the
+  *second* branch — the first fails fast on digits, which is why an early probe against
+  one branch showed nothing), and `_RE_SKILL_AS_OBJECT`.
+
+- **Two gates against a recurrence.** `test_patterns_scale_linearly.py` times all 224
+  compiled patterns across 30 modules against 25 pathological filler alphabets at
+  doubling lengths and fails on super-linear growth — it found `_RE_SKILL_AS_OBJECT`,
+  which was not on the audit's fix list, on its first run. It confirms an offender at two
+  consecutive doublings with more repetitions before failing, because the healthy margin
+  is 1.3–2.4× against a 3.0× threshold and a single sample under load did flake once
+  during development; verified red-capable (4.20×, 4.02× confirmed) and green four times
+  over under four busy cores. `test_patterns_are_bounded.py` is its deterministic
+  companion: it pins each bounded spelling and pins each bound above the corpus maximum
+  it was calibrated from, so tightening one below the real data fails too.
+
+  **What these gates do not cover, stated rather than implied:** the empirical one reaches
+  exactly as far as its filler alphabet. Its first draft also covered only 11 modules and
+  138 patterns while the harness that found the defects covered 25 and 224 — a gate
+  narrower than the harness it replaces is not a regression guard, so the module list was
+  widened (0 additional findings, so the coverage was free) and a count assertion now
+  fails if it ever shrinks. The remaining blind spot is real and documented in the test:
+  `manifest._FM` is quadratic on a frontmatter-shaped input and none of the generic
+  fillers trip it. A shape nobody thought of stays invisible.
+
+  A repo-wide *static* rule was prototyped and rejected on measurement: "any unbounded
+  quantifier on a character class" flagged 47 of the 102 patterns in `scoring/patterns/*`,
+  and the refinement "…with no required literal prefix" still flagged 11, including one
+  certain false positive. A gate whose allowlist is longer than its findings is the thing
+  it exists to prevent.
+
+- **`clarity`'s function docstring contradicted its own module docstring**, claiming a
+  zero default weight and a `--clarity` opt-in. Both were stale — clarity runs in the
+  default scorer set for every format — and that contradiction is exactly what made two
+  quadratic sub-checks in that function look unreachable.
+
+  Spec: `docs/specs/2026-07-30-redos-audit-fixes.md`.
+
 ### Changed
 
 - **The SKILL.md token budget was set below the median of what it measures.** It flagged

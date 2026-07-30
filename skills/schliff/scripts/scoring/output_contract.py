@@ -34,10 +34,16 @@ _RE_JSON_SKELETON = re.compile(r'\{[^}]{5,500}\}')
 _RE_JSON_KEY = re.compile(r'"(\w+)"\s*:')
 
 # Extended length constraint: catches "Maximum response size: 2000 tokens" etc.
+# Both branches are bounded. The SECOND one is the expensive branch — `\d+` before a
+# required word unit is O(n^2) on a long digit run — which is why an early probe
+# against the leading `max(imum)?...` branch alone showed nothing: it fails fast on
+# digits. Measured 11.7s at 16KB, bounded 18ms (636x), linear, 0 verdict differences
+# across the corpus. See docs/specs/2026-07-30-redos-audit-fixes.md (D5).
 _RE_LENGTH_EXTENDED = re.compile(
-    r"(?i)(max(imum)?\s+.{0,30}\d+\s*(words?|tokens?|sentences?|characters?"
+    r"(?i)(max(imum)?\s+.{0,30}\d{1,12}\s*(words?|tokens?|sentences?|characters?"
     r"|paragraphs?|lines?)"
-    r"|\d+\s*(words?|tokens?|sentences?|characters?|paragraphs?|lines?)\s*(max|limit|cap))"
+    r"|\d{1,12}\s*(words?|tokens?|sentences?|characters?|paragraphs?|lines?)"
+    r"\s*(max|limit|cap))"
 )
 
 # Extended example pattern: "Example N:" or "Example:" with code block nearby
