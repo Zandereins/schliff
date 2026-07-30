@@ -1,7 +1,7 @@
 # Bounded quantifiers: closing the ReDoS class found by the 2026-07-30 audit
 
 Status: D1, D1a, D2, D5, D6 implemented (PR 1). D3 implemented (PR 2).
-D9 implemented, D10 declined (PR 3). D7 pending, D8 declined.
+D9 implemented, D10 declined (PR 3). D7 implemented (PR 4). D8 declined.
 Date: 2026-07-30
 Baseline: `main` @ `ab41827`
 

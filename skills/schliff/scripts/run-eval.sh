@@ -217,12 +217,29 @@ if jq -e '.test_cases' "$EVAL_SUITE" > /dev/null 2>&1; then
         # Collect results as JSONL lines (one per assertion), build array at end
         RESULTS_LINES=$(mktemp "$TMPDIR_BASE/results.XXXXXX")
 
-        # Pre-resolve timeout command (once, not per-assertion)
+        # Pre-resolve timeout command (once, not per-assertion).
+        #
+        # This guard is BEST-EFFORT and its absence used to be silent: neither binary
+        # ships with a stock macOS, so there _GREP_TIMEOUT is empty, grep runs unbounded,
+        # and the `124) pattern timed out` case below is dead code — with nothing in the
+        # output saying so. A guard you cannot tell apart from a working one is worse than
+        # a documented absence, so say it once.
+        #
+        # Deliberately NOT replaced by a portable Python fallback. Measured: the sink does
+        # not backtrack — GNU grep, BSD grep 2.6.0 and ugrep 7.5.0 are DFA-based and stayed
+        # flat (0.044-0.050s) on the patterns validate_regex_complexity accepts. So this is
+        # defence in depth, while swapping ERE for Python `re` would re-run the dialect
+        # regression that left six assertions dead on CI for months (see
+        # tests/unit/test_eval_suite_is_portable_ere.py).
         _GREP_TIMEOUT=""
         if command -v gtimeout &>/dev/null; then
             _GREP_TIMEOUT="gtimeout 2"
         elif command -v timeout &>/dev/null; then
             _GREP_TIMEOUT="timeout 2"
+        else
+            echo "  Note: no 'timeout' or 'gtimeout' on PATH — the 2s regex timeout guard" >&2
+            echo "        is inactive for this run and patterns are matched unbounded." >&2
+            echo "        Install coreutils (brew install coreutils) to enable it." >&2
         fi
 
         while IFS= read -r -d '' assertion_block; do
