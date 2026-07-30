@@ -42,8 +42,8 @@ Example 1 — score a skill:
 
 ```
 $ uvx schliff score SKILL.md
-  structure      85/100    triggers   95/100    quality  92/100
-  Structural Score  84.5/100  [B]        Tokens: 1,031 / 1,000 (over)
+  structure      95/100    triggers   95/100    quality  90/100
+  Structural Score  87.4/100  [A]        Tokens: 1,044 / 2,000 (ok)
 ```
 
 Grades run S · A · B · C · D · E · F. `4/7 dims` in the readout means no eval
