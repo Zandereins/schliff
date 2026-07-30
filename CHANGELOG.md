@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.9.0] - 2026-07-30
+
 ### Security
 
 - **Five scoring regexes were quadratic on untrusted input; the worst cost 162 seconds
@@ -1212,6 +1214,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
 [Unreleased]: https://github.com/Zandereins/schliff/compare/v8.8.2...HEAD
+[8.9.0]: https://github.com/Zandereins/schliff/compare/v8.8.2...v8.9.0
 [8.8.2]: https://github.com/Zandereins/schliff/compare/v8.8.1...v8.8.2
 [8.8.1]: https://github.com/Zandereins/schliff/compare/v8.8.0...v8.8.1
 [8.8.0]: https://github.com/Zandereins/schliff/compare/v8.7.0...v8.8.0
