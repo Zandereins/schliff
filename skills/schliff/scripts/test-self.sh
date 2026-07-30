@@ -95,6 +95,13 @@ PASS_TOTAL=$(echo "$EVAL_RESULT" | python3 -c "import sys,json; d=json.load(sys.
 python3 -c "import sys; exit(0 if int(sys.argv[1]) >= 80 else 1)" "${PASS_PCT:-0}" 2>/dev/null && \
     pass "Pass rate ${PASS_PCT}% ($PASS_TOTAL static assertions)" || fail "Pass rate ${PASS_PCT}% ($PASS_TOTAL) below 80%"
 
+# Assertions that cannot be run leave the pass-rate denominator, so the rate above can
+# rise while the suite decays — one runnable assertion out of thirteen reads 100%. This
+# is the counterweight: on our own suite, every assertion must actually execute.
+ERRORED=$(echo "$EVAL_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['pass_rate'].get('errored', 0))" 2>/dev/null)
+[[ "${ERRORED:-0}" == "0" ]] && pass "All assertions runnable (0 errored)" || \
+    fail "$ERRORED assertions could not be run — the pass rate above is measured over a shrunken suite"
+
 # Composite from eval should match standalone scorer
 EVAL_COMP=$(echo "$EVAL_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['composite_score'])" 2>/dev/null)
 python3 -c "import sys; exit(0 if abs(float(sys.argv[1]) - float(sys.argv[2])) < 1 else 1)" "$EVAL_COMP" "$COMPOSITE" 2>/dev/null && \
