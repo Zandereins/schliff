@@ -135,9 +135,21 @@ _RE_ANTI_DOMAIN_SIGNAL = re.compile(
 # mention. When this is present the anti-domain suppression must NOT fire,
 # otherwise legitimate skill-improvement prompts that name a domain
 # ("improve the composability of my database skill") get wrongly suppressed.
+# Bounded quantifiers: the SECOND alternative starts with `[\w-]+` and therefore has
+# no literal prefix to limit start positions, so an unbounded run before the required
+# `\s+` was O(n^2) — measured 2.8s at 16KB, ratio 4.1x per doubling. This pattern is
+# fed eval-suite trigger prompts, i.e. untrusted JSON, so the input is attacker-chosen
+# on any `score --eval-suite` / `run-eval.sh` / Action `eval-suite` path.
+#
+# Bound 64 against a measured longest real run of 19 chars across 494 trigger and test
+# prompts (3.4x headroom). Verified identical on the two cases this pattern exists to
+# protect ("improve the composability of my database skill", "the migration skill") and
+# on the anti-signal it must keep rejecting ("optimize my database queries").
+# Found by tests/unit/test_patterns_scale_linearly.py, not by the audit's fix list —
+# which is the reason that gate exists.
 _RE_SKILL_AS_OBJECT = re.compile(
-    r"(?i)(?:my|this|the|our|your|a|an)\s+(?:[\w-]+\s+){0,3}skills?\b|"
-    r"[\w-]+\s+skills?\b\s+(?:conflicts?|needs?|works?|is\b|when\b|that\b)"
+    r"(?i)(?:my|this|the|our|your|a|an)\s+(?:[\w-]{1,64}\s+){0,3}skills?\b|"
+    r"[\w-]{1,64}\s+skills?\b\s+(?:conflicts?|needs?|works?|is\b|when\b|that\b)"
 )
 
 

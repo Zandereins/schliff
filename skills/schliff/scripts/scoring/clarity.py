@@ -71,7 +71,11 @@ def _extract_action_pairs(text, pattern):
 def score_clarity(skill_path: str) -> dict:
     """Score instruction clarity — detect contradictions, ambiguity, vague references.
 
-    Optional 7th dimension with zero default weight. Activated via --clarity.
+    Runs in the DEFAULT scorer set for every instruction-file format, at weight 0.05
+    on the skill.md family — see the module docstring and `scoring/registry.py`. (The
+    previous line here claimed a zero default weight and a `--clarity` opt-in; both
+    were stale, and the contradiction with the module docstring above is exactly what
+    made two quadratic sub-checks in this function look unreachable.)
 
     Sub-checks (100 pts total):
     - Contradiction detection (30 pts): "always X" vs "never X" on same topic
@@ -123,15 +127,28 @@ def score_clarity(skill_path: str) -> dict:
     vague_refs = []
     for i, line in enumerate(lines):
         matches = _RE_VAGUE_REF.findall(line)
+        if not matches:
+            continue
+        # Both tests below are match-INDEPENDENT: they look at the line and at the
+        # preceding 3 lines, never at `match`. Running them once per line instead of
+        # once per match is output-identical by construction (verified on 250 real
+        # files, 0 differing vague-reference lists) and it is what actually closes the
+        # hot path: bounding the regex alone took the 25.9KB worst case from 162.6s to
+        # 11.9s, because O(n^2) had become O(m*n). With the work hoisted: 58.9ms.
+        # See docs/specs/2026-07-30-redos-audit-fixes.md (D2).
+        #
+        # Skip if a backtick-quoted reference is on the same line (e.g. "the file
+        # `output.json`").
+        if _RE_BACKTICK_REF.search(line):
+            continue
+        # Check the preceding 3 lines for a specific file/path reference. If there is
+        # no specific path, filename, or backtick-quoted reference nearby, every
+        # occurrence on this line is vague.
+        context = "\n".join(lines[max(0, i - 3):i])
+        if _RE_SPECIFIC_REF.search(context):
+            continue
         for match in matches:
-            # Skip if backtick-quoted reference is on the same line (e.g., "the file `output.json`")
-            if _RE_BACKTICK_REF.search(line):
-                continue
-            # Check preceding 3 lines for a specific file/path reference
-            context = "\n".join(lines[max(0, i - 3):i])
-            # If no specific path, filename, or backtick-quoted reference nearby, it's vague
-            if not _RE_SPECIFIC_REF.search(context):
-                vague_refs.append(f"line {i + 1}: {match}")
+            vague_refs.append(f"line {i + 1}: {match}")
 
     if vague_refs:
         penalty = min(25, len(vague_refs) * 5)
