@@ -55,18 +55,26 @@ class TestContentLengthGuard:
     """
 
     @staticmethod
-    def _handler_class():
+    def _handler_class(monkeypatch):
+        """Load playground/api/score.py by path.
+
+        `monkeypatch.syspath_prepend`, not a bare `sys.path.insert`: the first version of
+        this helper inserted the repo root on EVERY call and never removed it, so a suite
+        run left five duplicate entries in a global. This file's sibling conftest isolates
+        cwd per test with automatic restore for the same reason — a test that mutates
+        process-wide state and does not undo it can change the behaviour of tests that run
+        after it.
+        """
         import importlib.util
-        import sys
-        sys.path.insert(0, str(_ROOT))
+        monkeypatch.syspath_prepend(str(_ROOT))
         spec = importlib.util.spec_from_file_location("_pg_score", _SCORE_PY)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod
 
-    def _drive(self, content_length: str, body: bytes):
+    def _drive(self, monkeypatch, content_length: str, body: bytes):
         import io
-        mod = self._handler_class()
+        mod = self._handler_class(monkeypatch)
 
         class RecordingBytesIO(io.BytesIO):
             def __init__(self, data):
@@ -102,46 +110,46 @@ class TestContentLengthGuard:
     # A body far past the cap, so an unbounded read is unmistakable.
     BODY = json.dumps({"content": "x" * 64, "filename": "SKILL.md"}).encode() + b"\n" + b"P" * (3 * 1024 * 1024)
 
-    def test_negative_content_length_does_not_bypass_the_cap(self):
-        h, cap = self._drive("-1", self.BODY)
+    def test_negative_content_length_does_not_bypass_the_cap(self, monkeypatch):
+        h, cap = self._drive(monkeypatch, "-1", self.BODY)
         requested, returned = h.rfile.reads[0] if h.rfile.reads else (None, 0)
         assert returned <= cap, (
             f"Content-Length: -1 read {returned:,} bytes past the {cap:,}-byte cap "
             f"(rfile.read({requested}) reads to EOF)"
         )
 
-    def test_negative_content_length_is_reported_as_an_invalid_header(self):
+    def test_negative_content_length_is_reported_as_an_invalid_header(self, monkeypatch):
         """Discriminating on the REASON, not just the status.
 
         Before the guard this already returned 400 — from the truncated-JSON branch, not
         from any Content-Length check. Asserting the status alone would have passed on the
         unfixed code, so it asserts the error string that only the guard produces.
         """
-        h, _ = self._drive("-1", self.BODY)
+        h, _ = self._drive(monkeypatch, "-1", self.BODY)
         assert h.status == 400, f"expected 400 for an invalid Content-Length, got {h.status}"
         assert h.body.get("error") == "Invalid Content-Length header", (
             f"400 came from the wrong branch: {h.body!r}. A negative Content-Length must be "
             f"rejected as an invalid header, not incidentally as unparseable JSON."
         )
 
-    def test_honest_oversize_still_gets_413(self):
-        h, _ = self._drive(str(3 * 1024 * 1024), self.BODY)
+    def test_honest_oversize_still_gets_413(self, monkeypatch):
+        h, _ = self._drive(monkeypatch, str(3 * 1024 * 1024), self.BODY)
         assert h.status == 413, f"expected 413 for an honest oversize, got {h.status}"
 
-    def test_lying_small_content_length_still_reads_only_what_it_declared(self):
-        h, _ = self._drive("10", self.BODY)
+    def test_lying_small_content_length_still_reads_only_what_it_declared(self, monkeypatch):
+        h, _ = self._drive(monkeypatch, "10", self.BODY)
         requested, returned = h.rfile.reads[0]
         assert returned == 10, f"read {returned} bytes for a declared 10"
         assert h.status == 400  # truncated JSON
 
-    def test_zero_content_length_still_rejected_as_an_empty_body(self):
+    def test_zero_content_length_still_rejected_as_an_empty_body(self, monkeypatch):
         """Also discriminating on the reason, for the opposite direction.
 
         An over-broad guard (`<= 0` instead of `< 0`) keeps every status identical and only
         changes which message an empty body gets — invisible to a status-only assertion.
         Found by mutation, like every other instance of this on the branch.
         """
-        h, _ = self._drive("0", b"")
+        h, _ = self._drive(monkeypatch, "0", b"")
         assert h.status == 400
         assert h.body.get("error") == "Empty request body", (
             f"an empty body must keep its own reason, not be absorbed by the "
