@@ -26,7 +26,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   whether a watch hook reports growth, which is where the missing selectivity actually
   cost something.
 
-  A regression test now asserts schliff's own card satisfies the budget schliff
+  The same boundary falls out of a measurement this project already published —
+  `docs/launch/state-of-ai-instructions.md` "Length Has a Sweet Spot": across 120 files the
+  300–2000 token band averages composite 64.5, under 300 averages 51.3, over 2000 averages
+  59.9. So 2000 marks where files start scoring measurably worse, not merely where the
+  distribution sits. Two unrelated methods, one number.
+
+  `docs/SCORING.md` and `docs/ARCHITECTURE.md` both carried a hand-copied budget table
+  stating the old value; both are corrected, and a test now compares each table against the
+  constant in both directions — a stale value fails, and so does adding a format without
+  documenting it. Nothing had gated those copies, which is why a shipped doc could state a
+  budget the code no longer used.
+
+  A regression test also asserts schliff's own card satisfies the budget schliff
   advertises for its format: a measurement tool must not flag its own exemplar.
 
 - **The bundled eval suite measured its own source, so it measured nothing.** All 108
