@@ -98,13 +98,25 @@ HEADLINE_EXCLUDED: dict[str, frozenset] = {
 }
 
 
+def resolve_format(fmt: str) -> str:
+    """Canonicalize a format name, mapping any `--format` alias to its real name.
+
+    Every lookup below resolves aliases individually. Callers that BRANCH on the
+    format string must resolve it first — a raw `fmt == "system_prompt"` compare
+    silently takes the wrong path for the public `system-prompt` alias, which is
+    how `security` (a core system_prompt dimension) went missing from an explicitly
+    formatted score while detection kept it. Unknown names pass through unchanged
+    so the existing per-format fallbacks still apply.
+    """
+    return FORMAT_ALIASES.get(fmt, fmt)
+
+
 def get_headline_excluded(fmt: str) -> frozenset:
     """Return the dims excluded from the headline composite for a format (resolves aliases).
 
     Falls back to the instruction-file exclusion set for unknown formats.
     """
-    resolved = FORMAT_ALIASES.get(fmt, fmt)
-    return HEADLINE_EXCLUDED.get(resolved, _HEADLINE_EXCLUDED_INSTRUCTION)
+    return HEADLINE_EXCLUDED.get(resolve_format(fmt), _HEADLINE_EXCLUDED_INSTRUCTION)
 
 
 # ---------------------------------------------------------------------------
@@ -116,8 +128,7 @@ def get_scorers(fmt: str) -> list[str]:
 
     Falls back to skill.md scorers for unknown formats.
     """
-    resolved = FORMAT_ALIASES.get(fmt, fmt)
-    return list(SCORER_REGISTRY.get(resolved, SCORER_REGISTRY["skill.md"]))
+    return list(SCORER_REGISTRY.get(resolve_format(fmt), SCORER_REGISTRY["skill.md"]))
 
 
 def get_weights(fmt: str) -> dict[str, float]:
@@ -125,8 +136,7 @@ def get_weights(fmt: str) -> dict[str, float]:
 
     Falls back to skill.md weights for unknown formats (forward compat).
     """
-    resolved = FORMAT_ALIASES.get(fmt, fmt)
-    return dict(WEIGHT_PROFILES.get(resolved, WEIGHT_PROFILES["skill.md"]))
+    return dict(WEIGHT_PROFILES.get(resolve_format(fmt), WEIGHT_PROFILES["skill.md"]))
 
 
 def get_all_formats() -> list[str]:
