@@ -420,6 +420,21 @@ def cmd_doctor(args: argparse.Namespace) -> None:
               "not both", file=sys.stderr)
         raise SystemExit(2)
 
+    # A directory the user NAMED must exist; the built-in defaults must not be
+    # validated, because `.claude/skills` legitimately does not exist in most
+    # repos and the no-arg scan is the common invocation. Without this, a typo'd
+    # path renders as "No skills found" + exit 0 — indistinguishable from an
+    # empty directory, so no CI gate can catch it — and the report then lists the
+    # default dirs it did not scan. `verify` already errors on a missing file.
+    named = flagged or positional
+    if named:
+        bad = [d for d in named if not os.path.isdir(d)]
+        if bad:
+            for d in bad:
+                kind = "not a directory" if os.path.exists(d) else "no such directory"
+                print(f"schliff doctor: {kind}: {d}", file=sys.stderr)
+            raise SystemExit(2)
+
     report = doctor_mod.run_doctor(
         skill_dirs=flagged or positional,
         verbose=verbose,
