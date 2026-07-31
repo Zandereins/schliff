@@ -7,8 +7,8 @@
 The same file scores differently depending on whether its format is *detected* or *stated*:
 
 ```
-$ schliff score fp.txt --json                         → composite 49.4 · 7 dims · security 100
-$ schliff score fp.txt --format system-prompt --json  → composite 36.8 · 6 dims · security absent
+schliff score fp.txt --json                         → composite 49.4 · 7 dims · security 100
+schliff score fp.txt --format system-prompt --json  → composite 36.8 · 6 dims · security absent
 ```
 
 Measured spread across five files: **5.9 to 15.0 composite points**. The user who pins the
