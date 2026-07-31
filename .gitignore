@@ -66,3 +66,9 @@ uv.lock
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# LLM-council session artifacts (verdict + full transcript). These carry
+# adoption numbers, private decision context and advisor reasoning — they are
+# working notes, not repo content.
+council-report-*.html
+council-transcript-*.md
