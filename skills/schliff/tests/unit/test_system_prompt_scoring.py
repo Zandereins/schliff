@@ -830,3 +830,47 @@ class TestAntiGaming:
             assert result["score"] <= 60
         finally:
             os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# Format alias must not change the scored dimension set
+# ---------------------------------------------------------------------------
+
+class TestFormatAliasDoesNotDropSecurity:
+    """`--format system-prompt` must score the same dimensions as detection.
+
+    `shared.build_scores` branches on a RAW string compare (`fmt == "system_prompt"`).
+    The public `--format` flag also accepts the hyphenated alias `system-prompt`
+    (`registry.FORMAT_ALIASES`), which fails that compare, falls through to the
+    instruction-file branch, and there loses `security` to the `include_security`
+    gate — even though `security` is a CORE headline dimension for system_prompt
+    (weight 0.15, `registry.HEADLINE_EXCLUDED`). Measured on the shipped 8.9.0:
+    the same file scored 49.4 detected vs 36.8 with the alias.
+    """
+
+    def test_alias_scores_the_same_dimensions_as_canonical(self):
+        from shared import build_scores
+        path = _fixture_path("good_api_assistant.txt")
+        canonical = build_scores(path, fmt="system_prompt")
+        aliased = build_scores(path, fmt="system-prompt")
+        assert set(aliased) == set(canonical), (
+            "the hyphenated alias scored a different dimension set: "
+            f"missing={set(canonical) - set(aliased)}, extra={set(aliased) - set(canonical)}"
+        )
+
+    def test_alias_keeps_the_core_security_dimension(self):
+        from shared import build_scores
+        path = _fixture_path("good_api_assistant.txt")
+        assert "security" in build_scores(path, fmt="system-prompt")
+
+    def test_alias_and_detection_agree_on_every_dimension_score(self):
+        """Not just the key set — the values must be identical too."""
+        from scoring.formats import detect_format
+        from shared import build_scores
+        path = _fixture_path("good_api_assistant.txt")
+        assert detect_format(path) == "system_prompt"
+        detected = build_scores(path)
+        aliased = build_scores(path, fmt="system-prompt")
+        assert {k: v["score"] for k, v in aliased.items()} == {
+            k: v["score"] for k, v in detected.items()
+        }
