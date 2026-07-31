@@ -204,13 +204,22 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
     import tempfile
 
     from scoring.formats import detect_format, normalize_content
-    from scoring.registry import get_scorers
+    from scoring.registry import get_scorers, resolve_format
 
     if fmt is None:
         fmt = detect_format(skill_path)
 
+    # DISPATCH on the canonical name, NORMALIZE on the raw one. `fmt` may be a
+    # public `--format` alias (`system-prompt`, `skill`, ...) and both compares
+    # below are raw string compares, but only this one may be widened: resolving
+    # `fmt` itself would also flip the `!= "skill.md"` compare underneath, so
+    # `--format skill` would stop being normalized through a temp file and its
+    # score would move (measured: 30.8 -> 26.1 on a .txt). That normalization
+    # asymmetry is a separate, unaccused defect — see the branch note in the spec.
+    # detect_format already returns canonical names, so this is a no-op on the
+    # detected path.
     # System prompts: no normalization, no temp file, dedicated scorer set
-    if fmt == "system_prompt":
+    if resolve_format(fmt) == "system_prompt":
         scores = {}
         for dim in get_scorers("system_prompt"):
             scores[dim] = _call_scorer(dim, skill_path, None)
