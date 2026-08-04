@@ -83,6 +83,14 @@ Because the number is stable, it does real work: gate pull requests on it [in CI
 
 An optional LLM judge exists for exploratory work, but it is never part of the deterministic score. The number you gate on is rule-based, end to end.
 
+**Where AI is and is not involved.** Scoring calls no model: install core Schliff and nothing
+leaves your machine. Two opt-in extras do call one — `[evolve]` for the improvement loop and
+`[judge]` for an exploratory smoke-test — and when they do, the request runs **from your machine
+with your own API key, to the provider you configure**. This project operates no inference
+service, holds no key of yours, and receives nothing you score. Without the extra installed the
+LLM paths refuse to run rather than degrading silently, and `schliff evolve --budget 0` stays
+deterministic even with it installed.
+
 ---
 
 ## The scoring model
@@ -332,8 +340,8 @@ LLM extras power this optional layer only; they are never used for scoring.
 | Install | Pulls in | When you need it |
 | --- | --- | --- |
 | `schliff` | stdlib only | Scoring, verify, badge, CI — everything that gates a release |
-| `schliff[judge]` | LLM client | Opt-in exploratory LLM-judge smoke-test (never scoring) |
-| `schliff[evolve]` | LLM client | Opt-in autonomous-improvement extras |
+| `schliff[judge]` | `anthropic`, `pydantic` | Opt-in exploratory LLM-judge smoke-test (never scoring) |
+| `schliff[evolve]` | `litellm` | Opt-in autonomous-improvement extras |
 
 ---
 
