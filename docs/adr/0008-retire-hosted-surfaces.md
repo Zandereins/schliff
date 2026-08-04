@@ -105,3 +105,25 @@ provider-identification threshold for a non-monetised open-source demo is genuin
 disputed, and the processing analysis above is a considered reading rather than a finding.
 It is written down so the decision is not re-litigated from memory, not so it can be cited
 as authority.
+
+## Correction, 2026-08-04 (same day, after acceptance)
+
+The Context section above states the trigger as "the maintainer … will not publish a home
+address". **That was too broad and is corrected here rather than rewritten** — an accepted
+ADR records what was decided and on what basis, including where the basis turned out to be
+stated wrongly.
+
+The accurate position: publishing provider-identification data was never the blocker it was
+written up as, and the maintainer does publish it where it is owed. What a published address
+cannot do is discharge the **data-protection information duty**, because that duty attaches
+to processing rather than to how an operator presents themselves — which is exactly the
+reasoning already given under *Why*, and which the retirement was actually built on.
+
+**The decision is unchanged and the load-bearing argument is untouched.** The two reasons that
+carry it — a permanent processing obligation, and no demonstrable demand for the surfaces
+paying for it — were independent of the trigger from the start. Only the framing of the
+trigger was wrong, and a public record that says something inaccurate about its own author is
+worth correcting even when the outcome does not move.
+
+See `docs/adr/0009-ai-act-assessment.md` for the regulatory assessment that was deliberately
+left out of this ADR at the time.
