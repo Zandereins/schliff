@@ -88,3 +88,78 @@ def test_format_alias_resolves_to_correct_token_budget():
             assert check_token_budget(content, alias)["budget"] != FORMAT_TOKEN_BUDGETS["unknown"]
     # unknown/garbage still falls back safely
     assert check_token_budget(content, "totally-bogus")["budget"] == FORMAT_TOKEN_BUDGETS["unknown"]
+
+
+# --- Alias and canonical name must score identically (2026-08-04) ---
+
+_NO_FRONTMATTER = """\
+# Deploy Helper
+
+Helps deploy things to production safely.
+
+## Usage
+
+Run the deploy command.
+
+## When to Use
+
+Use when deploying a service.
+"""
+
+
+def _write(tmp_path, name, content):
+    path = tmp_path / name
+    path.write_text(content, encoding="utf-8")
+    return str(path)
+
+
+def test_skill_alias_scores_identically_to_canonical_name(tmp_path):
+    """`--format skill` and `--format skill.md` must agree on a frontmatter-less file.
+
+    `shared.build_scores` branched on a RAW compare (`fmt != "skill.md"`). The public
+    `skill` alias failed it, entered the normalization branch its canonical twin skips,
+    and was scored as a copy wrapped in synthetic frontmatter that the file does not
+    have — inflating it by 4.7-5.5 composite points across the 8 tracked instruction
+    files without frontmatter (two of them in the benchmark corpus).
+
+    The fixture deliberately has NO frontmatter: with frontmatter present
+    `normalize_content` returns the content unchanged, so the bug is invisible.
+    """
+    from shared import build_scores
+    path = _write(tmp_path, "SKILL.md", _NO_FRONTMATTER)
+    assert build_scores(path, None, fmt="skill") == build_scores(path, None, fmt="skill.md")
+
+
+def test_stating_skill_format_does_not_invent_frontmatter(tmp_path):
+    """The structure score must report missing frontmatter, not have it papered over.
+
+    This is the direction the fix converges on, pinned separately from the equality
+    above: equality alone would also be satisfied by making BOTH spellings normalize,
+    which would hide the defect the structure dimension exists to report.
+    """
+    from shared import build_scores
+    no_fm = _write(tmp_path, "SKILL.md", _NO_FRONTMATTER)
+    with_fm = _write(
+        tmp_path,
+        "WITH.md",
+        "---\nname: deploy-helper\ndescription: Use when deploying.\n---\n\n" + _NO_FRONTMATTER,
+    )
+    stated = build_scores(no_fm, None, fmt="skill")["structure"]["score"]
+    assert stated < build_scores(with_fm, None, fmt="skill.md")["structure"]["score"]
+
+
+def test_every_format_alias_scores_identically_to_its_canonical_name(tmp_path):
+    """Generalized over the alias table, so a newly added alias cannot reopen this.
+
+    Two of the four branch sites that compared a raw format string have now been fixed
+    one incident at a time (#168 for `system-prompt`, this one for `skill`). Deriving
+    the pairs from FORMAT_ALIASES instead of listing them is what makes the next alias
+    covered on the day it is added.
+    """
+    from scoring.registry import FORMAT_ALIASES
+    from shared import build_scores
+    path = _write(tmp_path, "SKILL.md", _NO_FRONTMATTER)
+    for alias, canonical in sorted(FORMAT_ALIASES.items()):
+        assert build_scores(path, None, fmt=alias) == build_scores(path, None, fmt=canonical), (
+            f"alias {alias!r} scored differently than canonical {canonical!r}"
+        )
