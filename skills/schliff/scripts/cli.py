@@ -177,9 +177,15 @@ def cmd_score(args: argparse.Namespace) -> None:
         effective_fmt = fmt_override or url_fmt
         scores = build_scores(skill_path, eval_suite, include_runtime=True, fmt=effective_fmt)
 
-        # Determine the effective format for display
+        # Determine the effective format for display. Canonicalize a stated format:
+        # `--format` accepts aliases, and echoing the alias made the report state a
+        # name that is not the format's ("Format: skill") and, because the
+        # "(normalized)" guard below compares against the canonical name, claim a
+        # normalization that never happened. detect_format already returns canonical
+        # names, so this only affects the stated path.
         if effective_fmt:
-            detected_fmt = effective_fmt
+            from scoring.registry import resolve_format
+            detected_fmt = resolve_format(effective_fmt)
         else:
             from scoring.formats import detect_format
             detected_fmt = detect_format(skill_path)
