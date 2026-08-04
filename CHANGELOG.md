@@ -5,6 +5,81 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.10.1] - 2026-08-04
+
+**The hosted playground, leaderboard and badge endpoint have been retired.** The CLI, the
+GitHub Action, the pre-commit hook and the Claude Code skill are unaffected and continue to
+be maintained — this release exists so the published package stops pointing at services
+that no longer answer.
+
+### Removed
+
+- **The hosted surfaces are offline.** `schliff-playground.vercel.app` and
+  `schliff-leaderboard.vercel.app` now serve a static retirement notice and hold no
+  functions and no environment variables. The Redis instance behind the leaderboard's rate
+  limiter has been deleted.
+
+  The reason is not the one this started as. The trigger was a provider-identification duty,
+  which for a non-monetised open-source demo is genuinely disputed. The load-bearing reason
+  is the data-protection information duty, which attaches to **processing** rather than to
+  how an operator presents themselves — visitor IPs used as rate-limit keys are processing,
+  and no address, wording change or legal opinion discharges that. It is a permanent
+  operating obligation, and it was being paid for surfaces with **no demonstrable demand**:
+  web analytics was never enabled on either project, and a code search for both URLs found
+  references in three repositories, all owned by the maintainer.
+
+  **Badges already embedded in a README do not break.** `/api/badge` still answers, as a
+  static shields endpoint reporting `retired` in grey. Both Vercel projects are kept rather
+  than deleted, deliberately: a released `*.vercel.app` subdomain is re-registrable, and
+  this project's own Action had already written the playground URL into third-party pull
+  requests.
+
+  The application code and its tests stay in the repository. Full rationale and the
+  rejected alternatives — including a service address and a static client-side rebuild —
+  are in [`docs/adr/0008-retire-hosted-surfaces.md`](docs/adr/0008-retire-hosted-surfaces.md).
+  ([#176](https://github.com/Zandereins/schliff/pull/176),
+  [#177](https://github.com/Zandereins/schliff/pull/177))
+
+### Fixed
+
+- **The documented CI recipe granted no permissions while the feature it documents needs
+  one.** `comment-on-pr` defaults to `true` and the comment step needs `pull-requests:
+  write`, but the README workflow carried no `permissions:` block. In repositories whose
+  default token is read-only the documented feature failed silently; in repositories with a
+  read-write default the workflow ran with more privilege than it needed. The example now
+  carries the minimal set that this project's own self-test workflow already used.
+  ([#177](https://github.com/Zandereins/schliff/pull/177))
+
+- **Added the warning against `pull_request_target` that was missing.** It is exactly the
+  trigger a user reaches for when fork-PR comments fail, and it pairs a write-scoped token
+  with a checkout of untrusted code. On a fork PR the read-only token is the *intended*
+  degradation — the score and the exit code still work, only the comment is skipped — and
+  the docs now say so instead of leaving the reader to discover it.
+  ([#177](https://github.com/Zandereins/schliff/pull/177))
+
+- **The CI example pinned `actions/checkout@v4`** while every workflow in this repository
+  pins by commit SHA. For a tool that argues for supply-chain care, teaching the unpinned
+  form was the wrong signal. It now uses the same SHA the workflows here already trust.
+  ([#177](https://github.com/Zandereins/schliff/pull/177))
+
+- A README link rendered as `#10` while pointing at pull request 129.
+  ([#177](https://github.com/Zandereins/schliff/pull/177))
+
+### Changed
+
+- **The README now says where a model is involved and where it is not.** Scoring calls no
+  model and core Schliff is literally zero-dependency — `pyproject.toml` declares no
+  `dependencies` at all. The two opt-in extras that do call one run **from the user's own
+  machine with the user's own API key**; this project operates no inference service, holds
+  no key, and receives nothing that is scored. Without the extra installed those paths
+  refuse to run rather than degrading silently, and `schliff evolve --budget 0` never
+  imports the LLM path at all. The install table now names the actual packages
+  (`anthropic`, `pydantic`, `litellm`) instead of saying "LLM client".
+  ([#178](https://github.com/Zandereins/schliff/pull/178))
+
+- `RELEASING.md` drops the web-redeploy step and the playground engine pin: there are now
+  **six** version surfaces, not eight. ([#177](https://github.com/Zandereins/schliff/pull/177))
+
 ## [8.10.0] - 2026-08-04
 
 Four correctness fixes, all in the same place: a value that describes *how* a file was
@@ -1300,7 +1375,8 @@ measured, reported wrongly. Three of them were found by verifying the fourth.
 
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.10.0...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.10.1...HEAD
+[8.10.1]: https://github.com/Zandereins/schliff/compare/v8.10.0...v8.10.1
 [8.10.0]: https://github.com/Zandereins/schliff/compare/v8.9.0...v8.10.0
 [8.9.0]: https://github.com/Zandereins/schliff/compare/v8.8.2...v8.9.0
 [8.8.2]: https://github.com/Zandereins/schliff/compare/v8.8.1...v8.8.2
