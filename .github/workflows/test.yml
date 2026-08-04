@@ -11,7 +11,13 @@ permissions:
 
 concurrency:
   group: test-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded runs on PR branches, but NEVER on the default branch. A cancelled
+  # run on main leaves the branch with no completed test result — GitHub renders that as
+  # a red mark next to the commit, indistinguishable from a real failure, while proving
+  # nothing either way. It happened on 42cf108: `lint` finished green, every test job was
+  # cancelled mid-flight, zero jobs failed. Same reasoning as the `cancel-in-progress:
+  # false` on publish.yml — some runs are worth more than the minutes they cost.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # Lint gate for the project's own Python (dogfoods "the Ruff for SKILL.md").
