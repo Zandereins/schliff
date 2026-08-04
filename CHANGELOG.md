@@ -5,6 +5,93 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.10.0] - 2026-08-04
+
+Four correctness fixes, all in the same place: a value that describes *how* a file was
+measured, reported wrongly. Three of them were found by verifying the fourth.
+
+### Changed
+
+- **`--format skill` and `--format skill.md` scored the same file differently — the alias
+  is now the canonical name, which LOWERS the score for files without frontmatter.**
+  Measured on `AGENTS.md`: 39.3 via the alias, 34.5 via the canonical spelling. Across the
+  29 tracked instruction files in this repo, exactly the 8 that carry no YAML frontmatter
+  diverged, by 4.7–5.5 composite points — two of them real files in the project's own
+  benchmark corpus, so this was not an edge case nobody met.
+
+  `shared.build_scores` branched on a raw string compare (`fmt != "skill.md"`), so the
+  public `skill` alias entered a normalization branch that its canonical twin skips. For a
+  file without frontmatter that branch invents a name and description from the body and
+  scores the wrapped copy — `structure` went 50 → 80 and the `no_frontmatter` issue
+  disappeared. **The alias was hiding the exact defect the dimension exists to report.**
+
+  The two spellings agreeing is not a judgment call for a deterministic scorer; which side
+  they agree on is. Normalization exists so formats that *legitimately* carry no
+  frontmatter (CLAUDE.md, AGENTS.md, `.cursorrules`) are scorable at all, and a SKILL.md is
+  defined by its frontmatter — so the un-normalized, lower number is the measurement and
+  39.3 was the flattered one. This is why the release is a minor and not a patch.
+
+  Only the stated-format path moves. `detect_format` already returned canonical names, so
+  auto-detection, every other command, and the playground are strict no-ops — verified
+  cell by cell. Nothing that pins a format in CI can change verdict either: a stated format
+  reaches the engine only through `score`, never through `verify`.
+
+  Gate: 29 files × 12 format values (`None`, all 10 registry/alias choices, and `unknown`),
+  comparing the composite *and* every per-dimension score — **340/348 cells byte-identical**,
+  and the 8 that moved are exactly the accused set, each now equal to its canonical twin.
+  ([#173](https://github.com/Zandereins/schliff/pull/173))
+
+- **The reported format echoed the `--format` alias instead of the format's name.** A
+  genuine SKILL.md scored with `--format skill` printed `Format: skill (normalized)`, where
+  neither half was true — `skill` is not the format's name, and content that already has
+  frontmatter is returned unchanged. The JSON `format` field now reports canonical names
+  for every alias (`--format claude` → `claude.md`). No consumer breaks: the leaderboard
+  validates against its own display vocabulary, which never accepted engine names.
+  ([#173](https://github.com/Zandereins/schliff/pull/173))
+
+### Fixed
+
+- **`--format system-prompt` silently dropped the security dimension, worth up to 15
+  composite points.** The same file, the same version: `49.4` with 7 dimensions when the
+  format was detected, `36.8` with 6 and no `security` when it was stated through the
+  public hyphenated alias. Spread across five files: 5.9 to 15.0 points. The user who pins
+  the format explicitly — the more careful thing to do in CI — got the wrong number.
+
+  `shared.build_scores` dispatched on a raw `fmt == "system_prompt"`, which the
+  `system-prompt` alias fails; the file then fell through to the instruction-file branch,
+  where the `include_security` gate removes a dimension that is CORE for `system_prompt`
+  (weight 0.15). Dispatch now resolves through a single `registry.resolve_format()`, which
+  also replaced the inline copies of that lookup — the duplication is why one caller could
+  forget it. ([#168](https://github.com/Zandereins/schliff/pull/168))
+
+- **`schliff doctor <typo>` exited 0.** A named directory that does not exist rendered
+  "No skills found. Check skill directories." and exited successfully — indistinguishable
+  from an empty directory, so no CI gate could catch the typo. The report then listed the
+  DEFAULT scan directories, which it had not scanned, as if those were the ones that came
+  up empty. `verify` had always errored on a missing file; `doctor` disagreed with it.
+
+  Validation sits at the CLI boundary, so library callers are untouched, and only paths the
+  user NAMED are checked — the built-in defaults stay optional, because `.claude/skills`
+  legitimately does not exist in most repos and the no-arg scan is the common invocation. A
+  path that exists but is a regular file is rejected too; it previously scanned to zero in
+  silence. ([#169](https://github.com/Zandereins/schliff/pull/169))
+
+- **The version stamped into every score described the installed package, not the engine
+  that produced the score.** `_resolve_version()` read `importlib.metadata`, i.e. the
+  installed dist-info, while its docstring promised the value "can never drift from
+  pyproject.toml" — in a source or editable checkout those are different things, and the
+  docstring was part of the defect. Measured in this repo: all three gated version sources
+  said 8.9.0, `schliff version` said 8.1.0, and the console script was loading the 8.9.0
+  working tree the whole time.
+
+  Not cosmetic — `score --json` stamps this value as `version`, so it propagated into
+  benchmark JSONL and leaderboard entries, attributing measurements to an engine version
+  that never produced them. Now read from the package `__init__.py` next to the module,
+  which is already gated against `pyproject.toml`, and resolved by path rather than by
+  import so the answer does not depend on how the CLI was invoked. A `pip install` user was
+  never affected; their metadata matches their code.
+  ([#172](https://github.com/Zandereins/schliff/pull/172))
+
 ## [8.9.0] - 2026-07-30
 
 ### Security
@@ -1213,7 +1300,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.8.2...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.10.0...HEAD
+[8.10.0]: https://github.com/Zandereins/schliff/compare/v8.9.0...v8.10.0
 [8.9.0]: https://github.com/Zandereins/schliff/compare/v8.8.2...v8.9.0
 [8.8.2]: https://github.com/Zandereins/schliff/compare/v8.8.1...v8.8.2
 [8.8.1]: https://github.com/Zandereins/schliff/compare/v8.8.0...v8.8.1
