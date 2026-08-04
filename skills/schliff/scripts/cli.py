@@ -38,19 +38,34 @@ _PATH_HELP = "Path to instruction file (SKILL.md/CLAUDE.md/AGENTS.md/.cursorrule
 def _resolve_version() -> str:
     """Single source of truth for the runtime version string.
 
-    Reads from installed package metadata (importlib.metadata) so the CLI,
-    the score-display header, and the --version flag can never drift from
-    pyproject.toml. Falls back to "dev" when the package is not installed
-    (e.g. running cli.py straight from a source checkout).
+    Reads `__version__` from the package `__init__.py` next to this module, so the
+    reported version always describes the code that is actually loaded. That
+    constant is gated against pyproject.toml and .claude-plugin/plugin.json by
+    test_version_consistency.py, so it cannot drift from the release either.
+
+    Deliberately NOT importlib.metadata: that reads the *installed* dist-info,
+    which in a source or editable checkout describes a different — often older —
+    copy of schliff than the one executing. This value is stamped into the score
+    JSON (see cmd_score) and propagates into benchmark JSONL and leaderboard
+    entries, so a stale read misattributes measurements to an engine version that
+    never produced them. Resolving by path rather than by import also keeps the
+    answer independent of how the CLI was invoked (console script, -m, or
+    straight from a checkout), which sys.path-based lookups are not.
+
+    Falls back to "dev" when the constant cannot be read.
     """
+    import re
+
+    init_path = os.path.join(os.path.dirname(_SCRIPTS_DIR), "__init__.py")
     try:
-        from importlib.metadata import PackageNotFoundError, version
-        try:
-            return version("schliff")
-        except PackageNotFoundError:
-            return "dev"
-    except ImportError:  # importlib.metadata absent (pathological env)
-        return "dev"
+        with open(init_path, encoding="utf-8") as handle:
+            for line in handle:
+                match = re.match(r"""^__version__\s*=\s*["']([^"']+)["']""", line)
+                if match:
+                    return match.group(1)
+    except OSError:
+        pass
+    return "dev"
 
 
 def _ensure_skill_path_exists(skill_path: str, exit_code: int = 1) -> None:
