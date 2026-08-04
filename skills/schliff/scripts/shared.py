@@ -209,17 +209,19 @@ def build_scores(skill_path: str, eval_suite: Optional[dict] = None,
     if fmt is None:
         fmt = detect_format(skill_path)
 
-    # DISPATCH on the canonical name, NORMALIZE on the raw one. `fmt` may be a
-    # public `--format` alias (`system-prompt`, `skill`, ...) and both compares
-    # below are raw string compares, but only this one may be widened: resolving
-    # `fmt` itself would also flip the `!= "skill.md"` compare underneath, so
-    # `--format skill` would stop being normalized through a temp file and its
-    # score would move (measured: 30.8 -> 26.1 on a .txt). That normalization
-    # asymmetry is a separate, unaccused defect — see the branch note in the spec.
-    # detect_format already returns canonical names, so this is a no-op on the
-    # detected path.
+    # Canonicalize ONCE, then branch only on the canonical name. `fmt` may be a
+    # public `--format` alias (`skill`, `system-prompt`, ...), and every branch
+    # below used to compare the raw string — so an alias took a different path
+    # than its canonical twin. That cost `system-prompt` the security dimension
+    # (#168) and sent `skill` through a normalization branch that `skill.md`
+    # skips, inventing synthetic frontmatter and inflating a frontmatter-less
+    # file by 4.7-5.5 composite points. `detect_format` already returns canonical
+    # names, so this is a strict no-op on the detected path — including the
+    # playground, which only ever passes detected formats.
+    fmt = resolve_format(fmt)
+
     # System prompts: no normalization, no temp file, dedicated scorer set
-    if resolve_format(fmt) == "system_prompt":
+    if fmt == "system_prompt":
         scores = {}
         for dim in get_scorers("system_prompt"):
             scores[dim] = _call_scorer(dim, skill_path, None)

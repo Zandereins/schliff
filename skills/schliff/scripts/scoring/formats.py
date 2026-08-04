@@ -73,6 +73,11 @@ def normalize_content(content: str, fmt: str) -> str:
     If the content already has YAML frontmatter (starts with "---") or
     fmt is "skill.md", return content unchanged. Otherwise wrap the content
     in synthetic YAML frontmatter so the scoring engine can process it.
+
+    `fmt` must be a CANONICAL format name, not a `--format` alias: the early
+    return below is a raw compare, so passing "skill" instead of "skill.md"
+    wraps a SKILL.md in invented frontmatter and inflates its structure score.
+    `shared.build_scores` — the only production caller — resolves before calling.
     """
     if fmt == FORMAT_SKILL_MD:
         return content
