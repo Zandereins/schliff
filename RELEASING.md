@@ -13,11 +13,12 @@ Run through this list before creating a new tag. Skipping a step has burned us b
 7. **Commit on a release branch** (`chore/release-X.Y.Z`), open PR, merge to `main`.
 8. **Create the GitHub Release** (tag `vX.Y.Z`, e.g. `gh release create vX.Y.Z`) — `publish.yml` fires on `release: published`, NOT on a bare tag push.
 9. **Verify PyPI release** — check `pip install schliff==X.Y.Z` works.
-10. **Redeploy the web surfaces** — their bundles carry engine/seed state:
-    playground (bump `playground/pyproject.toml` pin + `uv lock --upgrade-package schliff`,
-    then `vercel --prod` + dispatch `playground-pin-drift.yml`) AND leaderboard
-    (`vercel --prod` from `web/leaderboard/` — its bundled seed shows the
-    self-entry version; skipping this left the live row on 8.1.0 until 2026-07-07).
+10. **No web surfaces to redeploy.** The playground, the leaderboard and the hosted
+    badge endpoint were retired on 2026-08-04 (see `docs/adr/0008-retire-hosted-surfaces.md`).
+    Their code and tests stay in the tree, but nothing is deployed and no engine pin
+    needs to move with a release. There are **six** version surfaces, not eight:
+    `pyproject.toml`, `.claude-plugin/plugin.json`, `skills/schliff/__init__.py`,
+    the README references, `docs/README.md`, and the git tag.
 11. **Re-point the `v1` float tag** to the release commit (`git tag -f v1 <sha> && git push origin v1 --force`).
 12. **Post-release:** close milestone, update memory entries that reference version.
 

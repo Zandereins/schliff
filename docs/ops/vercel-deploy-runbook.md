@@ -1,5 +1,15 @@
 # Vercel Deploy + Firewall Runbook (playground & leaderboard)
 
+> **RETIRED 2026-08-04 — do not follow this to bring the services back up.**
+> The playground, leaderboard and hosted badge endpoint were taken offline; both
+> Vercel projects now serve a static retirement notice and hold no functions and
+> no environment variables. The rationale, including the data-protection reasoning
+> that drove it, is in `docs/adr/0008-retire-hosted-surfaces.md`.
+>
+> This document is kept because the code it describes is still in the tree (95
+> tests load it) and because the firewall and KV sections record what *was*
+> configured. Reviving any of it is a new decision, not a redeploy.
+
 > Status as of 2026-06-03: **DEPLOYED**. Both projects are live and public in
 > team `zaneins-projects`:
 >
