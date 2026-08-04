@@ -11,9 +11,6 @@
 [![Python](https://img.shields.io/pypi/pyversions/schliff)](https://pypi.org/project/schliff/)
 [![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![AGENTS.md quality](https://img.shields.io/endpoint?url=https%3A%2F%2Fschliff-playground.vercel.app%2Fapi%2Fbadge%3Frepo%3DZandereins%2Fschliff)](https://schliff-playground.vercel.app)
-
-*That last badge is Schliff scoring this repo's own `AGENTS.md` — live, and reproducible from your own checkout.*
 
 **Your AI instruction files silently degrade — and nothing catches it.** `AGENTS.md` is read by Cursor, Codex, Copilot, and Claude Code — one rotting file now quietly degrades four tools. A trigger phrase rots, an edge case slips, the file balloons past its token budget. No error, no red test — just agents that quietly get worse.
 
@@ -47,9 +44,9 @@ schliff v8.10.0
   Format: agents.md (normalized)
 ```
 
-No model produced that number. Run it on another laptop and you get 95.6 again — **a score you can't reproduce isn't a measurement, it's a vibe.** And we hold *ourselves* to that: this repo's own badge (scored in isolation) once disagreed with its own CLI (scored in-repo) by ~15 points on the *same bytes*, because `structure` was crediting an on-disk `references/` neighbourhood instead of the file's content. We fixed the engine, not the file ([#10](https://github.com/Zandereins/schliff/pull/129)) — now `cp AGENTS.md /tmp && schliff score /tmp/AGENTS.md` returns the same number as CI and the badge. (The `agents.md` headline weights `structure`·`operational_coverage`·`efficiency` at 0.4/0.4/0.2; `composability` and `clarity` are shown for information, not counted.)
+No model produced that number. Run it on another laptop and you get 95.6 again — **a score you can't reproduce isn't a measurement, it's a vibe.** And we hold *ourselves* to that: this repo's own badge (scored in isolation) once disagreed with its own CLI (scored in-repo) by ~15 points on the *same bytes*, because `structure` was crediting an on-disk `references/` neighbourhood instead of the file's content. We fixed the engine, not the file ([#129](https://github.com/Zandereins/schliff/pull/129)) — now `cp AGENTS.md /tmp && schliff score /tmp/AGENTS.md` returns the same number as CI and the badge. (The `agents.md` headline weights `structure`·`operational_coverage`·`efficiency` at 0.4/0.4/0.2; `composability` and `clarity` are shown for information, not counted.)
 
-*The quick-start and case-study numbers here are reproducible from released `schliff==8.10.0` (`pip install schliff==8.10.0` or `uvx schliff@8.10.0`); the hydra field run below is dated to the version it was measured on. Prefer the browser? Paste your file into the [playground](https://schliff-playground.vercel.app) — same engine, with AGENTS.md and SKILL.md tabs.*
+*The quick-start and case-study numbers here are reproducible from released `schliff==8.10.0` (`pip install schliff==8.10.0` or `uvx schliff@8.10.0`); the hydra field run below is dated to the version it was measured on.*
 
 ---
 
@@ -77,7 +74,7 @@ Deterministic means reproducible and auditable — it does not automatically mea
 
 Config linters tell you whether the file is *valid* — a list of pass/fail rules. Schliff tells you how *good* it is — one graded 0–100 score you can gate, diff across commits, and rank.
 
-- **Reproducible.** The headline composite is computed from a canonical, versioned weight registry. Calibration is **off by default**, so `verify`, `badge`, and the leaderboard return the same score on your laptop and in CI.
+- **Reproducible.** The headline composite is computed from a canonical, versioned weight registry. Calibration is **off by default**, so `verify` and `badge` return the same score on your laptop and in CI.
 - **Auditable.** Every dimension is a readable scorer in [`scripts/scoring/`](skills/schliff/scripts/scoring/). The weights are a dict you can open. There is no hidden judge prompt.
 - **Anti-gaming, precisely scoped.** A dedicated guard layer ([`guards.py`](skills/schliff/scripts/scoring/guards.py)) detects and floors padding, junk fences, platitude farms, and keyword stuffing — worthless text cannot outrank operational text. A *plausible lie* about your repo is out of reach of any static scorer (see [What the score does not measure](#what-the-score-does-not-measure)).
 - **Zero core dependencies.** Core Schliff is stdlib-only and runs on **Python ≥ 3.10**. (Optional `[evolve]` / `[judge]` extras pull in LLM clients for an opt-in smoke-test only — never for scoring.)
@@ -229,15 +226,30 @@ repo-root `AGENTS.md` and posts a scored comment on every PR:
 # .github/workflows/agents-lint.yml
 name: AGENTS.md Lint
 on: [pull_request]
+permissions:
+  contents: read
+  pull-requests: write   # the comment step needs this; omit it and set comment-on-pr: false
 jobs:
   score:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: Zandereins/schliff@v1
         with:
           minimum-score: '75'   # optional: fail the PR below this score
 ```
+
+`comment-on-pr` defaults to `true`, and posting a comment needs
+`pull-requests: write` — without the `permissions:` block above you inherit the
+repository default, which in many repos is read-only, and the comment step then
+fails while the score still gates the PR.
+
+> **Never switch this to `pull_request_target` to get comments on fork PRs.**
+> That trigger runs with a write-scoped token in the base repository while
+> checking out untrusted code, which is the standard way CI secrets get stolen.
+> On a fork PR the token is read-only by design: the score and the exit code
+> still work, only the comment is skipped. That degradation is the intended
+> behaviour, not a problem to route around.
 
 By default it scores `AGENTS.md` at the repo root; set `skill-path:` to lint a
 `SKILL.md`, `CLAUDE.md`, or `.cursorrules` instead. One caveat: the Action
@@ -259,18 +271,6 @@ supported format — the minimum is scaled by measurement coverage, so `SKILL.md
 files without an eval suite aren't auto-failed. Requires schliff ≥ 8.5.0 for
 `AGENTS.md`: older engines scored it under the SKILL profile
 ([#101](https://github.com/Zandereins/schliff/issues/101)).
-
-### README badge
-
-Show your repo's AGENTS.md quality — no setup, no CI, no account:
-
-```markdown
-![AGENTS.md quality](https://img.shields.io/endpoint?url=https%3A%2F%2Fschliff-playground.vercel.app%2Fapi%2Fbadge%3Frepo%3DOWNER%2FREPO)
-```
-
-Replace `OWNER/REPO` with your repository. The badge is scored live from your
-`AGENTS.md` at `HEAD`; GitHub's image cache (camo) may delay refreshes. Public
-repos only.
 
 ### pre-commit
 
@@ -360,8 +360,7 @@ scripts/
 ## Links & docs
 
 - **Docs:** [`docs/SCORING.md`](docs/SCORING.md)
-- **Playground:** [schliff-playground.vercel.app](https://schliff-playground.vercel.app) — paste a SKILL.md or AGENTS.md, get a live score (or `schliff demo` in the CLI). The playground reports the structural score for SKILL.md — the CLI's full 7-dim composite can differ; AGENTS.md has no such gap.
-- **Leaderboard:** [schliff-leaderboard.vercel.app](https://schliff-leaderboard.vercel.app)
+- **Try it without installing:** `uvx schliff@latest demo` scores a built-in bad skill; `schliff score <file>` scores your own.
 - **Case studies:** [`docs/case-studies/`](docs/case-studies/)
 
 ## License
