@@ -43,6 +43,7 @@ import score_skill as scorer  # noqa: E402
 import text_gradient as gradient_mod  # noqa: E402
 from terminal_art import grade_colored, progress_bar, score_to_grade, sparkline  # noqa: E402
 
+from eval_split import split_eval_suite  # noqa: E402
 from shared import load_eval_suite  # noqa: E402
 
 # --- State Management ---
@@ -308,6 +309,13 @@ def run_auto_improve(
     skill_path = str(Path(skill_path).resolve())
     eval_suite = load_eval_suite(skill_path)
 
+    # Derive edits from `train`, judge them on `val` (ADR 0015). When the two
+    # are not disjoint the loop still runs — but `holdout_leaked` travels into
+    # the summary so the delta is never presented as evidence of generalisation.
+    train_suite, val_suite, holdout_leaked = (
+        split_eval_suite(eval_suite) if eval_suite else (None, None, False)
+    )
+
     # Load existing state for resume
     state = _load_state(skill_path)
     start_iteration = len(state)
@@ -318,7 +326,7 @@ def run_auto_improve(
 
     # Clear scorer cache for fresh reads
     scorer.invalidate_cache(skill_path)
-    baseline = _score_skill(skill_path, eval_suite)
+    baseline = _score_skill(skill_path, val_suite)
 
     if start_iteration == 0:
         baseline_entry = {
@@ -386,7 +394,7 @@ def run_auto_improve(
         # Clear cache and compute gradients
         scorer.invalidate_cache(skill_path)
         gradients = gradient_mod.compute_gradients(
-            skill_path, eval_suite=eval_suite, include_clarity=True
+            skill_path, eval_suite=train_suite, include_clarity=True
         )
 
         if not gradients:
@@ -443,11 +451,11 @@ def run_auto_improve(
             # Score the in-memory candidate content instead.
             if dry_run:
                 new_score = _score_content(
-                    result["new_content"], skill_path, eval_suite
+                    result["new_content"], skill_path, val_suite
                 )
             else:
                 scorer.invalidate_cache(skill_path)
-                new_score = _score_skill(skill_path, eval_suite)
+                new_score = _score_skill(skill_path, val_suite)
             delta = round(new_score["composite"] - current_score["composite"], 1)
 
             if verbose and explore_width > 1:
@@ -554,7 +562,7 @@ def run_auto_improve(
 
     # Final summary
     elapsed = time.monotonic() - _loop_start
-    final_score = _score_skill(skill_path, eval_suite) if not dry_run else current_score
+    final_score = _score_skill(skill_path, val_suite) if not dry_run else current_score
 
     # Sparkline of score progression
     score_history = [e.get("composite", 0) for e in state if e.get("status") in ("keep", "baseline")]
@@ -572,6 +580,8 @@ def run_auto_improve(
         "dry_run": dry_run,
         "elapsed_seconds": round(elapsed, 1),
         "sparkline": sparkline_str,
+        # False only when gradients and gate genuinely saw different cases.
+        "holdout_leaked": holdout_leaked,
     }
 
     return summary
