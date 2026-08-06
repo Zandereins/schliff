@@ -295,6 +295,18 @@ def cmd_score(args: argparse.Namespace) -> None:
             else:
                 print(f"  Tokens: {tok:,} / {bud:,} ({token_info['severity']})")
 
+            # Credential findings. `score` reports and never gates (ADR 0014) —
+            # `verify` is the surface that fails. Vendor and line only: naming
+            # the value here would print it into any CI log that runs `score`.
+            if credentials:
+                print()
+                for finding in credentials:
+                    print(
+                        f"  credential: {finding['vendor']} at line {finding['line']}"
+                    )
+                print("  → remove it from the file and rotate the key.")
+                print("    `schliff verify` fails on this at any --min-score.")
+
             # --tokens: section breakdown
             if getattr(args, "tokens", False):
                 lines = skill_content.splitlines()

@@ -73,9 +73,33 @@ runs:
         # Default to AGENTS.md at the repo root when no path is given (the
         # AGENTS.md-first entry point). Fail clearly if the file is missing,
         # with a message tailored to whether the path was explicit or defaulted.
+        # Containment. Every path handed to schliff must resolve inside the
+        # workspace. A fork PR controls its own checkout, so it can plant a
+        # symlink pointing anywhere on the runner — and schliff's reads report
+        # existence, byte size and (for the credential scan) whether a key is
+        # present, which turns an unguarded read into an out-of-repo oracle.
+        # This is the same guard `command_resolution._contained` applies to
+        # manifest reads. It runs BEFORE the `-f` test below, because `-f`
+        # dereferences symlinks and is itself an existence probe (ADR 0016).
+        contained() {
+        CONTAIN_ROOT="$GITHUB_WORKSPACE" CONTAIN_TARGET="$1" python3 -P -c "
+        import os, sys
+        try:
+            root = os.path.realpath(os.environ['CONTAIN_ROOT'])
+            target = os.path.realpath(os.environ['CONTAIN_TARGET'])
+            sys.exit(0 if os.path.commonpath([root, target]) == root else 1)
+        except (OSError, ValueError):
+            sys.exit(1)
+        "
+        }
+
         EXPLICIT_PATH="${INPUT_SKILL_PATH}"
         INPUT_SKILL_PATH="${INPUT_SKILL_PATH:-AGENTS.md}"
         SKILL_FULL="${GITHUB_WORKSPACE}/${INPUT_SKILL_PATH}"
+        if ! contained "$SKILL_FULL"; then
+          echo "::error::'skill-path' resolves outside the workspace. Refusing to read it."
+          exit 1
+        fi
         if [ ! -f "$SKILL_FULL" ]; then
           if [ -n "$EXPLICIT_PATH" ]; then
             echo "::error::Instruction file not found: ${INPUT_SKILL_PATH} (from the 'skill-path' input)."
@@ -88,6 +112,13 @@ runs:
         if [ -n "${INPUT_EVAL_SUITE}" ]; then
           EVAL_FLAG="--eval-suite"
           EVAL_PATH="${GITHUB_WORKSPACE}/${INPUT_EVAL_SUITE}"
+          # Second path on the same command line, and previously unguarded:
+          # schliff reports the eval suite's existence and exact byte size on
+          # stderr, which this action echoes into a public ::error:: annotation.
+          if ! contained "$EVAL_PATH"; then
+            echo "::error::'eval-suite' resolves outside the workspace. Refusing to read it."
+            exit 1
+          fi
         fi
         if [ -n "$EVAL_FLAG" ]; then
           RESULT=$(schliff score "$SKILL_FULL" "$EVAL_FLAG" "$EVAL_PATH" --json 2>/tmp/schliff_stderr) || true
@@ -132,6 +163,19 @@ runs:
         # KeyError (schliff 6.3.0 emits no `format`).
         FORMAT=$(echo "$RESULT" | python3 -P -c "import sys,json; print(json.load(sys.stdin).get('format',''))" 2>/dev/null) || true
         echo "format=$FORMAT" >> "$GITHUB_OUTPUT"
+
+        # Credential findings, rendered as "vendor:line" pairs. `.get` with a
+        # default so a pinned pre-8.11 engine degrades to "no findings" instead
+        # of failing the parse — the same graceful-degradation contract the
+        # `format` line above follows and the `old-engine` self-test asserts.
+        # Only vendor and line cross this boundary; the value never entered the
+        # JSON in the first place (ADR 0014).
+        CREDENTIALS=$(echo "$RESULT" | python3 -P -c "
+        import sys, json
+        found = json.load(sys.stdin).get('credentials', []) or []
+        print(' '.join(f\"{c['vendor']}:{c['line']}\" for c in found))
+        " 2>/dev/null) || true
+        echo "credentials=$CREDENTIALS" >> "$GITHUB_OUTPUT"
         # The already-resolved absolute path — single source of truth so the
         # dangling step does not re-derive the default-to-AGENTS.md logic.
         echo "skill_full=$SKILL_FULL" >> "$GITHUB_OUTPUT"
@@ -178,6 +222,24 @@ runs:
           " 2>/dev/null || true
         else
           echo "No dangling commands."
+        fi
+
+    - name: Fail on detected credentials
+      shell: bash
+      env:
+        CREDENTIALS: ${{ steps.score.outputs.credentials }}
+      run: |
+        # Categorical and unconditional: a leak does not compete with a score
+        # threshold, so this step carries no `if:` on minimum-score and cannot
+        # be tuned away (ADR 0011, ADR 0014). It runs before the threshold gate
+        # so the credential is the reported reason, not a score that happens to
+        # be low as well.
+        if [ -n "${CREDENTIALS}" ]; then
+          for finding in ${CREDENTIALS}; do
+            echo "::error::Credential detected: ${finding%%:*} at line ${finding##*:}"
+          done
+          echo "::error::Remove it from the instruction file and rotate the key."
+          exit 1
         fi
 
     - name: Check minimum score

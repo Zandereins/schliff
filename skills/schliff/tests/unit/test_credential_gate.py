@@ -130,3 +130,54 @@ class TestVerifyGate:
         result = _run_cli("verify", skill, "--min-score", "0")
 
         assert LIVE_KEY not in result.stdout + result.stderr
+
+
+class TestReportingSurfaces:
+    """ADR 0014: reporting surfaces display the finding and never change their
+    exit code. A human running `score` must see it too — the JSON branch is for
+    machines, and a leak that only machines can see helps nobody.
+    """
+
+    def test_human_score_output_shows_vendor_and_line(self, tmp_path):
+        skill = _write_skill(tmp_path, f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
+
+        result = _run_cli("score", skill)
+
+        assert "aws_access_key" in result.stdout
+        assert "17" in result.stdout
+        assert LIVE_KEY not in result.stdout
+
+    def test_human_score_still_exits_zero(self, tmp_path):
+        skill = _write_skill(tmp_path, f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
+
+        result = _run_cli("score", skill)
+
+        assert result.returncode == 0, "score reports, it does not gate"
+
+    def test_clean_file_says_nothing_about_credentials(self, tmp_path):
+        skill = _write_skill(tmp_path, "Set `AWS_ACCESS_KEY_ID` in your environment.")
+
+        result = _run_cli("score", skill)
+
+        assert "credential" not in result.stdout.lower()
+
+    def test_doctor_json_reports_the_finding_without_gating(self, tmp_path):
+        _write_skill(tmp_path / "leaky", f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
+
+        result = _run_cli("doctor", "--skill-dirs", str(tmp_path), "--json")
+
+        assert result.returncode == 0, "doctor reports on other people's files"
+        report = json.loads(result.stdout)
+        entries = [r for r in report["results"] if r.get("credentials")]
+        assert len(entries) == 1
+        assert entries[0]["credentials"] == [{"vendor": "aws_access_key", "line": 17}]
+        assert LIVE_KEY not in result.stdout
+
+    def test_doctor_human_output_flags_the_skill(self, tmp_path):
+        _write_skill(tmp_path / "leaky", f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
+
+        result = _run_cli("doctor", "--skill-dirs", str(tmp_path))
+
+        assert "credential" in result.stdout.lower()
+        assert "aws_access_key" in result.stdout
+        assert LIVE_KEY not in result.stdout

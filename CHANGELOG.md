@@ -5,6 +5,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### BREAKING BEHAVIOUR
+
+- **`schliff verify` and the GitHub Action now fail on a detected credential, at any
+  `--min-score`.** A pipeline that is green today turns red if the instruction file contains
+  a structurally valid vendor token — an AWS access key, a GitHub token, an Anthropic or
+  OpenAI key, a Slack or Google key, or a JWT. This is filed here rather than under *Added*
+  because a build that used to pass can now fail without the workflow changing, and the
+  Action's `schliff-version` input defaults to the latest release.
+
+  **No score changes.** The composite, every dimension, badges, `compare`, and every pinned
+  `--min-score` threshold behave exactly as before. A leak is not a quality deduction that
+  competes with a threshold; it is a categorical failure, so it is modelled as one. That is
+  also why no `--allow-secrets` escape ships: an opt-out on a security gate becomes the
+  default copy-paste line, and a legitimate value that trips the detector is a pattern bug
+  to fix in the pattern.
+
+  **Placeholders never fire.** A finding requires the vendor prefix *and* the exact shape
+  that vendor issues, and any token announcing itself as a stand-in is ignored — including
+  AWS's own documentation key `AKIAIOSFODNN7EXAMPLE`, `sk-ant-REPLACE_ME…`, `<your-key>`
+  and `${VAR}`.
+
+### Added
+
+- **Credential findings in `score`, `score --json` and `doctor`.** Reporting surfaces display
+  the finding and never change their exit code; only `verify` and the Action gate on it.
+  A finding carries the **vendor and the line number, never the value** — the Action hands
+  the whole score object to its PR-comment step, so output sites cannot be enumerated and
+  the value must not be in the object to begin with.
+
+### Security
+
+- **The Action now refuses paths that resolve outside the workspace.** Both `skill-path` and
+  `eval-suite` are checked before schliff reads anything. A pull request from a fork controls
+  its own checkout and could previously plant a symlink pointing elsewhere on the runner;
+  schliff's messages report existence and exact byte size, which made an unguarded read an
+  out-of-repo oracle. A pinned pre-8.11 engine degrades to "no findings" rather than failing
+  the parse.
+
 ## [8.10.1] - 2026-08-04
 
 **The hosted playground, leaderboard and badge endpoint have been retired.** The CLI, the
