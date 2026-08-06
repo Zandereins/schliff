@@ -16,13 +16,21 @@ _SECRET_PATTERNS = [
     (re.compile(r'mongodb(\+srv)?://[^\s"\']+'), '[REDACTED:mongodb-url]'),
     (re.compile(r'redis://[^\s"\']+'), '[REDACTED:redis-url]'),
     (re.compile(r'mysql://[^\s"\']+'), '[REDACTED:mysql-url]'),
-    (re.compile(r'ghp_[a-zA-Z0-9]{36}'), '[REDACTED:github-token]'),
-    (re.compile(r'gho_[a-zA-Z0-9]{36}'), '[REDACTED:github-oauth]'),
+    # All five GitHub token classes, variable length. The previous pair bound at
+    # exactly 36 and covered only ghp_/gho_, so a shorter token or a ghu_/ghs_/ghr_
+    # one survived unless the surrounding text happened to trip the generic
+    # assignment catcher below. Redaction may over-reach; a miss here reaches a
+    # model provider (ADR 0013).
+    (re.compile(r'gho_[a-zA-Z0-9]{20,}'), '[REDACTED:github-oauth]'),
+    (re.compile(r'gh[pusr]_[a-zA-Z0-9]{20,}'), '[REDACTED:github-token]'),
     (re.compile(r'glpat-[a-zA-Z0-9_-]{20,}'), '[REDACTED:gitlab-token]'),
     (re.compile(r'xox[bporas]-[a-zA-Z0-9-]+'), '[REDACTED:slack-token]'),
     (re.compile(r'Bearer\s+[a-zA-Z0-9._-]{20,}'), '[REDACTED:bearer-token]'),
     (re.compile(r'-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----'), '[REDACTED:private-key]'),
     (re.compile(r'AIza[a-zA-Z0-9_-]{35}'), '[REDACTED:google-api-key]'),
+    # ODBC abbreviates Password as Pwd. The lookbehind keeps the conventional
+    # all-caps $PWD working-directory variable intact, per SkillOpt staging.py.
+    (re.compile(r'(?<![A-Za-z0-9])(Pwd|pwd)\s*=\s*[^\s;"\']{8,}'), r'\1=[REDACTED:db-pass]'),
     (re.compile(r'eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'), '[REDACTED:jwt]'),
     # Generic assignment catcher — keep last so vendor-specific patterns win.
     # Matches keyword-bearing identifiers (e.g. AWS_SECRET_ACCESS_KEY, db_password,
