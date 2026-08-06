@@ -177,7 +177,7 @@ def run_verify(
         "passed_threshold": False, "exit_code": 2, "message": "",
         "previous_score": None, "delta": None, "regression": False,
         # Uniform key set with the normal verdict (provenance is N/A on an error path).
-        "weight_source": "default", "weights_hash": None,
+        "weight_source": "default", "weights_hash": None, "credentials": [],
     }
 
     if not Path(skill_path).exists():
@@ -222,7 +222,33 @@ def run_verify(
         # Provenance so CI consumers can confirm the gate used canonical weights.
         "weight_source": result.get("weight_source", "default"),
         "weights_hash": result.get("weights_hash"),
+        "credentials": [],
     }
+
+    # Credential gate — categorical and independent of --min-score (ADR 0011,
+    # ADR 0014). A leak is not a quality deduction that competes with a
+    # threshold; it fails the build on its own. Reads the raw file so the
+    # reported line points at what the user wrote (ADR 0016), and the message
+    # names vendor and line only — never the value (ADR 0014).
+    from scoring.credentials import scan_credentials
+    from shared import read_skill_safe
+
+    try:
+        raw_content = read_skill_safe(skill_path)
+    except (OSError, ValueError):
+        raw_content = ""
+    credentials = scan_credentials(raw_content)
+    if credentials:
+        verdict["credentials"] = credentials
+        verdict["exit_code"] = 1
+        vendors = ", ".join(sorted({c["vendor"] for c in credentials}))
+        locations = ", ".join(str(c["line"]) for c in credentials)
+        verdict["message"] = (
+            f"FAIL: credential detected ({vendors}) at line {locations} — "
+            f"remove it from the file and rotate the key"
+        )
+        append_history(skill_path, result, history_path)
+        return verdict
 
     # Threshold check (coverage-aware)
     if composite < effective_min:

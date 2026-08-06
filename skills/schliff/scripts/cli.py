@@ -208,6 +208,14 @@ def cmd_score(args: argparse.Namespace) -> None:
             sys.exit(1)
         token_info = check_token_budget(skill_content, detected_fmt)
 
+        # Credential detection runs on the RAW file, not on the normalized content
+        # build_scores hands the scorers: line numbers must point at the file the
+        # user named, and the normalization seam at shared.py:232-241 has corrupted
+        # scores here twice already (ADR 0016). Score-neutral by construction — the
+        # findings ride alongside the composite and never enter it (ADR 0011).
+        from scoring.credentials import scan_credentials
+        credentials = scan_credentials(skill_content)
+
         if getattr(args, "json", False):
             # A dimension score of -1 is the sentinel for "not measured" (e.g.
             # triggers/quality/edges with no eval suite). Surface it as JSON null
@@ -232,6 +240,10 @@ def cmd_score(args: argparse.Namespace) -> None:
                 },
                 "warnings": composite["warnings"],
                 "token_budget": token_info,
+                # Vendor + line only. The matched value never enters this object:
+                # the Action hands the whole thing to its PR-comment step as
+                # RESULT_B64, so output sites are not enumerable (ADR 0014).
+                "credentials": credentials,
             }
             print(json.dumps(result, indent=2))
         else:

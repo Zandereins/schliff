@@ -576,6 +576,8 @@ class TestVerdictStructure:
             "passed_threshold", "exit_code", "message",
             "previous_score", "delta", "regression",
             "weight_source", "weights_hash",
+            # Vendor + line per finding, never the matched value (ADR 0014).
+            "credentials",
         }
         assert set(verdict.keys()) == expected_keys
 
