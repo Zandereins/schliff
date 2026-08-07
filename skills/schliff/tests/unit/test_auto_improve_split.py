@@ -90,3 +90,23 @@ def test_summary_headline_matches_the_full_suite_not_val(tmp_path, monkeypatch):
     assert full != val_only, "fixture must actually discriminate"
     assert summary["final_dimensions"]["triggers"] == full
     assert summary["gate_suite"] == "val"
+
+
+def test_printed_delta_matches_the_printed_arrow(tmp_path, monkeypatch, capsys):
+    """The arrow and the parenthesised delta must come from one basis.
+
+    The first attempt at this fix moved baseline and final to the full suite but
+    left the printed delta accumulating gate-side deltas, so `42 -> 40 (+1.6)`
+    was still possible.
+    """
+    skill = _write(tmp_path)
+    monkeypatch.setattr(auto_improve, "load_eval_suite", lambda _p: _suite(labelled=True))
+
+    summary = auto_improve.run_auto_improve(skill, max_iterations=2, dry_run=True)
+
+    arrow_delta = round(
+        summary["final_composite"] - summary["baseline_composite"], 1
+    )
+    assert summary["total_delta_reported"] == arrow_delta
+    # The value the renderer actually prints must be the one matching the arrow.
+    assert auto_improve._printed_delta(summary) == arrow_delta

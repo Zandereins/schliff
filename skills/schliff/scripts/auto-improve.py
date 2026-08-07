@@ -640,6 +640,19 @@ def run_auto_improve(
     return summary
 
 
+def _printed_delta(summary: dict) -> float:
+    """The delta the human renderer shows, on the same basis as its arrow.
+
+    `total_delta` accumulates the GATE's per-step deltas, which are measured on
+    `val`. Printing it beside a full-suite arrow produced `42 -> 40 (+1.6)`:
+    two numbers, two bases, one line. The renderer uses this instead.
+    """
+    return summary.get(
+        "total_delta_reported",
+        round(summary["final_composite"] - summary["baseline_composite"], 1),
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Schliff Auto-Improve — Autonomous Loop Driver")
     parser.add_argument("skill_path", help="Path to SKILL.md")
@@ -674,7 +687,7 @@ def main():
         bar = progress_bar(sc, 20)
         grade = score_to_grade(sc)
         grade_str = grade_colored(grade)
-        print(f"  Score:  {summary['baseline_composite']:.0f} \u2192 {sc:.0f}/100  {bar}  ({summary['total_delta']:+.1f})  {grade_str}")
+        print(f"  Score:  {summary['baseline_composite']:.0f} \u2192 {sc:.0f}/100  {bar}  ({_printed_delta(summary):+.1f})  {grade_str}")
         print(f"  Iters:  {summary['iterations']}  |  Kept: {summary['improvements']}  |  Time: {time_str}")
         if summary.get('sparkline'):
             print(f"  Trend:  {summary['sparkline']}  ({summary['baseline_composite']:.0f} \u2192 {sc:.0f})")
