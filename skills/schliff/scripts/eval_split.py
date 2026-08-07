@@ -48,13 +48,12 @@ def split_eval_suite(suite: dict) -> tuple[dict, dict, bool]:
             leaked = True
             continue
 
-        # An unlabelled case in a partly labelled population goes to `train`.
-        # Dropping it — as an earlier version did — deleted 43 of 44 cases the
-        # moment a user marked one `test`, which emptied the population, turned
-        # three dimensions into the unmeasured sentinel and blinded the gate
-        # without saying so.
-        train_cases = [c for c in cases if _label(c) in (_TRAIN, "")]
+        # Only `val` and `test` are special. Everything else — unlabelled AND
+        # unrecognised — is train, so a typo like "traing" can never delete a
+        # case. Dropping on an unknown label was the same silent-drop class the
+        # unlabelled fix removed, one branch over.
         val_cases = [c for c in cases if _label(c) == _VAL]
+        train_cases = [c for c in cases if _label(c) not in (_VAL, _TEST)]
 
         # One side empty means nothing is being held out for this population.
         if not train_cases or not val_cases:

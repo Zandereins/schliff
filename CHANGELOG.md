@@ -10,7 +10,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **`schliff verify` and the GitHub Action now fail on a detected credential, at any
   `--min-score`.** A pipeline that is green today turns red if the instruction file contains
   a structurally valid vendor token — an AWS access key, a GitHub token, an Anthropic or
-  OpenAI key, a Slack or Google key, or a JWT. This is filed here rather than under *Added*
+  OpenAI key, a Slack token or a Google key. **JWTs are deliberately not detected**: the
+  jwt.io sample and Supabase's `anon` key are public by design, and nothing in a JWT's shape
+  separates them from a service key. Use a dedicated secret scanner if you need that class.
+  This is filed here rather than under *Added*
   because a build that used to pass can now fail without the workflow changing, and the
   Action's `schliff-version` input defaults to the latest release.
 

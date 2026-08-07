@@ -76,10 +76,14 @@ def _score_single_skill(skill_path: str) -> dict:
     # Doctor reports, it never gates: these are usually somebody else's files
     # and a red exit on a file you cannot edit helps nobody (ADR 0014). Raw
     # content so the line points at the real file (ADR 0016).
+    # `None` means "could not scan", which is not the same as "scanned, clean".
+    # verify.py got this contract; doctor did not, so an oversize file with a
+    # live key printed a row with no credential line and any `--json` consumer
+    # testing `if r["credentials"]:` read it as clean.
     try:
         credentials = scan_credentials(read_skill_safe(skill_path))
     except (OSError, ValueError):
-        credentials = []
+        credentials = None
 
     composite = scorer.compute_composite(scores)
 
@@ -323,12 +327,18 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
         lines.append(f"  {name:<25s} {score:>5.0f} {grade:s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
 
         # Credentials print unconditionally, not behind --verbose: a leak is not
-        # a detail you opt into. Vendor and line only (ADR 0014).
-        for finding in r.get("credentials", []):
-            lines.append(
-                f"    {'':25s}  └─ credential: {finding['vendor']} "
-                f"at line {finding['line']}"
-            )
+        # a detail you opt into. Vendor and line only (ADR 0014). `None` is the
+        # third state — the file could not be read, which must not render as a
+        # clean row.
+        found = r.get("credentials", [])
+        if found is None:
+            lines.append(f"    {'':25s}  └─ credential scan: could not read the file")
+        else:
+            for finding in found:
+                lines.append(
+                    f"    {'':25s}  └─ credential: {finding['vendor']} "
+                    f"at line {finding['line']}"
+                )
 
         if verbose and r.get("issues"):
             for issue in r["issues"][:5]:  # Cap at 5 to avoid flooding

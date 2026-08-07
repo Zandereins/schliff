@@ -18,8 +18,15 @@ _PATTERNS: tuple[tuple[str, "re.Pattern[str]"], ...] = (
     ("aws_access_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("anthropic_api_key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}")),
     # `sk-` is Anthropic's prefix too; the lookahead keeps one token from
-    # producing two findings and keeps the vendor label honest.
-    ("openai_api_key", re.compile(r"\bsk-(?!ant-)[A-Za-z0-9_-]{20,}")),
+    # producing two findings and keeps the vendor label honest. No BARE hyphens
+    # after the prefix: an earlier `[A-Za-z0-9_-]{20,}` matched kebab-case prose
+    # such as `sk-production-cluster-namespace`, which failed a third party's
+    # build with no way to suppress it. Real keys are `sk-<alnum>` or one known
+    # segment (`proj-`, `svcacct-`, `admin-`) followed by alnum.
+    (
+        "openai_api_key",
+        re.compile(r"\bsk-(?!ant-)(?:proj-|svcacct-|admin-)?[A-Za-z0-9_]{20,}"),
+    ),
     ("github_token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}")),
     ("slack_token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}")),
     ("google_api_key", re.compile(r"\bAIza[A-Za-z0-9_-]{31,}")),

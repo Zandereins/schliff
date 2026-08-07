@@ -237,23 +237,6 @@ runs:
           echo "No dangling commands."
         fi
 
-    - name: Check minimum score
-      if: inputs.minimum-score != '0'
-      shell: bash
-      env:
-        COMPOSITE: ${{ steps.score.outputs.composite }}
-        MINIMUM: ${{ inputs.minimum-score }}
-      run: |
-        python3 -P -c "
-        import sys, os
-        score = float(os.environ['COMPOSITE'])
-        minimum = float(os.environ['MINIMUM'])
-        if score < minimum:
-            print(f'::error::Score {score} is below minimum {minimum}')
-            sys.exit(1)
-        print(f'Score {score} passes minimum {minimum}')
-        "
-
     - name: Comment on PR
       if: inputs.comment-on-pr == 'true' && github.event_name == 'pull_request'
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -430,6 +413,23 @@ runs:
           echo "::error::Remove it from the instruction file and rotate the key."
           exit 1
         fi
+
+    - name: Check minimum score
+      if: inputs.minimum-score != '0'
+      shell: bash
+      env:
+        COMPOSITE: ${{ steps.score.outputs.composite }}
+        MINIMUM: ${{ inputs.minimum-score }}
+      run: |
+        python3 -P -c "
+        import sys, os
+        score = float(os.environ['COMPOSITE'])
+        minimum = float(os.environ['MINIMUM'])
+        if score < minimum:
+            print(f'::error::Score {score} is below minimum {minimum}')
+            sys.exit(1)
+        print(f'Score {score} passes minimum {minimum}')
+        "
 
     - name: Enforce dangling gate
       # Opt-in, and LAST: the comment above always posts first, then (only if the

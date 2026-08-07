@@ -185,3 +185,91 @@ class TestPwdRedactionDoesNotEatShell:
         secret = "Sup3rSecretValue12345"
 
         assert secret not in redact_secrets(f"DRIVER={{ODBC}};Pwd={secret};")
+
+
+# --- Second review pass, 2026-08-07 -----------------------------------------
+# Six of these were regressions from the first pass's fixes: each repaired the
+# one line the reviewer named and left the symmetric case next to it.
+
+
+class TestVendorShapesAreActuallyVendorShapes:
+    """An OpenAI key has no bare hyphens after its prefix. Kebab-case prose
+    starting with `sk-` must not trip a gate that has no opt-out."""
+
+    @pytest.mark.parametrize("text", [
+        "run: kubectl get pods -n sk-production-cluster-namespace",
+        "Branch naming: sk-add-credential-scanning-to-verify",
+        "See https://docs.acme.com/sk-slovenska-verzia-dokumentacie for details",
+    ])
+    def test_kebab_case_prose_is_not_a_credential(self, text):
+        assert scan_credentials(text) == []
+
+    @pytest.mark.parametrize("token", [
+        "sk-proj-Nx7Qm2Kd9dK2mNqR7vT4wX1zB6cF8gH3",
+        "sk-Nx7Qm2Kd9dK2mNqR7vT4wX1zB6cF8gH3jL5pQ",
+    ])
+    def test_real_openai_shapes_still_fire(self, token):
+        assert [f["vendor"] for f in scan_credentials(f"key {token}")] == ["openai_api_key"]
+
+
+class TestOdbcCoversBothSpellings:
+    """`PWD=` is what Microsoft's own ODBC and pyodbc connection strings use;
+    narrowing to `Pwd` alone traded one blind spot for another."""
+
+    @pytest.mark.parametrize("spelling", ["PWD", "Pwd"])
+    def test_connection_string_password_is_redacted(self, spelling):
+        secret = "Pr0dPassw0rd12345"
+        text = f"DRIVER={{ODBC Driver 17}};SERVER=db;UID=sa;{spelling}={secret};"
+
+        assert secret not in redact_secrets(text)
+
+    def test_lowercase_shell_pwd_still_survives(self):
+        text = "export pwd=/Users/franz/projects/schliff/build"
+
+        assert redact_secrets(text) == text
+
+    def test_the_shell_variable_reference_survives(self):
+        text = "Run the build from $PWD before deploying."
+
+        assert redact_secrets(text) == text
+
+
+class TestSplitNeverDropsACase:
+    """Finding 6. An unrecognised label is a typo, not an instruction to
+    delete the case."""
+
+    def test_a_mistyped_label_keeps_the_case_on_the_train_side(self):
+        suite = {"triggers": [{"prompt": f"p{i}", "split": "traing"} for i in range(40)]}
+
+        train, val, leaked = split_eval_suite(suite)
+
+        assert len(train["triggers"]) == 40, "a typo must not delete 40 cases"
+        assert val["triggers"] == []
+        assert leaked is True
+
+    def test_test_labelled_cases_reach_neither_side(self):
+        suite = {"triggers": [{"prompt": "a", "split": "train"},
+                              {"prompt": "b", "split": "val"},
+                              {"prompt": "c", "split": "test"}]}
+
+        train, val, _ = split_eval_suite(suite)
+
+        assert "c" not in [x["prompt"] for x in train["triggers"] + val["triggers"]]
+
+
+class TestDoctorHonoursTheThreeStateContract:
+    """Finding 3. The rule was applied to verify and not carried to doctor."""
+
+    def test_unreadable_skill_reports_none_not_empty(self, tmp_path):
+        import doctor
+
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            "---\nname: x\ndescription: d\n---\n\n# x\n\n"
+            f"AWS key: {LIVE_KEY}\n" + ("filler\n" * 200000),
+            encoding="utf-8",
+        )
+
+        result = doctor._score_single_skill(str(skill))
+
+        assert result["credentials"] is None, "unscannable must not read as clean"

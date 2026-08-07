@@ -312,9 +312,24 @@ def run_auto_improve(
     # Derive edits from `train`, judge them on `val` (ADR 0015). When the two
     # are not disjoint the loop still runs — but `holdout_leaked` travels into
     # the summary so the delta is never presented as evidence of generalisation.
-    train_suite, val_suite, holdout_leaked = (
-        split_eval_suite(eval_suite) if eval_suite else (None, None, False)
-    )
+    if eval_suite:
+        train_suite, val_suite, holdout_leaked = split_eval_suite(eval_suite)
+        # A val side with no cases in any population cannot judge anything:
+        # triggers/quality/edges collapse to the unmeasured sentinel and the
+        # gate keeps a patch that destroyed every trigger match. Fall back to
+        # the full suite for gating and say the holdout is gone.
+        if not any(val_suite.get(k) for k in ("triggers", "test_cases", "edge_cases")):
+            val_suite = eval_suite
+            holdout_leaked = True
+            gate_basis = "full (val was empty)"
+        else:
+            gate_basis = "val"
+    else:
+        # No suite at all: gradients and gate see the identical empty set, so
+        # nothing is held out. Reporting False here contradicted the field's
+        # own documented meaning in the most common configuration.
+        train_suite, val_suite, holdout_leaked = None, None, True
+        gate_basis = "none"
 
     # Load existing state for resume
     state = _load_state(skill_path)
@@ -327,6 +342,11 @@ def run_auto_improve(
     # Clear scorer cache for fresh reads
     scorer.invalidate_cache(skill_path)
     baseline = _score_skill(skill_path, val_suite)
+    # Reported figures need ONE basis. The gate judges `val`; the headline
+    # compares full-suite against full-suite, or the summary subtracts two
+    # different measurements and prints `42 -> 40 (+0.0)`.
+    scorer.invalidate_cache(skill_path)
+    baseline_reported = _score_skill(skill_path, eval_suite)
 
     if start_iteration == 0:
         baseline_entry = {
@@ -367,6 +387,9 @@ def run_auto_improve(
 
     _loop_start = time.monotonic()
     current_score = baseline
+    # The winning candidate's content, so a dry-run summary can score what the
+    # run would have produced instead of re-reading the untouched file.
+    last_candidate: Optional[str] = None
     improvements = 0
     total_delta = 0
     reason = ""
@@ -470,13 +493,21 @@ def run_auto_improve(
                 continue
 
             if delta > best_delta:
-                content_after = Path(skill_path).read_text(encoding="utf-8") if not dry_run else None
+                # Keep the candidate in dry-run too: without it the summary
+                # re-scored the untouched file and erased the projection.
+                content_after = (
+                    Path(skill_path).read_text(encoding="utf-8")
+                    if not dry_run
+                    else result.get("new_content")
+                )
                 best_result = (new_score, delta, patch_candidate, content_after)
                 best_delta = delta
 
         # Determine outcome from exploration
         if best_result and best_delta >= 0:
             new_score, delta, chosen_patch, content_after = best_result
+            if content_after is not None:
+                last_candidate = content_after
             status = "keep"
             if not dry_run and content_after is not None:
                 Path(skill_path).write_text(content_after, encoding="utf-8")
@@ -571,7 +602,12 @@ def run_auto_improve(
     # figures therefore come from the full suite; `gate_suite` says which set
     # actually decided keep vs revert.
     scorer.invalidate_cache(skill_path)
-    reported = _score_skill(skill_path, eval_suite)
+    if not dry_run:
+        reported = _score_skill(skill_path, eval_suite)
+    elif last_candidate is not None:
+        reported = _score_content(last_candidate, skill_path, eval_suite)
+    else:
+        reported = baseline_reported
 
     # Sparkline of score progression
     score_history = [e.get("composite", 0) for e in state if e.get("status") in ("keep", "baseline")]
@@ -582,13 +618,17 @@ def run_auto_improve(
         "iterations": max(0, len(state) - 1),  # Exclude baseline
         "improvements": improvements,
         "total_delta": round(total_delta, 1),
-        "baseline_composite": baseline["composite"],
+        "baseline_composite": baseline_reported["composite"],
         "final_composite": reported["composite"],
+        "total_delta_reported": round(
+            reported["composite"] - baseline_reported["composite"], 1
+        ),
         "final_dimensions": reported["dimensions"],
         # Which set decided keep vs revert. The figures above are full-suite.
-        "gate_suite": "val" if val_suite is not None else "none",
+        "gate_suite": gate_basis,
         # What the gate itself saw, kept separate so the two are never confused.
         "gate_composite": final_score["composite"],
+        "gate_baseline_composite": baseline["composite"],
         "stop_reason": reason if should_stop else "max_iterations" if iteration >= start_iteration + max_iterations else "no_patches",
         "dry_run": dry_run,
         "elapsed_seconds": round(elapsed, 1),
