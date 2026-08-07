@@ -170,11 +170,24 @@ runs:
         # `format` line above follows and the `old-engine` self-test asserts.
         # Only vendor and line cross this boundary; the value never entered the
         # JSON in the first place (ADR 0014).
-        CREDENTIALS=$(echo "$RESULT" | python3 -P -c "
+        # Three states, never two. `MISSING` = a pinned pre-8.11 engine that
+        # never scanned (documented degradation, same contract the old-engine
+        # self-test asserts for check-commands). Empty = scanned, nothing found.
+        # A non-zero exit = could not evaluate, and that must fail the build:
+        # the previous `2>/dev/null || true` turned a malformed entry into an
+        # empty string, so a gate that could not run reported "all clear".
+        if ! CREDENTIALS=$(echo "$RESULT" | python3 -P -c "
         import sys, json
-        found = json.load(sys.stdin).get('credentials', []) or []
-        print(' '.join(f\"{c['vendor']}:{c['line']}\" for c in found))
-        " 2>/dev/null) || true
+        data = json.load(sys.stdin)
+        if 'credentials' not in data:
+            print('MISSING')
+        else:
+            found = data['credentials'] or []
+            print(' '.join('{}:{}'.format(c['vendor'], c['line']) for c in found))
+        "); then
+          echo "::error::Could not evaluate credential findings from the scorer output. Refusing to report a clean result."
+          exit 1
+        fi
         echo "credentials=$CREDENTIALS" >> "$GITHUB_OUTPUT"
         # The already-resolved absolute path — single source of truth so the
         # dangling step does not re-derive the default-to-AGENTS.md logic.
@@ -222,24 +235,6 @@ runs:
           " 2>/dev/null || true
         else
           echo "No dangling commands."
-        fi
-
-    - name: Fail on detected credentials
-      shell: bash
-      env:
-        CREDENTIALS: ${{ steps.score.outputs.credentials }}
-      run: |
-        # Categorical and unconditional: a leak does not compete with a score
-        # threshold, so this step carries no `if:` on minimum-score and cannot
-        # be tuned away (ADR 0011, ADR 0014). It runs before the threshold gate
-        # so the credential is the reported reason, not a score that happens to
-        # be low as well.
-        if [ -n "${CREDENTIALS}" ]; then
-          for finding in ${CREDENTIALS}; do
-            echo "::error::Credential detected: ${finding%%:*} at line ${finding##*:}"
-          done
-          echo "::error::Remove it from the instruction file and rotate the key."
-          exit 1
         fi
 
     - name: Check minimum score
@@ -411,6 +406,30 @@ runs:
           } catch (e) {
             core.warning(`Could not post the Schliff comment (likely a fork PR with a read-only token): ${e.message}`);
           }
+
+    - name: Fail on detected credentials
+      shell: bash
+      env:
+        CREDENTIALS: ${{ steps.score.outputs.credentials }}
+      run: |
+        # Categorical and unconditional: a leak does not compete with a score
+        # threshold, so this step carries no `if:` on minimum-score and cannot
+        # be tuned away (ADR 0011, ADR 0014).
+        #
+        # Placed AFTER "Comment on PR" deliberately. Inner steps of a composite
+        # action cannot carry continue-on-error, so the first non-zero exit stops
+        # the rest: gating earlier meant the contributor got a red check with no
+        # score comment at all - no dimensions, no dangling summary - on exactly
+        # the pull request that most needs reviewing.
+        if [ "${CREDENTIALS}" = "MISSING" ]; then
+          echo "::notice::The pinned schliff engine predates the credential gate; no scan was performed."
+        elif [ -n "${CREDENTIALS}" ]; then
+          for finding in ${CREDENTIALS}; do
+            echo "::error::Credential detected: ${finding%%:*} at line ${finding##*:}"
+          done
+          echo "::error::Remove it from the instruction file and rotate the key."
+          exit 1
+        fi
 
     - name: Enforce dangling gate
       # Opt-in, and LAST: the comment above always posts first, then (only if the

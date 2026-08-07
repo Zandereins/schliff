@@ -9,6 +9,7 @@ A finding carries the vendor and the line, never the matched value (ADR 0014).
 """
 from __future__ import annotations
 
+import bisect
 import re
 
 # (vendor, pattern). Each requires the vendor prefix AND the exact shape that
@@ -22,10 +23,12 @@ _PATTERNS: tuple[tuple[str, "re.Pattern[str]"], ...] = (
     ("github_token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}")),
     ("slack_token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}")),
     ("google_api_key", re.compile(r"\bAIza[A-Za-z0-9_-]{31,}")),
-    (
-        "jwt",
-        re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"),
-    ),
+    # No JWT pattern. A JWT's shape says nothing about whether it is secret:
+    # the jwt.io sample and Supabase's `anon` key are public by design and appear
+    # in real instruction files, and no structural test separates them from a
+    # service key. Under a hard-fail gate with no opt-out (ADR 0011), a class we
+    # cannot decide is a class we must not fire on. Redaction keeps its JWT
+    # pattern — there a false positive is free (ADR 0013).
 )
 
 
@@ -55,6 +58,12 @@ def scan_credentials(content: str) -> list[dict]:
     Each finding is ``{"vendor": str, "line": int}`` with 1-based line numbers.
     The matched value is deliberately absent — see ADR 0014.
     """
+    # Line starts once, then a binary search per finding. Counting newlines per
+    # match made the scan quadratic, and the content comes from a file a CI
+    # caller does not control: 20k findings in 420 KB took 2.8s that way.
+    line_starts = [0]
+    line_starts.extend(m.end() for m in re.finditer(r"\n", content))
+
     findings: list[dict] = []
     for vendor, pattern in _PATTERNS:
         for match in pattern.finditer(content):
@@ -62,6 +71,6 @@ def scan_credentials(content: str) -> list[dict]:
                 continue
             findings.append({
                 "vendor": vendor,
-                "line": content.count("\n", 0, match.start()) + 1,
+                "line": bisect.bisect_right(line_starts, match.start()),
             })
     return findings

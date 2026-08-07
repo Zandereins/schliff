@@ -564,6 +564,15 @@ def run_auto_improve(
     elapsed = time.monotonic() - _loop_start
     final_score = _score_skill(skill_path, val_suite) if not dry_run else current_score
 
+    # The keep/revert gate judges `val` — that is the whole point of the split.
+    # But the number the user READS has to be the one `schliff score` and
+    # `schliff verify` produce for the same file, otherwise the loop prints 60,
+    # the user sets --min-score 60, and CI computes 50 and fails. Reported
+    # figures therefore come from the full suite; `gate_suite` says which set
+    # actually decided keep vs revert.
+    scorer.invalidate_cache(skill_path)
+    reported = _score_skill(skill_path, eval_suite)
+
     # Sparkline of score progression
     score_history = [e.get("composite", 0) for e in state if e.get("status") in ("keep", "baseline")]
     sparkline_str = sparkline(score_history) if len(score_history) >= 2 else ""
@@ -574,8 +583,12 @@ def run_auto_improve(
         "improvements": improvements,
         "total_delta": round(total_delta, 1),
         "baseline_composite": baseline["composite"],
-        "final_composite": final_score["composite"],
-        "final_dimensions": final_score["dimensions"],
+        "final_composite": reported["composite"],
+        "final_dimensions": reported["dimensions"],
+        # Which set decided keep vs revert. The figures above are full-suite.
+        "gate_suite": "val" if val_suite is not None else "none",
+        # What the gate itself saw, kept separate so the two are never confused.
+        "gate_composite": final_score["composite"],
         "stop_reason": reason if should_stop else "max_iterations" if iteration >= start_iteration + max_iterations else "no_patches",
         "dry_run": dry_run,
         "elapsed_seconds": round(elapsed, 1),

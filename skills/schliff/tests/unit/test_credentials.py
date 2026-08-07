@@ -59,16 +59,27 @@ class TestVendorCoverage:
         ("slack_token", "xoxb-2417-9821-A9dK2mNqR7vT4wX1zB6c"),
         ("google_api_key", "AIzaSyD3kL9mN2pQ7rT4vW8xZ1bC6fG5hJ0"),
         ("openai_api_key", "sk-proj-Nx7Qm2Kd9dK2mNqR7vT4wX1zB6cF8gH3"),
-        (
-            "jwt",
-            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0"
-            ".dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk",
-        ),
     ])
     def test_vendor_token_is_detected(self, vendor, token):
         findings = scan_credentials(f"credential: {token}\n")
 
         assert [f["vendor"] for f in findings] == [vendor]
+
+    def test_jwts_are_deliberately_not_detected(self):
+        """A JWT's shape does not say whether it is secret.
+
+        The jwt.io sample and Supabase's `anon` key are public by design and
+        appear in real instruction files; nothing structural separates them
+        from a service key. Under a hard-fail gate with no opt-out, an
+        undecidable class must not fire. Redaction keeps its JWT pattern,
+        where a false positive costs nothing.
+        """
+        jwt = (
+            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0"
+            ".dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+        )
+
+        assert scan_credentials(f"credential: {jwt}\n") == []
 
 
 class TestPlaceholdersNeverFire:

@@ -28,9 +28,12 @@ _SECRET_PATTERNS = [
     (re.compile(r'Bearer\s+[a-zA-Z0-9._-]{20,}'), '[REDACTED:bearer-token]'),
     (re.compile(r'-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----'), '[REDACTED:private-key]'),
     (re.compile(r'AIza[a-zA-Z0-9_-]{35}'), '[REDACTED:google-api-key]'),
-    # ODBC abbreviates Password as Pwd. The lookbehind keeps the conventional
-    # all-caps $PWD working-directory variable intact, per SkillOpt staging.py.
-    (re.compile(r'(?<![A-Za-z0-9])(Pwd|pwd)\s*=\s*[^\s;"\']{8,}'), r'\1=[REDACTED:db-pass]'),
+    # ODBC abbreviates Password as Pwd. Capital-P spelling ONLY: a lowercase
+    # `pwd=` alternative also matched ordinary shell (`pwd=$(pwd)/artifacts`)
+    # and rewrote it to a broken command. The lookbehind stops `Passwd=` style
+    # suffix matches; what keeps the all-caps `$PWD` variable safe is simply
+    # that `PWD` is not in this pattern at all.
+    (re.compile(r'(?<![A-Za-z0-9])Pwd\s*=\s*[^\s;"\']{8,}'), 'Pwd=[REDACTED:db-pass]'),
     (re.compile(r'eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'), '[REDACTED:jwt]'),
     # Generic assignment catcher — keep last so vendor-specific patterns win.
     # Matches keyword-bearing identifiers (e.g. AWS_SECRET_ACCESS_KEY, db_password,

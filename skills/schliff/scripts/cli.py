@@ -213,6 +213,10 @@ def cmd_score(args: argparse.Namespace) -> None:
         # user named, and the normalization seam at shared.py:232-241 has corrupted
         # scores here twice already (ADR 0016). Score-neutral by construction — the
         # findings ride alongside the composite and never enter it (ADR 0011).
+        # No unknown state to model here: the read above already exits 1 with an
+        # error on an unreadable or oversize file, so this line is only reached
+        # when the raw content is in hand. `verify` needs the third state
+        # because it decides pass/fail; `score` fails closed by not emitting.
         from scoring.credentials import scan_credentials
         credentials = scan_credentials(skill_content)
 

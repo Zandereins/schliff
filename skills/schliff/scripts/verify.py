@@ -233,19 +233,32 @@ def run_verify(
     from scoring.credentials import scan_credentials
     from shared import read_skill_safe
 
+    # Failing to read is NOT "no credentials". An oversize or unreadable file
+    # used to swallow the error and scan an empty string, so a 1.6 MB SKILL.md
+    # with a live key passed the gate green. A gate that cannot distinguish
+    # "nothing found" from "could not look" is not a gate.
     try:
         raw_content = read_skill_safe(skill_path)
-    except (OSError, ValueError):
-        raw_content = ""
+    except (OSError, ValueError) as exc:
+        verdict["credentials"] = None
+        verdict["exit_code"] = 2
+        verdict["message"] = (
+            f"ERROR: cannot scan for credentials: {exc}. "
+            f"Refusing to pass a file that could not be checked."
+        )
+        return verdict
+
     credentials = scan_credentials(raw_content)
     if credentials:
         verdict["credentials"] = credentials
         verdict["exit_code"] = 1
-        vendors = ", ".join(sorted({c["vendor"] for c in credentials}))
-        locations = ", ".join(str(c["line"]) for c in credentials)
+        # Rendered as pairs. Two parallel lists — sorted vendors against
+        # scan-ordered lines — pointed the reader at the wrong line and invited
+        # rotating the wrong credential.
+        located = ", ".join(f"{c['vendor']} at line {c['line']}" for c in credentials)
         verdict["message"] = (
-            f"FAIL: credential detected ({vendors}) at line {locations} — "
-            f"remove it from the file and rotate the key"
+            f"FAIL: credential detected — {located}. "
+            f"Remove it from the file and rotate the key."
         )
         append_history(skill_path, result, history_path)
         return verdict

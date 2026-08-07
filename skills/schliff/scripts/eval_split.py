@@ -32,6 +32,7 @@ def split_eval_suite(suite: dict) -> tuple[dict, dict, bool]:
     train: dict = {k: v for k, v in suite.items() if k not in _POPULATIONS}
     val: dict = dict(train)
     leaked = False
+    held_something_out = False
 
     for population in _POPULATIONS:
         cases = suite.get(population)
@@ -40,14 +41,19 @@ def split_eval_suite(suite: dict) -> tuple[dict, dict, bool]:
 
         labelled = [c for c in cases if isinstance(c, dict) and c.get("split")]
         if not labelled:
-            # No opt-in: the loop reads and judges the same cases. Runnable,
-            # but it proves nothing about generalisation.
+            # No opt-in anywhere: the loop reads and judges the same cases.
+            # Runnable, but it proves nothing about generalisation.
             train[population] = list(cases)
             val[population] = list(cases)
             leaked = True
             continue
 
-        train_cases = [c for c in cases if _label(c) == _TRAIN]
+        # An unlabelled case in a partly labelled population goes to `train`.
+        # Dropping it — as an earlier version did — deleted 43 of 44 cases the
+        # moment a user marked one `test`, which emptied the population, turned
+        # three dimensions into the unmeasured sentinel and blinded the gate
+        # without saying so.
+        train_cases = [c for c in cases if _label(c) in (_TRAIN, "")]
         val_cases = [c for c in cases if _label(c) == _VAL]
 
         # One side empty means nothing is being held out for this population.
@@ -56,6 +62,14 @@ def split_eval_suite(suite: dict) -> tuple[dict, dict, bool]:
 
         train[population] = train_cases
         val[population] = val_cases
+        if val_cases:
+            held_something_out = True
+
+    # A suite with no populations, or only empty ones, held nothing out — the
+    # flag has to say so, because its documented meaning is "gradients and gate
+    # genuinely saw different cases".
+    if not held_something_out:
+        leaked = True
 
     return train, val, leaked
 

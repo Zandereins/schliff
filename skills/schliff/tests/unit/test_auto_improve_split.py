@@ -55,3 +55,38 @@ def test_summary_flags_an_unlabelled_suite(tmp_path, monkeypatch):
     summary = auto_improve.run_auto_improve(skill, max_iterations=1, dry_run=True)
 
     assert summary["holdout_leaked"] is True
+
+
+def test_summary_headline_matches_the_full_suite_not_val(tmp_path, monkeypatch):
+    """Finding 5 of the 2026-08-07 review.
+
+    The gate rightly judges `val`, but the number the user sees has to be the
+    one `schliff score` and `schliff verify` report for the same file —
+    otherwise `/schliff:auto` prints 81, the user sets --min-score 80, and the
+    build fails on a different composite.
+    """
+    # The description must match the val prompts and miss the train ones, or
+    # both sides score the same sentinel and the test proves nothing.
+    skill_file = tmp_path / "SKILL.md"
+    skill_file.write_text(
+        "---\nname: deploy-helper\n"
+        "description: Deploys the service to staging. Use when asked to deploy or ship.\n"
+        "---\n\n# deploy-helper\n\nRun `make deploy`.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "eval-suite.json").write_text("{}", encoding="utf-8")
+    skill = str(skill_file)
+    suite = {"triggers": (
+        [{"prompt": "rotate the TLS certificate", "should_trigger": True, "split": "train"}] * 4
+        + [{"prompt": "deploy to staging", "should_trigger": True, "split": "val"}] * 4
+    )}
+    monkeypatch.setattr(auto_improve, "load_eval_suite", lambda _p: suite)
+
+    summary = auto_improve.run_auto_improve(skill, max_iterations=1, dry_run=True)
+
+    import score_skill as scorer
+    full = scorer.score_triggers(skill, suite)["score"]
+    val_only = scorer.score_triggers(skill, {"triggers": suite["triggers"][4:]})["score"]
+    assert full != val_only, "fixture must actually discriminate"
+    assert summary["final_dimensions"]["triggers"] == full
+    assert summary["gate_suite"] == "val"
