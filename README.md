@@ -7,7 +7,7 @@
 
 **The Ruff for `AGENTS.md` — deterministic quality scores for the instruction files that drive your AI. Same input, same score, on every machine.**
 
-[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.11.0)](https://pypi.org/project/schliff/)
+[![PyPI](https://img.shields.io/pypi/v/schliff?color=blue&label=PyPI&v=8.11.1)](https://pypi.org/project/schliff/)
 [![Python](https://img.shields.io/pypi/pyversions/schliff)](https://pypi.org/project/schliff/)
 [![Tests](https://github.com/Zandereins/schliff/actions/workflows/test.yml/badge.svg)](https://github.com/Zandereins/schliff/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -30,7 +30,7 @@ This is the real, current output of `schliff score AGENTS.md` on this repo's own
 [`AGENTS.md`](AGENTS.md) — clone and run it yourself:
 
 ```text
-schliff v8.11.0
+schliff v8.11.1
 
   structure             ██████████  100/100  perfect
   operational_coverage  ██████████  100/100  perfect
@@ -46,7 +46,7 @@ schliff v8.11.0
 
 No model produced that number. Run it on another laptop and you get 95.6 again — **a score you can't reproduce isn't a measurement, it's a vibe.** And we hold *ourselves* to that: this repo's own badge (scored in isolation) once disagreed with its own CLI (scored in-repo) by ~15 points on the *same bytes*, because `structure` was crediting an on-disk `references/` neighbourhood instead of the file's content. We fixed the engine, not the file ([#129](https://github.com/Zandereins/schliff/pull/129)) — now `cp AGENTS.md /tmp && schliff score /tmp/AGENTS.md` returns the same number as CI and the badge. (The `agents.md` headline weights `structure`·`operational_coverage`·`efficiency` at 0.4/0.4/0.2; `composability` and `clarity` are shown for information, not counted.)
 
-*The quick-start and case-study numbers here are reproducible from released `schliff==8.11.0` (`pip install schliff==8.11.0` or `uvx schliff@8.11.0`); the hydra field run below is dated to the version it was measured on.*
+*The quick-start and case-study numbers here are reproducible from released `schliff==8.11.1` (`pip install schliff==8.11.1` or `uvx schliff@8.11.1`); the hydra field run below is dated to the version it was measured on.*
 
 ---
 
@@ -262,7 +262,7 @@ fails while the score still gates the PR.
 By default it scores `AGENTS.md` at the repo root; set `skill-path:` to lint a
 `SKILL.md`, `CLAUDE.md`, or `.cursorrules` instead. One caveat: the Action
 installs the latest released engine from PyPI, so after a release its scores can
-lead an older pinned install; pin it with `schliff-version: '8.11.0'` in the
+lead an older pinned install; pin it with `schliff-version: '8.11.1'` in the
 `with:` block if you need byte-stable gates.
 
 ### CI gate without the Action
@@ -286,7 +286,7 @@ files without an eval suite aren't auto-failed. Requires schliff ≥ 8.5.0 for
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/Zandereins/schliff
-    rev: v8.11.0
+    rev: v8.11.1
     hooks:
       - id: schliff-verify
         args: ['--min-score', '75']

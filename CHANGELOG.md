@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.11.1] - 2026-08-10
+
+### Fixed
+
+- **The skill mesh no longer reports a skill as colliding with itself.** Installing the
+  same skill in two places — `~/.claude/skills` plus a project-local copy, which is how
+  schliff itself is distributed — produced two *critical* findings and cost 27 mesh-health
+  points. The pair was never two skills competing; it is one skill at two paths, and the
+  remediation the mesh generated for it named the same skill on both sides. Pairs sharing a
+  declared name are no longer compared, at every comparison site.
+- **A duplicate skill name is now reported as what it is.** `duplicate_name` (severity
+  `info`, no health penalty) names every path the skill was found at, because only one of
+  them resolves and the file itself does not say which.
+- **`doctor` shows mesh findings again after an upgrade.** Its incremental cache keys on
+  skill *content*, so upgrading schliff — which changes no file on your disk — used to
+  return the verdict computed by the previous version indefinitely. The cache now carries a
+  version stamp and discards verdicts written by different analysis logic.
+
 ## [8.11.0] - 2026-08-10
 
 ### Added
@@ -1410,7 +1428,8 @@ measured, reported wrongly. Three of them were found by verifying the fourth.
 
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.11.0...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.11.1...HEAD
+[8.11.1]: https://github.com/Zandereins/schliff/compare/v8.11.0...v8.11.1
 [8.11.0]: https://github.com/Zandereins/schliff/compare/v8.10.1...v8.11.0
 [8.10.1]: https://github.com/Zandereins/schliff/compare/v8.10.0...v8.10.1
 [8.10.0]: https://github.com/Zandereins/schliff/compare/v8.9.0...v8.10.0
