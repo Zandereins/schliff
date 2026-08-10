@@ -1,8 +1,21 @@
 # Decision brief: does the credential gate ship, and in what shape?
 
-**Status:** open, awaiting decision · **Branch:** `docs/skillopt-import-adrs` at `846e171`
-**Written:** 2026-08-07, after the third code-review pass · **Updated:** 2026-08-10, the four
-decision-independent findings are fixed and the branch waits on this one question
+**Status:** decided 2026-08-10 — **(a) report, do not gate**, implemented in ADR 0019 and
+ADR 0020 · **Branch:** `docs/skillopt-import-adrs`
+**Written:** 2026-08-07, after the third code-review pass
+
+> The decision this brief was written to force has been taken, so the document below is the
+> record of the question and not a live proposal. What was settled, beyond the headline: no
+> opt-in flag; the Action annotates with a warning and never fails; the vendor patterns widen
+> (the repeated-run heuristic is gone, hyphens are allowed behind a known OpenAI prefix, JWTs
+> stay out); the CHANGELOG's BREAKING section is withdrawn; `verify`'s fail-closed exit 2 on an
+> unreadable file is withdrawn with it, while `credentials: null` survives as the third state;
+> the `action-selftest.yml` follow-up becomes a **green**-path fixture (post-release, since the
+> Action installs from PyPI); and ADR 0016 is untouched.
+>
+> One measurement was added after the fact and is not in the analysis below: across 128 real
+> instruction files the detector finds nothing, and across ~600 documentation files every
+> finding it produces is documentation *about* credentials. See ADR 0020.
 
 Input for a grilling session. Everything here was measured on the branch, not inferred.
 The decision is F3's alone; **F1 and F4 are unaffected and healthy.**
@@ -144,6 +157,7 @@ them. The branch now has exactly one open question.
 - **The CHANGELOG entry** currently sits under BREAKING BEHAVIOUR for a behaviour that may
   not ship. It follows the decision.
 - **Push and PR** — nothing has left the local tree. The branch is ten commits.
-- **The `action-selftest.yml` red-path fixture** remains a post-release follow-up: the
-  composite action installs from PyPI, so no self-test can exercise a detector that is not
-  published yet (ADR 0014).
+- **The `action-selftest.yml` fixture** remains a post-release follow-up, now proving the
+  **green** path: a file with a vendor token must leave the job green and produce the warning
+  annotation. The timing constraint is unchanged — the composite action installs from PyPI, so
+  no self-test can exercise a scan that is not published yet (ADR 0014, ADR 0019).

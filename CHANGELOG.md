@@ -5,37 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-### BREAKING BEHAVIOUR
-
-- **`schliff verify` and the GitHub Action now fail on a detected credential, at any
-  `--min-score`.** A pipeline that is green today turns red if the instruction file contains
-  a structurally valid vendor token — an AWS access key, a GitHub token, an Anthropic or
-  OpenAI key, a Slack token or a Google key. **JWTs are deliberately not detected**: the
-  jwt.io sample and Supabase's `anon` key are public by design, and nothing in a JWT's shape
-  separates them from a service key. Use a dedicated secret scanner if you need that class.
-  This is filed here rather than under *Added*
-  because a build that used to pass can now fail without the workflow changing, and the
-  Action's `schliff-version` input defaults to the latest release.
-
-  **No score changes.** The composite, every dimension, badges, `compare`, and every pinned
-  `--min-score` threshold behave exactly as before. A leak is not a quality deduction that
-  competes with a threshold; it is a categorical failure, so it is modelled as one. That is
-  also why no `--allow-secrets` escape ships: an opt-out on a security gate becomes the
-  default copy-paste line, and a legitimate value that trips the detector is a pattern bug
-  to fix in the pattern.
-
-  **Placeholders never fire.** A finding requires the vendor prefix *and* the exact shape
-  that vendor issues, and any token announcing itself as a stand-in is ignored — including
-  AWS's own documentation key `AKIAIOSFODNN7EXAMPLE`, `sk-ant-REPLACE_ME…`, `<your-key>`
-  and `${VAR}`.
-
 ### Added
 
-- **Credential findings in `score`, `score --json` and `doctor`.** Reporting surfaces display
-  the finding and never change their exit code; only `verify` and the Action gate on it.
-  A finding carries the **vendor and the line number, never the value** — the Action hands
-  the whole score object to its PR-comment step, so output sites cannot be enumerated and
-  the value must not be in the object to begin with.
+- **Credential findings in `score`, `score --json`, `doctor`, `verify` and the GitHub Action.**
+  Schliff points out strings shaped like an AWS access key, a GitHub token, an Anthropic or
+  OpenAI key, a Slack token or a Google key. A finding carries the **vendor and the line
+  number, never the value** — the Action hands the whole score object to its PR-comment step,
+  so output sites cannot be enumerated and the value must not be in the object to begin with.
+
+  **Nothing gates on it, and no exit code changes anywhere.** A green pipeline stays green:
+  `verify` still exits on `--min-score` and `--regression` alone, and the Action annotates
+  with a warning without failing the job. No score changes either — the composite, every
+  dimension, badges, `compare` and every pinned threshold are bit-identical to before.
+
+  **The limitation, stated plainly:** a token's shape does not tell a live key from a
+  documentation example. Placeholders that name themselves are excluded — AWS's own
+  `AKIAIOSFODNN7EXAMPLE`, `sk-ant-REPLACE_ME…`, `<your-key>`, `${VAR}` — but a placeholder
+  that merely looks real will be reported, and a real key in a shape schliff does not know
+  will not be. Measured over ~740 real files on the author's machine, every finding the scan
+  produced was documentation *about* credentials. JWTs are deliberately not detected at all:
+  the jwt.io sample and Supabase's `anon` key are public by design and structurally identical
+  to a service key. **This is a report, not a secret scanner** — if you need enforcement, run
+  a dedicated one, and read the `credentials` field of `schliff score --json` if you want to
+  fail your own build on it.
 
 ### Security
 

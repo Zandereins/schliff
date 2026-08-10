@@ -16,13 +16,14 @@ not enumerable.
 
 ## Gate-effective
 
-A change that alters an exit code without altering any score. `verify` and the GitHub Action
-exit non-zero; the composite, badges, comparisons and every pinned `--min-score` threshold are
-bit-identical to before.
+A change that alters an exit code without altering any score. The distinction stays useful — it
+is what separates "breaking in behaviour" from "breaking in score" — but **no credential finding
+is gate-effective any more** (ADR 0019). The credential scan is score-neutral *and* exit-neutral;
+the only gate-effective things left in schliff are the `--min-score` threshold and `--regression`.
 
-_Avoid:_ "breaking", "score-affecting" — both blur the distinction the design depends on. A
-gate-effective change is breaking in *behaviour* and neutral in *score*, and collapsing the two
-is what made the credential gate look like it needed a major release and a rubric version.
+_Avoid:_ "breaking", "score-affecting" — both blur the distinction the design depends on. Also
+avoid calling the credential scan a **gate**: it reports, and the word was what made an
+undecidable classification look like it could carry a build.
 
 ## Gradient target
 
@@ -49,21 +50,35 @@ neither distinguishes the two things that matter when a finding needs a true lin
 
 ## Red-path proof
 
-Two distinct proofs that an earlier draft collapsed into one requirement. The **engine
-red path** — `verify` exits non-zero on a credential fixture — is a CLI test that runs against
-the working tree today. The **wiring red path** — the Action propagates the finding and fails
-— cannot run before release, because `action.yml:63` installs the engine from PyPI and every
-self-test job enters via `uses: ./`.
+Two distinct proofs that an earlier draft collapsed into one requirement, of which **only the
+second still exists**. The engine red path is gone with the gate (ADR 0019): `verify` no longer
+exits non-zero on a credential, so the CLI test now proves the opposite — the finding is
+displayed *and* the exit code is unchanged. The **wiring proof** survives as a green path: the
+Action must annotate and stay green. It still cannot run before release, because `action.yml:63`
+installs the engine from PyPI and every self-test job enters via `uses: ./`.
 
 _Avoid:_ "the red-path fixture" as a single item — it names a requirement that is only half
 satisfiable at any given time, and the unsatisfiable half passes green for the wrong reason.
 
+## Reported, not gated
+
+The contract every credential surface now holds: the finding is displayed wherever a human or a
+machine looks — `score`, `score --json`, `doctor`, `verify`, the Action's annotations — and
+changes no exit code anywhere. Unknown stays a third state: a file that could not be read reports
+`credentials: null`, never `[]`.
+
+_Avoid:_ "advisory", "soft fail", "warning-only gate" — the first two suggest a severity dial
+that does not exist, and the third keeps the word *gate* for something that cannot fail.
+
 ## Structurally valid vendor token
 
-A credential match that carries a known vendor prefix *and* the exact shape that vendor issues
-— `AKIA` plus 16 base32 characters, `gh[pousr]_` plus 20 or more, `sk-ant-` plus 20 or more.
-Placeholder shapes (`sk-...`, `<your-key>`, `${VAR}`, `[REDACTED…]`) are not tokens and never
-produce a finding.
+A string carrying a known vendor prefix *and* the exact shape that vendor issues — `AKIA` plus
+16 base32 characters, `gh[pousr]_` plus 20 or more, `sk-ant-` plus 20 or more. It asserts **form
+only**. Whether the token is live, revoked, or invented for a README is not knowable from the
+string, and the term must never be read as "real" (ADR 0020). Tokens naming themselves as
+stand-ins (`<your-key>`, `sk-ant-EXAMPLE…`, `${VAR}`, `[REDACTED…]`) are excluded by marker word,
+which is the one exclusion that never cost a real key.
 
-_Avoid:_ "secret", "API key", "credential" on their own — none of them separates a live key
-from the example in a setup snippet, and that separation is the entire false-positive defence.
+_Avoid:_ "secret", "API key", "credential" on their own — each asserts authenticity the check
+cannot establish. Also avoid "valid" without "structurally": the word did the entire work of the
+premise that turned out to be false.

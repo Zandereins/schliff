@@ -34,6 +34,11 @@ instruction files: no findings. In 601 documentation files: 11 findings, **all o
 documentation about credentials**, none of them a real key. The detector's observed behaviour in
 the wild is to fire on people writing about secrets.
 
+Re-running it after this ADR was written makes the point better than the numbers do: the file
+you are reading is documentation about credentials, and it now contributes seven findings of its
+own. Counts reproduced later will therefore exceed the ones above, and for exactly the reason
+this ADR gives.
+
 ## Decision
 
 **The premise is withdrawn.** Shape establishes that a string *could* be a credential of a given
