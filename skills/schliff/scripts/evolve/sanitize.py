@@ -10,6 +10,13 @@ import re
 # Patterns that indicate secrets — compiled for performance
 _SECRET_PATTERNS = [
     (re.compile(r'sk-ant-[a-zA-Z0-9_-]{20,}'), '[REDACTED:anthropic-key]'),
+    # Modern OpenAI keys (`sk-proj-`, `sk-svcacct-`, `sk-admin-`) carry `-` and
+    # `_` inside the body, so the alnum-only rule below stops at the first
+    # hyphen and cannot match them at all. Hyphens are allowed only behind a
+    # known key prefix: allowing them after a bare `sk-` would redact
+    # kebab-case prose like `sk-add-credential-scanning-to-verify`, and
+    # over-redaction destroys the very prompt it is protecting.
+    (re.compile(r'sk-(?:proj|svcacct|admin)-[a-zA-Z0-9_-]{20,}'), '[REDACTED:openai-key]'),
     (re.compile(r'sk-[a-zA-Z0-9]{20,}'), '[REDACTED:openai-key]'),
     (re.compile(r'AKIA[0-9A-Z]{16}'), '[REDACTED:aws-key]'),
     (re.compile(r'postgres://[^\s"\']+'), '[REDACTED:postgres-url]'),
@@ -31,9 +38,13 @@ _SECRET_PATTERNS = [
     # ODBC abbreviates Password as Pwd, and Microsoft's own connection strings
     # use the all-caps `PWD=`. Both spellings, never the lowercase one: `pwd=`
     # is ordinary shell (`pwd=$(pwd)/artifacts`) and redacting it rewrote the
-    # command. `$` in the lookbehind keeps a `$PWD` reference intact; the
-    # {8,} value bound keeps short assignments out.
-    (re.compile(r'(?<![A-Za-z0-9$])((?:PWD|Pwd)\s*=\s*)[^\s;"\']{8,}'), r'\1[REDACTED:db-pass]'),
+    # command. `$` in the lookbehind keeps a `$PWD` reference intact.
+    #
+    # No length floor: a connection-string password may be six characters, and
+    # nothing else in this set covers the spelling — the generic catcher below
+    # needs a keyword-bearing identifier and a 16-character value, so a short
+    # `PWD=` reached the lineage file verbatim.
+    (re.compile(r'(?<![A-Za-z0-9$])((?:PWD|Pwd)\s*=\s*)[^\s;"\']+'), r'\1[REDACTED:db-pass]'),
     (re.compile(r'eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'), '[REDACTED:jwt]'),
     # Generic assignment catcher — keep last so vendor-specific patterns win.
     # Matches keyword-bearing identifiers (e.g. AWS_SECRET_ACCESS_KEY, db_password,

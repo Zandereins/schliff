@@ -4,6 +4,7 @@ Each test was confirmed red against the branch before the corresponding fix.
 The theme of the review was a gate that fails in both directions: it fired on
 published example tokens, and it stayed silent when it could not read the file.
 """
+import importlib.util
 import json
 import subprocess
 import sys
@@ -13,9 +14,10 @@ from pathlib import Path
 
 import pytest
 
+import score_skill as scorer
 import verify as verify_mod
 from eval_split import split_eval_suite
-from evolve.sanitize import redact_secrets
+from evolve.sanitize import contains_secrets, redact_secrets
 from scoring.credentials import scan_credentials
 
 CLI_PATH = str(Path(__file__).resolve().parent.parent.parent / "scripts" / "cli.py")
@@ -273,3 +275,175 @@ class TestDoctorHonoursTheThreeStateContract:
         result = doctor._score_single_skill(str(skill))
 
         assert result["credentials"] is None, "unscannable must not read as clean"
+
+
+# --- Third review pass, 2026-08-07 ------------------------------------------
+# Four of the ten findings are ordinary bugs rather than premise failures, so
+# they are fixed regardless of what happens to the credential gate itself.
+# Two are redaction misses (F4, ADR 0013); two are basis errors in the loop.
+
+_AUTO_SPEC = importlib.util.spec_from_file_location(
+    "auto_improve", Path(__file__).resolve().parent.parent.parent / "scripts" / "auto-improve.py"
+)
+auto_improve = importlib.util.module_from_spec(_AUTO_SPEC)
+_AUTO_SPEC.loader.exec_module(auto_improve)
+
+_SKILL_MD = (
+    "---\nname: deploy-helper\n"
+    "description: Deploys the service to staging. Use when asked to deploy or ship.\n"
+    "---\n\n# deploy-helper\n\nRun `make deploy`.\n"
+)
+
+
+def _skill_file(tmp_path: Path) -> str:
+    path = tmp_path / "SKILL.md"
+    path.write_text(_SKILL_MD, encoding="utf-8")
+    (tmp_path / "eval-suite.json").write_text("{}", encoding="utf-8")
+    return str(path)
+
+
+class TestOdbcPasswordsAreNotLengthGated:
+    """A connection-string password may be short, and nothing else in the set
+    covers the ODBC spelling — the generic assignment catcher needs a
+    keyword-bearing identifier and 16 characters, so `PWD=abc123` reached the
+    lineage file verbatim. The eight-character floor was an invented bound."""
+
+    @pytest.mark.parametrize("secret", ["abc123", "s3cr3t", "Pa55"])
+    def test_a_short_connection_string_password_is_redacted(self, secret):
+        text = f"conn: Server=db;PWD={secret};DB=main"
+
+        assert secret not in redact_secrets(text)
+
+    @pytest.mark.parametrize("spelling", ["PWD", "Pwd"])
+    def test_both_spellings_lose_the_short_value(self, spelling):
+        assert "abc123" not in redact_secrets(f"Driver={{ODBC}};{spelling}=abc123;")
+
+    def test_the_shell_variable_reference_still_survives(self):
+        text = "Run the build from $PWD before deploying."
+
+        assert redact_secrets(text) == text
+
+    def test_the_lowercase_shell_assignment_still_survives(self):
+        text = "export pwd=/Users/franz/projects/schliff/build"
+
+        assert redact_secrets(text) == text
+
+
+class TestModernOpenAIKeysAreRedacted:
+    """`sk-proj-` and `sk-svcacct-` keys carry hyphens and underscores inside
+    the body. An alnum-only body stopped at the first hyphen, so the redaction
+    set could not match the key format OpenAI has issued since 2024 — and a
+    miss here reaches a model provider (ADR 0013)."""
+
+    @pytest.mark.parametrize("token", [
+        "sk-proj-Ab3d-Kf9LmQ2xR7tYu1VwZ0nBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcdef",
+        "sk-svcacct-Ab3d_Kf9LmQ2xR7tYu1VwZ0nBcDeFgHiJkLmNoPqRsTu",
+    ])
+    def test_a_prefixed_key_in_prose_is_redacted(self, token):
+        # Bare prose deliberately: in an assignment the generic name=value rule
+        # would redact it whatever the vendor pattern does, proving nothing.
+        assert token not in redact_secrets(f"Authenticate with {token} and retry.")
+
+    def test_an_anthropic_key_is_still_reported_as_anthropic(self):
+        # Widening the OpenAI body must not make sk-ant- keys match twice and
+        # get reported under the wrong vendor.
+        key = "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx"
+
+        assert contains_secrets(f"Authenticate with {key} please") == [
+            "[REDACTED:anthropic-key]"
+        ]
+
+    @pytest.mark.parametrize("text", [
+        "Branch naming: sk-add-credential-scanning-to-verify",
+        "run: kubectl get pods -n sk-production-cluster-namespace",
+    ])
+    def test_kebab_case_prose_survives(self, text):
+        # Redaction may over-reach, but not into the prompt it is protecting:
+        # hyphens are only allowed behind a known key prefix.
+        assert redact_secrets(text) == text
+
+
+class TestTheGateSeesEveryPopulationTheSuiteHas:
+    """The empty-val guard fired only when ALL THREE populations were empty.
+    A suite whose triggers alone carry `split: val` leaves quality and edges at
+    the unmeasured sentinel on the gate, so a patch that destroys them is kept
+    and written to the user's SKILL.md."""
+
+    SUITE = {
+        "triggers": [
+            {"prompt": "deploy to staging", "should_trigger": True, "split": "val"},
+            {"prompt": "rotate the TLS certificate", "should_trigger": False, "split": "train"},
+        ],
+        "test_cases": [
+            {"name": "deploys", "prompt": "deploy", "split": "train",
+             "assertions": [{"type": "contains", "value": "make deploy", "description": "runs it"}]},
+        ],
+        "edge_cases": [
+            {"name": "no target", "category": "minimal_input", "split": "train",
+             "expected_behavior": "asks which environment",
+             "assertions": [{"type": "contains", "value": "environment"}]},
+        ],
+    }
+
+    def test_a_population_with_no_val_cases_falls_back_to_the_full_suite(self, tmp_path):
+        skill = _skill_file(tmp_path)
+        raw_val = split_eval_suite(self.SUITE)[1]
+        assert scorer.score_quality(skill, raw_val)["score"] == -1, "fixture must reproduce"
+        assert scorer.score_edges(skill, raw_val)["score"] == -1, "fixture must reproduce"
+
+        _train, val, leaked, basis = auto_improve._gate_suites(self.SUITE)
+
+        assert scorer.score_quality(skill, val)["score"] != -1
+        assert scorer.score_edges(skill, val)["score"] != -1
+        assert leaked is True, "a population judged on its own train cases holds nothing out"
+        assert "test_cases" in basis and "edge_cases" in basis
+
+    def test_the_population_that_does_hold_out_keeps_its_holdout(self, tmp_path):
+        _train, val, _leaked, _basis = auto_improve._gate_suites(self.SUITE)
+
+        assert [c["prompt"] for c in val["triggers"]] == ["deploy to staging"]
+
+    def test_a_clean_split_is_left_alone(self):
+        suite = {"triggers": [{"prompt": "a", "should_trigger": True, "split": "train"},
+                              {"prompt": "b", "should_trigger": True, "split": "val"}]}
+
+        _train, _val, leaked, basis = auto_improve._gate_suites(suite)
+
+        assert (leaked, basis) == (False, "val")
+
+
+class TestTheStopThresholdUsesTheReportedBasis:
+    """`_should_stop` compares against 98 and against 90 per dimension — both
+    documented in the module header and both read by a user who runs
+    `schliff score`. Feeding it the val-basis composite made the loop keep
+    iterating on a file every other schliff surface already rates past the
+    threshold."""
+
+    SUITE = {"triggers": (
+        [{"prompt": "rotate the TLS certificate", "should_trigger": True, "split": "train"}] * 4
+        + [{"prompt": "deploy to staging", "should_trigger": True, "split": "val"}] * 4
+    )}
+
+    def test_the_score_it_judges_is_the_score_the_user_reads(self, tmp_path, monkeypatch):
+        skill = _skill_file(tmp_path)
+        monkeypatch.setattr(auto_improve, "load_eval_suite", lambda _p: self.SUITE)
+        seen: list[float] = []
+        real_should_stop = auto_improve._should_stop
+
+        def spy(state, current_score):
+            seen.append(current_score["composite"])
+            return real_should_stop(state, current_score)
+
+        monkeypatch.setattr(auto_improve, "_should_stop", spy)
+
+        auto_improve.run_auto_improve(skill, max_iterations=1, dry_run=True)
+
+        scorer.invalidate_cache(skill)
+        full = auto_improve._score_skill(skill, self.SUITE)["composite"]
+        scorer.invalidate_cache(skill)
+        val_only = auto_improve._score_skill(
+            skill, {"triggers": self.SUITE["triggers"][4:]}
+        )["composite"]
+        assert full != val_only, "fixture must actually discriminate"
+        assert seen, "the loop must reach its stopping check"
+        assert seen[0] == full

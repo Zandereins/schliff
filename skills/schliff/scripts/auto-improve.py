@@ -169,6 +169,52 @@ def _score_content(
     return result
 
 
+# --- Gate suite ---
+
+# Populations a suite may carry. A dimension is scored from exactly one of
+# them, so a population the gate cannot see is a dimension it cannot judge.
+_POPULATIONS = ("triggers", "test_cases", "edge_cases")
+
+
+def _gate_suites(
+    eval_suite: Optional[dict],
+) -> tuple[Optional[dict], Optional[dict], bool, str]:
+    """Return ``(train_suite, val_suite, holdout_leaked, gate_basis)``.
+
+    Edits are derived from ``train`` and judged on ``val`` (ADR 0015). A val
+    side with no cases in some population scores that dimension at the
+    unmeasured sentinel (-1), and the keep/revert gate then cannot see a patch
+    that destroyed it — so every such population falls back to the full suite
+    and the run says the holdout is gone for it. Checking only whether ALL
+    populations were empty left a suite whose triggers alone carry `split: val`
+    gating on triggers while quality and edges went unjudged.
+    """
+    if not eval_suite:
+        # No suite at all: gradients and gate see the identical empty set, so
+        # nothing is held out. Reporting False here contradicted the field's
+        # own documented meaning in the most common configuration.
+        return None, None, True, "none"
+
+    train_suite, val_suite, leaked = split_eval_suite(eval_suite)
+
+    populated = [
+        p for p in _POPULATIONS
+        if isinstance(eval_suite.get(p), list) and eval_suite[p]
+    ]
+    blind = [p for p in populated if not val_suite.get(p)]
+    if not blind:
+        return train_suite, val_suite, leaked, "val"
+
+    val_suite = dict(val_suite)
+    for population in blind:
+        val_suite[population] = list(eval_suite[population])
+    basis = (
+        "full (val was empty)" if len(blind) == len(populated)
+        else "val + full (" + ", ".join(blind) + ")"
+    )
+    return train_suite, val_suite, True, basis
+
+
 # --- ROI Stopping ---
 
 def _has_dimension_regression(
@@ -312,24 +358,7 @@ def run_auto_improve(
     # Derive edits from `train`, judge them on `val` (ADR 0015). When the two
     # are not disjoint the loop still runs — but `holdout_leaked` travels into
     # the summary so the delta is never presented as evidence of generalisation.
-    if eval_suite:
-        train_suite, val_suite, holdout_leaked = split_eval_suite(eval_suite)
-        # A val side with no cases in any population cannot judge anything:
-        # triggers/quality/edges collapse to the unmeasured sentinel and the
-        # gate keeps a patch that destroyed every trigger match. Fall back to
-        # the full suite for gating and say the holdout is gone.
-        if not any(val_suite.get(k) for k in ("triggers", "test_cases", "edge_cases")):
-            val_suite = eval_suite
-            holdout_leaked = True
-            gate_basis = "full (val was empty)"
-        else:
-            gate_basis = "val"
-    else:
-        # No suite at all: gradients and gate see the identical empty set, so
-        # nothing is held out. Reporting False here contradicted the field's
-        # own documented meaning in the most common configuration.
-        train_suite, val_suite, holdout_leaked = None, None, True
-        gate_basis = "none"
+    train_suite, val_suite, holdout_leaked, gate_basis = _gate_suites(eval_suite)
 
     # Load existing state for resume
     state = _load_state(skill_path)
@@ -363,7 +392,19 @@ def run_auto_improve(
         state.append(baseline_entry)
 
     if verbose:
-        print(f"Baseline: {baseline['composite']}/100 ({baseline['measured']} dims)", file=sys.stderr)
+        # The reported basis, like every other number a user acts on. Printing
+        # the gate's baseline here and the full-suite figure in the summary put
+        # `Baseline: 95.3` and `99 → 99` in one stream.
+        print(
+            f"Baseline: {baseline_reported['composite']}/100 "
+            f"({baseline_reported['measured']} dims)",
+            file=sys.stderr,
+        )
+        if baseline["composite"] != baseline_reported["composite"]:
+            print(
+                f"  gate basis {gate_basis}: {baseline['composite']}/100",
+                file=sys.stderr,
+            )
 
     # Recall relevant episodes
     if not dry_run:
@@ -387,6 +428,11 @@ def run_auto_improve(
 
     _loop_start = time.monotonic()
     current_score = baseline
+    # `_should_stop` compares against documented absolute thresholds (98
+    # composite, 90 per dimension) that a user checks with `schliff score`.
+    # Those have to be judged on the reported basis; only the keep/revert gate
+    # and its deltas run on `val`.
+    current_reported = baseline_reported
     # The winning candidate's content, so a dry-run summary can score what the
     # run would have produced instead of re-reading the untouched file.
     last_candidate: Optional[str] = None
@@ -401,7 +447,7 @@ def run_auto_improve(
             print(f"\n--- Iteration {iteration} ---", file=sys.stderr)
 
         # Check stopping conditions
-        should_stop, reason = _should_stop(state, current_score)
+        should_stop, reason = _should_stop(state, current_reported)
         if should_stop:
             if verbose:
                 print(f"Stopping: {reason}", file=sys.stderr)
@@ -514,6 +560,16 @@ def run_auto_improve(
                 scorer.invalidate_cache(skill_path)
             old_composite = current_score["composite"]
             current_score = new_score
+            # Re-measure on the reported basis so the next stop check sees the
+            # kept patch. Only on a keep: a discard restores the file.
+            if content_after is not None:
+                if dry_run:
+                    current_reported = _score_content(
+                        content_after, skill_path, eval_suite
+                    )
+                else:
+                    scorer.invalidate_cache(skill_path)
+                    current_reported = _score_skill(skill_path, eval_suite)
             if delta > 0:
                 improvements += 1
             total_delta += delta
