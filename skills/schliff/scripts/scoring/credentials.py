@@ -42,9 +42,11 @@ _PATTERNS: tuple[tuple[str, "re.Pattern[str]"], ...] = (
     # No JWT pattern. A JWT's shape says nothing about whether it is secret:
     # the jwt.io sample and Supabase's `anon` key are public by design and appear
     # in real instruction files, and no structural test separates them from a
-    # service key. Under a hard-fail gate with no opt-out (ADR 0011), a class we
-    # cannot decide is a class we must not fire on. Redaction keeps its JWT
-    # pattern — there a false positive is free (ADR 0013).
+    # service key. The reason outlived the gate that first motivated it: a class
+    # nothing can decide is a class this scan stays out of, because a report
+    # that fires on every published example token is one people learn to ignore
+    # (ADR 0020). Redaction keeps its JWT pattern — there a false positive is
+    # free (ADR 0013).
 )
 
 

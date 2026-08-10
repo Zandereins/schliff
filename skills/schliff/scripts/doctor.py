@@ -73,9 +73,10 @@ def _score_single_skill(skill_path: str) -> dict:
     eval_suite = load_eval_suite(skill_path)
     scores = build_scores(skill_path, eval_suite)
 
-    # Doctor reports, it never gates: these are usually somebody else's files
-    # and a red exit on a file you cannot edit helps nobody (ADR 0014). Raw
-    # content so the line points at the real file (ADR 0016).
+    # Doctor reports, it never gates — as every surface now does (ADR 0019).
+    # Doctor was the first place the argument held: these are usually somebody
+    # else's files, and a red exit on a file you cannot edit helps nobody
+    # (ADR 0014). Raw content so the line points at the real file (ADR 0016).
     # `None` means "could not scan", which is not the same as "scanned, clean".
     # verify.py got this contract; doctor did not, so an oversize file with a
     # live key printed a row with no credential line and any `--json` consumer
