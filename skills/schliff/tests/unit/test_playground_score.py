@@ -1,8 +1,15 @@
 """Regression guards for the playground/leaderboard JSON parse robustness (PG-1).
 
-Deeply-nested JSON makes json.loads raise RecursionError, which is NOT a subclass
-of ValueError/JSONDecodeError, so it escaped the parse `except` and surfaced as a
-Vercel 500 instead of a clean 400. Both internet-facing parse sites must catch it.
+Deeply-nested JSON makes json.loads raise RecursionError on CPython 3.10-3.13.
+RecursionError is NOT a subclass of ValueError/JSONDecodeError, so it escaped the
+parse `except` and surfaced as a Vercel 500 instead of a clean 400. Both
+internet-facing parse sites must catch it.
+
+CPython 3.14 changed the ground under this: its json parser no longer recurses,
+so the same input raises JSONDecodeError and 20 000-deep *valid* nesting parses
+successfully where it used to be rejected. The guard tuple stays as it is —
+half the supported range still needs it — and the tests below assert
+containment rather than which exception a given interpreter picks.
 """
 from __future__ import annotations
 
@@ -17,11 +24,39 @@ _SCORE_PY = _ROOT / "playground" / "api" / "score.py"
 _SUBMIT_PY = _ROOT / "web" / "leaderboard" / "api" / "submit.py"
 
 
-def test_json_loads_deep_nesting_raises_recursionerror_not_valueerror():
-    # Root-cause pin: confirms the broadened except is actually needed.
-    with pytest.raises(RecursionError):
+# The tuple the production parse sites catch. Named once so the test below
+# asserts against the same thing the code does.
+_PARSE_GUARD = (json.JSONDecodeError, ValueError, RecursionError)
+
+
+def test_deep_nesting_cannot_escape_the_parse_guard():
+    """Nothing thrown by deeply-nested input may fall outside the guard.
+
+    This used to pin `RecursionError` specifically, which made it a statement
+    about CPython rather than about the code under test — and CPython changed:
+    3.14's json parser no longer recurses, so the same 50 000-deep input raises
+    JSONDecodeError there while 3.10-3.13 raise RecursionError. Both are inside
+    the guard, which is the only property that ever mattered.
+    """
+    try:
         json.loads("[" * 50000)
-    # And that it is NOT already caught by the narrow tuple.
+    except _PARSE_GUARD:
+        pass
+    except BaseException as exc:  # noqa: BLE001 — the point is to name escapees
+        pytest.fail(
+            f"{type(exc).__name__} escapes the production except tuple on "
+            f"this interpreter"
+        )
+
+
+def test_recursion_error_must_be_named_explicitly():
+    """Why the tuple cannot shrink to (ValueError, JSONDecodeError).
+
+    Still load-bearing on every supported interpreter: `requires-python` is
+    >=3.10, and on 3.10-3.13 deeply-nested JSON does raise RecursionError.
+    Dropping it because 3.14 no longer needs it would break the older half of
+    the support range.
+    """
     assert not issubclass(RecursionError, (ValueError, json.JSONDecodeError))
 
 

@@ -212,27 +212,38 @@ class TestBoundaryHeadersOnlyNoContent:
         assert isinstance(result["score"], (int, float))
 
 
+@pytest.fixture(scope="module")
+def large_skill_path(tmp_path_factory):
+    """Build a 10k-line skill once and reuse it across the tests below.
+
+    Module-level rather than a class-scoped method: pytest deprecates a
+    class-scoped fixture defined as an instance method (PytestRemovedIn10Warning,
+    an error in pytest 10) because it runs once while every test gets a fresh
+    instance. `@classmethod` silences that on the supported range but breaks
+    collection outright on 3.9 — `classmethod` objects gained `__name__` only in
+    3.10 — and 3.9 is what `/usr/bin/python3` is on this machine. The fixture
+    never touched `self`, so lifting it out of the class costs nothing and is
+    version-neutral.
+    """
+    tmp = tmp_path_factory.mktemp("large")
+    header = (
+        "---\nname: large-skill\n"
+        "description: Use when you need to process large amounts of content.\n"
+        "---\n\n# Large Skill\n\n"
+    )
+    # 5000 prose lines + 5000 instruction lines
+    body = ("This is content line.\n" * 5000) + ("Run the verification step.\n" * 5000)
+    content = header + body
+    assert len(content.encode()) <= MAX_SKILL_SIZE, (
+        f"Test fixture exceeds MAX_SKILL_SIZE ({MAX_SKILL_SIZE})"
+    )
+    p = tmp / "SKILL.md"
+    p.write_text(content, encoding="utf-8")
+    return str(p)
+
+
 class TestBoundaryLargeSkill:
     """Skill with 10,000 lines — well within the 1 MB limit."""
-
-    @pytest.fixture(scope="class")
-    def large_skill_path(self, tmp_path_factory):
-        """Build a 10k-line skill once and reuse across tests in this class."""
-        tmp = tmp_path_factory.mktemp("large")
-        header = (
-            "---\nname: large-skill\n"
-            "description: Use when you need to process large amounts of content.\n"
-            "---\n\n# Large Skill\n\n"
-        )
-        # 5000 prose lines + 5000 instruction lines
-        body = ("This is content line.\n" * 5000) + ("Run the verification step.\n" * 5000)
-        content = header + body
-        assert len(content.encode()) <= MAX_SKILL_SIZE, (
-            f"Test fixture exceeds MAX_SKILL_SIZE ({MAX_SKILL_SIZE})"
-        )
-        p = tmp / "SKILL.md"
-        p.write_text(content, encoding="utf-8")
-        return str(p)
 
     def test_structure_large_skill_does_not_crash(self, large_skill_path):
         result = score_structure(large_skill_path)
