@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.11.0] - 2026-08-10
+
 ### Added
 
 - **Credential findings in `score`, `score --json`, `doctor`, `verify` and the GitHub Action.**
@@ -1408,7 +1410,8 @@ measured, reported wrongly. Three of them were found by verifying the fourth.
 
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.10.1...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.11.0...HEAD
+[8.11.0]: https://github.com/Zandereins/schliff/compare/v8.10.1...v8.11.0
 [8.10.1]: https://github.com/Zandereins/schliff/compare/v8.10.0...v8.10.1
 [8.10.0]: https://github.com/Zandereins/schliff/compare/v8.9.0...v8.10.0
 [8.9.0]: https://github.com/Zandereins/schliff/compare/v8.8.2...v8.9.0
