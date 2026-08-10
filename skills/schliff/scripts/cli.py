@@ -208,6 +208,18 @@ def cmd_score(args: argparse.Namespace) -> None:
             sys.exit(1)
         token_info = check_token_budget(skill_content, detected_fmt)
 
+        # Credential detection runs on the RAW file, not on the normalized content
+        # build_scores hands the scorers: line numbers must point at the file the
+        # user named, and the normalization seam at shared.py:232-241 has corrupted
+        # scores here twice already (ADR 0016). Score-neutral by construction — the
+        # findings ride alongside the composite and never enter it (ADR 0011).
+        # No unknown state to model here: the read above already exits 1 with an
+        # error on an unreadable or oversize file, so this line is only reached
+        # when the raw content is in hand. `verify` needs the third state
+        # because it decides pass/fail; `score` fails closed by not emitting.
+        from scoring.credentials import scan_credentials
+        credentials = scan_credentials(skill_content)
+
         if getattr(args, "json", False):
             # A dimension score of -1 is the sentinel for "not measured" (e.g.
             # triggers/quality/edges with no eval suite). Surface it as JSON null
@@ -232,6 +244,10 @@ def cmd_score(args: argparse.Namespace) -> None:
                 },
                 "warnings": composite["warnings"],
                 "token_budget": token_info,
+                # Vendor + line only. The matched value never enters this object:
+                # the Action hands the whole thing to its PR-comment step as
+                # RESULT_B64, so output sites are not enumerable (ADR 0014).
+                "credentials": credentials,
             }
             print(json.dumps(result, indent=2))
         else:
@@ -282,6 +298,20 @@ def cmd_score(args: argparse.Namespace) -> None:
                 print(f"  Tokens: {color}{tok:,}{RESET} / {bud:,} ({sev})")
             else:
                 print(f"  Tokens: {tok:,} / {bud:,} ({token_info['severity']})")
+
+            # Credential findings. No surface gates on these (ADR 0019); shape
+            # does not tell a live key from a documentation example (ADR 0020),
+            # so the wording claims a possibility and not a fact. Vendor and
+            # line only: naming the value here would print it into any CI log
+            # that runs `score`.
+            if credentials:
+                print()
+                for finding in credentials:
+                    print(
+                        f"  possible credential: {finding['vendor']} "
+                        f"at line {finding['line']}"
+                    )
+                print("  → if it is real, remove it from the file and rotate the key.")
 
             # --tokens: section breakdown
             if getattr(args, "tokens", False):

@@ -576,6 +576,11 @@ class TestVerdictStructure:
             "passed_threshold", "exit_code", "message",
             "previous_score", "delta", "regression",
             "weight_source", "weights_hash",
+            # Vendor + line per finding, never the matched value (ADR 0014).
+            "credentials",
+            # Why `credentials` is None, so "could not look" can say what stopped
+            # it without ever collapsing into "nothing found".
+            "credential_error",
         }
         assert set(verdict.keys()) == expected_keys
 

@@ -673,6 +673,27 @@ def format_gradients(gradients: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _targets_another_file(target: object, skill_path: str) -> bool:
+    """True when a gradient's ``target`` names a file other than the patched one.
+
+    ``apply_patches`` only ever writes ``skill_path``, but ``target`` is free to
+    name something else — eleven gradients here name ``eval-suite.json``. Without
+    this check the filter admits them on confidence and effort alone, and a
+    file-A instruction becomes a file-B patch (ADR 0015).
+
+    In-file targets pass through: locators (``line:1``), section names
+    (``body``, ``frontmatter``, ``description``, ``references``, ``directory``),
+    and the skill's own filename.
+    """
+    if not isinstance(target, str) or not target:
+        return False
+    if ":" in target:          # in-file locator, e.g. "line:12"
+        return False
+    if "." not in target:      # a section, not a filename
+        return False
+    return Path(target).name != Path(skill_path).name
+
+
 def generate_patches(skill_path: str, gradients: list[dict]) -> list[dict]:
     """Generate concrete patches for deterministic gradients.
 
@@ -735,6 +756,11 @@ def generate_patches(skill_path: str, gradients: list[dict]) -> list[dict]:
 
     for g in gradients:
         if g.get("confidence") != "high" or g.get("effort", 2) > EFFORT_SIMPLE:
+            continue
+        # Third filter dimension: which file the gradient is even about. Without
+        # it the two already-qualifying eval-suite gradients are stopped only by
+        # a missing handler, which is a gap, not a guard (ADR 0015).
+        if _targets_another_file(g.get("target"), skill_path):
             continue
 
         patch = None
