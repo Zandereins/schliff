@@ -18,6 +18,7 @@ on:
       - 'AGENTS.md'
       - '.github/workflows/action-selftest.yml'
       - 'skills/schliff/tests/fixtures/dangling-repo/**'
+      - 'skills/schliff/tests/fixtures/credential-repo/**'
   workflow_dispatch:
 
 permissions:
@@ -144,6 +145,47 @@ jobs:
           set -euo pipefail
           test "${{ steps.gate.outcome }}" = "failure" || { echo "expected failure, got '${{ steps.gate.outcome }}'"; exit 1; }
           echo "fail-on-dangling correctly failed the action"
+
+  # V9: a credential in the file is REPORTED and the job stays GREEN (ADR 0019).
+  #
+  # This is the wiring proof ADR 0014 deferred, inverted. It could not run before
+  # 8.11.0: `action.yml` installs the engine from PyPI, so a fixture added in the
+  # F3 PR would have exercised 8.10.1 — which has no scan — and passed for the
+  # wrong reason. The published engine now has one.
+  #
+  # No `continue-on-error` here on purpose: if the action ever starts exiting
+  # non-zero on a finding again, this job goes red at the action step and never
+  # reaches the assertion. Reaching the assertion IS the green-path proof.
+  credential-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run against a file that carries a vendor token
+        id: cred
+        uses: ./
+        with:
+          skill-path: 'skills/schliff/tests/fixtures/credential-repo/AGENTS.md'
+          comment-on-pr: 'false'
+      - name: Assert the finding is reported, and carries no value
+        env:
+          RESULT_B64: ${{ steps.cred.outputs.result_b64 }}
+        run: |
+          set -euo pipefail
+          python3 -P -c "
+          import base64, json, os
+          raw = base64.b64decode(os.environ['RESULT_B64'])
+          result = json.loads(raw)
+          creds = result['credentials']
+          # Without this the job would also pass on a fixture the detector never
+          # sees, which is the failure mode a green-path test invites.
+          assert creds == [{'vendor': 'aws_access_key', 'line': 16}], creds
+          # ADR 0014 in the real transport: this payload is handed to the
+          # PR-comment step verbatim, so the value must not be in it at all.
+          assert b'AKIA3XZQ7RBN2WKPLMTV' not in raw, 'matched value reached the payload'
+          print('credential reported, job green, value absent')
+          "
 
   # V8: a non-AGENTS format skips the dangling step entirely (empty output).
   non-agents-format:
