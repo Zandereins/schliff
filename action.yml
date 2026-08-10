@@ -390,28 +390,30 @@ runs:
             core.warning(`Could not post the Schliff comment (likely a fork PR with a read-only token): ${e.message}`);
           }
 
-    - name: Fail on detected credentials
+    - name: Report detected credentials
       shell: bash
       env:
         CREDENTIALS: ${{ steps.score.outputs.credentials }}
       run: |
-        # Categorical and unconditional: a leak does not compete with a score
-        # threshold, so this step carries no `if:` on minimum-score and cannot
-        # be tuned away (ADR 0011, ADR 0014).
+        # Reports, never gates (ADR 0019). A token's shape does not separate a
+        # live key from a documentation example (ADR 0020), so this check must
+        # not decide anyone's build: the person a false positive hits does not
+        # control schliff's release cycle, and `schliff-version` defaults to
+        # latest. `warning` rather than `error` is the honest severity for a
+        # finding that is right some of the time.
         #
-        # Placed AFTER "Comment on PR" deliberately. Inner steps of a composite
-        # action cannot carry continue-on-error, so the first non-zero exit stops
-        # the rest: gating earlier meant the contributor got a red check with no
-        # score comment at all - no dimensions, no dangling summary - on exactly
-        # the pull request that most needs reviewing.
+        # Annotations do not fail a job on their own, so no `exit 1` belongs
+        # here. The step stays after "Comment on PR" regardless: inner steps of
+        # a composite action cannot carry continue-on-error, so anything that
+        # started exiting non-zero here would again cost the contributor the
+        # score comment on exactly the pull request that most needs reviewing.
         if [ "${CREDENTIALS}" = "MISSING" ]; then
-          echo "::notice::The pinned schliff engine predates the credential gate; no scan was performed."
+          echo "::notice::The pinned schliff engine predates the credential scan; no scan was performed."
         elif [ -n "${CREDENTIALS}" ]; then
           for finding in ${CREDENTIALS}; do
-            echo "::error::Credential detected: ${finding%%:*} at line ${finding##*:}"
+            echo "::warning::Possible credential: ${finding%%:*} at line ${finding##*:}"
           done
-          echo "::error::Remove it from the instruction file and rotate the key."
-          exit 1
+          echo "::warning::If it is real, remove it from the instruction file and rotate the key."
         fi
 
     - name: Check minimum score

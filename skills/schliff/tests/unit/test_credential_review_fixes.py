@@ -70,10 +70,17 @@ class TestScanIsLinear:
         assert [f["line"] for f in scan_credentials(content)] == [4, 6]
 
 
-class TestVerifyCannotFailOpen:
-    """Finding 1. `read_skill_safe` raising must never read as 'no credentials'."""
+class TestUnscannableIsNeverReportedAsClean:
+    """Finding 1, as it survives ADR 0019.
 
-    def test_oversize_skill_does_not_pass_the_gate(self, tmp_path):
+    The gate is gone, so an unreadable file no longer fails the build — that
+    stance only made sense while a finding gated. What must NOT come back is the
+    original defect: swallowing the read error and scanning an empty string, so
+    a 1.6 MB file with a live key rendered as `credentials: []`. Unknown is a
+    third state and stays distinguishable from clean.
+    """
+
+    def test_oversize_skill_reports_unknown_not_empty(self, tmp_path):
         skill = tmp_path / "SKILL.md"
         skill.write_text(
             "---\nname: x\ndescription: d\n---\n\n# x\n\n"
@@ -85,9 +92,11 @@ class TestVerifyCannotFailOpen:
             str(skill), min_score=0.0, history_path=str(tmp_path / "h.jsonl")
         )
 
-        assert verdict["exit_code"] != 0, (
-            "a file that cannot be scanned must not pass the credential gate"
+        assert verdict["credentials"] is None, "unscannable must not read as clean"
+        assert verdict["exit_code"] == 0, (
+            "the threshold decides the exit code now; failing to look is not a failure"
         )
+        assert LIVE_KEY not in verify_mod.format_verdict(verdict)
 
 
 class TestVerifyMessagePairsVendorWithLine:
@@ -107,10 +116,14 @@ class TestVerifyMessagePairsVendorWithLine:
         verdict = verify_mod.run_verify(
             str(skill), min_score=0.0, history_path=str(tmp_path / "h.jsonl")
         )
-        message = verdict["message"]
+        # The pairing rule outlived the gate: under ADR 0019 the finding is a
+        # note in the rendered verdict rather than the failure message, but
+        # sending an operator to the wrong line still risks rotating the wrong
+        # credential.
+        rendered = verify_mod.format_verdict(verdict)
 
-        assert "aws_access_key at line 5" in message
-        assert "anthropic_api_key at line 7" in message
+        assert "aws_access_key at line 5" in rendered
+        assert "anthropic_api_key at line 7" in rendered
 
 
 class TestScoreFailsClosedOnAnUnreadableFile:
@@ -209,6 +222,12 @@ class TestVendorShapesAreActuallyVendorShapes:
     @pytest.mark.parametrize("token", [
         "sk-proj-Nx7Qm2Kd9dK2mNqR7vT4wX1zB6cF8gH3",
         "sk-Nx7Qm2Kd9dK2mNqR7vT4wX1zB6cF8gH3jL5pQ",
+        # Row 1 of the decision brief: hyphens inside the body of a modern
+        # project key. Silent until ADR 0020 widened the body behind a known
+        # prefix — the kebab-case cases above are the other half of that trade
+        # and must stay silent, so the two belong in one class.
+        "sk-proj-Ab3d-Kf9LmQ2xR7tYu1VwZ0nBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcdef",
+        "sk-svcacct-Ab3d_Kf9-LmQ2xR7tYu1VwZ0nBcDeFgHiJ",
     ])
     def test_real_openai_shapes_still_fire(self, token):
         assert [f["vendor"] for f in scan_credentials(f"key {token}")] == ["openai_api_key"]

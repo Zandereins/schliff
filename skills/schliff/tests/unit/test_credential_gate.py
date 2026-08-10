@@ -1,9 +1,10 @@
 """Tests for wiring the credential detector into schliff's surfaces.
 
 ADR 0011 — score-neutral: the composite is bit-identical with and without a
-credential in the file.
-ADR 0014 — gate-effective: `verify` exits non-zero on a finding, independently
-of `--min-score`; reporting surfaces display it and never change their exit code.
+credential in the file. Still in force.
+ADR 0019 — every surface reports and none gates: no finding changes an exit
+code anywhere. The risk this file guards is that removing the gate also removes
+the finding from sight, which would leave the feature with no purpose at all.
 """
 import json
 import subprocess
@@ -107,22 +108,49 @@ class TestScoreNeutrality:
         assert dirty_payload["dimensions"] == clean_payload["dimensions"]
 
 
-class TestVerifyGate:
-    """ADR 0014: `verify` fails on a credential regardless of the threshold."""
+class TestVerifyReportsWithoutGating:
+    """ADR 0019: `verify` shows the finding and exits on the threshold alone."""
 
-    def test_verify_fails_even_with_the_threshold_satisfied(self, tmp_path):
+    def test_verify_exits_zero_with_a_credential_present(self, tmp_path):
         skill = _write_skill(tmp_path, f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
 
         result = _run_cli("verify", skill, "--min-score", "0")
 
-        assert result.returncode != 0, "a credential must fail the gate at any threshold"
+        assert result.returncode == 0, (
+            "a credential no longer fails the build; the classification is "
+            "undecidable and the false positive is not fixable by the person it hits"
+        )
 
-    def test_verify_passes_a_clean_file_at_the_same_threshold(self, tmp_path):
+    def test_verify_still_shows_vendor_and_line(self, tmp_path):
+        """The finding must survive the removal of the gate.
+
+        Deleting the gate by deleting the branch would take the only place
+        `verify` ever mentions a credential with it, and the feature would exit
+        the release silently.
+        """
+        skill = _write_skill(tmp_path, f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
+
+        result = _run_cli("verify", skill, "--min-score", "0")
+        output = result.stdout + result.stderr
+
+        assert "aws_access_key" in output
+        assert "17" in output
+
+    def test_verify_still_fails_on_the_threshold(self, tmp_path):
+        """The other gate is untouched — removing one must not remove both."""
+        skill = _write_skill(tmp_path, f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
+
+        result = _run_cli("verify", skill, "--min-score", "100")
+
+        assert result.returncode == 1
+
+    def test_verify_says_nothing_about_credentials_on_a_clean_file(self, tmp_path):
         skill = _write_skill(tmp_path, "Set `AWS_ACCESS_KEY_ID` in your environment.")
 
         result = _run_cli("verify", skill, "--min-score", "0")
 
         assert result.returncode == 0, result.stderr
+        assert "credential" not in (result.stdout + result.stderr).lower()
 
     def test_verify_never_echoes_the_value(self, tmp_path):
         skill = _write_skill(tmp_path, f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
@@ -154,6 +182,20 @@ class TestReportingSurfaces:
 
         assert result.returncode == 0, "score reports, it does not gate"
 
+    def test_score_does_not_promise_a_gate_that_no_longer_exists(self, tmp_path):
+        """The renderer used to tell the reader that `verify` would fail on this.
+
+        Instructions that outlive the behaviour they describe are the exact
+        follow-on damage that dominated the three review passes: the rule was
+        changed in one module and its neighbouring sentence was left standing.
+        """
+        skill = _write_skill(tmp_path, f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
+
+        out = _run_cli("score", skill).stdout.lower()
+
+        assert "verify" not in out or "fails" not in out
+        assert "--min-score" not in out
+
     def test_clean_file_says_nothing_about_credentials(self, tmp_path):
         skill = _write_skill(tmp_path, "Set `AWS_ACCESS_KEY_ID` in your environment.")
 
@@ -181,3 +223,21 @@ class TestReportingSurfaces:
         assert "credential" in result.stdout.lower()
         assert "aws_access_key" in result.stdout
         assert LIVE_KEY not in result.stdout
+
+    def test_every_human_surface_hedges_the_same_way(self, tmp_path):
+        """One wording across surfaces, because one claim is being made.
+
+        `score` and `verify` were changed to say "possible"; `doctor` kept the
+        confident noun for a release. It reads other people's files, where an
+        unhedged claim is least defensible.
+        """
+        skill = _write_skill(tmp_path / "leaky", f"Set `AWS_ACCESS_KEY_ID={LIVE_KEY}`.")
+
+        surfaces = {
+            "score": _run_cli("score", skill).stdout,
+            "verify": _run_cli("verify", skill, "--min-score", "0").stdout,
+            "doctor": _run_cli("doctor", "--skill-dirs", str(tmp_path)).stdout,
+        }
+
+        for name, out in surfaces.items():
+            assert "possible credential" in out.lower(), f"{name} states it as a fact"

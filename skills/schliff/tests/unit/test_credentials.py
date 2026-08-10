@@ -83,21 +83,40 @@ class TestVendorCoverage:
 
 
 class TestPlaceholdersNeverFire:
-    """The discriminator is the value, not the location (ADR 0012).
+    """A token that names itself a stand-in produces no finding (ADR 0020).
 
-    A false positive here turns somebody else's green build red, so a shape that
-    announces itself as a placeholder must never produce a finding.
+    Marker words are all that is left of the placeholder test, and they are the
+    only part that never cost a real key: `example`, `your`, `replace` and the
+    rest do not occur in issued credentials.
     """
 
     @pytest.mark.parametrize("placeholder", [
         "sk-ant-REPLACE_ME_WITH_YOUR_KEY",
-        "sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx",
         "sk-ant-YOUR_API_KEY_GOES_HERE_1",
         "sk-ant-api03-EXAMPLE_KEY_NOT_REAL",
         "AKIAIOSFODNN7EXAMPLE",
     ])
     def test_placeholder_produces_no_finding(self, placeholder):
         assert scan_credentials(f"ANTHROPIC_API_KEY={placeholder}\n") == []
+
+
+class TestTheAcceptedFalsePositives:
+    """The price of dropping the repeated-run heuristic, pinned so it is a
+    decision on record rather than a surprise (ADR 0020).
+
+    `sk-ant-xxxxxxxx` is documentation and now produces a finding, because the
+    same rule that suppressed it also suppressed `AKIA0000TUVWXY3BCDEF`, which
+    is a legal AWS key. Under ADR 0019 this costs a line of output; before it,
+    the reverse error cost an unseen credential.
+    """
+
+    def test_a_repeated_character_placeholder_now_fires(self):
+        assert scan_credentials("ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx\n") != []
+
+    def test_and_the_real_key_it_used_to_hide_fires_too(self):
+        assert [f["vendor"] for f in scan_credentials("AKIA0000TUVWXY3BCDEF\n")] == [
+            "aws_access_key"
+        ]
 
 
 class TestReDoSBound:

@@ -326,17 +326,20 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
 
         lines.append(f"  {name:<25s} {score:>5.0f} {grade:s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
 
-        # Credentials print unconditionally, not behind --verbose: a leak is not
-        # a detail you opt into. Vendor and line only (ADR 0014). `None` is the
-        # third state — the file could not be read, which must not render as a
-        # clean row.
+        # Credentials print unconditionally, not behind --verbose: a possible
+        # leak is not a detail you opt into. Vendor and line only (ADR 0014).
+        # `None` is the third state — the file could not be read, which must not
+        # render as a clean row. "possible" is the same hedge `score` and
+        # `verify` use, because the finding asserts shape and not authenticity
+        # (ADR 0020); doctor in particular reads other people's files, where a
+        # confident claim is least warranted.
         found = r.get("credentials", [])
         if found is None:
             lines.append(f"    {'':25s}  └─ credential scan: could not read the file")
         else:
             for finding in found:
                 lines.append(
-                    f"    {'':25s}  └─ credential: {finding['vendor']} "
+                    f"    {'':25s}  └─ possible credential: {finding['vendor']} "
                     f"at line {finding['line']}"
                 )
 
