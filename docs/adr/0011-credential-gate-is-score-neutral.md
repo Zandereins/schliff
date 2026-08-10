@@ -2,6 +2,9 @@
 
 - Status: accepted
 - Date: 2026-08-06
+- Superseded in part by ADR 0019 on 2026-08-10: the gate-effective half is withdrawn — no
+  credential finding changes an exit code. Score-neutrality and its operative constraint (the
+  detector stays out of `scoring.security._CATEGORIES`) remain in force.
 
 ## Context
 

@@ -2,6 +2,9 @@
 
 - Status: accepted
 - Date: 2026-08-06
+- Superseded in part by ADR 0019 on 2026-08-10: the gate-surface list is empty — neither
+  `verify` nor the Action changes its exit code. The finding-payload rule (vendor and line, never
+  the value) and the reporting-surface rule remain in force, the latter now universally.
 
 ## Context
 

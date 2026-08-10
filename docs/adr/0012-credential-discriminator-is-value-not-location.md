@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-08-06
+- Superseded by ADR 0020 on 2026-08-10: the premise below — *"shape carries all of it"* — is
+  refuted by measurement. The decisions in this ADR stand; only their stated reason does not.
 
 ## Context
 
