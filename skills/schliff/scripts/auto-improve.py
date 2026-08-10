@@ -41,9 +41,9 @@ import parallel_runner  # noqa: E402
 # Use underscore aliases for clean imports (wrapper modules for hyphenated originals)
 import score_skill as scorer  # noqa: E402
 import text_gradient as gradient_mod  # noqa: E402
+from eval_split import split_eval_suite  # noqa: E402
 from terminal_art import grade_colored, progress_bar, score_to_grade, sparkline  # noqa: E402
 
-from eval_split import split_eval_suite  # noqa: E402
 from shared import load_eval_suite  # noqa: E402
 
 # --- State Management ---
