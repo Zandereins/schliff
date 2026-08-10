@@ -1,7 +1,8 @@
 # Decision brief: does the credential gate ship, and in what shape?
 
-**Status:** open, awaiting decision · **Branch:** `docs/skillopt-import-adrs` at `0751e45`
-**Written:** 2026-08-07, after the third code-review pass
+**Status:** open, awaiting decision · **Branch:** `docs/skillopt-import-adrs` at `846e171`
+**Written:** 2026-08-07, after the third code-review pass · **Updated:** 2026-08-10, the four
+decision-independent findings are fixed and the branch waits on this one question
 
 Input for a grilling session. Everything here was measured on the branch, not inferred.
 The decision is F3's alone; **F1 and F4 are unaffected and healthy.**
@@ -106,25 +107,33 @@ which misses real keys offers false assurance, which can be worse than none.
 ## Not in scope — but still open
 
 F1 (gradient target check + train/val split) and F4 (redaction patterns) ship regardless of
-this decision. **Four findings from the third pass are ordinary bugs rather than premise
-failures, and need fixing whatever is decided here:**
+this decision. **Four findings from the third pass were ordinary bugs rather than premise
+failures. All four are closed in `846e171`; they needed no decision:**
 
-- `evolve/sanitize.py:36` — short `PWD=` values go unredacted and no other pattern covers the
-  ODBC spelling, so the generic assignment catcher does not backstop it. Verified:
-  `redact_secrets('conn: Server=x;PWD=abc123;DB=y')` returns the string unchanged.
-- `evolve/sanitize.py:13` — the redaction set cannot match a modern `sk-proj-` OpenAI key
+- `evolve/sanitize.py:36` — short `PWD=` values went unredacted and no other pattern covers
+  the ODBC spelling, so the generic assignment catcher did not backstop it. Was:
+  `redact_secrets('conn: Server=x;PWD=abc123;DB=y')` returned the string unchanged. Fixed by
+  dropping the invented eight-character floor; `$PWD` and lowercase `pwd=` still survive.
+- `evolve/sanitize.py:13` — the redaction set could not match a modern `sk-proj-` OpenAI key
   (alnum-only body stops at the hyphen). A miss here reaches a model provider, which is the
-  expensive direction for redaction (ADR 0013).
-- `auto-improve.py:321` — the empty-val guard fires only when **all three** populations are
-  empty, so holding out only triggers leaves `quality` and `edges` at the unmeasured sentinel
-  on the gate. Verified against the shipped fixture suite: a val side of
-  `{triggers: 22, test_cases: 0, edge_cases: 0}` satisfies `any(...)`, no fallback fires, and
-  destructive patches are written to the user's SKILL.md.
-- `auto-improve.py:404` — `_should_stop` still receives the val-basis score, so the
-  documented "composite reaches 98+" stop is evaluated against a number no other schliff
-  surface produces. Verified: a run printed `Baseline: 95.3` (gate basis) while the summary
-  reported `99 → 99`, and the loop kept iterating on a file `schliff score` already rates
-  past the threshold. The basis sweep of `a335ff9` was incomplete.
+  expensive direction for redaction (ADR 0013). Fixed by allowing hyphens **behind a known
+  key prefix only**: a bare `sk-` with hyphens would have eaten kebab-case prose such as
+  `sk-add-credential-scanning-to-verify`, and over-redaction destroys the prompt it protects.
+- `auto-improve.py:321` — the empty-val guard fired only when **all three** populations were
+  empty, so holding out only triggers left `quality` and `edges` at the unmeasured sentinel
+  on the gate and destructive patches reached the user's SKILL.md. Fixed per population:
+  each population with no val cases falls back to the full suite and `gate_suite` names it,
+  while populations that do hold out keep their holdout. Measured on schliff's own 44/4/14
+  suite — the gate saw `quality -1, edges -1`, and now sees `90, 100`.
+- `auto-improve.py:404` — `_should_stop` received the val-basis score, so the documented
+  "composite reaches 98+" stop was evaluated against a number no other schliff surface
+  produces: a run printed `Baseline: 95.3` (gate basis) while the summary reported `99 → 99`.
+  The basis sweep of `a335ff9` was incomplete. Fixed: the stop check runs on the reported
+  basis, re-measured after each keep, and the verbose baseline line prints the reported
+  figure with the gate's number labelled beside it.
+
+Nothing in the four touches `scoring/credentials.py`, so the decision below is unchanged by
+them. The branch now has exactly one open question.
 
 ## The rest of the backlog
 
