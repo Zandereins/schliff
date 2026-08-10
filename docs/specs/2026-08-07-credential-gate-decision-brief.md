@@ -103,10 +103,38 @@ which misses real keys offers false assurance, which can be worse than none.
 - ADR 0011, 0012, 0014 and 0016 all rest on the refuted premise to some degree. Which are
   superseded, and which merely need their reasoning corrected?
 
-## Not in scope
+## Not in scope — but still open
 
-F1 (gradient target check + train/val split) and F4 (redaction patterns) ship regardless.
-Two open F4 items from the third pass are ordinary bugs, not premise failures, and are worth
-fixing whatever is decided here: short `PWD=` values are unredacted with no backstop
-(`sanitize.py:36`), and the redaction set cannot match a modern `sk-proj-` key
-(`sanitize.py:13`) — a miss that reaches a model provider.
+F1 (gradient target check + train/val split) and F4 (redaction patterns) ship regardless of
+this decision. **Four findings from the third pass are ordinary bugs rather than premise
+failures, and need fixing whatever is decided here:**
+
+- `evolve/sanitize.py:36` — short `PWD=` values go unredacted and no other pattern covers the
+  ODBC spelling, so the generic assignment catcher does not backstop it. Verified:
+  `redact_secrets('conn: Server=x;PWD=abc123;DB=y')` returns the string unchanged.
+- `evolve/sanitize.py:13` — the redaction set cannot match a modern `sk-proj-` OpenAI key
+  (alnum-only body stops at the hyphen). A miss here reaches a model provider, which is the
+  expensive direction for redaction (ADR 0013).
+- `auto-improve.py:321` — the empty-val guard fires only when **all three** populations are
+  empty, so holding out only triggers leaves `quality` and `edges` at the unmeasured sentinel
+  on the gate. Verified against the shipped fixture suite: a val side of
+  `{triggers: 22, test_cases: 0, edge_cases: 0}` satisfies `any(...)`, no fallback fires, and
+  destructive patches are written to the user's SKILL.md.
+- `auto-improve.py:404` — `_should_stop` still receives the val-basis score, so the
+  documented "composite reaches 98+" stop is evaluated against a number no other schliff
+  surface produces. Verified: a run printed `Baseline: 95.3` (gate basis) while the summary
+  reported `99 → 99`, and the loop kept iterating on a file `schliff score` already rates
+  past the threshold. The basis sweep of `a335ff9` was incomplete.
+
+## The rest of the backlog
+
+- **Version bump to 8.11.0** — its own `chore(release):` commit touching `pyproject.toml:7`,
+  `.claude-plugin/plugin.json:3`, `skills/schliff/__init__.py:3` (the three constants
+  `test_version_consistency.py` asserts), plus `README.md`, `docs/README.md` and the badge
+  cache-bust. A release step, not a feature step (ADR 0017).
+- **The CHANGELOG entry** currently sits under BREAKING BEHAVIOUR for a behaviour that may
+  not ship. It follows the decision.
+- **Push and PR** — nothing has left the local tree. The branch is ten commits.
+- **The `action-selftest.yml` red-path fixture** remains a post-release follow-up: the
+  composite action installs from PyPI, so no self-test can exercise a detector that is not
+  published yet (ADR 0014).
