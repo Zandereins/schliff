@@ -119,7 +119,12 @@ def generate_dashboard(
         mesh_result = {"issues": []}
     mesh_issues = [
         i for i in mesh_result.get("issues", [])
-        if skill_name in (i.get("skill_a", ""), i.get("skill_b", ""), i.get("skill", ""))
+        # `name` carries the skill for single-skill findings such as
+        # duplicate_name, which name one skill rather than a pair. Without it
+        # the dashboard silently drops every issue of that shape.
+        if skill_name in (
+            i.get("skill_a", ""), i.get("skill_b", ""), i.get("skill", ""), i.get("name", ""),
+        )
     ]
 
     # 4. Untriaged failures

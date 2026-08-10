@@ -229,12 +229,34 @@ def _lsh_candidates(signatures: list[list[int]], bands: int = 16) -> set[tuple[i
     return candidates
 
 
+def _skill_key(skill: dict) -> str:
+    """Identity of a skill for pairing purposes: its declared name.
+
+    Two SKILL.md files with the same name are one skill found at two paths —
+    a global install plus a project-local copy, a vendored fixture — not two
+    skills competing. Comparing such a pair produces a perfect overlap and a
+    patch instruction naming the same skill on both sides ("Narrow scope: X
+    should own this domain"), which nobody can carry out. Reported separately
+    by `detect_duplicate_names`.
+    """
+    return (skill.get("name") or "").strip().lower()
+
+
+def _is_same_skill(a: dict, b: dict) -> bool:
+    key_a, key_b = _skill_key(a), _skill_key(b)
+    # An unnamed skill parses as "unknown"; two of those are not known to be
+    # the same thing, so they stay comparable.
+    return bool(key_a) and key_a not in ("", "unknown") and key_a == key_b
+
+
 def _detect_overlaps_bruteforce(skills: list[dict], vectors: dict) -> list[dict]:
     """O(n^2) brute-force trigger overlap detection for small skill sets."""
     overlaps = []
     for i in range(len(skills)):
         for j in range(i + 1, len(skills)):
             if i not in vectors or j not in vectors:
+                continue
+            if _is_same_skill(skills[i], skills[j]):
                 continue
 
             sim = _cosine_similarity(vectors[i], vectors[j])
@@ -291,6 +313,11 @@ def detect_trigger_overlaps(skills: list[dict]) -> list[dict]:
     overlaps = []
     for i, j in candidates:
         if i not in vectors or j not in vectors:
+            continue
+        # Same rule as the brute-force path above. Applying it to only one of
+        # the two would make the finding depend on whether the machine happens
+        # to hold 50 skills.
+        if _is_same_skill(skills[i], skills[j]):
             continue
 
         sim = _cosine_similarity(vectors[i], vectors[j])
@@ -378,6 +405,33 @@ def _classify_domain(skill: dict) -> dict[str, float]:
     return domains
 
 
+def detect_duplicate_names(skills: list[dict]) -> list[dict]:
+    """Report one skill name found at more than one path.
+
+    This is what the overlap detectors used to call a critical conflict. It is
+    a real thing worth seeing — only one of the copies wins when the agent
+    resolves the name, and which one is not obvious from the file — but it is
+    not a scope problem, and it is not the author's mistake to fix by rewriting
+    a description. Hence `info`: visible, and costing no health.
+    """
+    by_name: dict[str, list[str]] = defaultdict(list)
+    for skill in skills:
+        key = _skill_key(skill)
+        if key and key != "unknown":
+            by_name[key].append(skill["path"])
+
+    return [
+        {
+            "type": "duplicate_name",
+            "severity": "info",
+            "name": name,
+            "paths": sorted(paths),
+        }
+        for name, paths in sorted(by_name.items())
+        if len(paths) > 1
+    ]
+
+
 def detect_scope_collisions(skills: list[dict]) -> list[dict]:
     """Detect skills with overlapping primary domains and positive scope overlap.
 
@@ -400,6 +454,9 @@ def detect_scope_collisions(skills: list[dict]) -> list[dict]:
         for a_pos in range(len(indices)):
             for b_pos in range(a_pos + 1, len(indices)):
                 i, j = indices[a_pos], indices[b_pos]
+
+                if _is_same_skill(skills[i], skills[j]):
+                    continue
 
                 # Check scope overlap via token overlap
                 tokens_i = set(skills[i].get("tokens", []))
@@ -506,18 +563,33 @@ def generate_mesh_actions(issues: list[dict], skills: list[dict]) -> list[dict]:
 _MESH_CACHE_PATH = Path.home() / ".schliff" / "meta" / "mesh-cache.json"
 
 
+# Bump whenever a detector's verdict changes for unchanged input. The cache
+# keys on skill CONTENT, so without this an upgrade is invisible to everyone who
+# has run `doctor` before: same files, same hashes, cached verdict returned, and
+# the fix they installed never shows. Raised to 2 when same-name pairs stopped
+# being reported as collisions.
+_MESH_CACHE_VERSION = 2
+
+
 def _load_mesh_cache() -> dict:
     """Load mesh analysis cache (content_hash -> analysis results)."""
     if not _MESH_CACHE_PATH.exists():
         return {}
     try:
-        return json.loads(_MESH_CACHE_PATH.read_text(encoding="utf-8"))
+        cache = json.loads(_MESH_CACHE_PATH.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
+    if not isinstance(cache, dict) or cache.get("_version") != _MESH_CACHE_VERSION:
+        # Written by a different analysis. Discard rather than migrate: the
+        # entries are verdicts, and a verdict from older logic is exactly what
+        # must not survive.
+        return {}
+    return cache
 
 
 def _save_mesh_cache(cache: dict) -> None:
     """Save mesh analysis cache."""
+    cache["_version"] = _MESH_CACHE_VERSION
     _MESH_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     _MESH_CACHE_PATH.write_text(json.dumps(cache), encoding="utf-8")
 
@@ -627,6 +699,7 @@ def run_mesh_analysis(
     issues = []
     issues.extend(detect_trigger_overlaps(skills))
     issues.extend(detect_scope_collisions(skills))
+    issues.extend(detect_duplicate_names(skills))
 
     # Generate evolution actions for issues
     actions = generate_mesh_actions(issues, skills)
@@ -711,6 +784,13 @@ def format_mesh_report(result: dict) -> str:
                     f"  [{sev}] Scope collision: {issue['skill_a']} <-> {issue['skill_b']}"
                     f" (domain: {issue['shared_domain']}, overlap: {issue['overlap_score']:.1%})"
                 )
+            elif itype == "duplicate_name":
+                lines.append(
+                    f"  [{sev}] Duplicate name: '{issue['name']}' found at "
+                    f"{len(issue['paths'])} paths — only one of them resolves"
+                )
+                for path in issue["paths"]:
+                    lines.append(f"         {path}")
             lines.append("")
     else:
         lines.append("  No issues found — mesh is healthy!")
