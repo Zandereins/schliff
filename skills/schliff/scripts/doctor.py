@@ -377,7 +377,11 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
     mesh_health = report.get("mesh_health", 100)
     mesh_issues = report.get("mesh_issue_count", 0)
     if mesh_issues > 0:
-        lines.append(f"  Mesh Health: {mesh_health}/100 ({mesh_issues} cross-skill issues)")
+        # "cross-skill" was accurate while every finding named a pair. A
+        # duplicate name names one skill at two paths, so the summary says how
+        # many findings there are and lets `/schliff:mesh` say what they are.
+        noun = "finding" if mesh_issues == 1 else "findings"
+        lines.append(f"  Mesh Health: {mesh_health}/100 ({mesh_issues} mesh {noun})")
         lines.append("  Run /schliff:mesh for details.")
         lines.append("")
 
