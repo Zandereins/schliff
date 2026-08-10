@@ -67,10 +67,24 @@ def _default_skill_dirs() -> list[str]:
 
 def _score_single_skill(skill_path: str) -> dict:
     """Score a single skill and return summary."""
-    from shared import build_scores, load_eval_suite
+    from scoring.credentials import scan_credentials
+    from shared import build_scores, load_eval_suite, read_skill_safe
 
     eval_suite = load_eval_suite(skill_path)
     scores = build_scores(skill_path, eval_suite)
+
+    # Doctor reports, it never gates — as every surface now does (ADR 0019).
+    # Doctor was the first place the argument held: these are usually somebody
+    # else's files, and a red exit on a file you cannot edit helps nobody
+    # (ADR 0014). Raw content so the line points at the real file (ADR 0016).
+    # `None` means "could not scan", which is not the same as "scanned, clean".
+    # verify.py got this contract; doctor did not, so an oversize file with a
+    # live key printed a row with no credential line and any `--json` consumer
+    # testing `if r["credentials"]:` read it as clean.
+    try:
+        credentials = scan_credentials(read_skill_safe(skill_path))
+    except (OSError, ValueError):
+        credentials = None
 
     composite = scorer.compute_composite(scores)
 
@@ -118,6 +132,8 @@ def _score_single_skill(skill_path: str) -> dict:
         "action": action,
         "tokens": tokens,
         "recommendations": recommendations,
+        # Vendor + line only, never the value (ADR 0014).
+        "credentials": credentials,
     }
 
 
@@ -310,6 +326,23 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
         action = r["action"][:35]
 
         lines.append(f"  {name:<25s} {score:>5.0f} {grade:s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
+
+        # Credentials print unconditionally, not behind --verbose: a possible
+        # leak is not a detail you opt into. Vendor and line only (ADR 0014).
+        # `None` is the third state — the file could not be read, which must not
+        # render as a clean row. "possible" is the same hedge `score` and
+        # `verify` use, because the finding asserts shape and not authenticity
+        # (ADR 0020); doctor in particular reads other people's files, where a
+        # confident claim is least warranted.
+        found = r.get("credentials", [])
+        if found is None:
+            lines.append(f"    {'':25s}  └─ credential scan: could not read the file")
+        else:
+            for finding in found:
+                lines.append(
+                    f"    {'':25s}  └─ possible credential: {finding['vendor']} "
+                    f"at line {finding['line']}"
+                )
 
         if verbose and r.get("issues"):
             for issue in r["issues"][:5]:  # Cap at 5 to avoid flooding

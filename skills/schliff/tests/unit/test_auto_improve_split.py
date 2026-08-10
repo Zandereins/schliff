@@ -1,0 +1,112 @@
+"""The loop derives edits from `train` and judges them on `val` (ADR 0015).
+
+When the two sides are not disjoint the run must say so, because a delta from a
+non-disjoint comparison is not evidence of anything.
+"""
+import importlib.util
+from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parent.parent.parent / "scripts"
+_spec = importlib.util.spec_from_file_location("auto_improve", SCRIPTS / "auto-improve.py")
+auto_improve = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(auto_improve)
+
+SKILL = """\
+---
+name: deploy-helper
+description: Deploys the service. Use when asked to deploy or ship.
+---
+
+# deploy-helper
+
+Run `make deploy`.
+"""
+
+
+def _suite(labelled: bool):
+    def case(name, split):
+        c = {"prompt": name, "should_trigger": True}
+        if labelled:
+            c["split"] = split
+        return c
+    return {"triggers": [case("a", "train"), case("b", "val")]}
+
+
+def _write(tmp_path):
+    p = tmp_path / "SKILL.md"
+    p.write_text(SKILL, encoding="utf-8")
+    (tmp_path / "eval-suite.json").write_text("{}", encoding="utf-8")
+    return str(p)
+
+
+def test_summary_reports_a_clean_split(tmp_path, monkeypatch):
+    skill = _write(tmp_path)
+    monkeypatch.setattr(auto_improve, "load_eval_suite", lambda _p: _suite(labelled=True))
+
+    summary = auto_improve.run_auto_improve(skill, max_iterations=1, dry_run=True)
+
+    assert summary["holdout_leaked"] is False
+
+
+def test_summary_flags_an_unlabelled_suite(tmp_path, monkeypatch):
+    skill = _write(tmp_path)
+    monkeypatch.setattr(auto_improve, "load_eval_suite", lambda _p: _suite(labelled=False))
+
+    summary = auto_improve.run_auto_improve(skill, max_iterations=1, dry_run=True)
+
+    assert summary["holdout_leaked"] is True
+
+
+def test_summary_headline_matches_the_full_suite_not_val(tmp_path, monkeypatch):
+    """Finding 5 of the 2026-08-07 review.
+
+    The gate rightly judges `val`, but the number the user sees has to be the
+    one `schliff score` and `schliff verify` report for the same file —
+    otherwise `/schliff:auto` prints 81, the user sets --min-score 80, and the
+    build fails on a different composite.
+    """
+    # The description must match the val prompts and miss the train ones, or
+    # both sides score the same sentinel and the test proves nothing.
+    skill_file = tmp_path / "SKILL.md"
+    skill_file.write_text(
+        "---\nname: deploy-helper\n"
+        "description: Deploys the service to staging. Use when asked to deploy or ship.\n"
+        "---\n\n# deploy-helper\n\nRun `make deploy`.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "eval-suite.json").write_text("{}", encoding="utf-8")
+    skill = str(skill_file)
+    suite = {"triggers": (
+        [{"prompt": "rotate the TLS certificate", "should_trigger": True, "split": "train"}] * 4
+        + [{"prompt": "deploy to staging", "should_trigger": True, "split": "val"}] * 4
+    )}
+    monkeypatch.setattr(auto_improve, "load_eval_suite", lambda _p: suite)
+
+    summary = auto_improve.run_auto_improve(skill, max_iterations=1, dry_run=True)
+
+    import score_skill as scorer
+    full = scorer.score_triggers(skill, suite)["score"]
+    val_only = scorer.score_triggers(skill, {"triggers": suite["triggers"][4:]})["score"]
+    assert full != val_only, "fixture must actually discriminate"
+    assert summary["final_dimensions"]["triggers"] == full
+    assert summary["gate_suite"] == "val"
+
+
+def test_printed_delta_matches_the_printed_arrow(tmp_path, monkeypatch, capsys):
+    """The arrow and the parenthesised delta must come from one basis.
+
+    The first attempt at this fix moved baseline and final to the full suite but
+    left the printed delta accumulating gate-side deltas, so `42 -> 40 (+1.6)`
+    was still possible.
+    """
+    skill = _write(tmp_path)
+    monkeypatch.setattr(auto_improve, "load_eval_suite", lambda _p: _suite(labelled=True))
+
+    summary = auto_improve.run_auto_improve(skill, max_iterations=2, dry_run=True)
+
+    arrow_delta = round(
+        summary["final_composite"] - summary["baseline_composite"], 1
+    )
+    assert summary["total_delta_reported"] == arrow_delta
+    # The value the renderer actually prints must be the one matching the arrow.
+    assert auto_improve._printed_delta(summary) == arrow_delta

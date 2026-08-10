@@ -41,6 +41,7 @@ import parallel_runner  # noqa: E402
 # Use underscore aliases for clean imports (wrapper modules for hyphenated originals)
 import score_skill as scorer  # noqa: E402
 import text_gradient as gradient_mod  # noqa: E402
+from eval_split import split_eval_suite  # noqa: E402
 from terminal_art import grade_colored, progress_bar, score_to_grade, sparkline  # noqa: E402
 
 from shared import load_eval_suite  # noqa: E402
@@ -166,6 +167,52 @@ def _score_content(
             pass
         scorer.invalidate_cache(str(tmp_path))
     return result
+
+
+# --- Gate suite ---
+
+# Populations a suite may carry. A dimension is scored from exactly one of
+# them, so a population the gate cannot see is a dimension it cannot judge.
+_POPULATIONS = ("triggers", "test_cases", "edge_cases")
+
+
+def _gate_suites(
+    eval_suite: Optional[dict],
+) -> tuple[Optional[dict], Optional[dict], bool, str]:
+    """Return ``(train_suite, val_suite, holdout_leaked, gate_basis)``.
+
+    Edits are derived from ``train`` and judged on ``val`` (ADR 0015). A val
+    side with no cases in some population scores that dimension at the
+    unmeasured sentinel (-1), and the keep/revert gate then cannot see a patch
+    that destroyed it — so every such population falls back to the full suite
+    and the run says the holdout is gone for it. Checking only whether ALL
+    populations were empty left a suite whose triggers alone carry `split: val`
+    gating on triggers while quality and edges went unjudged.
+    """
+    if not eval_suite:
+        # No suite at all: gradients and gate see the identical empty set, so
+        # nothing is held out. Reporting False here contradicted the field's
+        # own documented meaning in the most common configuration.
+        return None, None, True, "none"
+
+    train_suite, val_suite, leaked = split_eval_suite(eval_suite)
+
+    populated = [
+        p for p in _POPULATIONS
+        if isinstance(eval_suite.get(p), list) and eval_suite[p]
+    ]
+    blind = [p for p in populated if not val_suite.get(p)]
+    if not blind:
+        return train_suite, val_suite, leaked, "val"
+
+    val_suite = dict(val_suite)
+    for population in blind:
+        val_suite[population] = list(eval_suite[population])
+    basis = (
+        "full (val was empty)" if len(blind) == len(populated)
+        else "val + full (" + ", ".join(blind) + ")"
+    )
+    return train_suite, val_suite, True, basis
 
 
 # --- ROI Stopping ---
@@ -308,6 +355,11 @@ def run_auto_improve(
     skill_path = str(Path(skill_path).resolve())
     eval_suite = load_eval_suite(skill_path)
 
+    # Derive edits from `train`, judge them on `val` (ADR 0015). When the two
+    # are not disjoint the loop still runs — but `holdout_leaked` travels into
+    # the summary so the delta is never presented as evidence of generalisation.
+    train_suite, val_suite, holdout_leaked, gate_basis = _gate_suites(eval_suite)
+
     # Load existing state for resume
     state = _load_state(skill_path)
     start_iteration = len(state)
@@ -318,7 +370,12 @@ def run_auto_improve(
 
     # Clear scorer cache for fresh reads
     scorer.invalidate_cache(skill_path)
-    baseline = _score_skill(skill_path, eval_suite)
+    baseline = _score_skill(skill_path, val_suite)
+    # Reported figures need ONE basis. The gate judges `val`; the headline
+    # compares full-suite against full-suite, or the summary subtracts two
+    # different measurements and prints `42 -> 40 (+0.0)`.
+    scorer.invalidate_cache(skill_path)
+    baseline_reported = _score_skill(skill_path, eval_suite)
 
     if start_iteration == 0:
         baseline_entry = {
@@ -335,7 +392,19 @@ def run_auto_improve(
         state.append(baseline_entry)
 
     if verbose:
-        print(f"Baseline: {baseline['composite']}/100 ({baseline['measured']} dims)", file=sys.stderr)
+        # The reported basis, like every other number a user acts on. Printing
+        # the gate's baseline here and the full-suite figure in the summary put
+        # `Baseline: 95.3` and `99 → 99` in one stream.
+        print(
+            f"Baseline: {baseline_reported['composite']}/100 "
+            f"({baseline_reported['measured']} dims)",
+            file=sys.stderr,
+        )
+        if baseline["composite"] != baseline_reported["composite"]:
+            print(
+                f"  gate basis {gate_basis}: {baseline['composite']}/100",
+                file=sys.stderr,
+            )
 
     # Recall relevant episodes
     if not dry_run:
@@ -359,6 +428,14 @@ def run_auto_improve(
 
     _loop_start = time.monotonic()
     current_score = baseline
+    # `_should_stop` compares against documented absolute thresholds (98
+    # composite, 90 per dimension) that a user checks with `schliff score`.
+    # Those have to be judged on the reported basis; only the keep/revert gate
+    # and its deltas run on `val`.
+    current_reported = baseline_reported
+    # The winning candidate's content, so a dry-run summary can score what the
+    # run would have produced instead of re-reading the untouched file.
+    last_candidate: Optional[str] = None
     improvements = 0
     total_delta = 0
     reason = ""
@@ -370,7 +447,7 @@ def run_auto_improve(
             print(f"\n--- Iteration {iteration} ---", file=sys.stderr)
 
         # Check stopping conditions
-        should_stop, reason = _should_stop(state, current_score)
+        should_stop, reason = _should_stop(state, current_reported)
         if should_stop:
             if verbose:
                 print(f"Stopping: {reason}", file=sys.stderr)
@@ -386,7 +463,7 @@ def run_auto_improve(
         # Clear cache and compute gradients
         scorer.invalidate_cache(skill_path)
         gradients = gradient_mod.compute_gradients(
-            skill_path, eval_suite=eval_suite, include_clarity=True
+            skill_path, eval_suite=train_suite, include_clarity=True
         )
 
         if not gradients:
@@ -443,11 +520,11 @@ def run_auto_improve(
             # Score the in-memory candidate content instead.
             if dry_run:
                 new_score = _score_content(
-                    result["new_content"], skill_path, eval_suite
+                    result["new_content"], skill_path, val_suite
                 )
             else:
                 scorer.invalidate_cache(skill_path)
-                new_score = _score_skill(skill_path, eval_suite)
+                new_score = _score_skill(skill_path, val_suite)
             delta = round(new_score["composite"] - current_score["composite"], 1)
 
             if verbose and explore_width > 1:
@@ -462,19 +539,37 @@ def run_auto_improve(
                 continue
 
             if delta > best_delta:
-                content_after = Path(skill_path).read_text(encoding="utf-8") if not dry_run else None
+                # Keep the candidate in dry-run too: without it the summary
+                # re-scored the untouched file and erased the projection.
+                content_after = (
+                    Path(skill_path).read_text(encoding="utf-8")
+                    if not dry_run
+                    else result.get("new_content")
+                )
                 best_result = (new_score, delta, patch_candidate, content_after)
                 best_delta = delta
 
         # Determine outcome from exploration
         if best_result and best_delta >= 0:
             new_score, delta, chosen_patch, content_after = best_result
+            if content_after is not None:
+                last_candidate = content_after
             status = "keep"
             if not dry_run and content_after is not None:
                 Path(skill_path).write_text(content_after, encoding="utf-8")
                 scorer.invalidate_cache(skill_path)
             old_composite = current_score["composite"]
             current_score = new_score
+            # Re-measure on the reported basis so the next stop check sees the
+            # kept patch. Only on a keep: a discard restores the file.
+            if content_after is not None:
+                if dry_run:
+                    current_reported = _score_content(
+                        content_after, skill_path, eval_suite
+                    )
+                else:
+                    scorer.invalidate_cache(skill_path)
+                    current_reported = _score_skill(skill_path, eval_suite)
             if delta > 0:
                 improvements += 1
             total_delta += delta
@@ -554,7 +649,21 @@ def run_auto_improve(
 
     # Final summary
     elapsed = time.monotonic() - _loop_start
-    final_score = _score_skill(skill_path, eval_suite) if not dry_run else current_score
+    final_score = _score_skill(skill_path, val_suite) if not dry_run else current_score
+
+    # The keep/revert gate judges `val` — that is the whole point of the split.
+    # But the number the user READS has to be the one `schliff score` and
+    # `schliff verify` produce for the same file, otherwise the loop prints 60,
+    # the user sets --min-score 60, and CI computes 50 and fails. Reported
+    # figures therefore come from the full suite; `gate_suite` says which set
+    # actually decided keep vs revert.
+    scorer.invalidate_cache(skill_path)
+    if not dry_run:
+        reported = _score_skill(skill_path, eval_suite)
+    elif last_candidate is not None:
+        reported = _score_content(last_candidate, skill_path, eval_suite)
+    else:
+        reported = baseline_reported
 
     # Sparkline of score progression
     score_history = [e.get("composite", 0) for e in state if e.get("status") in ("keep", "baseline")]
@@ -565,16 +674,39 @@ def run_auto_improve(
         "iterations": max(0, len(state) - 1),  # Exclude baseline
         "improvements": improvements,
         "total_delta": round(total_delta, 1),
-        "baseline_composite": baseline["composite"],
-        "final_composite": final_score["composite"],
-        "final_dimensions": final_score["dimensions"],
+        "baseline_composite": baseline_reported["composite"],
+        "final_composite": reported["composite"],
+        "total_delta_reported": round(
+            reported["composite"] - baseline_reported["composite"], 1
+        ),
+        "final_dimensions": reported["dimensions"],
+        # Which set decided keep vs revert. The figures above are full-suite.
+        "gate_suite": gate_basis,
+        # What the gate itself saw, kept separate so the two are never confused.
+        "gate_composite": final_score["composite"],
+        "gate_baseline_composite": baseline["composite"],
         "stop_reason": reason if should_stop else "max_iterations" if iteration >= start_iteration + max_iterations else "no_patches",
         "dry_run": dry_run,
         "elapsed_seconds": round(elapsed, 1),
         "sparkline": sparkline_str,
+        # False only when gradients and gate genuinely saw different cases.
+        "holdout_leaked": holdout_leaked,
     }
 
     return summary
+
+
+def _printed_delta(summary: dict) -> float:
+    """The delta the human renderer shows, on the same basis as its arrow.
+
+    `total_delta` accumulates the GATE's per-step deltas, which are measured on
+    `val`. Printing it beside a full-suite arrow produced `42 -> 40 (+1.6)`:
+    two numbers, two bases, one line. The renderer uses this instead.
+    """
+    return summary.get(
+        "total_delta_reported",
+        round(summary["final_composite"] - summary["baseline_composite"], 1),
+    )
 
 
 def main():
@@ -611,7 +743,7 @@ def main():
         bar = progress_bar(sc, 20)
         grade = score_to_grade(sc)
         grade_str = grade_colored(grade)
-        print(f"  Score:  {summary['baseline_composite']:.0f} \u2192 {sc:.0f}/100  {bar}  ({summary['total_delta']:+.1f})  {grade_str}")
+        print(f"  Score:  {summary['baseline_composite']:.0f} \u2192 {sc:.0f}/100  {bar}  ({_printed_delta(summary):+.1f})  {grade_str}")
         print(f"  Iters:  {summary['iterations']}  |  Kept: {summary['improvements']}  |  Time: {time_str}")
         if summary.get('sparkline'):
             print(f"  Trend:  {summary['sparkline']}  ({summary['baseline_composite']:.0f} \u2192 {sc:.0f})")

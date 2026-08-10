@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.11.0] - 2026-08-10
+
+### Added
+
+- **Credential findings in `score`, `score --json`, `doctor`, `verify` and the GitHub Action.**
+  Schliff points out strings shaped like an AWS access key, a GitHub token, an Anthropic or
+  OpenAI key, a Slack token or a Google key. A finding carries the **vendor and the line
+  number, never the value** — the Action hands the whole score object to its PR-comment step,
+  so output sites cannot be enumerated and the value must not be in the object to begin with.
+
+  **Nothing gates on it, and no exit code changes anywhere.** A green pipeline stays green:
+  `verify` still exits on `--min-score` and `--regression` alone, and the Action annotates
+  with a warning without failing the job. No score changes either — the composite, every
+  dimension, badges, `compare` and every pinned threshold are bit-identical to before.
+
+  **The limitation, stated plainly:** a token's shape does not tell a live key from a
+  documentation example. Placeholders that name themselves are excluded — AWS's own
+  `AKIAIOSFODNN7EXAMPLE`, `sk-ant-REPLACE_ME…`, `<your-key>`, `${VAR}` — but a placeholder
+  that merely looks real will be reported, and a real key in a shape schliff does not know
+  will not be. Measured over ~740 real files on the author's machine, every finding the scan
+  produced was documentation *about* credentials. JWTs are deliberately not detected at all:
+  the jwt.io sample and Supabase's `anon` key are public by design and structurally identical
+  to a service key. **This is a report, not a secret scanner** — if you need enforcement, run
+  a dedicated one, and read the `credentials` field of `schliff score --json` if you want to
+  fail your own build on it.
+
+### Security
+
+- **The Action now refuses paths that resolve outside the workspace.** Both `skill-path` and
+  `eval-suite` are checked before schliff reads anything. A pull request from a fork controls
+  its own checkout and could previously plant a symlink pointing elsewhere on the runner;
+  schliff's messages report existence and exact byte size, which made an unguarded read an
+  out-of-repo oracle. A pinned pre-8.11 engine degrades to "no findings" rather than failing
+  the parse.
+
 ## [8.10.1] - 2026-08-04
 
 **The hosted playground, leaderboard and badge endpoint have been retired.** The CLI, the
@@ -1375,7 +1410,8 @@ measured, reported wrongly. Three of them were found by verifying the fourth.
 
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.10.1...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.11.0...HEAD
+[8.11.0]: https://github.com/Zandereins/schliff/compare/v8.10.1...v8.11.0
 [8.10.1]: https://github.com/Zandereins/schliff/compare/v8.10.0...v8.10.1
 [8.10.0]: https://github.com/Zandereins/schliff/compare/v8.9.0...v8.10.0
 [8.9.0]: https://github.com/Zandereins/schliff/compare/v8.8.2...v8.9.0

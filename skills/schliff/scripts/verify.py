@@ -177,7 +177,8 @@ def run_verify(
         "passed_threshold": False, "exit_code": 2, "message": "",
         "previous_score": None, "delta": None, "regression": False,
         # Uniform key set with the normal verdict (provenance is N/A on an error path).
-        "weight_source": "default", "weights_hash": None,
+        "weight_source": "default", "weights_hash": None, "credentials": [],
+        "credential_error": None,
     }
 
     if not Path(skill_path).exists():
@@ -222,7 +223,30 @@ def run_verify(
         # Provenance so CI consumers can confirm the gate used canonical weights.
         "weight_source": result.get("weight_source", "default"),
         "weights_hash": result.get("weights_hash"),
+        "credentials": [],
+        # Set only when the raw read failed, so `credentials: None` can say why.
+        "credential_error": None,
     }
+
+    # Credential scan — reported, never gated (ADR 0019). Shape does not
+    # separate a real token from a documentation placeholder (ADR 0020), so a
+    # false positive is not fixable by the person it would hit; it must not
+    # decide anyone's exit code. Reads the raw file so the reported line points
+    # at what the user wrote (ADR 0016), and records vendor and line only —
+    # never the value (ADR 0014, still in force).
+    from scoring.credentials import scan_credentials
+    from shared import read_skill_safe
+
+    # Failing to read is NOT "no credentials". An oversize or unreadable file
+    # used to swallow the error and scan an empty string, so a 1.6 MB SKILL.md
+    # with a live key rendered as `credentials: []`. `None` keeps "could not
+    # look" distinguishable from "nothing found" — the gate is gone, the three
+    # states are not (`doctor` holds the same contract).
+    try:
+        verdict["credentials"] = scan_credentials(read_skill_safe(skill_path))
+    except (OSError, ValueError) as exc:
+        verdict["credentials"] = None
+        verdict["credential_error"] = str(exc)
 
     # Threshold check (coverage-aware)
     if composite < effective_min:
@@ -300,6 +324,24 @@ def run_verify(
 def format_verdict(verdict: dict) -> str:
     """Format verdict for human-readable terminal output."""
     lines = [verdict["message"]]
+
+    # The finding has to survive the removal of the gate — it used to be visible
+    # only because it was the failure message (ADR 0019). Vendor and line, never
+    # the value, rendered as pairs: two parallel lists once pointed the reader at
+    # the wrong line and invited rotating the wrong credential.
+    credentials = verdict.get("credentials")
+    if credentials:
+        located = ", ".join(f"{c['vendor']} at line {c['line']}" for c in credentials)
+        lines.append(f"  NOTE: possible credential — {located}.")
+        lines.append(
+            "    If it is real, remove it from the file and rotate the key. "
+            "schliff reports this and does not fail the build: a token's shape "
+            "does not tell a live key from a documentation example."
+        )
+    elif credentials is None:
+        reason = verdict.get("credential_error")
+        detail = f": {reason}" if reason else ""
+        lines.append(f"  NOTE: could not scan for credentials{detail}.")
 
     # Show dimension breakdown on failure or regression
     if verdict["exit_code"] != 0:

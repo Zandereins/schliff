@@ -10,19 +10,41 @@ import re
 # Patterns that indicate secrets — compiled for performance
 _SECRET_PATTERNS = [
     (re.compile(r'sk-ant-[a-zA-Z0-9_-]{20,}'), '[REDACTED:anthropic-key]'),
+    # Modern OpenAI keys (`sk-proj-`, `sk-svcacct-`, `sk-admin-`) carry `-` and
+    # `_` inside the body, so the alnum-only rule below stops at the first
+    # hyphen and cannot match them at all. Hyphens are allowed only behind a
+    # known key prefix: allowing them after a bare `sk-` would redact
+    # kebab-case prose like `sk-add-credential-scanning-to-verify`, and
+    # over-redaction destroys the very prompt it is protecting.
+    (re.compile(r'sk-(?:proj|svcacct|admin)-[a-zA-Z0-9_-]{20,}'), '[REDACTED:openai-key]'),
     (re.compile(r'sk-[a-zA-Z0-9]{20,}'), '[REDACTED:openai-key]'),
     (re.compile(r'AKIA[0-9A-Z]{16}'), '[REDACTED:aws-key]'),
     (re.compile(r'postgres://[^\s"\']+'), '[REDACTED:postgres-url]'),
     (re.compile(r'mongodb(\+srv)?://[^\s"\']+'), '[REDACTED:mongodb-url]'),
     (re.compile(r'redis://[^\s"\']+'), '[REDACTED:redis-url]'),
     (re.compile(r'mysql://[^\s"\']+'), '[REDACTED:mysql-url]'),
-    (re.compile(r'ghp_[a-zA-Z0-9]{36}'), '[REDACTED:github-token]'),
-    (re.compile(r'gho_[a-zA-Z0-9]{36}'), '[REDACTED:github-oauth]'),
+    # All five GitHub token classes, variable length. The previous pair bound at
+    # exactly 36 and covered only ghp_/gho_, so a shorter token or a ghu_/ghs_/ghr_
+    # one survived unless the surrounding text happened to trip the generic
+    # assignment catcher below. Redaction may over-reach; a miss here reaches a
+    # model provider (ADR 0013).
+    (re.compile(r'gho_[a-zA-Z0-9]{20,}'), '[REDACTED:github-oauth]'),
+    (re.compile(r'gh[pusr]_[a-zA-Z0-9]{20,}'), '[REDACTED:github-token]'),
     (re.compile(r'glpat-[a-zA-Z0-9_-]{20,}'), '[REDACTED:gitlab-token]'),
     (re.compile(r'xox[bporas]-[a-zA-Z0-9-]+'), '[REDACTED:slack-token]'),
     (re.compile(r'Bearer\s+[a-zA-Z0-9._-]{20,}'), '[REDACTED:bearer-token]'),
     (re.compile(r'-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----'), '[REDACTED:private-key]'),
     (re.compile(r'AIza[a-zA-Z0-9_-]{35}'), '[REDACTED:google-api-key]'),
+    # ODBC abbreviates Password as Pwd, and Microsoft's own connection strings
+    # use the all-caps `PWD=`. Both spellings, never the lowercase one: `pwd=`
+    # is ordinary shell (`pwd=$(pwd)/artifacts`) and redacting it rewrote the
+    # command. `$` in the lookbehind keeps a `$PWD` reference intact.
+    #
+    # No length floor: a connection-string password may be six characters, and
+    # nothing else in this set covers the spelling — the generic catcher below
+    # needs a keyword-bearing identifier and a 16-character value, so a short
+    # `PWD=` reached the lineage file verbatim.
+    (re.compile(r'(?<![A-Za-z0-9$])((?:PWD|Pwd)\s*=\s*)[^\s;"\']+'), r'\1[REDACTED:db-pass]'),
     (re.compile(r'eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'), '[REDACTED:jwt]'),
     # Generic assignment catcher — keep last so vendor-specific patterns win.
     # Matches keyword-bearing identifiers (e.g. AWS_SECRET_ACCESS_KEY, db_password,
