@@ -198,6 +198,64 @@ Anything not reachable by one of those commands is out of scope: no private mess
 no "someone told me they saw it." If a signal cannot be produced by a command another person can
 re-run against public data, it does not exist for this gate.
 
+**(1b) Dating — a hit must be shown to post-date D0, or it does not count.**
+
+Surfacing a hit is not the same as showing it happened *after* the intervention. S1 carries a
+`createdAt` and is filtered on it, but `search/code` returns **no date at all**, and an
+undated S2 hit would let a file that already existed before any submission — a marketplace config
+that happens to list schliff, written by a genuine stranger months ago — satisfy every other
+condition and be counted as demand produced by an intervention that had not happened yet. That
+would not be a weak signal; it would be evidence from the wrong side of the experiment. The rules
+below are mechanical on purpose: a reviewer who is not the author, months from now, must reach the
+same verdict without judgement.
+
+| Surface | Dating rule |
+| --- | --- |
+| S1 | `createdAt` of the issue/PR/discussion must fall inside the window. Already filtered by the command above. |
+| S3 | `createdAt` of the comment must fall inside the window — `gh pr view <URL> --json comments` returns it per comment. |
+| S2 | Not directly dated by the search API. Use the two-step procedure below. |
+
+**The pre-D0 S2 baseline (do this before submitting anything).** Both S2 queries are run once
+*before* D0 and their full result set — repository, path, and the date of capture — is committed
+to `docs/experiments/plugin-channel/s2-baseline.md`. Every repository/path pair in that snapshot
+is pre-existing by definition and is **permanently excluded** from S2, with no dating work
+required. This must be captured before the first submission PR is opened; **if D0 arrives with no
+committed baseline, the S2 branch is void** and only S1 and S3 remain available. A control taken
+after the intervention is not a control.
+
+**Dating a hit that is not in the baseline.** Given a hit at `OWNER/REPO` path `P`:
+
+1. Find the last commit touching `P` before D0:
+
+   ```bash
+   gh api "repos/OWNER/REPO/commits?path=P&until=<D0>T00:00:00Z&per_page=1" --jq '.[0].sha'
+   ```
+
+2. **Empty result** — the path did not exist before D0. The hit post-dates the intervention.
+   **Counts.**
+3. **A sha comes back** — fetch the file as it stood at that commit and look for the reference:
+
+   ```bash
+   gh api "repos/OWNER/REPO/contents/P?ref=<sha>" --jq '.content' | base64 --decode
+   ```
+
+   If the schliff plugin reference is already present in that content, the reference pre-dates D0
+   and the hit is **excluded**. If it is absent, the reference was added after D0 and the hit
+   **counts**.
+
+Dates are committer dates in UTC, matching the window boundaries fixed in *The clock*.
+
+**When a hit cannot be dated.** If either call fails to resolve — the repository has since gone
+private or was deleted, the path was renamed so its history does not reach back past D0, or the
+API returns an error — the hit is recorded as **undatable** and **does not satisfy this branch on
+its own**. An undatable S2 hit counts only if corroborated by a qualifying S1 signal from the same
+author inside the window, which is dated by construction. There is no third option and no
+tie-break by inspection: an undatable hit with no S1 corroboration is written down as
+examined-and-excluded, with "undatable" as the recorded reason. Narrowing the criterion is the
+correct trade here — a branch that silently admits pre-intervention evidence is worse than one
+that turns away a real signal it cannot date, because only the first kind of error can manufacture
+a false GREEN.
+
 **(2) Not the owner, not a bot.** Author login ≠ `Zandereins`, and `gh api users/<login> --jq
 .type` returns `User` (not `Bot`, and not an `app/` login).
 
@@ -349,9 +407,11 @@ against the same artifacts, on the stated dates:
   missing snapshot at day 30 is an operational failure to fix, not a reason to substitute a
   different line.
 - Gate 2, qualitative branch: the S1/S2/S3 commands listed in the Gate 2 section, run over the
-  window, with every surviving candidate then checked against conditions (2), (3), and (4) — not
-  a bot, unsolicited, attributable to the plugin channel. A candidate that fails any one of the
-  four is recorded as examined-and-excluded, with the failing condition named, so the verdict
+  window; every hit is first **dated** per condition (1b) — S1/S3 on `createdAt`, S2 against the
+  pre-D0 baseline and then the commit-history procedure — and every survivor is then checked
+  against conditions (2), (3), and (4): not a bot, unsolicited, attributable to the plugin
+  channel. A candidate that fails any one of the four is recorded as examined-and-excluded, with
+  the failing condition named (including "undatable" where that is the reason), so the verdict
   shows what was looked at and not only what passed.
 - Observation R: as specified in its own section — read 2026-09-10, recorded whatever it says.
 

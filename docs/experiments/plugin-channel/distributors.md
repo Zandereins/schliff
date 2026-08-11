@@ -13,10 +13,11 @@ Where a repo publishes a CONTRIBUTING policy, that policy overrides a raw distin
 own CONTRIBUTING.md states external contributions are not accepted.
 
 **`--limit` is not optional.** `gh pr list` defaults to 30 results and truncates silently — no
-warning, no non-zero exit, just a short list that looks complete. Every count in this document
-was re-run 2026-08-11 with an explicit limit high enough that the returned `mergedAt` range
-covers the whole 90-day window; see [Corrections](#corrections) for the one number this
-changed and by how much.
+warning, no non-zero exit, just a short list that looks complete. Every count in this document was
+re-run 2026-08-11 with an explicit limit, and completeness was checked the only way that actually
+proves it: **the returned count came back strictly below the limit passed.** A set equal to its
+limit is capped and tells you nothing; a set smaller than its limit had nothing left to cut. See
+[Corrections](#corrections) for the one number this changed and by how much.
 
 ## Findings vs. the pre-measured numbers
 
@@ -96,8 +97,9 @@ does not currently show any external human merge in 90 days.
 > **Corrected 2026-08-11 — this figure was first published as 3.** See
 > [Corrections](#corrections). The verdict (QUALIFIED) is unchanged; the margin is not.
 
-758 merged PRs all-time (`mergedAt` range 2025-10-15 → 2026-08-09, so the returned set covers the
-window with room to spare), 320 of them inside it. Owner `jeremylongshore`
+758 merged PRs all-time — returned in full, not truncated: the query asked for up to 3000 and got
+758, and a result set smaller than its own limit cannot have been cut off. 320 of those fall
+inside the window. Owner `jeremylongshore`
 (company: intent-solutions.io) merged 293 of those 320 himself and `app/github-actions` another 9,
 but **15 distinct non-owner, non-bot authors** merged inside the window across 18 PRs:
 
@@ -121,7 +123,8 @@ but **15 distinct non-owner, non-bot authors** merged inside the window across 1
 | 2026-07-18 | #1081 | `astrotars` |
 
 All 15 are `"type":"User"` per `gh api users/<login>`, and none list the owner's company. Merges
-are spread across ten separate dates from May to July — an ongoing review process, not the
+are spread across eleven separate dates from May to July (05-16, 05-17, 05-24, 05-29, 06-02,
+06-19, 06-30, 07-07, 07-10, 07-13, 07-18) — an ongoing review process, not the
 single-batch import pattern that disqualifies `rohitg00/awesome-claude-code-toolkit` below.
 Documented process: `.github/CONTRIBUTING.md` ("community-driven project and contributions of all
 sizes are welcome"), plus a full PR template, CODEOWNERS, and a published contribution spec.
@@ -243,14 +246,29 @@ almost the entire window was invisible. The three authors originally reported (`
 `metrox-eth`, `astrotars`) are simply the three that survived into the last 30 merges; twelve more
 were cut off.
 
-*Re-verification:* re-run with `--limit 3000`, confirming the returned set was not itself
-truncated by checking that its `mergedAt` range (2025-10-15 → 2026-08-09) extends past both edges
-of the 90-day window:
+*Re-verification:* re-run with an explicit high limit:
 
 ```bash
 gh pr list --repo jeremylongshore/claude-code-plugins-plus-skills \
   --state merged --limit 3000 --json number,author,mergedAt
 ```
+
+**Why that result set is provably complete: it returned 758 items against a limit of 3000.** A
+result set smaller than its own limit was not truncated — there was nothing left to cut. That is
+the whole proof, and it needs no assumption about dates.
+
+An earlier draft of this section argued completeness differently — that the returned `mergedAt`
+range, 2025-10-15 → 2026-08-09, "extends past both edges of the 90-day window." **That argument
+does not hold**, and it is corrected here rather than quietly dropped, since misplaced confidence
+in a truncation check is what produced the original error. The window closes 2026-08-11, so the
+upper edge of the returned range sits *inside* the window, not past it. The range argument is also
+the wrong tool: `gh pr list` returns newest-first, so truncation can only ever drop the **oldest**
+results. The recent edge is therefore never evidence of anything, and only the old edge — or,
+better, the count-versus-limit check above — can establish completeness.
+
+*Method note for anyone re-running this:* check the returned count against the limit you passed.
+If they are equal, the set is capped and the real figure is unknown — raise the limit and re-run
+until the count comes back strictly below it.
 
 *What it changes:* the qualification verdict does not move — 3 and 15 both clear a bar of 2 — but
 the characterisation does. This repo is not a marginal qualifier that scraped past the criterion;
