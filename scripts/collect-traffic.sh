@@ -11,10 +11,16 @@
 # numbers: the analysis method can change later, the observation cannot be
 # retaken.
 #
+# Run it with `make collect-traffic` (or directly). Nothing schedules this:
+# no cron job and no LaunchAgent is installed by this repo. It must be run by
+# hand at least once every 14 days or the un-snapshotted days expire for good
+# — see the "Operating the collector" section of
+# docs/specs/2026-08-11-plugin-channel-experiment.md.
+#
 # Idempotent per day: if the output file already has a line for today's UTC
 # date, this run OVERWRITES that line in place instead of appending a
-# duplicate. That makes re-running the script safely (e.g. a retried cron
-# invocation) never produce two observations for the same date.
+# duplicate. That makes re-running the script safe (e.g. running it twice in
+# one day to be sure) — it never produces two observations for the same date.
 #
 # The one exception is a line carrying "note":"baseline" — a manually seeded
 # historical anchor, not output from a prior run of this script. It is never
@@ -56,6 +62,10 @@ line="$(printf '{"collected_at":"%s","views":%s,"clones":%s,"referrers":%s,"path
 
 if [ -f "${OUT_FILE}" ]; then
   tmp_file="$(mktemp "${OUT_FILE}.XXXXXX")"
+  # The temp file lives beside the output, inside a tracked docs directory.
+  # Without this trap an interrupted or failing run strands a `traffic.jsonl.*`
+  # file there; `.gitignore` covers the pattern as a second line of defence.
+  trap 'rm -f "${tmp_file}"' EXIT
   replaced=0
   while IFS= read -r existing_line || [ -n "${existing_line}" ]; do
     case "${existing_line}" in

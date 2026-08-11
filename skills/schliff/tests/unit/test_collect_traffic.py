@@ -34,6 +34,15 @@ TODAY = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 # Stub `gh` CLI: answers `gh auth status` and `gh api ...` with canned,
 # offline data so collect-traffic.sh can be run for real without any
 # network access. GH_STUB_AUTH_EXIT lets a test simulate "unauthenticated".
+#
+# The repo-metadata branch deliberately HONOURS `--jq`. Without that, the stub
+# would hand back a 3-key object whether or not the script asked for a
+# projection, and deleting `--jq` from collect-traffic.sh would leave this
+# suite green while the real script started writing GitHub's full ~97-key repo
+# payload into every line of traffic.jsonl. So: no `--jq` returns a wide
+# payload (as the real API does), and `--jq '{a, b, c}'` returns exactly the
+# named fields. See
+# test_collect_traffic_sh_projects_repo_metadata_to_three_keys.
 GH_STUB = """#!/bin/sh
 if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
   exit "${GH_STUB_AUTH_EXIT:-0}"
@@ -42,20 +51,57 @@ if [ "$1" = "api" ]; then
   case "$*" in
     *traffic/views*)
       printf '%s' '{"count":1,"uniques":1,"views":[]}'
+      exit 0
       ;;
     *traffic/clones*)
       printf '%s' '{"count":2,"uniques":2,"clones":[]}'
+      exit 0
       ;;
     *traffic/popular/referrers*)
       printf '%s' '[]'
+      exit 0
       ;;
     *traffic/popular/paths*)
       printf '%s' '[]'
-      ;;
-    *)
-      printf '%s' '{"stargazers_count":99,"forks_count":9,"subscribers_count":1}'
+      exit 0
       ;;
   esac
+
+  # Repo metadata. Find the value passed after --jq, if any.
+  jq_expr=""
+  prev=""
+  for arg in "$@"; do
+    if [ "$prev" = "--jq" ]; then
+      jq_expr="$arg"
+    fi
+    prev="$arg"
+  done
+
+  if [ -z "$jq_expr" ]; then
+    # Unprojected: what `gh api repos/OWNER/REPO` really returns — wide.
+    printf '%s' '{"id":1,"node_id":"R_stub","name":"schliff","full_name":"Zandereins/schliff","private":false,"html_url":"https://github.com/Zandereins/schliff","description":"stub","fork":false,"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","default_branch":"main","stargazers_count":99,"watchers_count":99,"forks_count":9,"open_issues_count":0,"subscribers_count":1,"topics":[],"visibility":"public"}'
+    exit 0
+  fi
+
+  # Projected: emit only the field names the expression asked for.
+  fields="$(printf '%s' "$jq_expr" | tr -d '{} ' | tr ',' ' ')"
+  out=""
+  for f in $fields; do
+    case "$f" in
+      stargazers_count) v=99 ;;
+      watchers_count) v=99 ;;
+      forks_count) v=9 ;;
+      subscribers_count) v=1 ;;
+      open_issues_count) v=0 ;;
+      *) v=null ;;
+    esac
+    if [ -z "$out" ]; then
+      out="\\"$f\\":$v"
+    else
+      out="$out,\\"$f\\":$v"
+    fi
+  done
+  printf '{%s}' "$out"
   exit 0
 fi
 exit 1
@@ -102,6 +148,14 @@ def _run(script_copy, env):
 
 # ---------------------------------------------------------------------------
 # POSIX grep/sed portability (UR-001 rule, applied to the new script)
+#
+# NOTE ON WHAT THESE TWO TESTS ARE WORTH: collect-traffic.sh contains no
+# `grep` (and no `sed`) at all, so the GNU-only-escape scan currently has
+# nothing to look at and passes vacuously. They are a registration guard and a
+# regression tripwire for the day someone adds a `grep -E '\\d'` to the script
+# — they are NOT behavioural coverage of it. Do not read a green here as "the
+# collector is tested"; the tests that actually exercise it are the ones below
+# that run the script against the stub `gh`.
 # ---------------------------------------------------------------------------
 
 def test_collect_traffic_sh_is_registered_as_a_shipped_shell_script():
@@ -158,6 +212,36 @@ def test_collect_traffic_sh_first_run_appends_one_valid_line(tmp_path):
     assert obj["collected_at"].startswith(TODAY)
     for key in ("views", "clones", "referrers", "paths", "repo"):
         assert key in obj
+
+
+def test_collect_traffic_sh_projects_repo_metadata_to_three_keys(tmp_path):
+    """The repo-metadata call must project via `--jq`, not store the raw payload.
+
+    `gh api repos/OWNER/REPO` returns ~97 keys. Storing all of them on every
+    daily line would bloat traffic.jsonl and bury the three fields the
+    experiment actually reads. The stub `gh` honours `--jq`, so removing that
+    flag from collect-traffic.sh makes this assertion fail with the stub's
+    wide payload instead of passing silently.
+    """
+    script_copy, out_file, env = _make_sandbox(tmp_path)
+    result = _run(script_copy, env)
+    assert result.returncode == 0, result.stderr
+
+    obj = json.loads(out_file.read_text().splitlines()[0])
+    assert set(obj["repo"].keys()) == {
+        "stargazers_count",
+        "forks_count",
+        "subscribers_count",
+    }, (
+        "repo metadata was not projected down to the three recorded fields — "
+        f"got {sorted(obj['repo'].keys())}. Is `--jq` still on the "
+        "`gh api repos/...` call in collect-traffic.sh?"
+    )
+    assert obj["repo"] == {
+        "stargazers_count": 99,
+        "forks_count": 9,
+        "subscribers_count": 1,
+    }
 
 
 def test_collect_traffic_sh_is_idempotent_same_day(tmp_path):

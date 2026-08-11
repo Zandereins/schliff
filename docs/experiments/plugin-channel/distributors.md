@@ -6,11 +6,17 @@ Measured 2026-08-11. Establishes N for Gate 1 of
 **Qualification criterion:** at least two distinct external authors (not the repository owner,
 not a bot) with PRs merged in the 90-day window **2026-05-13 to 2026-08-11**.
 
-**Method:** `gh api /repos/OWNER/REPO`, `gh pr list --state merged --json author,mergedAt`, and
-`gh api /orgs/OWNER/public_members` to screen owner-affiliation. Where a repo publishes a
-CONTRIBUTING policy, that policy overrides a raw distinct-username count — see `hashicorp/agent-skills`
-below, where several non-owner usernames merged PRs but the repo's own CONTRIBUTING.md states
-external contributions are not accepted.
+**Method:** `gh api /repos/OWNER/REPO`, `gh pr list --state merged --limit 3000 --json
+number,author,mergedAt`, and `gh api /orgs/OWNER/public_members` to screen owner-affiliation.
+Where a repo publishes a CONTRIBUTING policy, that policy overrides a raw distinct-username count
+— see `hashicorp/agent-skills` below, where several non-owner usernames merged PRs but the repo's
+own CONTRIBUTING.md states external contributions are not accepted.
+
+**`--limit` is not optional.** `gh pr list` defaults to 30 results and truncates silently — no
+warning, no non-zero exit, just a short list that looks complete. Every count in this document
+was re-run 2026-08-11 with an explicit limit high enough that the returned `mergedAt` range
+covers the whole 90-day window; see [Corrections](#corrections) for the one number this
+changed and by how much.
 
 ## Findings vs. the pre-measured numbers
 
@@ -18,8 +24,8 @@ The three starting candidates were re-verified and **all three numbers changed**
 window was applied (the prior figures counted all-time merges, not windowed ones):
 
 - `trailofbits/skills-curated`: prior note said "4 distinct authors" (all-time). Windowed, it's
-  **1** — `dguido` (the repo's own CEO, a public member of the `trailofbits` org) merged 20 of 22
-  PRs, all in February 2026, outside the window. Only one PR fell inside the window.
+  **1** — `dguido` (the repo's own CEO, a public member of the `trailofbits` org) merged 17 of the
+  20 PRs, all outside the window. Only one PR fell inside the window.
 - `obra/superpowers-marketplace`: confirmed **0** merged PRs exist at all (GraphQL
   `pullRequests(states:MERGED)` returns `totalCount: 0`). The prior note's "46 open items" doesn't
   match either — actual count is 25 open + 15 closed-unmerged = 40.
@@ -34,7 +40,7 @@ window was applied (the prior figures counted all-time merges, not windowed ones
 | `obra/superpowers-marketplace` | 1204 | 2026-08-07 | No | 0 | No — none found |
 | `MadAppGang/claude-code` | 278 | 2026-03-15 | No | 0 | No — `docs/contributing.md` linked |
 | `anthropics/claude-plugins-official` | 33394 | 2026-08-11 | No | 0 | No — automation policy only |
-| `jeremylongshore/claude-code-plugins-plus-skills` | 2616 | 2026-08-11 | No | **3** | **Yes** — `.github/CONTRIBUTING.md` |
+| `jeremylongshore/claude-code-plugins-plus-skills` | 2616 | 2026-08-11 | No | **15** | **Yes** — `.github/CONTRIBUTING.md` |
 | `Piebald-AI/claude-code-lsps` | 511 | 2026-07-25 | No | **6** | **Yes** — README contributor section |
 | `hashicorp/agent-skills` | 794 | 2026-08-10 | No | 0 (by policy) | No — CONTRIBUTING.md |
 | `team-attention/plugins-for-claude-natives` | 816 | 2026-04-20 | No | 0 | No — README section |
@@ -54,11 +60,11 @@ can target; they are link lists, not marketplaces.
 
 ### `trailofbits/skills-curated` — NOT QUALIFIED (1)
 
-22 merged PRs total. 20 by `dguido` (Trail of Bits CEO, public member of the `trailofbits` org —
-internal), one by `dmaynor` (2026-02-23, outside the window), one bot (`app/dependabot`, #12). In
-window: only `bsamuels453` merged, 2026-07-14 (#39). One distinct external author — one short of
-the bar. Submission process: README `### 3. Submit an individual skill` (line 106) plus a
-`.github/ISSUE_TEMPLATE`.
+20 merged PRs total: 17 by `dguido` (Trail of Bits CEO, public member of the `trailofbits` org —
+internal), one by `dmaynor` (2026-02-23, outside the window), one bot (`app/dependabot`, #12), and
+one by `bsamuels453`. In window: only `bsamuels453`, 2026-07-14 (#39). One distinct external
+author — one short of the bar. Submission process: README `### 3. Submit an individual skill`
+(line 106) plus a `.github/ISSUE_TEMPLATE`.
 
 ### `obra/superpowers-marketplace` — NOT QUALIFIED (0)
 
@@ -85,14 +91,44 @@ validation pipeline, not a human external-contribution path that is currently re
 This is the most surprising negative result: the highest-star, most active, "official" marketplace
 does not currently show any external human merge in 90 days.
 
-### `jeremylongshore/claude-code-plugins-plus-skills` — QUALIFIED (3)
+### `jeremylongshore/claude-code-plugins-plus-skills` — QUALIFIED (15)
 
-Owner `jeremylongshore` (company: intent-solutions.io) merged most PRs himself, but three
-distinct non-owner, non-bot authors merged inside the window: `khendzel` (2026-07-13, #1020),
-`metrox-eth` (2026-07-13, #1029), `astrotars` (2026-07-18, #1081, company `@clerk` — unrelated to
-the owner). None share the owner's company/org. Documented process:
-`.github/CONTRIBUTING.md` ("community-driven project and contributions of all sizes are welcome"),
-plus a full PR template, CODEOWNERS, and a published contribution spec.
+> **Corrected 2026-08-11 — this figure was first published as 3.** See
+> [Corrections](#corrections). The verdict (QUALIFIED) is unchanged; the margin is not.
+
+758 merged PRs all-time (`mergedAt` range 2025-10-15 → 2026-08-09, so the returned set covers the
+window with room to spare), 320 of them inside it. Owner `jeremylongshore`
+(company: intent-solutions.io) merged 293 of those 320 himself and `app/github-actions` another 9,
+but **15 distinct non-owner, non-bot authors** merged inside the window across 18 PRs:
+
+| Merged | PR | Author |
+|---|---|---|
+| 2026-05-16 | #722 | `Mohammed-Abdelhady` |
+| 2026-05-17 | #727 | `CeciliaZ030` |
+| 2026-05-24 | #709 | `ratamaha-git` |
+| 2026-05-29 | #761 | `ejentum` |
+| 2026-06-02 | #818 | `victorchimakanu` |
+| 2026-06-19 | #880 | `a11forallstudio` |
+| 2026-06-30 | #865, #924 | `kriptoburak` |
+| 2026-06-30 | #916, #918 | `olispeedy` |
+| 2026-06-30 | #890 | `trpsbill` |
+| 2026-07-07 | #981 | `anuveyatsu` |
+| 2026-07-07 | #983 | `alib8b8` |
+| 2026-07-10 | #1008 | `Mohammed-Abdelhady` |
+| 2026-07-13 | #960 | `MulhamAnalytics` |
+| 2026-07-13 | #1020 | `khendzel` |
+| 2026-07-13 | #1029 | `metrox-eth` |
+| 2026-07-18 | #1081 | `astrotars` |
+
+All 15 are `"type":"User"` per `gh api users/<login>`, and none list the owner's company. Merges
+are spread across ten separate dates from May to July — an ongoing review process, not the
+single-batch import pattern that disqualifies `rohitg00/awesome-claude-code-toolkit` below.
+Documented process: `.github/CONTRIBUTING.md` ("community-driven project and contributions of all
+sizes are welcome"), plus a full PR template, CODEOWNERS, and a published contribution spec.
+
+**This is the most externally-open marketplace in the survey** — more distinct outside authors
+than `Piebald-AI/claude-code-lsps` (6), and the only repo here where an outside merge is a routine
+event rather than an exception.
 
 ### `Piebald-AI/claude-code-lsps` — QUALIFIED (6)
 
@@ -163,7 +199,8 @@ window. 0 external authors in window.
 
 **2 of 14 candidates qualify:**
 
-1. `jeremylongshore/claude-code-plugins-plus-skills` — 3 distinct external authors in window
+1. `jeremylongshore/claude-code-plugins-plus-skills` — 15 distinct external authors in window
+   (corrected from 3; see [Corrections](#corrections))
 2. `Piebald-AI/claude-code-lsps` — 6 distinct external authors in window
 
 **This is fewer than three.** Per the brief, that is stated plainly and not softened: of 14
@@ -179,3 +216,50 @@ getting merged in the last 90 days — is applied.
 by the current candidate pool. Submitting to `jeremylongshore/claude-code-plugins-plus-skills` and
 `Piebald-AI/claude-code-lsps` is evidenced; treating any other repo in this table as a channel that
 will plausibly merge an outside PR is not currently supported by the data.
+
+**The two do not carry equal weight, and N = 2 overstates the pool.** After the correction below,
+`jeremylongshore/claude-code-plugins-plus-skills` is a general plugins-and-skills marketplace that
+merged 15 distinct outside authors in 90 days. `Piebald-AI/claude-code-lsps` is a marketplace for
+**LSP servers**, and schliff is a skill linter, not an LSP server — a submission there is
+off-topic for the repo's stated scope regardless of how open its merge log is. The *effective* N
+for a schliff submission is therefore closer to **1** than to 2, in both directions: a merge at
+Piebald would be weak evidence of channel fit, and a non-merge there would be close to
+uninformative, because a marketplace declining an out-of-scope submission tells you nothing about
+whether marketplaces distribute skill linters. The spec's Gate 1 caveat records this on both
+sides.
+
+## Corrections
+
+This document is public and one of its numbers changed after publication. Showing the correction
+is the point; silently editing it would be worse than the original error.
+
+**`jeremylongshore/claude-code-plugins-plus-skills`: 3 → 15 external authors in window
+(2026-08-11).**
+
+*Cause:* the original count came from a `gh pr list --state merged --json author,mergedAt` call
+with no `--limit`. `gh pr list` defaults to 30 results and truncates without warning, exit code 0
+— the returned page held only the most recent PRs, and this repo merges hundreds per quarter, so
+almost the entire window was invisible. The three authors originally reported (`khendzel`,
+`metrox-eth`, `astrotars`) are simply the three that survived into the last 30 merges; twelve more
+were cut off.
+
+*Re-verification:* re-run with `--limit 3000`, confirming the returned set was not itself
+truncated by checking that its `mergedAt` range (2025-10-15 → 2026-08-09) extends past both edges
+of the 90-day window:
+
+```bash
+gh pr list --repo jeremylongshore/claude-code-plugins-plus-skills \
+  --state merged --limit 3000 --json number,author,mergedAt
+```
+
+*What it changes:* the qualification verdict does not move — 3 and 15 both clear a bar of 2 — but
+the characterisation does. This repo is not a marginal qualifier that scraped past the criterion;
+it is the most externally-open marketplace in the survey and the single channel on which Gate 1
+substantively rests.
+
+*Scope of the audit:* every count in this document was re-run with an explicit high limit at the
+same time. `trailofbits/skills-curated` (20 merged, `dguido` 17 / `dmaynor` 1 / `app/dependabot` 1
+/ `bsamuels453` 1) and `Piebald-AI/claude-code-lsps` (32 merged, 6 distinct external authors in
+window) were confirmed against the full result set. Two figures in the `trailofbits` prose were
+also corrected in place, from "22 merged PRs total, 20 by `dguido`" to the verified 20 and 17;
+that verdict, NOT QUALIFIED (1), is unaffected.
