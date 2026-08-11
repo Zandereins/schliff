@@ -106,8 +106,19 @@ than as a bare RED or GREEN. The gate is not abandoned or resized — it is exac
 Within 30 days of the first acceptance under Gate 1:
 
 **At least one qualitative signal from a stranger** (an issue, a question, a PR, or a mention
-that is not a bot) **or** unique visitors ≥ 3× baseline (**≥ 96** per 14-day window, against the
-32-unique baseline above).
+that is not a bot) **or** unique visitors ≥ 3× baseline (**≥ 96**, GitHub's 14-day rolling
+window, against the 32-unique baseline above).
+
+The 30 days and the 14 days measure different things and are not interchangeable: 30 days is
+the period Gate 2 has to resolve in; 14 days is the width of the window GitHub's API reports on
+any single call. The quantitative branch resolves against **one fixed snapshot**: the last
+`traffic.jsonl` line whose `collected_at` falls on or before day 30 of the Gate 2 window. That
+line's own `views.uniques` field — itself already a trailing-14-day count as of that
+`collected_at` — is compared against 96. No other line in the file counts, even if an
+intermediate snapshot happened to clear 96 and a later one did not: picking whichever of several
+overlapping 14-day readings clears the bar is a multiple-comparisons problem, and fixing the
+evaluation point to a single pre-specified snapshot is what keeps the threshold from being found
+by search after the fact.
 
 **Failure verdict:** `RED-DEMAND` — and that one is final, because it is measured. There is no
 retry: if the channel opens (Gate 1 passes) and no signal follows within the window, the
@@ -128,9 +139,9 @@ demand.
 
 ## What is deliberately not done
 
-No announcement round. No second Show HN. The 2026-07-13 finding stands: a post from a cold
-account has no reach, and content was never the problem (`feedback_cold_account_distribution`).
-This experiment tests whether an existing, already-installable path becomes visible in places a
+No announcement round. No second Show HN. The 2026-07-13 finding stands, as recorded in the
+parent plan (`docs/superpowers/plans/2026-08-11-plugin-channel-experiment.md`): a post from a
+cold account has no reach, and content was never the problem. This experiment tests whether an existing, already-installable path becomes visible in places a
 prospective user already looks — the README and marketplace listings — not whether a fresh
 promotional push generates traffic. Adding an announcement round would reintroduce the
 confound the 2026-08-04 bet already failed on: a positive result could then be attributed to the
@@ -146,10 +157,14 @@ against the same artifacts, on the stated dates:
   a merge commit dated within 21 days of the submission's opening. No other repo counts toward
   N, regardless of how promising it looks once visited — the qualified list is fixed by
   `distributors.md` and is not expanded after Gate 1 opens.
-- Gate 2: `scripts/collect-traffic.sh`'s output in `traffic.jsonl` for the `uniques` field
-  across the 30-day window, compared against the fixed baseline of 32 recorded above; and a scan
-  of GitHub issues/PRs/mentions opened by accounts other than the repository owner and not
-  flagged as bots.
+- Gate 2, quantitative branch: from `traffic.jsonl`, the last line with `collected_at` on or
+  before day 30 of the Gate 2 window; its `views.uniques` field compared against 96 (3× the
+  32-unique baseline recorded above). `scripts/collect-traffic.sh` must have been run at least
+  once at or near that boundary for the line to exist — the plan already requires the collector
+  to run "regularly against the 14-day expiry," so a missing snapshot at day 30 is an
+  operational failure to fix, not a reason to substitute a different line.
+- Gate 2, qualitative branch: a scan of GitHub issues/PRs/mentions opened by accounts other than
+  the repository owner and not flagged as bots, over the same 30 days.
 
 Both thresholds are numbers fixed in this document before either measurement is taken. There is
 no discretionary judgment call available at verdict time beyond the one already made and
