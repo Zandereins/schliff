@@ -437,6 +437,27 @@ make collect-traffic     # or: bash scripts/collect-traffic.sh
 06:17 UTC) so the record does not depend on anyone remembering. Nothing is installed on any
 machine — no cron job, no LaunchAgent.
 
+**Where the scheduled observations land: the `experiment/traffic-data` branch, not `main`.**
+`main` is protected with `enforce_admins: true` and six required status checks, so a workflow
+push to it is rejected outright — measured on 2026-08-11 in run `31519738229`, where collection
+succeeded and only the push failed with `GH006: Protected branch update failed`. Opening a pull
+request for each weekly line would trade that for a merge queue nobody asked for. The scheduled
+job therefore appends to `docs/experiments/plugin-channel/traffic.jsonl` **on that branch**, and
+`main` keeps only the seeded baseline until a reading is taken.
+
+**Consequence for every reading in this document:** read the file from the data branch, not from
+a working copy of `main`:
+
+```bash
+git fetch origin experiment/traffic-data
+git show origin/experiment/traffic-data:docs/experiments/plugin-channel/traffic.jsonl
+```
+
+At each reading date the branch's state is merged into `main` in one pull request, so the record
+ends up where this document says it is. A reading taken from `main` before that merge sees only
+the baseline and would be wrong — that is the one operational mistake this arrangement makes
+possible, and it is named here so it is not made.
+
 That workflow needs one secret, and it cannot use the default workflow token. Measured on
 2026-08-11 in run `31514201151`: `gh api repos/OWNER/REPO/traffic/views` with `GITHUB_TOKEN` and
 `contents: write` returns **HTTP 403, "Resource not accessible by integration"**. The traffic
