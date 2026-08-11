@@ -425,20 +425,38 @@ can be adjusted after the traffic or PR data comes in.
 
 Every quantitative reading in this document — Gate 2's branch and Observation R — is taken from a
 line in `docs/experiments/plugin-channel/traffic.jsonl`. That file only has lines in it because
-someone ran the collector. Nothing runs it automatically, by design: no cron job, LaunchAgent, or
-system scheduler is installed by this branch, because that would change the owner's machine.
+the collector ran.
 
-**The command:**
+**The command, by hand:**
 
 ```bash
 make collect-traffic     # or: bash scripts/collect-traffic.sh
 ```
 
+**Or on a schedule, in CI.** `.github/workflows/collect-traffic.yml` runs it weekly (Mondays
+06:17 UTC) so the record does not depend on anyone remembering. Nothing is installed on any
+machine — no cron job, no LaunchAgent.
+
+That workflow needs one secret, and it cannot use the default workflow token. Measured on
+2026-08-11 in run `31514201151`: `gh api repos/OWNER/REPO/traffic/views` with `GITHUB_TOKEN` and
+`contents: write` returns **HTTP 403, "Resource not accessible by integration"**. The traffic
+endpoints sit behind repository *Administration* permissions, which a workflow token cannot be
+granted through the `permissions:` block at all.
+
+So the workflow reads a `TRAFFIC_TOKEN` repository secret — a fine-grained personal access token
+scoped to this repository with **Administration: Read** (and Contents: Read and write, so it can
+commit the observation). Until that secret exists the job exits green with a notice and collects
+nothing: a scheduled job that fails every week teaches its owner to ignore it, which is a worse
+failure than a missing measurement. **A green run is therefore not evidence that an observation
+was taken** — check that `traffic.jsonl` grew.
+
 It needs an authenticated `gh` and nothing else, is idempotent per UTC day (a second run the same
 day overwrites that day's line rather than appending a duplicate), and never touches the seeded
 `"note":"baseline"` line.
 
-**The required cadence: at least once every 14 days, and on each reading date.** GitHub's traffic
+**The required cadence: at least once every 14 days, and on each reading date.** The weekly
+workflow satisfies this with a full missed run of slack — but only once `TRAFFIC_TOKEN` is set.
+Until then the manual command is the only thing producing lines. GitHub's traffic
 API returns a rolling 14-day window and serves nothing older. That is a hard property of the API,
 not a default that can be raised.
 
