@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-self test-proof test-all score lint install install-dev clean help
+.PHONY: test test-unit test-self test-proof test-all score lint install install-dev clean help collect-traffic
 
 SKILL_DIR := skills/schliff
 
@@ -30,6 +30,9 @@ lint: ## Run ruff on scripts + markdownlint on tracked docs (same as CI)
 	ruff check $(SKILL_DIR)/scripts/ || echo "Install ruff: pip install ruff"
 	git ls-files '*.md' | xargs npx --yes markdownlint-cli2@0.23.2 \
 	  || echo "markdown lint needs node (npx); see .markdownlint-cli2.jsonc"
+
+collect-traffic: ## Snapshot GitHub traffic (run >=1x/14d or the data expires)
+	bash scripts/collect-traffic.sh
 
 install: ## Install Schliff (copy mode)
 	bash install.sh

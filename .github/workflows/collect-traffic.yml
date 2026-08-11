@@ -1,0 +1,78 @@
+name: Collect traffic
+
+# The plugin-channel experiment's measuring instrument, on a schedule.
+#
+# GitHub's traffic API serves a rolling 14-day window and nothing older. The
+# collector therefore has to run at least once every 14 days or the unsnapshotted
+# days are gone permanently — see "Operating the collector" in
+# docs/specs/2026-08-11-plugin-channel-experiment.md, which names that outcome
+# UNMEASURED-COLLECTOR-GAP and calls it worse than any RED, because a RED is a
+# finding and a gap is a mistake.
+#
+# Running it here rather than on the maintainer's machine is deliberate: it does
+# not depend on a laptop being awake, and it installs nothing on anyone's system.
+# Weekly, not daily — the window is 14 days, so weekly leaves a full missed run
+# of slack before data is actually lost.
+
+on:
+  schedule:
+    # Mondays 06:17 UTC. Off the hour on purpose: GitHub sheds scheduled jobs
+    # under load at popular times, and a dropped run costs a week of slack.
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect-traffic
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Collect
+        env:
+          # NOT GITHUB_TOKEN. Measured on 2026-08-11, run 31514201151:
+          # `gh api repos/OWNER/REPO/traffic/views` with the workflow token and
+          # `contents: write` returns HTTP 403 "Resource not accessible by
+          # integration". The traffic endpoints sit behind repository
+          # Administration permissions, which a workflow token cannot be granted
+          # — no combination of the `permissions:` block fixes it. A PAT is the
+          # only way, so the collector reads one from a repository secret.
+          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::notice::TRAFFIC_TOKEN is not configured — nothing collected."
+            echo "::notice::See 'Operating the collector' in docs/specs/2026-08-11-plugin-channel-experiment.md."
+            exit 0
+          fi
+          # Probe before collecting: a token without traffic access fails with
+          # an empty payload rather than an error, which would commit a line of
+          # nulls and look like a real observation.
+          if ! gh api "repos/${GITHUB_REPOSITORY}/traffic/views" --jq '.count' > /dev/null; then
+            echo "::error::TRAFFIC_TOKEN cannot read the traffic API for ${GITHUB_REPOSITORY}." >&2
+            echo "::error::It needs a fine-grained PAT with repository Administration: Read." >&2
+            exit 1
+          fi
+          bash scripts/collect-traffic.sh
+
+      - name: Commit the observation
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/experiments/plugin-channel/traffic.jsonl; then
+            echo "No change to traffic.jsonl — already collected for this UTC day."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/experiments/plugin-channel/traffic.jsonl
+          git commit -m "chore(experiment): collect traffic observation
+
+          Automated by .github/workflows/collect-traffic.yml. One line per UTC
+          day; re-runs on the same day overwrite in place rather than appending."
+          git push

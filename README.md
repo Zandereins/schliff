@@ -16,6 +16,15 @@
 
 Schliff scores `AGENTS.md` — and the rest of the family (`SKILL.md`, `CLAUDE.md`, `.cursorrules`, system prompts) — against an explicit, versioned rubric. No LLM judge in the critical path. No network. No randomness. A rule engine you can read, pin, and gate CI on.
 
+**Inside Claude Code** — wires up the `/schliff:*` commands (scoring, `/schliff:auto`, `/schliff:doctor`, ...):
+
+```text
+/plugin marketplace add Zandereins/schliff
+/plugin install schliff@schliff
+```
+
+**From a terminal** — for CI, pre-commit, or scripting outside Claude Code:
+
 ```bash
 # no venv, no commitment — needs uv (https://docs.astral.sh/uv/):
 uvx schliff score AGENTS.md   # or any SKILL.md / CLAUDE.md / .cursorrules

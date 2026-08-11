@@ -30,7 +30,13 @@ PYPROJECT = REPO_ROOT / "pyproject.toml"
 SHIPPED_SHELL_SCRIPTS = [
     REPO_ROOT / "install.sh",
     REPO_ROOT / "skills" / "schliff" / "scripts" / "analyze-skill.sh",
+    REPO_ROOT / "scripts" / "collect-traffic.sh",
 ]
+
+# GNU grep/egrep extensions (``\s``, ``\d``, ``\w``, ``\b`` and their uppercase
+# complements) all silently fail on classic BSD grep — the pattern still
+# parses, matches nothing, and produces wrong output instead of an error.
+GNU_ONLY_GREP_ESCAPES = [r"\s", r"\S", r"\d", r"\D", r"\w", r"\W", r"\b", r"\B"]
 
 
 # ---------------------------------------------------------------------------
@@ -46,6 +52,27 @@ def _find_version_grep_line(install_sh_text: str) -> str:
         "Could not locate VERSION-extraction grep line in install.sh. "
         "Expected a line matching 'VERSION=$(grep -E ... pyproject.toml ...)'."
     )
+
+
+def _scan_shell_script_for_gnu_only_grep_escapes(script_path: Path) -> list:
+    """Return (lineno, line, offending_escapes) for grep/egrep lines in
+    ``script_path`` that use GNU-only escape sequences.
+
+    Shared by the parametrized sweep below and by other test modules that
+    need to check one specific shipped script (e.g. test_collect_traffic.py)
+    without duplicating the scan logic.
+    """
+    offenders = []
+    for lineno, raw in enumerate(script_path.read_text().splitlines(), start=1):
+        stripped = raw.strip()
+        if stripped.startswith("#"):
+            continue
+        if "grep" not in stripped and "egrep" not in stripped:
+            continue
+        found = [esc for esc in GNU_ONLY_GREP_ESCAPES if esc in raw]
+        if found:
+            offenders.append((lineno, raw.strip(), found))
+    return offenders
 
 
 # ---------------------------------------------------------------------------
@@ -122,17 +149,7 @@ def test_shipped_shell_script_has_no_gnu_only_grep_escapes(script_path):
     if not script_path.exists():
         pytest.skip(f"{script_path} not present in this checkout")
 
-    gnu_only = [r"\s", r"\S", r"\d", r"\D", r"\w", r"\W", r"\b", r"\B"]
-    offenders: list[tuple[int, str, list[str]]] = []
-    for lineno, raw in enumerate(script_path.read_text().splitlines(), start=1):
-        stripped = raw.strip()
-        if stripped.startswith("#"):
-            continue
-        if "grep" not in stripped and "egrep" not in stripped:
-            continue
-        found = [esc for esc in gnu_only if esc in raw]
-        if found:
-            offenders.append((lineno, raw.strip(), found))
+    offenders = _scan_shell_script_for_gnu_only_grep_escapes(script_path)
 
     assert not offenders, (
         f"{script_path.relative_to(REPO_ROOT)} uses GNU-only escapes in "
