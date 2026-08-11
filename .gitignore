@@ -72,3 +72,6 @@ uv.lock
 # working notes, not repo content.
 council-report-*.html
 council-transcript-*.md
+
+# Collector temp files (scripts/collect-traffic.sh writes these beside its output)
+docs/experiments/plugin-channel/traffic.jsonl.*
