@@ -1,0 +1,73 @@
+"""Skill discovery must not report vendored copies as installed skills.
+
+There are two discovery walks over a repo tree. `discover_instruction_files`
+(doctor.py) filters with EXCLUDED_DIRS; `discover_skills` (skill_mesh.py) does a bare
+`rglob("SKILL.md")` and filters nothing. Same purpose, two implementations, one filter.
+
+In this project's own repo that made `schliff doctor .` report 6 skills where there is
+one: three copies vendored into virtualenvs and a uv cache archive, counted into
+"skills scanned", into the grade distribution and into "Total context cost".
+
+Spec: docs/specs/2026-08-13-doctor-counts-vendored-skills.md
+"""
+from pathlib import Path
+
+import pytest
+
+from skill_mesh import discover_skills
+
+SKILL = """---
+name: demo
+description: A demo skill used to verify discovery filtering behaviour end to end.
+---
+
+# demo
+
+Use when verifying discovery. Do not use for anything else.
+"""
+
+
+def _write(root: Path, relative: str) -> Path:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(SKILL, encoding="utf-8")
+    return path
+
+
+@pytest.fixture
+def tree(tmp_path):
+    """A repo with one real skill and four vendored copies."""
+    _write(tmp_path, "skills/real/SKILL.md")
+    _write(tmp_path, ".venv/lib/python3.12/site-packages/skills/vendored/SKILL.md")
+    _write(tmp_path, "node_modules/some-pkg/skills/vendored/SKILL.md")
+    # A uv cache archive: no `.venv` and no `site-packages` anywhere in the path.
+    _write(tmp_path, ".vercel/python/cache/uv/archive-v0/AbC123/skills/vendored/SKILL.md")
+    # A bare site-packages install outside any .venv directory.
+    _write(tmp_path, "lib/python3.12/site-packages/skills/vendored/SKILL.md")
+    return tmp_path
+
+
+def test_only_the_real_skill_is_discovered(tree):
+    found = {s["path"] for s in discover_skills([str(tree)])}
+    assert found == {str(tree / "skills" / "real" / "SKILL.md")}, (
+        f"vendored copies discovered: "
+        f"{sorted(p.replace(str(tree), '') for p in found)}"
+    )
+
+
+@pytest.mark.parametrize("vendored", [
+    ".venv/lib/python3.12/site-packages/skills/vendored/SKILL.md",
+    "node_modules/some-pkg/skills/vendored/SKILL.md",
+    ".vercel/python/cache/uv/archive-v0/AbC123/skills/vendored/SKILL.md",
+    "lib/python3.12/site-packages/skills/vendored/SKILL.md",
+])
+def test_each_vendored_location_is_excluded(tree, vendored):
+    found = {s["path"] for s in discover_skills([str(tree)])}
+    assert str(tree / vendored) not in found
+
+
+def test_a_real_skill_named_like_a_cache_dir_still_counts(tmp_path):
+    """Exclusion keys on path segments, so a skill ABOUT caching is not collateral."""
+    _write(tmp_path, "skills/cache-warmer/SKILL.md")
+    found = {s["path"] for s in discover_skills([str(tmp_path)])}
+    assert str(tmp_path / "skills" / "cache-warmer" / "SKILL.md") in found

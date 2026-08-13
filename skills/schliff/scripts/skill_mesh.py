@@ -25,7 +25,7 @@ from typing import Optional
 
 # Import scorer functions for tokenization and description extraction
 from nlp import tokenize_meaningful
-from shared import extract_description
+from shared import EXCLUDED_DIRS, extract_description
 
 # --- Skill Discovery ---
 
@@ -50,6 +50,14 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
 
         scan_root = Path(os.path.realpath(str(skill_dir_path)))
         for skill_md in skill_dir_path.rglob("SKILL.md"):
+            # A vendored copy is not an installed skill. doctor.py's sibling walk
+            # (discover_instruction_files) has always filtered on EXCLUDED_DIRS; this
+            # one did not, so virtualenvs, node_modules and cache archives were counted
+            # into "skills scanned", the grade distribution and "Total context cost".
+            # Keyed on path SEGMENTS, so a skill legitimately named `cache-warmer` is
+            # not collateral.
+            if EXCLUDED_DIRS & set(skill_md.parts):
+                continue
             file_count += 1
             if file_count > MAX_SCAN_FILES:
                 print(f"Warning: scan limit reached ({MAX_SCAN_FILES} files), stopping discovery", file=sys.stderr)
