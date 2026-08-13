@@ -217,8 +217,28 @@ def test_agents_md_corpus_golden_distribution():
     # Prior baseline for the content-only structure model (#10, A', 2026-07-22):
     # was 61.46/61.40/29.0 before that change; one former-F file (29.0) cleared
     # 35 → E (F 1→0, E 4→5).
-    assert statistics.mean(scores) == pytest.approx(61.53, abs=0.05)
-    assert statistics.median(scores) == pytest.approx(61.70, abs=0.05)
+    # Re-baselined for documented-command signal (2026-08-13,
+    # docs/specs/2026-08-13-structural-signal-detection.md). Was 61.53 mean /
+    # 61.70 median / B 3 / C 8. A line that IS an executable command with its
+    # explanation beside it now counts as actionable content; previously only an
+    # English imperative at line start did, so a command table scored as nothing.
+    # EXACTLY FIVE of the 30 files move, all upward, each verified by hand to
+    # document real commands:
+    #   bnomei__kirby-mcp          efficiency 54 → 80  (`composer install|test|analyse|format`)
+    #   hexlet-codebattle          efficiency 77 → 99  (`make credo|lint-js|server|test`)
+    #   MinistryPlatform           efficiency 55 → 66  (`npm run dev|create-widget`)
+    #   constROD__template-hono    efficiency 76 → 84  (`pnpm build|format|check:all`)
+    #   giobi__brain-seo-template  efficiency 82 → 85  (`git add .|commit|push`)
+    # Movement is upward and confined to those five: min/max unchanged, one
+    # C→B reclassification (bnomei__kirby-mcp, composite 76.00).
+    #
+    # A sixth file moved in the first pass and was a FALSE POSITIVE, since fixed:
+    # deanthecoder__MasterG33k aligns a dependency table with trailing spaces
+    # inside the backticks (`` `coverlet.collector     ` : Coverlet is a … ``),
+    # which read as "program + argument". Pinned in
+    # test_documented_command_signal.py::test_aligned_dependency_entry_is_not_a_command.
+    assert statistics.mean(scores) == pytest.approx(61.99, abs=0.05)
+    assert statistics.median(scores) == pytest.approx(61.90, abs=0.05)
     assert min(scores) == pytest.approx(35.0, abs=0.05)
     assert max(scores) == pytest.approx(91.0, abs=0.05)
 
@@ -226,8 +246,8 @@ def test_agents_md_corpus_golden_distribution():
     # (>=95); the two CJK docs floor opcov directives to 0 (English-scoped, §8.1).
     assert bands["S"] == 0
     assert bands["A"] == 1
-    assert bands["B"] == 3
-    assert bands["C"] == 9
+    assert bands["B"] == 4
+    assert bands["C"] == 8
     assert bands["D"] == 12
     assert bands["E"] == 5
     assert bands["F"] == 0

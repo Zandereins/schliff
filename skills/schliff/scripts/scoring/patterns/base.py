@@ -4,6 +4,8 @@ import re
 __all__ = [
     # Efficiency
     "_RE_ACTIONABLE_LINES",
+    "_RE_DOCUMENTED_COMMAND",
+    "normalize_command",
     "_RE_WHY_COUNT",
     "_RE_VERIFICATION_CMDS",
     "_RE_FILLER_PHRASES",
@@ -61,6 +63,61 @@ _RE_ACTIONABLE_LINES = re.compile(
     r"Ensure|Define|Specify|Register|Mount|Scan|Inspect|Monitor)\b",
     re.MULTILINE,
 )
+# ---------------------------------------------------------------------------
+# Documented command lines.
+#
+# `_RE_ACTIONABLE_LINES` above recognises an English imperative at line start, so a
+# line that *is* an executable command scores nothing — the most actionable line a
+# reference document can contain. This pattern closes that gap, but deliberately only
+# for a command that carries its explanation: `- `tool sub <arg>` — what it does`.
+#
+# Measured rationale (docs/specs/2026-08-13-structural-signal-detection.md): counting
+# every command-bearing line ranks a dump of `ls -la` / `pwd -P` ABOVE a documented
+# command list, because efficiency divides signal by word count and the dump is
+# shorter. Requiring the explanation is the only variant where the documented file wins.
+#
+# Structure, not a wordlist of tool names: a list marker, a backticked command whose
+# first token looks like a program and which has at least one further token, a
+# separator, and at least 10 characters of explanation.
+_RE_DOCUMENTED_COMMAND = re.compile(
+    r"^(?:\d+\.\s*|[-*+]\s+)"           # list marker — a documented command is a list item
+    # Backticked: program-like head + at least one REAL argument. The `[^\s`]` is
+    # load-bearing — a dependency list aligns its entries with trailing spaces
+    # (`` `coverlet.collector     ` : Coverlet is a … library ``), which otherwise
+    # reads as "program + argument" and credits a package name as a command.
+    r"`([a-z][\w.@/-]*[ \t]+[^\s`][^`\n]*)`"
+    r"[ \t]*[—–:-][ \t]+"               # separator between command and explanation
+    r"(\S[^\n]{9,})",                   # the explanation itself, on the same line
+    re.MULTILINE,
+)
+
+# Argument-like token: placeholder, flag, shell operator, or a file with an extension.
+_RE_COMMAND_ARG = re.compile(r"^(?:<|-|\$|\||[\w./-]+\.[a-z]{1,5}$)")
+
+
+def normalize_command(command: str) -> str:
+    """Reduce a command to its identity: program plus subcommands.
+
+    Arguments, flags and version pins are not part of what a command IS, so
+    ``tool score <file>``, ``tool score SKILL.md`` and ``tool@1.2.3 score`` collapse to
+    ``tool score``. Without this, one command listed in a command table, an example and
+    a workflow counts three times.
+
+    Subcommands are kept: truncating to a fixed token count collapses an entire CLI
+    family (``tool score`` / ``tool doctor`` / ``tool verify``) into a single signal.
+    """
+    parts = []
+    for token in command.split():
+        if _RE_COMMAND_ARG.match(token):
+            break
+        # Strip a version pin (`tool@1.2.3`), but never on a scoped package name
+        # (`@vercel/microfrontends`), where the leading `@` is the name itself —
+        # splitting there yields an empty token, so `npx @a/x run` and `npx @b/y run`
+        # collapse to the same identity. Found on real installed skills, not fixtures.
+        parts.append(token if token.startswith("@") else token.split("@", 1)[0])
+    return " ".join(parts)
+
+
 _RE_WHY_COUNT = re.compile(
     r"\b(because|since|this enables|this prevents|this means|the reason|"
     r"this ensures|this avoids|otherwise|so that|why[:\s])\b",

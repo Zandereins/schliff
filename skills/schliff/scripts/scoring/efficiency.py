@@ -9,6 +9,7 @@ from nlp import RE_WORD_TOKEN, STOPWORDS
 from scoring.patterns import (
     _RE_ACTIONABLE_LINES,
     _RE_CODE_BLOCK_REGION,
+    _RE_DOCUMENTED_COMMAND,
     _RE_FILLER_PHRASES,
     _RE_HEDGING,
     _RE_OBVIOUS_INSTRUCTIONS,
@@ -16,6 +17,7 @@ from scoring.patterns import (
     _RE_SCOPE_BOUNDARY,
     _RE_VERIFICATION_CMDS,
     _RE_WHY_COUNT,
+    normalize_command,
 )
 from shared import read_skill_safe, strip_frontmatter
 
@@ -84,6 +86,14 @@ def score_efficiency(skill_path: str) -> dict:
         if _RE_ACTIONABLE_LINES.match(line.strip()):
             key = line.strip().lower()[:80]
             seen_actions.add(key)
+    # A documented command line is actionable content too, and the imperative-verb
+    # pattern above cannot see it. Deduplicate on the normalized command rather than
+    # on line text, so the same command in a command table, an example and a workflow
+    # contributes once. See docs/specs/2026-08-13-structural-signal-detection.md.
+    for match in _RE_DOCUMENTED_COMMAND.finditer(content):
+        identity = normalize_command(match.group(1))
+        if identity:
+            seen_actions.add(f"cmd:{identity.lower()}")
     actionable_lines = len(seen_actions)
 
     # Real examples (input/output pairs, not just code blocks)
