@@ -323,7 +323,43 @@ The counterexample pair still holds: `deserves.md` 98 > `dump.md` 96.
 survive" a denominator change. It survives by construction: `min(words, cap) ≤ words`, so
 density can only rise, so no score can fall. Measured 0 fallers, as the algebra requires.
 
-Still not implemented — this section is the measurement, and the decision is Franz's.
+### B was implemented, then reverted the same day
+
+The cap shipped at 1500 and was taken out again after review. **Monotonicity was the wrong
+safety property.** It guarantees no file loses points; it says nothing about the direction
+*gameable* files move, and that is the direction that matters for this dimension.
+
+`_spread_stuffing_noise` allows `0.12 × prose_tokens`, so its penalty is relative to length:
+diluting an over-used term with unrelated prose drives noise to zero. An uncapped denominator
+charges for the words spent on the dilution; a capped one does not. Measured on a stuffed probe:
+
+| words | 195 | 885 | 2955 | 9395 |
+| --- | --- | --- | --- | --- |
+| uncapped | 43 | 66 | **44** | **35** |
+| capped at 1500 | 43 | 66 | **73** | **68** |
+
+The 43 → 66 step is a pre-existing dilution defect present either way. What the cap removed is
+the correction after it, turning a self-limiting gain into a permanent one — in the dimension
+`doctor` cites as "Total context cost".
+
+Three attempts at keeping the cap and closing the hole, all measured, all failed:
+
+- a density threshold on the bloat penalty — no threshold separates the attack from real files
+  (60 files: the constructed attack sits at raw density 1.25, above `research-briefing` 0.69
+  and `llm-council` 0.95)
+- capping `allowed` in the stuffing check the same way — only the extreme tail moves
+  (43 → 66 → 73 → 23); the 43 → 73 climb survives
+- the bloat penalty on uncapped density — 68 → 53, still above the 43 it started from
+
+**The defect B addressed is real and remains open**: `signal_count` maxes at 95 against an
+unbounded denominator, so 182 of 349 files cannot reach the top band at any quality, and
+`hydra`/`skill-creator` score 44/42 while emitting the maximum representable signal. That is a
+*conservative* error — it under-rates good long files. The hole is a *permissive* one, in a tool
+whose stated value is anti-gaming. Between the two, a measuring instrument takes the strict side.
+
+A real fix has to decouple the signal ceiling from the length charge — raise or remove the
+per-term caps so that a long dense file can express its density — rather than shrink the
+denominator. Not attempted here.
 
 ## Follow-up, agreed but not in this branch
 
