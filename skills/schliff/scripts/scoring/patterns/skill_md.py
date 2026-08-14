@@ -83,6 +83,12 @@ _RE_ALTERNATIVES = re.compile(
 # more precisely than one that says "on error". The phrasing alternatives below were the
 # only recognised form until 2026-08-13; "Errors go to stderr as one line with a non-zero
 # exit" scored nothing. See docs/specs/2026-08-13-structural-signal-detection.md.
+#
+# KNOWN LIMIT, measured and accepted: `\bstderr\b` detects the WORD, not the contract, so
+# "Do not write to stderr in library code" is credited. Distinguishing a declared failure
+# channel from a mention of the stream needs sentence-level meaning, which no regex here
+# has. Measured over 186 real files: 0 where a bare `stderr` is the only thing carrying
+# the point. Revisit if a field hit appears.
 _RE_ERROR_BEHAVIOR = re.compile(
     r"(?i)(on\s+error|error\s+handling|if\s+\w[\w ]{0,80}\s+fails?|when\s+\w[\w ]{0,80}\s+fails?|"
     r"graceful(?:ly)?\s+(?:handle|degrad\w+|fail)|recover(?:y|s)?\s+(?:from|when)|"
@@ -117,6 +123,11 @@ _RE_DEPENDENCY_DECL = re.compile(
     # and "the loop needs iteration 3" read as tool-plus-version. Zero field hits, and
     # two constructed false positives, so the digit is now only allowed as an optional
     # version BETWEEN the tool and an explicit availability phrase.
+    #
+    # KNOWN LIMIT: the `(?i)` on this pattern makes "on the PATH" match "on the path",
+    # so "needs work on the path to production" is credited. Dropping the flag for this
+    # alternative alone would need the pattern split in two; the whole-pattern flag is
+    # load-bearing for the wordlist branches above. Measured: 0 field hits.
     r"needs?[ \t]+`?[\w-]+(?:\.[\w-]+)*`?(?:[ \t]+v?[\d.]+)?[ \t]+on[ \t]+the[ \t]+PATH)"
 )
 _RE_NAMESPACE_ISOLATION = re.compile(
