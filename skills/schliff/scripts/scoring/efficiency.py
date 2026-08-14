@@ -31,6 +31,34 @@ _STUFF_MIN_PROSE_TOKENS = 40   # need enough prose to judge term frequency
 _STUFF_DOMINANCE = 0.12        # a term exceeding 12% of meaningful prose tokens is over-used
 _STUFF_MIN_COUNT = 8           # ...and occurs at least this many times
 
+# Density denominator cap. Every signal term below is capped, so signal_count maxes out at
+# 95; total_words was not, which made this dimension measure LENGTH rather than density.
+# 182 of 349 real files (52%) could not reach score 95 at any quality.
+#
+# That the effect is an artifact, not a judgement, is measured: across those files the
+# median of structure/clarity/composability RISES with length (68 → 74) while efficiency
+# falls (70 → 42) — only this dimension punishes length.
+#
+# Calibrated against the real scorer over 350 files. Correlation between word count and
+# score, uncapped, is −0.477:
+#
+#   cap    none    2000    1750    1500    1250    1000
+#   corr  −0.477  −0.280  −0.251  −0.204  −0.073  +0.090
+#   ≥95      18      18      18      18      22      23
+#
+# 1500 halves the length effect while leaving the top band untouched. The zero crossing
+# sits near 1150, but caps below ~1400 start inflating the top (18 → 22 → 23 files at ≥95),
+# which trades a length bias for a score bias. 1500 is the conservative end of that range,
+# chosen deliberately: it removes the artifact it can remove without moving the ceiling.
+#
+# The residual −0.204 is partly a SECOND length effect not addressed here — the bloat
+# penalty below (`total_words > 2000 and density < 3`) keys on raw word count.
+#
+# Monotonic by construction: min(words, cap) <= words, so density can only rise and no
+# score can fall. Measured 0 fallers over 349 files, as the algebra requires.
+# See docs/specs/2026-08-13-structural-signal-detection.md (section B).
+_DENSITY_DENOMINATOR_CAP = 1500
+
 
 def _spread_stuffing_noise(prose: str) -> tuple[int, list[str]]:
     """Return (excess-repetition noise, issues) for over-used meaningful terms in prose."""
@@ -161,8 +189,13 @@ def score_efficiency(skill_path: str) -> dict:
         stuffing_noise * 2           # Over-used keywords spread across lines are padding
     )
 
-    # Density = signal per 100 words, penalized by noise
-    density = ((signal_count - noise_count) / max(total_words, 1)) * 100
+    # Density = signal per 100 words, penalized by noise. The denominator is capped so a
+    # long file is not punished for length once it is past the point where the signal
+    # terms themselves stop counting (see _DENSITY_DENOMINATOR_CAP).
+    density = (
+        (signal_count - noise_count)
+        / max(min(total_words, _DENSITY_DENOMINATOR_CAP), 1)
+    ) * 100
 
     # Map density to score — continuous (no step-function cliffs).
     # Uses sqrt curve calibrated to match previous step midpoints:

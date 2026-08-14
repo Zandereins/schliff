@@ -237,8 +237,15 @@ def test_agents_md_corpus_golden_distribution():
     # inside the backticks (`` `coverlet.collector     ` : Coverlet is a … ``),
     # which read as "program + argument". Pinned in
     # test_documented_command_signal.py::test_aligned_dependency_entry_is_not_a_command.
-    assert statistics.mean(scores) == pytest.approx(61.99, abs=0.05)
-    assert statistics.median(scores) == pytest.approx(61.90, abs=0.05)
+    # Re-baselined again for the density denominator cap (2026-08-13, same spec,
+    # section B). Was 61.99 mean / 61.90 median / B 4 / D 12. efficiency capped its
+    # denominator at 1500 words, because signal_count is capped at 95 on every term
+    # while total_words was not — 182 of 349 real files could not reach the top band at
+    # any quality. Monotonic by construction (min(words, cap) <= words), so no score can
+    # fall; measured 0 fallers over 350 files, 80 rise, median rise 6.
+    # min/max unchanged, one D->B reclassification.
+    assert statistics.mean(scores) == pytest.approx(62.35, abs=0.05)
+    assert statistics.median(scores) == pytest.approx(62.60, abs=0.05)
     assert min(scores) == pytest.approx(35.0, abs=0.05)
     assert max(scores) == pytest.approx(91.0, abs=0.05)
 
@@ -246,9 +253,9 @@ def test_agents_md_corpus_golden_distribution():
     # (>=95); the two CJK docs floor opcov directives to 0 (English-scoped, §8.1).
     assert bands["S"] == 0
     assert bands["A"] == 1
-    assert bands["B"] == 4
+    assert bands["B"] == 5
     assert bands["C"] == 8
-    assert bands["D"] == 12
+    assert bands["D"] == 11
     assert bands["E"] == 5
     assert bands["F"] == 0
 

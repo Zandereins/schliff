@@ -254,9 +254,72 @@ The decisive evidence is the files sitting at the absolute cap:
 judgement about density. 21 files are at the actionable cap, where further documented commands
 change nothing.
 
-Not designed or implemented here. Any fix reaches the formula every dimension consumer depends
-on, and the monotonicity invariant is unlikely to survive it — raising long files means the
-distribution moves, which is a scale change, not a false-negative repair.
+### B measured in full — 2026-08-13, after A landed
+
+**A correction to an earlier draft of this section.** It claimed A had halved the length
+effect (correlation −0.245, `skill-creator` at 62). Both numbers came from a hand-rebuilt
+copy of the scoring curve that omitted the bloat penalty (`total_words > 2000 and
+density < 3 → −15`). Measured against the real `score_efficiency`, correlation after A is
+**−0.477**, unchanged, and `skill-creator` scores **42**. A did not reduce B at all. The
+relative ranking of the variants below survives — every variant was computed on the same
+incomplete curve — but the cap value had to be recalibrated, see below.
+
+**The counter-hypothesis is refuted.** If long files were simply worse, every dimension would
+sag together. Median score by length, efficiency against the mean of structure, clarity and
+composability:
+
+| words | n | efficiency | other three dims |
+| --- | --- | --- | --- |
+| 0–300 | 40 | 65 | 68 |
+| 300–600 | 69 | 70 | 72 |
+| 600–1200 | 99 | 61 | 71 |
+| 1200–2400 | 100 | 58 | 74 |
+| >2400 | 41 | **42** | **74** |
+
+The other three *rise* with length (68 → 74). Efficiency falls (70 → 42). The gap widens from
+3 points to 32. That is a length effect, not a quality effect.
+
+**Scope: 182 of 349 files (52 %)** cannot reach score 95 at any quality, because
+`max(signal_count) = 95` against an unbounded denominator. 21 sit at the actionable cap where
+further documented commands change nothing.
+
+**Four denominator variants, same criteria:**
+
+| variant | corr(len) | median | files that fall | files ≥95 | skill-creator | hydra |
+| --- | --- | --- | --- | --- | --- | --- |
+| today | −0.245 | 63 | 0 | 18 | 62 | 59 |
+| cap denominator at 1500 | **−0.004** | 65 | **0** | **18** | 82 | 86 |
+| scale the signal caps with length | −0.206 | 63 | 0 | 18 | 67 | 68 |
+| sqrt denominator | +0.056 | 67 | **75** | 12 | 79 | 76 |
+
+`sqrt` fails the monotonicity invariant outright. Scaling the caps barely moves the
+correlation — the caps were never the main term, the denominator is.
+
+**Cap calibration, redone against the real scorer** (the first pass used the incomplete curve
+above and put the zero crossing at 1500; it is not there):
+
+| cap | none | 2500 | 2000 | 1750 | **1500** | 1250 | 1000 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| corr(len) | −0.477 | −0.347 | −0.280 | −0.251 | **−0.204** | −0.073 | +0.090 |
+| files ≥95 | 18 | 18 | 18 | 18 | **18** | 22 | 23 |
+| files that fall | 0 | 0 | 0 | 0 | **0** | 0 | 0 |
+
+The zero crossing is near **1150**, not 1500. Caps below ~1400 buy the remaining correlation
+by inflating the top band (18 → 22 → 23 files at ≥95), which trades a length bias for a score
+bias and moves a ceiling that nothing measured asks to move.
+
+**1500 is the conservative end**: it halves the length effect (−0.477 → −0.204) and leaves the
+top band exactly where it was. The residual is partly a *second* length effect not addressed
+here — the bloat penalty keys on raw `total_words`, so it fires on long files whose density the
+cap has already corrected.
+
+The counterexample pair still holds: `deserves.md` 98 > `dump.md` 96.
+
+**A prediction in this spec was wrong.** It said the monotonicity invariant was "unlikely to
+survive" a denominator change. It survives by construction: `min(words, cap) ≤ words`, so
+density can only rise, so no score can fall. Measured 0 fallers, as the algebra requires.
+
+Still not implemented — this section is the measurement, and the decision is Franz's.
 
 ## Follow-up, agreed but not in this branch
 
