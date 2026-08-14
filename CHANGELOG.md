@@ -5,6 +5,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A line that *is* a command now counts as actionable content.** `efficiency` recognised
+  English imperatives at line start, so `- \`tool score <file>\` — score one file` scored
+  nothing while "Run the score command" scored. Only commands that carry their explanation
+  count: crediting every command-bearing line was measured to rank a dump of `ls -la` and
+  `pwd -P` *above* a documented command list, because the score divides signal by word count
+  and the dump is shorter. Files that document their commands gain; nothing loses.
+- **`composability` recognises an error contract, a prerequisite and a version pin as
+  facts, not as phrasings.** "Errors go to stderr with a non-zero exit" now counts as a
+  declared error contract, `uv` counts as a declared prerequisite (the tool wordlist could
+  never be completed), and `tool@1.2.3` counts as a compatibility statement.
+- **`doctor` no longer counts vendored copies as installed skills.** A repo with one skill
+  reported six — three of them the same file inside virtualenvs and a uv cache archive —
+  inflating the skill count, the grade distribution and the headline "Total context cost"
+  (37,240 tokens where the real cost was 7,748). Skills in `node_modules`, `.venv`,
+  `site-packages`, `.cache` and `.vercel` are skipped. A skill's own directory name never
+  excludes it, and a directory above the scan root never does either: a checkout under
+  `~/build/` still finds its skills.
+- **Three command docs named flags that do not exist.** `/schliff:analyze` and
+  `/schliff:bench` documented `run-eval.sh --eval-suite <file>`, which the script rejects
+  (it takes the suite positionally); `/schliff:init` documented `init-skill.py --goal` and
+  `/schliff:triage` documented `text-gradient.py --focus`, neither of which the parsers
+  declare. An agent copies these verbatim, so a flag that does not parse is a broken
+  instruction. A test now checks every documented invocation against the real parser.
+
+### Notes
+
+- Scores for files that document their commands or state an error contract go **up**; no
+  file's score goes down. If you gate CI with `verify --min-score`, nothing you pass today
+  starts failing.
+- A denominator cap that would have stopped `efficiency` from penalising long files was
+  implemented and reverted before release: it decoupled the score from length, which let
+  padding dilute a keyword-stuffing penalty and keep the gain. The underlying limit stays
+  open and is documented in `docs/specs/2026-08-13-structural-signal-detection.md`.
+
 ## [8.11.1] - 2026-08-10
 
 ### Fixed

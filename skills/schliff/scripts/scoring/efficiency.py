@@ -9,6 +9,7 @@ from nlp import RE_WORD_TOKEN, STOPWORDS
 from scoring.patterns import (
     _RE_ACTIONABLE_LINES,
     _RE_CODE_BLOCK_REGION,
+    _RE_DOCUMENTED_COMMAND,
     _RE_FILLER_PHRASES,
     _RE_HEDGING,
     _RE_OBVIOUS_INSTRUCTIONS,
@@ -16,6 +17,7 @@ from scoring.patterns import (
     _RE_SCOPE_BOUNDARY,
     _RE_VERIFICATION_CMDS,
     _RE_WHY_COUNT,
+    normalize_command,
 )
 from shared import read_skill_safe, strip_frontmatter
 
@@ -28,6 +30,7 @@ from shared import read_skill_safe, strip_frontmatter
 _STUFF_MIN_PROSE_TOKENS = 40   # need enough prose to judge term frequency
 _STUFF_DOMINANCE = 0.12        # a term exceeding 12% of meaningful prose tokens is over-used
 _STUFF_MIN_COUNT = 8           # ...and occurs at least this many times
+
 
 
 def _spread_stuffing_noise(prose: str) -> tuple[int, list[str]]:
@@ -84,6 +87,14 @@ def score_efficiency(skill_path: str) -> dict:
         if _RE_ACTIONABLE_LINES.match(line.strip()):
             key = line.strip().lower()[:80]
             seen_actions.add(key)
+    # A documented command line is actionable content too, and the imperative-verb
+    # pattern above cannot see it. Deduplicate on the normalized command rather than
+    # on line text, so the same command in a command table, an example and a workflow
+    # contributes once. See docs/specs/2026-08-13-structural-signal-detection.md.
+    for match in _RE_DOCUMENTED_COMMAND.finditer(content):
+        identity = normalize_command(match.group(1))
+        if identity:
+            seen_actions.add(f"cmd:{identity.lower()}")
     actionable_lines = len(seen_actions)
 
     # Real examples (input/output pairs, not just code blocks)
@@ -151,7 +162,17 @@ def score_efficiency(skill_path: str) -> dict:
         stuffing_noise * 2           # Over-used keywords spread across lines are padding
     )
 
-    # Density = signal per 100 words, penalized by noise
+    # Density = signal per 100 words, penalized by noise.
+    #
+    # The denominator is deliberately NOT capped. Capping it at 1500 words removed a real
+    # defect — signal_count maxes at 95, so 182 of 349 real files could not reach the top
+    # band at any quality — but it also removed the self-correction that bounds gaming:
+    # diluting keyword stuffing lowers noise (allowed is relative to prose length), and an
+    # uncapped denominator charges for the words added to dilute it. Measured on a stuffed
+    # probe: uncapped 43 -> 66 -> 44 -> 35 (length takes the gain back), capped
+    # 43 -> 66 -> 73 -> 68 (the gain stays). Efficiency is the dimension doctor cites as
+    # "Total context cost", so it must not be decoupled from length.
+    # See docs/specs/2026-08-13-structural-signal-detection.md (section B).
     density = ((signal_count - noise_count) / max(total_words, 1)) * 100
 
     # Map density to score — continuous (no step-function cliffs).

@@ -55,7 +55,6 @@ Initialize Schliff improvement tracking for a skill.
    ```bash
    python3 scripts/init-skill.py \
      /path/to/SKILL.md \
-     --goal "USER'S IMPROVEMENT GOAL" \
      --output /path/to/skill/eval-suite.json
    ```
 

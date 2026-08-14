@@ -40,10 +40,18 @@ VALID_DIMENSIONS = {
 }
 
 # Directories to skip during discovery (common non-source dirs).
-# Shared by sync.py, doctor.py, and any future tree walkers.
+# Shared by sync.py, doctor.py, skill_mesh.py, and any future tree walkers.
+#
+# `site-packages`, `.cache` and `.vercel` were added 2026-08-13: an installed copy of a
+# skill is not an installed skill. Measured in this repo, `schliff doctor .` reported
+# three vendored copies of the same SKILL.md — two under site-packages, one in a uv
+# cache archive at `.vercel/python/cache/uv/archive-v0/…` where neither `.venv` nor
+# `site-packages` appears in the path. See
+# docs/specs/2026-08-13-doctor-counts-vendored-skills.md.
 EXCLUDED_DIRS = frozenset({
     ".git", "node_modules", ".venv", "venv", "__pycache__",
     ".tox", "dist", "build", ".eggs",
+    "site-packages", ".cache", ".vercel",
 })
 
 # --- Regex for description extraction ---

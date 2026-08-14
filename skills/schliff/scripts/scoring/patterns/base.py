@@ -4,6 +4,8 @@ import re
 __all__ = [
     # Efficiency
     "_RE_ACTIONABLE_LINES",
+    "_RE_DOCUMENTED_COMMAND",
+    "normalize_command",
     "_RE_WHY_COUNT",
     "_RE_VERIFICATION_CMDS",
     "_RE_FILLER_PHRASES",
@@ -61,6 +63,93 @@ _RE_ACTIONABLE_LINES = re.compile(
     r"Ensure|Define|Specify|Register|Mount|Scan|Inspect|Monitor)\b",
     re.MULTILINE,
 )
+# ---------------------------------------------------------------------------
+# Documented command lines.
+#
+# `_RE_ACTIONABLE_LINES` above recognises an English imperative at line start, so a
+# line that *is* an executable command scores nothing — the most actionable line a
+# reference document can contain. This pattern closes that gap, but deliberately only
+# for a command that carries its explanation: `- `tool sub <arg>` — what it does`.
+#
+# Measured rationale (docs/specs/2026-08-13-structural-signal-detection.md): counting
+# every command-bearing line ranks a dump of `ls -la` / `pwd -P` ABOVE a documented
+# command list, because efficiency divides signal by word count and the dump is
+# shorter. Requiring the explanation is the only variant where the documented file wins.
+#
+# Structure, not a wordlist of tool names: a list marker, a backticked command whose
+# first token looks like a program and which has at least one further token, a
+# separator, and at least 10 characters of explanation.
+#
+# KNOWN LIMIT, measured and accepted: this is a shape, so a two-token option or field
+# entry in the same shape is credited — `- `max_tokens int` — the maximum number of
+# tokens`. There is no structural signal that separates that from `- `make test` — run
+# the suite`, and inventing one would mean a wordlist of tool names, which is the design
+# this detector replaced. Measured over 186 real files: 39 hits, 39 of them genuine
+# commands, 0 option-list false positives — the two-token minimum already excludes the
+# common single-token option form (`- `max_tokens` — …`). Revisit if a field hit appears.
+_RE_DOCUMENTED_COMMAND = re.compile(
+    # `[ \t]` not `\s` — third instance of the same class in this changeset. It was
+    # swept out of _RE_ERROR_BEHAVIOR and _RE_DEPENDENCY_DECL and then reintroduced
+    # here: `\s` after the list marker crosses a newline, so a bare "1." on its own
+    # line credited the backticked command on the NEXT line as documented.
+    r"^(?:\d+\.[ \t]*|[-*+][ \t]+)"     # list marker — a documented command is a list item
+    # Backticked: program-like head + at least one REAL argument. The `[^\s`]` is
+    # load-bearing — a dependency list aligns its entries with trailing spaces
+    # (`` `coverlet.collector     ` : Coverlet is a … library ``), which otherwise
+    # reads as "program + argument" and credits a package name as a command.
+    r"`([a-z][\w.@/-]*[ \t]+[^\s`][^`\n]*)`"
+    r"[ \t]*[—–:-][ \t]+"               # separator between command and explanation
+    r"(\S[^\n]{9,})",                   # the explanation itself, on the same line
+    re.MULTILINE,
+)
+
+# Argument-like token: placeholder, flag, shell operator, or a file with an extension.
+# The operator branch covers the full set, not just `|`: an unstopped `&&`, `>` or `;`
+# left shell plumbing in the identity (`cd build && make`, `tool run >`), so two
+# different pipelines could share one and the same command could split into two.
+_RE_COMMAND_ARG = re.compile(r"^(?:<|-|\$|\||&|>|<|;|\|\||&&|[\w./-]+\.[a-z]{1,5}$)")
+
+# An interpreter prefix is not the command's identity — `bash scripts/a.sh` and
+# `bash scripts/b.sh` are different commands. Without this, the script path (a
+# file-with-suffix token) stopped the walk at index 1 and both collapsed to `bash`.
+_INTERPRETERS = frozenset({"bash", "sh", "zsh", "python", "python3", "node", "ruby", "perl"})
+
+
+def normalize_command(command: str) -> str:
+    """Reduce a command to its identity: program plus subcommands.
+
+    Arguments, flags and version pins are not part of what a command IS, so
+    ``tool score <file>``, ``tool score SKILL.md`` and ``tool@1.2.3 score`` collapse to
+    ``tool score``. Without this, one command listed in a command table, an example and
+    a workflow counts three times.
+
+    Subcommands are kept: truncating to a fixed token count collapses an entire CLI
+    family (``tool score`` / ``tool doctor`` / ``tool verify``) into a single signal.
+    """
+    tokens = command.split()
+    # The program is whatever follows an interpreter prefix, so the file-with-suffix
+    # shape must not be tested against it either: `bash scripts/a.sh` and
+    # `bash scripts/b.sh` otherwise both reduce to `bash`, merging N distinct
+    # documented commands into a single signal.
+    head = 1 if len(tokens) > 1 and tokens[0] in _INTERPRETERS else 0
+
+    parts = []
+    for index, token in enumerate(tokens):
+        # The head is the program — never test it against the argument shape. A program
+        # name with an extension (`run-eval.sh`, `manage.py`) matches the file-with-suffix
+        # branch, which broke out on token 0 and returned an empty identity, so the line
+        # was dropped entirely. That is the exact line shape this detector exists to
+        # credit, and the one this repo's own command docs use.
+        if index > head and _RE_COMMAND_ARG.match(token):
+            break
+        # Strip a version pin (`tool@1.2.3`), but never on a scoped package name
+        # (`@vercel/microfrontends`), where the leading `@` is the name itself —
+        # splitting there yields an empty token, so `npx @a/x run` and `npx @b/y run`
+        # collapse to the same identity. Found on real installed skills, not fixtures.
+        parts.append(token if token.startswith("@") else token.split("@", 1)[0])
+    return " ".join(parts)
+
+
 _RE_WHY_COUNT = re.compile(
     r"\b(because|since|this enables|this prevents|this means|the reason|"
     r"this ensures|this avoids|otherwise|so that|why[:\s])\b",

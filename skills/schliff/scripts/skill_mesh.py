@@ -25,7 +25,7 @@ from typing import Optional
 
 # Import scorer functions for tokenization and description extraction
 from nlp import tokenize_meaningful
-from shared import extract_description
+from shared import EXCLUDED_DIRS, extract_description
 
 # --- Skill Discovery ---
 
@@ -50,6 +50,36 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
 
         scan_root = Path(os.path.realpath(str(skill_dir_path)))
         for skill_md in skill_dir_path.rglob("SKILL.md"):
+            # A vendored copy is not an installed skill. doctor.py's sibling walk
+            # (discover_instruction_files) has always filtered on EXCLUDED_DIRS; this
+            # one did not, so virtualenvs, node_modules and cache archives were counted
+            # into "skills scanned", the grade distribution and "Total context cost".
+            #
+            # Only segments BELOW the scan root count. The caller named the root; what
+            # lies above it is their filesystem, not their tree. Matching the full path
+            # made a checkout under ~/build/ or ~/.cache/ report "No skills found" and
+            # exit 0 — quiet under-counting, which is worse than the loud over-counting
+            # this filter was added to fix. os.walk in the sibling never had the problem
+            # because pruning can only ever reach below its own root.
+            #
+            # Keyed on path SEGMENTS, so a skill legitimately named `cache-warmer` is
+            # not collateral.
+            # `[:-2]` drops the filename and the skill's OWN directory: only what lies
+            # strictly above the skill folder can mark it as vendored. Without it, a
+            # skill legitimately named `build`, `dist` or `.cache` excluded itself —
+            # 4 of 5 such skills vanished silently, the same quiet under-count as the
+            # scan-root defect, one level down.
+            try:
+                relative_parts = skill_md.relative_to(skill_dir_path).parts[:-2]
+            except ValueError:  # pragma: no cover — rglob yields paths under the root
+                relative_parts = skill_md.parts[:-2]
+            if EXCLUDED_DIRS & set(relative_parts):
+                continue
+            # Counted AFTER the filter, deliberately: MAX_SCAN_FILES exists to bound the
+            # expensive work, and the expensive work is the read + parse below, which a
+            # filtered path never reaches. Iterating rglob is cheap by comparison. The
+            # tradeoff is that a tree full of vendored copies no longer trips the limit
+            # early — it also no longer spends the budget on files that are discarded.
             file_count += 1
             if file_count > MAX_SCAN_FILES:
                 print(f"Warning: scan limit reached ({MAX_SCAN_FILES} files), stopping discovery", file=sys.stderr)

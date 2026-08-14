@@ -51,7 +51,7 @@ Cluster and prioritize logged failures, then generate targeted fixes.
 6. If `text-gradient.py` is available, run it to generate concrete patches:
 
    ```bash
-   python3 scripts/text-gradient.py /path/to/SKILL.md --focus "failure_description" --json
+   python3 scripts/text-gradient.py /path/to/SKILL.md --json --top 5
    ```
 
 7. Present recommended actions:

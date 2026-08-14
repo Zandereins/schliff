@@ -52,7 +52,7 @@ Perform a comprehensive analysis of a skill and identify top improvements.
    ```bash
    bash scripts/run-eval.sh \
      /path/to/SKILL.md \
-     --eval-suite /path/to/skill/eval-suite.json \
+     /path/to/skill/eval-suite.json \
      --no-runtime-auto
    ```
 

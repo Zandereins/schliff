@@ -79,28 +79,76 @@ _RE_ALTERNATIVES = re.compile(
     r"(?i)(alternatively|or use|if.*not available|fallback)"
 )
 # New composability patterns (v6.0.1 — granular scoring)
+# A file that names its failure CHANNEL and exit STATUS has declared an error contract
+# more precisely than one that says "on error". The phrasing alternatives below were the
+# only recognised form until 2026-08-13; "Errors go to stderr as one line with a non-zero
+# exit" scored nothing. See docs/specs/2026-08-13-structural-signal-detection.md.
+#
+# KNOWN LIMIT, measured and accepted: `\bstderr\b` detects the WORD, not the contract, so
+# "Do not write to stderr in library code" is credited. Distinguishing a declared failure
+# channel from a mention of the stream needs sentence-level meaning, which no regex here
+# has. Measured over 186 real files: 0 where a bare `stderr` is the only thing carrying
+# the point. Revisit if a field hit appears.
 _RE_ERROR_BEHAVIOR = re.compile(
     r"(?i)(on\s+error|error\s+handling|if\s+\w[\w ]{0,80}\s+fails?|when\s+\w[\w ]{0,80}\s+fails?|"
-    r"graceful(?:ly)?\s+(?:handle|degrad\w+|fail)|recover(?:y|s)?\s+(?:from|when))"
+    r"graceful(?:ly)?\s+(?:handle|degrad\w+|fail)|recover(?:y|s)?\s+(?:from|when)|"
+    # `[ \t]` not `\s` — same reason as _RE_DEPENDENCY_DECL below, and the same defect
+    # class this diff fixed there but missed here: `\s` crosses newlines, so
+    # "…until the agent exits\n1. Review…" matched `exits\n1` and credited an error
+    # contract that does not exist.
+    r"\bstderr\b|non-?zero[ \t]+(?:exit|status)|exit[ \t]+(?:code|status)|exits?[ \t]+[1-9])"
 )
 _RE_IDEMPOTENCY = re.compile(
     r"(?i)(idempotent|safe to (?:re-?run|run (?:again|twice|multiple))|"
     r"running (?:again|twice)|no side.?effects?|re-?entrant)"
 )
+# The closed tool wordlist below dates from v6.0.1 and cannot be completed — it lacked
+# `uv`, which is how this project's own skill declares its one prerequisite ("These run
+# anywhere `uv` is available"). The added alternatives are tool-agnostic: they key on the
+# SHAPE of a prerequisite statement, not on knowing every tool's name. Each still needs a
+# declaration frame ("anywhere X is available", "requires X to be installed"), so bare
+# prose like "the available options" is not credited.
 _RE_DEPENDENCY_DECL = re.compile(
     r"(?i)(requires?[:\s]+(?:python|node|npm|pip|git|jq|bash|ruby|go)\b|"
     r"depends?\s+on|prerequisite|"
     r"needs?\s+(?:python|node|npm|pip|git|jq|bash|ruby|go)\b|"
-    r"install\s+\w+\s+first)"
+    r"install\s+\w+\s+first|"
+    # `[ \t]` not `\s`: `\s` crosses newlines, so "…needs them.\n5. Next step"
+    # matched as "needs <tool> <version>" against a list number on the next line.
+    # The tool token also may not end in a sentence period, which is what separates
+    # "needs deno 2" from "needs them. 5". Found on a real installed skill.
+    r"anywhere[ \t]+`?[\w.-]+`?[ \t]+is[ \t]+available|"
+    r"requires?[ \t]+`?[\w.-]+`?[ \t]+to[ \t]+be[ \t]+installed|"
+    # A bare trailing digit was too loose — "this step needs step 2 to have run first"
+    # and "the loop needs iteration 3" read as tool-plus-version. Zero field hits, and
+    # two constructed false positives, so the digit is now only allowed as an optional
+    # version BETWEEN the tool and an explicit availability phrase.
+    #
+    # KNOWN LIMIT: the `(?i)` on this pattern makes "on the PATH" match "on the path",
+    # so "needs work on the path to production" is credited. Dropping the flag for this
+    # alternative alone would need the pattern split in two; the whole-pattern flag is
+    # load-bearing for the wordlist branches above. Measured: 0 field hits.
+    r"needs?[ \t]+`?[\w-]+(?:\.[\w-]+)*`?(?:[ \t]+v?[\d.]+)?[ \t]+on[ \t]+the[ \t]+PATH)"
 )
 _RE_NAMESPACE_ISOLATION = re.compile(
     r"(?i)(namespace\s+\w+|namespaced?\b|__\w+__|"
     r"@[\w-]+/[\w-]+|plugin[_-]\w+|scoped\s+to\b)"
 )
+# A version PIN is the compatibility statement people actually write — `tool@1.2.3` in a
+# CI line says more than "minimum version". The `@\d+\.\d+` shape is what keeps an email
+# address out: `user@example.com` has no digit after the `@`.
+#
+# The package-name run is BOUNDED. `[\w.-]+@` has no literal prefix to limit start
+# positions, so the unbounded form is O(n^2) — measured 18.1 → 72.2 → 288.0ms, ratio
+# 4.00x per doubling, caught by test_patterns_scale_linearly (the reason that gate
+# exists). 64 covers the longest real package name by a wide margin
+# (`@vercel/microfrontends` is 22); a bounded run costs O(bound) per start position
+# and keeps the pattern linear.
 _RE_VERSION_COMPAT = re.compile(
     r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
     r"requires?\s+\w+\s*[><=]+\s*[\d.]+|minimum\s+version|"
-    r"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+)"
+    r"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+|"
+    r"[\w.-]{1,64}@\d+\.\d+|pin\s+the\s+version)"
 )
 
 # --- Trigger patterns (SKILL.md-specific) ---
