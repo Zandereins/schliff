@@ -82,6 +82,13 @@ def test_efficiency_stays_in_range(path):
         # packages onto one identity. Found on an installed skill, not a fixture.
         ("npx @vercel/microfrontends compile", "npx @vercel/microfrontends compile"),
         ("npx @scope/other compile", "npx @scope/other compile"),
+        # The head is the program, never an argument. A program name carrying an
+        # extension matched the file-with-suffix branch and broke out on token 0,
+        # returning an empty identity so the whole line was dropped — the exact line
+        # shape this detector exists to credit. Found by review; 0 field hits.
+        ("run-eval.sh --eval-suite core", "run-eval.sh"),
+        ("manage.py migrate", "manage.py migrate"),
+        ("score-skill.py SKILL.md --json", "score-skill.py"),
     ],
 )
 def test_normalize_command_identity(command, expected):

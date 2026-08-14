@@ -39,6 +39,11 @@ class TestErrorBehaviour:
         "This skill scores instruction files deterministically.",
         "The exit interview is scheduled for Friday.",
         "Standard errors in reasoning are covered in the appendix.",
+        # `\s` crosses newlines, so a sentence ending in "exits" followed by a numbered
+        # list read as "exits 1". Same defect class the dependency pattern fixed in the
+        # same diff; this one was missed. Found by review, 0 hits in the field.
+        "Run the loop until the agent exits\n1. Review the transcript",
+        "sort by exit\ncode is not relevant",
     ])
     def test_prose_without_a_contract_is_not_credited(self, text):
         assert not _RE_ERROR_BEHAVIOR.search(text), f"false positive: {text!r}"
@@ -52,6 +57,7 @@ class TestDependencyDeclaration:
         "These run anywhere `uv` is available: no plugin, no checkout.",
         "Requires uvx to be installed.",
         "Needs deno 2 on the PATH.",
+        "Needs deno on the PATH.",
         "Requires bun; install it first.",
         # Already-working phrasings must keep working.
         "Requires python 3.11 or newer.",
@@ -67,6 +73,10 @@ class TestDependencyDeclaration:
         # list number on the following line. Found on a real installed skill
         # (gpt-5-4-prompting), not on a fixture.
         "4. State the constraints the caller needs them.\n5. Return the diff only.",
+        # A bare trailing digit made ordinary sequencing prose look like tool+version.
+        # Found by review; zero field hits, so tightening it costs nothing.
+        "This step needs step 2 to have run first.",
+        "The loop needs iteration 3 before it converges.",
     ])
     def test_unrelated_availability_is_not_a_declaration(self, text):
         assert not _RE_DEPENDENCY_DECL.search(text), f"false positive: {text!r}"

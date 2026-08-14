@@ -70,6 +70,11 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
                 relative_parts = skill_md.parts
             if EXCLUDED_DIRS & set(relative_parts):
                 continue
+            # Counted AFTER the filter, deliberately: MAX_SCAN_FILES exists to bound the
+            # expensive work, and the expensive work is the read + parse below, which a
+            # filtered path never reaches. Iterating rglob is cheap by comparison. The
+            # tradeoff is that a tree full of vendored copies no longer trips the limit
+            # early — it also no longer spends the budget on files that are discarded.
             file_count += 1
             if file_count > MAX_SCAN_FILES:
                 print(f"Warning: scan limit reached ({MAX_SCAN_FILES} files), stopping discovery", file=sys.stderr)

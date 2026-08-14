@@ -79,6 +79,14 @@ _RE_ACTIONABLE_LINES = re.compile(
 # Structure, not a wordlist of tool names: a list marker, a backticked command whose
 # first token looks like a program and which has at least one further token, a
 # separator, and at least 10 characters of explanation.
+#
+# KNOWN LIMIT, measured and accepted: this is a shape, so a two-token option or field
+# entry in the same shape is credited — `- `max_tokens int` — the maximum number of
+# tokens`. There is no structural signal that separates that from `- `make test` — run
+# the suite`, and inventing one would mean a wordlist of tool names, which is the design
+# this detector replaced. Measured over 186 real files: 39 hits, 39 of them genuine
+# commands, 0 option-list false positives — the two-token minimum already excludes the
+# common single-token option form (`- `max_tokens` — …`). Revisit if a field hit appears.
 _RE_DOCUMENTED_COMMAND = re.compile(
     r"^(?:\d+\.\s*|[-*+]\s+)"           # list marker — a documented command is a list item
     # Backticked: program-like head + at least one REAL argument. The `[^\s`]` is
@@ -107,8 +115,13 @@ def normalize_command(command: str) -> str:
     family (``tool score`` / ``tool doctor`` / ``tool verify``) into a single signal.
     """
     parts = []
-    for token in command.split():
-        if _RE_COMMAND_ARG.match(token):
+    for index, token in enumerate(command.split()):
+        # The head is the program — never test it against the argument shape. A program
+        # name with an extension (`run-eval.sh`, `manage.py`) matches the file-with-suffix
+        # branch, which broke out on token 0 and returned an empty identity, so the line
+        # was dropped entirely. That is the exact line shape this detector exists to
+        # credit, and the one this repo's own command docs use.
+        if index and _RE_COMMAND_ARG.match(token):
             break
         # Strip a version pin (`tool@1.2.3`), but never on a scoped package name
         # (`@vercel/microfrontends`), where the leading `@` is the name itself —

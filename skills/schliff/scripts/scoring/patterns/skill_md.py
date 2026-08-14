@@ -86,7 +86,11 @@ _RE_ALTERNATIVES = re.compile(
 _RE_ERROR_BEHAVIOR = re.compile(
     r"(?i)(on\s+error|error\s+handling|if\s+\w[\w ]{0,80}\s+fails?|when\s+\w[\w ]{0,80}\s+fails?|"
     r"graceful(?:ly)?\s+(?:handle|degrad\w+|fail)|recover(?:y|s)?\s+(?:from|when)|"
-    r"\bstderr\b|non-?zero\s+(?:exit|status)|exit\s+(?:code|status)|exits?\s+[1-9])"
+    # `[ \t]` not `\s` — same reason as _RE_DEPENDENCY_DECL below, and the same defect
+    # class this diff fixed there but missed here: `\s` crosses newlines, so
+    # "…until the agent exits\n1. Review…" matched `exits\n1` and credited an error
+    # contract that does not exist.
+    r"\bstderr\b|non-?zero[ \t]+(?:exit|status)|exit[ \t]+(?:code|status)|exits?[ \t]+[1-9])"
 )
 _RE_IDEMPOTENCY = re.compile(
     r"(?i)(idempotent|safe to (?:re-?run|run (?:again|twice|multiple))|"
@@ -109,7 +113,11 @@ _RE_DEPENDENCY_DECL = re.compile(
     # "needs deno 2" from "needs them. 5". Found on a real installed skill.
     r"anywhere[ \t]+`?[\w.-]+`?[ \t]+is[ \t]+available|"
     r"requires?[ \t]+`?[\w.-]+`?[ \t]+to[ \t]+be[ \t]+installed|"
-    r"needs?[ \t]+`?[\w-]+(?:\.[\w-]+)*`?[ \t]+(?:\d|on[ \t]+the[ \t]+PATH))"
+    # A bare trailing digit was too loose — "this step needs step 2 to have run first"
+    # and "the loop needs iteration 3" read as tool-plus-version. Zero field hits, and
+    # two constructed false positives, so the digit is now only allowed as an optional
+    # version BETWEEN the tool and an explicit availability phrase.
+    r"needs?[ \t]+`?[\w-]+(?:\.[\w-]+)*`?(?:[ \t]+v?[\d.]+)?[ \t]+on[ \t]+the[ \t]+PATH)"
 )
 _RE_NAMESPACE_ISOLATION = re.compile(
     r"(?i)(namespace\s+\w+|namespaced?\b|__\w+__|"
