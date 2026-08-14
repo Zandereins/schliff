@@ -96,6 +96,25 @@ def test_excluded_segment_above_the_scan_root_is_not_the_users_problem(tmp_path,
     )
 
 
+@pytest.mark.parametrize("skill_name", ["build", "dist", "venv", ".cache", "node_modules"])
+def test_a_skill_may_be_named_like_an_excluded_directory(tmp_path, skill_name):
+    """The skill's OWN directory name is not a vendoring signal.
+
+    `build` and `dist` are plausible skill names. Testing every relative segment
+    included the skill's own directory, so `skills/build/SKILL.md` was dropped —
+    4 of 5 such skills vanished silently, which `main` found. Only directories
+    strictly ABOVE the skill's own folder can mark it as vendored.
+
+    The earlier guard here used `cache-warmer`, a name that CONTAINS an excluded
+    word but is not equal to one, so it never covered this.
+    """
+    _write(tmp_path, f"skills/{skill_name}/SKILL.md")
+    found = {s["path"] for s in discover_skills([str(tmp_path)])}
+    assert str(tmp_path / "skills" / skill_name / "SKILL.md") in found, (
+        f"a skill directory named {skill_name!r} was dropped"
+    )
+
+
 def test_excluded_segment_below_the_scan_root_is_still_excluded(tmp_path):
     """The guard above must not reopen the door it was added to close."""
     root = tmp_path / "build" / "proj" / ".claude" / "skills"

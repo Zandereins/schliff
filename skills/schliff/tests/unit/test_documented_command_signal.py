@@ -89,6 +89,14 @@ def test_efficiency_stays_in_range(path):
         ("run-eval.sh --eval-suite core", "run-eval.sh"),
         ("manage.py migrate", "manage.py migrate"),
         ("score-skill.py SKILL.md --json", "score-skill.py"),
+        # An interpreter prefix is not the identity: the script path is a
+        # file-with-suffix token, which stopped the walk one index later and reduced
+        # every `bash scripts/*.sh` to plain `bash`.
+        ("bash scripts/run-eval.sh SKILL.md", "bash scripts/run-eval.sh"),
+        ("python3 scripts/verify.py --json", "python3 scripts/verify.py"),
+        # Shell plumbing is not part of a command's identity either.
+        ("cd build && make", "cd build"),
+        ("tool run > out.txt", "tool run"),
     ],
 )
 def test_normalize_command_identity(command, expected):
@@ -118,6 +126,22 @@ def test_aligned_dependency_entry_is_not_a_command():
     assert _RE_DOCUMENTED_COMMAND.search(real_command) is not None
 
 
+def test_list_marker_does_not_cross_a_newline():
+    """A bare list marker must not reach the backticked command on the next line.
+
+    Third instance of the `\\s`-crosses-newlines class in this changeset: swept out of
+    _RE_ERROR_BEHAVIOR and _RE_DEPENDENCY_DECL, then reintroduced in the pattern added
+    alongside them. Found by review.
+    """
+    from scoring.patterns import _RE_DOCUMENTED_COMMAND
+
+    split_across_lines = "Priorities:\n\n1.\n`make test` — run the whole suite here\n"
+    assert _RE_DOCUMENTED_COMMAND.search(split_across_lines) is None
+
+    on_one_line = "1. `make test` — run the whole suite here"
+    assert _RE_DOCUMENTED_COMMAND.search(on_one_line) is not None
+
+
 def test_scoped_packages_do_not_collapse():
     """Two different scoped packages must not deduplicate onto each other."""
     from scoring.patterns import normalize_command
@@ -125,3 +149,18 @@ def test_scoped_packages_do_not_collapse():
     a = normalize_command("npx @vercel/microfrontends compile")
     b = normalize_command("npx @scope/other compile")
     assert a != b, f"both normalized to {a!r}"
+
+
+def test_interpreter_prefixed_scripts_do_not_collapse():
+    """`bash a.sh` and `bash b.sh` are different commands, not two counts of `bash`.
+
+    The script path is a file-with-suffix token, so the walk stopped right after the
+    interpreter and every such line reduced to the interpreter name — N documented
+    commands contributing one signal. Found by review; 0 field occurrences.
+    """
+    from scoring.patterns import normalize_command
+
+    a = normalize_command("bash scripts/analyze.sh SKILL.md")
+    b = normalize_command("bash scripts/run-eval.sh SKILL.md")
+    assert a != b, f"both normalized to {a!r}"
+    assert a == "bash scripts/analyze.sh"

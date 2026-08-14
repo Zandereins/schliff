@@ -88,7 +88,11 @@ _RE_ACTIONABLE_LINES = re.compile(
 # commands, 0 option-list false positives — the two-token minimum already excludes the
 # common single-token option form (`- `max_tokens` — …`). Revisit if a field hit appears.
 _RE_DOCUMENTED_COMMAND = re.compile(
-    r"^(?:\d+\.\s*|[-*+]\s+)"           # list marker — a documented command is a list item
+    # `[ \t]` not `\s` — third instance of the same class in this changeset. It was
+    # swept out of _RE_ERROR_BEHAVIOR and _RE_DEPENDENCY_DECL and then reintroduced
+    # here: `\s` after the list marker crosses a newline, so a bare "1." on its own
+    # line credited the backticked command on the NEXT line as documented.
+    r"^(?:\d+\.[ \t]*|[-*+][ \t]+)"     # list marker — a documented command is a list item
     # Backticked: program-like head + at least one REAL argument. The `[^\s`]` is
     # load-bearing — a dependency list aligns its entries with trailing spaces
     # (`` `coverlet.collector     ` : Coverlet is a … library ``), which otherwise
@@ -100,7 +104,15 @@ _RE_DOCUMENTED_COMMAND = re.compile(
 )
 
 # Argument-like token: placeholder, flag, shell operator, or a file with an extension.
-_RE_COMMAND_ARG = re.compile(r"^(?:<|-|\$|\||[\w./-]+\.[a-z]{1,5}$)")
+# The operator branch covers the full set, not just `|`: an unstopped `&&`, `>` or `;`
+# left shell plumbing in the identity (`cd build && make`, `tool run >`), so two
+# different pipelines could share one and the same command could split into two.
+_RE_COMMAND_ARG = re.compile(r"^(?:<|-|\$|\||&|>|<|;|\|\||&&|[\w./-]+\.[a-z]{1,5}$)")
+
+# An interpreter prefix is not the command's identity — `bash scripts/a.sh` and
+# `bash scripts/b.sh` are different commands. Without this, the script path (a
+# file-with-suffix token) stopped the walk at index 1 and both collapsed to `bash`.
+_INTERPRETERS = frozenset({"bash", "sh", "zsh", "python", "python3", "node", "ruby", "perl"})
 
 
 def normalize_command(command: str) -> str:
@@ -114,14 +126,21 @@ def normalize_command(command: str) -> str:
     Subcommands are kept: truncating to a fixed token count collapses an entire CLI
     family (``tool score`` / ``tool doctor`` / ``tool verify``) into a single signal.
     """
+    tokens = command.split()
+    # The program is whatever follows an interpreter prefix, so the file-with-suffix
+    # shape must not be tested against it either: `bash scripts/a.sh` and
+    # `bash scripts/b.sh` otherwise both reduce to `bash`, merging N distinct
+    # documented commands into a single signal.
+    head = 1 if len(tokens) > 1 and tokens[0] in _INTERPRETERS else 0
+
     parts = []
-    for index, token in enumerate(command.split()):
+    for index, token in enumerate(tokens):
         # The head is the program — never test it against the argument shape. A program
         # name with an extension (`run-eval.sh`, `manage.py`) matches the file-with-suffix
         # branch, which broke out on token 0 and returned an empty identity, so the line
         # was dropped entirely. That is the exact line shape this detector exists to
         # credit, and the one this repo's own command docs use.
-        if index and _RE_COMMAND_ARG.match(token):
+        if index > head and _RE_COMMAND_ARG.match(token):
             break
         # Strip a version pin (`tool@1.2.3`), but never on a scoped package name
         # (`@vercel/microfrontends`), where the leading `@` is the name itself —

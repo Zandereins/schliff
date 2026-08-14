@@ -64,10 +64,15 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
             #
             # Keyed on path SEGMENTS, so a skill legitimately named `cache-warmer` is
             # not collateral.
+            # `[:-2]` drops the filename and the skill's OWN directory: only what lies
+            # strictly above the skill folder can mark it as vendored. Without it, a
+            # skill legitimately named `build`, `dist` or `.cache` excluded itself —
+            # 4 of 5 such skills vanished silently, the same quiet under-count as the
+            # scan-root defect, one level down.
             try:
-                relative_parts = skill_md.relative_to(skill_dir_path).parts
+                relative_parts = skill_md.relative_to(skill_dir_path).parts[:-2]
             except ValueError:  # pragma: no cover — rglob yields paths under the root
-                relative_parts = skill_md.parts
+                relative_parts = skill_md.parts[:-2]
             if EXCLUDED_DIRS & set(relative_parts):
                 continue
             # Counted AFTER the filter, deliberately: MAX_SCAN_FILES exists to bound the
