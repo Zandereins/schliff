@@ -71,3 +71,36 @@ def test_a_real_skill_named_like_a_cache_dir_still_counts(tmp_path):
     _write(tmp_path, "skills/cache-warmer/SKILL.md")
     found = {s["path"] for s in discover_skills([str(tmp_path)])}
     assert str(tmp_path / "skills" / "cache-warmer" / "SKILL.md") in found
+
+
+@pytest.mark.parametrize("ancestor", ["build", "dist", "venv", ".cache", "node_modules"])
+def test_excluded_segment_above_the_scan_root_is_not_the_users_problem(tmp_path, ancestor):
+    """Filtering must apply BELOW the scan root, not to the path that leads to it.
+
+    Whoever checks their repo out under ~/build/ or ~/.cache/ has not vendored
+    anything — the scan root is what the caller asked to scan, and everything above it
+    is their filesystem, not their tree. Matching on the full path made
+    `schliff doctor /abs/path` report "No skills found" and exit 0, silently, which is
+    worse than reporting a vendored copy: the previous defect over-counted loudly, this
+    one under-counts quietly.
+
+    doctor.py's sibling walk never had this problem — os.walk prunes dirs it descends
+    into, so it can only ever see segments below its own root.
+    """
+    root = tmp_path / ancestor / "proj" / ".claude" / "skills"
+    _write(root, "real/SKILL.md")
+
+    found = {s["path"] for s in discover_skills([str(root)])}
+    assert found == {str(root / "real" / "SKILL.md")}, (
+        f"a scan root under a directory named {ancestor!r} found nothing"
+    )
+
+
+def test_excluded_segment_below_the_scan_root_is_still_excluded(tmp_path):
+    """The guard above must not reopen the door it was added to close."""
+    root = tmp_path / "build" / "proj" / ".claude" / "skills"
+    _write(root, "real/SKILL.md")
+    _write(root, "vendor/.venv/lib/python3.12/site-packages/skills/x/SKILL.md")
+
+    found = {s["path"] for s in discover_skills([str(root)])}
+    assert found == {str(root / "real" / "SKILL.md")}

@@ -54,9 +54,21 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
             # (discover_instruction_files) has always filtered on EXCLUDED_DIRS; this
             # one did not, so virtualenvs, node_modules and cache archives were counted
             # into "skills scanned", the grade distribution and "Total context cost".
+            #
+            # Only segments BELOW the scan root count. The caller named the root; what
+            # lies above it is their filesystem, not their tree. Matching the full path
+            # made a checkout under ~/build/ or ~/.cache/ report "No skills found" and
+            # exit 0 — quiet under-counting, which is worse than the loud over-counting
+            # this filter was added to fix. os.walk in the sibling never had the problem
+            # because pruning can only ever reach below its own root.
+            #
             # Keyed on path SEGMENTS, so a skill legitimately named `cache-warmer` is
             # not collateral.
-            if EXCLUDED_DIRS & set(skill_md.parts):
+            try:
+                relative_parts = skill_md.relative_to(skill_dir_path).parts
+            except ValueError:  # pragma: no cover — rglob yields paths under the root
+                relative_parts = skill_md.parts
+            if EXCLUDED_DIRS & set(relative_parts):
                 continue
             file_count += 1
             if file_count > MAX_SCAN_FILES:
