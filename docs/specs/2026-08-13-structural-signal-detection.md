@@ -98,7 +98,8 @@ that exists only because we drew it.
 families (make, npm/yarn/pnpm, script paths) because its purpose is resolution against a repo:
 
 ```
-$ _extract_commands(SKILL.md body)  ->  extracted: 0
+_extract_commands(SKILL.md body)
+extracted: 0
 ```
 
 **Anti-gaming: inherit, do not invent.** Command lines feed the same signal pool as
@@ -174,8 +175,11 @@ is not obviously survivable there.
 frontmatter, differing only in whether the commands are real and documented:
 
 ```
-$ schliff score .../deserves.md --format skill | grep efficiency   ->  78/100
-$ schliff score .../dump.md     --format skill | grep efficiency   ->  84/100
+schliff score .../deserves.md --format skill | grep efficiency
+  efficiency  78/100
+
+schliff score .../dump.md --format skill | grep efficiency
+  efficiency  84/100
 ```
 
 Red = the dump outscores the documented file. Green = `deserves.md` rises **and** overtakes
