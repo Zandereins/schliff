@@ -101,12 +101,14 @@ def test_delta_is_a_floor_and_is_met(tmp_path, category):
 
 
 def test_delta_tracks_the_registry_not_a_copy_of_it(tmp_path):
-    """A duplicated weight literal stays green while the profile moves under it."""
+    """Both weights are read, never copied: the dimension weight from the registry
+    and the category weight from the scorer. A copy of either stays green while the
+    original moves under it."""
     path = _write(tmp_path, BARE)
     weight = get_weights("agents.md")["operational_coverage"]
     for g in _opcov(path):
         cat = g["issue"].replace("opcov_missing_", "")
-        expected = round(text_gradient._OPCOV_FIX[cat]["weight"] * weight, 1)
+        expected = round(text_gradient._OPCOV_WEIGHTS[cat] * weight, 1)
         assert g["delta"] == expected
 
 
@@ -132,10 +134,12 @@ def test_ranking_uses_the_agents_md_profile(tmp_path):
         )
 
 
-def test_format_is_detected_when_the_caller_passes_none(tmp_path):
-    """dashboard.py, auto-improve.py and main() call without a format."""
+def test_no_gradients_when_the_caller_omits_the_format(tmp_path):
+    """Detecting the format here was tried and reverted — it desynchronises this
+    function from compute_composite, which stays on skill.md weights. Pinned so
+    the revert is not undone by accident; the caller gap is tracked separately."""
     path = _write(tmp_path, BARE)
-    assert _opcov(path, fmt=None), "no operational_coverage fixes when fmt is omitted"
+    assert not _opcov(path, fmt=None)
 
 
 def test_all_fixes_together_reach_full_credit(tmp_path):

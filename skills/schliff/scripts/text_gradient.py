@@ -24,6 +24,8 @@ SCRIPT_DIR = Path(__file__).parent
 import score_skill as scorer  # noqa: E402
 
 from nlp import tokenize_meaningful  # noqa: E402
+from scoring.operational_coverage import _COMMAND_WEIGHTS as _OPCOV_COMMAND_WEIGHTS  # noqa: E402
+from scoring.operational_coverage import _DIRECTIVE_WEIGHTS as _OPCOV_DIRECTIVE_WEIGHTS  # noqa: E402
 from shared import extract_description, read_skill_safe, strip_frontmatter  # noqa: E402
 
 # --- Effort classification ---
@@ -625,6 +627,11 @@ def _scale_delta_to_format(value, dimension, resolved_fmt):
 # category is worth exactly weight x 0.4 composite points.
 _OPCOV_DIM = "operational_coverage"
 
+# Imported, not copied. A duplicated table stays green while the scorer moves
+# under it: halving setup there would leave a gradient promising +8.0 and paying
+# +4.0, at confidence "high".
+_OPCOV_WEIGHTS = {**_OPCOV_COMMAND_WEIGHTS, **_OPCOV_DIRECTIVE_WEIGHTS}
+
 # Every instruction below names a CANONICAL EXAMPLE, and that example is what
 # the tests score. They are one object on purpose: the first version of this
 # change advised `make` for build and a bare inline `pytest` for test, and the
@@ -642,67 +649,48 @@ _OPCOV_DIM = "operational_coverage"
 #     using "must" count once and score nothing
 _OPCOV_FIX = {
     "setup": {
-        "weight": 20,
         "example": "## Setup\n\n```bash\nnpm install\n```",
-        "instruction": (
-            "Document how to install dependencies as a runnable command in a fenced "
-            "block, e.g. ```bash / npm install / ``` (or `uv sync`, `make bootstrap`). "
-            "A bare verb like `make` on its own does not count — it needs an operand."
+        "instruction": ("Add a fenced `npm install` / `uv sync` / `make bootstrap` block — how to "
+            "install dependencies. A bare verb like `make` does not count; it needs an operand."
         ),
     },
     "build": {
-        "weight": 20,
         "example": "## Build\n\n```bash\nnpm run build\n```",
-        "instruction": (
-            "Document the build command in a fenced block, e.g. `npm run build`, "
-            "`cargo build` or `make build` — `make` alone is not enough, it needs the "
-            "target. Name the real one this repo uses, not a placeholder."
+        "instruction": ("Add a fenced `npm run build` / `cargo build` / `make build` block — the real "
+            "build command. `make` alone is not enough, it needs the target."
         ),
     },
     "test": {
-        "weight": 20,
         "example": "## Testing\n\n```bash\npytest -q\n```",
-        "instruction": (
-            "Document how to run the tests in a fenced block, e.g. ```bash / pytest -q "
-            "/ ``` (or `npm test`, `go test ./...`). A bare `pytest` mentioned in prose "
-            "does not count; fence it or give it a flag. This is what an agent runs to "
-            "check its own work."
+        "instruction": ("Add a fenced `pytest -q` / `npm test` / `go test ./...` block — how to run the "
+            "tests. A bare `pytest` in prose does not count; fence it or give it a flag."
         ),
     },
     "code_style": {
-        "weight": 15,
         "example": (
             "## Code Style\n\n- Never import from `internal/` outside its package.\n"
             "- Always use `snake_case` for module names."
         ),
-        "instruction": (
-            "Add a code-style section with at least two rules using DIFFERENT normative "
-            "words (never/always/must/avoid — two rules both saying 'must' count once) "
-            "and a concrete code token, e.g. `snake_case` or `internal/`."
+        "instruction": ("Add a Code Style section: two rules, two DIFFERENT normative words "
+            "(never/always/must/avoid — two `must` rules count once), one code token."
         ),
     },
     "gotchas": {
-        "weight": 15,
         "example": (
             "## Gotchas\n\n- Never commit `.env`; the deploy reads it from the vault.\n"
             "- Always wipe `build/` before a release or stale assets ship."
         ),
-        "instruction": (
-            "Add a Gotchas or Pitfalls section naming repo-specific traps that are not "
-            "guessable from the code. Use at least two DIFFERENT normative words "
-            "(never/always/must/avoid) and name a real path or file, e.g. `.env`."
+        "instruction": ("Add a Gotchas section: repo-specific traps not guessable from the code. Two "
+            "DIFFERENT normative words (never/always/must/avoid) and a real path like `.env`."
         ),
     },
     "pr": {
-        "weight": 10,
         "example": (
             "## Pull Requests\n\n- Branch names must use the `feat/` prefix.\n"
             "- Always run `pytest -q` before opening one."
         ),
-        "instruction": (
-            "Add a section on commits or pull requests — branch naming, commit format, "
-            "what must pass first. At least two rules with DIFFERENT normative words "
-            "and a concrete token, e.g. `feat/`."
+        "instruction": ("Add a Pull Requests section: branch naming, commit format, what must pass "
+            "first. Two DIFFERENT normative words and a concrete token like `feat/`."
         ),
     },
 }
@@ -741,9 +729,9 @@ def _compute_opcov_gradients(skill_path: str, dim_weight: float) -> list[dict]:
             "target": "body",
             "op": "add",
             "instruction": spec["instruction"],
-            "delta": round(spec["weight"] * dim_weight, 1),
+            "delta": round(_OPCOV_WEIGHTS[cat] * dim_weight, 1),
             "confidence": "high",
-            "effort": EFFORT_SIMPLE,
+            "effort": EFFORT_MODERATE,
             "reason": entry.get("reason", ""),
         })
 
@@ -758,7 +746,7 @@ def _compute_opcov_gradients(skill_path: str, dim_weight: float) -> list[dict]:
             "target": "body",
             "op": "add",
             "instruction": spec["instruction"],
-            "delta": round(spec["weight"] * dim_weight, 1),
+            "delta": round(_OPCOV_WEIGHTS[cat] * dim_weight, 1),
             "confidence": "high",
             "effort": EFFORT_MODERATE,
             "reason": entry.get("reason", ""),
@@ -783,17 +771,12 @@ def compute_gradients(
     """
     from scoring.registry import FORMAT_ALIASES
 
-    if fmt is None:
-        # dashboard.py, auto-improve.py and this module's own main() call without
-        # a format. Leaving `resolved` None there meant an AGENTS.md got neither
-        # the operational_coverage fixes nor the R2 suppression of SKILL-only
-        # advice — the exact symptom this fix path exists to remove.
-        from scoring.formats import detect_format
-        try:
-            fmt = detect_format(skill_path)
-        except Exception:
-            fmt = None
-
+    # Deliberately NOT detecting the format when the caller omits it. Doing so
+    # was tried and reverted: it makes this function format-aware while
+    # compute_composite next to it stays hardcoded to skill.md weights, so the
+    # evolve loop would score against a metric that values its own advice ~5x
+    # differently, and /schliff:auto would go from three patches to zero for an
+    # AGENTS.md. The callers that pass no fmt are a real gap, tracked separately.
     resolved = FORMAT_ALIASES.get(fmt, fmt) if fmt is not None else None
     agents_only = resolved == "agents.md"
 
@@ -827,12 +810,15 @@ def compute_gradients(
         if include_clarity:
             gradients.extend(_compute_clarity_gradients(skill_path))
 
-    # Dimension weights from registry (match composite formula). The profile has
-    # to be the one that applies: under skill.md's table operational_coverage is
-    # absent and falls to the 0.10 default, which ranked a 1.5-point TODO fix
-    # (priority 0.2250) above a 4.0-point PR section (0.2000) on a real file.
+    # Dimension weights from registry (match composite formula). agents.md gets
+    # its own profile: under skill.md's table operational_coverage is absent and
+    # falls to the 0.10 default, which ranked a 1.5-point TODO fix (priority
+    # 0.2250) above a 4.0-point PR section (0.2000) on a real file. Other formats
+    # keep skill.md's table unchanged — system_prompt's profile does not name the
+    # dimensions this module emits, so switching it would silently reorder
+    # advice no finding asked to change.
     from scoring.registry import get_weights
-    DIM_WEIGHTS = get_weights(resolved or "skill.md")
+    DIM_WEIGHTS = get_weights("agents.md" if agents_only else "skill.md")
     # Remove security from weights — text_gradient doesn't compute security gradients
     DIM_WEIGHTS.pop("security", None)
     CONFIDENCE_MULT = {"high": 1.0, "medium": 0.6, "low": 0.3}
