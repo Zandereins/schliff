@@ -66,7 +66,11 @@ submission PR is opened at either marketplace until
 `docs/experiments/plugin-channel/s2-baseline.md` is on `main`. The S2 void rule below is
 conditional on D0, which means the loss it describes is triggered by an action the owner takes,
 not by a date that shows up in a calendar — so the block belongs on the action. Captured
-2026-08-20; the precondition is satisfied.
+2026-08-20. Whether the precondition holds is not asserted here, it is checked:
+
+```bash
+git show origin/main:docs/experiments/plugin-channel/s2-baseline.md > /dev/null && echo OK
+```
 
 **Abandonment deadline.** If no submission PR has been opened at either qualified marketplace by
 **23:59 UTC on 2026-09-30**, the experiment is over. It is recorded in this file as
@@ -264,7 +268,9 @@ that turns away a real signal it cannot date, because only the first kind of err
 a false GREEN.
 
 **(2) Not the owner, not a bot.** Author login ≠ `Zandereins`, and `gh api users/<login> --jq
-.type` returns `User` (not `Bot`, and not an `app/` login).
+.type` returns `User` (not `Bot`, and not an `app/` login). *(amended 2026-08-20 — a
+mass-automation account can pass this check as written; if one is admitted it must be named in
+the verdict with the reason it was or was not counted. See [Amendments](#amendments).)*
 
 **(3) Unsolicited — the condition that does the real work.** The signal does not count if the
 author is anyone the owner contacted, asked, told, or is otherwise connected to. Checkable filters,
@@ -423,9 +429,10 @@ against the same artifacts, on the stated dates:
 - Observation R: as specified in its own section — read 2026-09-10, recorded whatever it says.
 
 Both thresholds are numbers fixed in this document before either measurement is taken. There is
-no discretionary judgment call available at verdict time beyond the two already made and
-disclosed above — the strength caveat on Gate 1 given an effective N of 1, and the owner-attested
-no-solicitation commitment in Gate 2's condition (3). Nothing about the passing or failing values
+no discretionary judgment call available at verdict time beyond the three already made and
+disclosed — the strength caveat on Gate 1 given an effective N of 1, the owner-attested
+no-solicitation commitment in Gate 2's condition (3), and the mass-automation disclosure duty
+added to condition (2) on 2026-08-20 (see [Amendments](#amendments)). Nothing about the passing or failing values
 can be adjusted after the traffic or PR data comes in.
 
 ## Operating the collector
@@ -440,8 +447,9 @@ the collector ran.
 make collect-traffic     # or: bash scripts/collect-traffic.sh
 ```
 
-**Or on a schedule, in CI.** `.github/workflows/collect-traffic.yml` runs it **daily at 20:17
-UTC** *(amended 2026-08-20 — was weekly, Mondays 06:17 UTC; see [Amendments](#amendments))* so
+**Or on a schedule, in CI.** `.github/workflows/collect-traffic.yml` runs it **twice daily, at
+12:17 and 20:17 UTC** *(amended 2026-08-20 — was weekly, Mondays 06:17 UTC; see
+[Amendments](#amendments))* so
 the record does not depend on anyone remembering. Nothing is installed on any machine — no cron
 job, no LaunchAgent.
 
@@ -483,9 +491,13 @@ It needs an authenticated `gh` and nothing else, is idempotent per UTC day (a se
 day overwrites that day's line rather than appending a duplicate), and never touches the seeded
 `"note":"baseline"` line.
 
-**The required cadence: at least once every 14 days, and on each reading date.** The daily
-workflow satisfies this with thirteen missed runs of slack against the 14-day limit, and covers
-every reading date by construction — but only once `TRAFFIC_TOKEN` is set.
+**The required cadence: at least once every 12 days, and on each reading date.** The twice-daily
+workflow satisfies this with wide margin, and covers every reading date by
+construction — but only once `TRAFFIC_TOKEN` is set. Twelve days rather than the API's fourteen
+because the window's end drifts: a run answered at T-1 covers `[N-14, N-1]`, one answered at T-2 covers
+`[N-15, N-2]` (measured — see [Amendments](#amendments)). If the run before a gap lands at T-2
+and the one after it at T-1, a 14-day spacing leaves exactly one day in no snapshot at all, which
+is `UNMEASURED-COLLECTOR-GAP`. Twelve is the figure that holds in the worst pairing.
 Until then the manual command is the only thing producing lines. GitHub's traffic
 API returns a rolling 14-day window and serves nothing older. That is a hard property of the API,
 not a default that can be raised.
@@ -520,8 +532,9 @@ Observation R still reads 2026-09-10, and the abandonment deadline is still 2026
 ### 2026-08-20 — collector moved from weekly to daily
 
 *What changed:* `.github/workflows/collect-traffic.yml` ran `cron: '17 6 * * 1'` (Mondays). It now
-runs `cron: '17 20 * * *'` (daily, 20:17 UTC). The prose in *Operating the collector* was
-corrected to match.
+runs `'17 12 * * *'` and `'17 20 * * *'` — twice daily. Every prose description of the cadence was
+corrected to match, in this file, in the workflow, and in `scripts/collect-traffic.sh`; the last
+of those was missed on the first pass and caught in review.
 
 *Why:* 2026-09-10 — Observation R's reading date, fixed on 2026-08-11 — is a **Thursday**. The
 Mondays available before it were 08-24, 08-31 and **09-07**. Under the reading rule, the
