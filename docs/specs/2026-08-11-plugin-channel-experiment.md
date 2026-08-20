@@ -61,6 +61,13 @@ The clock is not "when Franz decides to start" — it is an event with a public 
 | First submission PR URL | *not yet submitted* |
 | Second submission PR URL (if any) | *not yet submitted* |
 
+**Precondition on opening it at all** *(amended 2026-08-20 — see [Amendments](#amendments))*: no
+submission PR is opened at either marketplace until
+`docs/experiments/plugin-channel/s2-baseline.md` is on `main`. The S2 void rule below is
+conditional on D0, which means the loss it describes is triggered by an action the owner takes,
+not by a date that shows up in a calendar — so the block belongs on the action. Captured
+2026-08-20; the precondition is satisfied.
+
 **Abandonment deadline.** If no submission PR has been opened at either qualified marketplace by
 **23:59 UTC on 2026-09-30**, the experiment is over. It is recorded in this file as
 `ABANDONED-UNSUBMITTED`, and that is a real, reportable outcome, not a pause: it says the
@@ -433,9 +440,10 @@ the collector ran.
 make collect-traffic     # or: bash scripts/collect-traffic.sh
 ```
 
-**Or on a schedule, in CI.** `.github/workflows/collect-traffic.yml` runs it weekly (Mondays
-06:17 UTC) so the record does not depend on anyone remembering. Nothing is installed on any
-machine — no cron job, no LaunchAgent.
+**Or on a schedule, in CI.** `.github/workflows/collect-traffic.yml` runs it **daily at 20:17
+UTC** *(amended 2026-08-20 — was weekly, Mondays 06:17 UTC; see [Amendments](#amendments))* so
+the record does not depend on anyone remembering. Nothing is installed on any machine — no cron
+job, no LaunchAgent.
 
 **Where the scheduled observations land: the `experiment/traffic-data` branch, not `main`.**
 `main` is protected with `enforce_admins: true` and six required status checks, so a workflow
@@ -496,3 +504,87 @@ RED, because a RED is a finding and a gap is only a mistake.
 and A0+30 whenever Gate 1 passes. Running it on those two dates is not sufficient on its own —
 the 14-day rule still applies throughout, or the snapshot taken on the reading date will be
 correct but the record around it will have holes.
+
+## Amendments
+
+Changes made to this document **after** it was pre-registered on 2026-08-11. Listed so a reader
+can separate what was fixed in advance from what was added later. `distributors.md` sets the
+precedent: showing the correction is the point, silently editing it would be worse than the
+original error.
+
+**No threshold, window, date or gate criterion has been changed by any amendment below.** Gate 1
+is still "≥1 of N merges within D0+21", Gate 2's quantitative branch is still ≥96 uniques,
+Observation R still reads 2026-09-10, and the abandonment deadline is still 2026-09-30.
+
+### 2026-08-20 — collector moved from weekly to daily
+
+*What changed:* `.github/workflows/collect-traffic.yml` ran `cron: '17 6 * * 1'` (Mondays). It now
+runs `cron: '17 20 * * *'` (daily, 20:17 UTC). The prose in *Operating the collector* was
+corrected to match.
+
+*Why:* 2026-09-10 — Observation R's reading date, fixed on 2026-08-11 — is a **Thursday**. The
+Mondays available before it were 08-24, 08-31 and **09-07**. Under the reading rule, the
+qualifying snapshot would have been the one from 09-07: a 30-day window read on day 27, from a
+rolling 14-day counter that never contained 09-08 through 09-10. *The dates that must be covered*
+already required 2026-09-10; the schedule could not deliver it. This is not
+`UNMEASURED-COLLECTOR-GAP` — a line would have existed and the 14-day chain was never broken. It
+is a snapshot on the wrong date, which the reading rule forbids substituting away.
+
+*Why daily rather than a dated one-off:* the same requirement names a second date, A0+30, which
+cannot be wired in advance because A0 is the merge date of a submission not yet opened. A dated
+cron would have fixed one instance of the defect and left the other. 20:17 UTC puts ~20 of 24
+hours of any reading date into the counter while leaving ~3.7h before the 23:59 boundary.
+
+*Cost:* ~30 observations per month on `experiment/traffic-data` instead of ~4. That branch holds
+data only.
+
+### 2026-08-20 — S2 baseline captured, and made a precondition of D0
+
+*What changed:* `docs/experiments/plugin-channel/s2-baseline.md` was created (48 repository/path
+pairs, 22 repositories; the `schliff@schliff` query returned 0). A precondition was added to *The
+clock*: no submission PR is opened until that file is on `main`.
+
+*Why:* the file the spec required had never been written. The void rule is conditional on D0, so
+nothing was lost yet — but the trigger is an action the owner controls rather than a date, which
+is precisely why it stayed invisible for nine days. Binding it to the action removes the
+dependency on anyone remembering. No criterion moved: the S2 branch, its dating procedure and its
+conditions are unchanged.
+
+### 2026-08-20 — Gate 2 condition (2): disclosure duty for mass-automation accounts
+
+*What changed:* nothing in the condition. This amendment adds a **disclosure duty**, not a
+threshold.
+
+*Why:* condition (2) qualifies an author by `gh api users/<login> --jq .type` returning `User`.
+Measured 2026-08-20, the account `webbrain-one` — which forked this repository and opened PR #188
+— returns `type=User` and `is_bot=false` while holding 20,816 public repositories on an account
+created 2026-06-21. It passes condition (2) as written. In this instance condition (3) excludes it
+anyway, because its interaction with this repository pre-dates D0, so no live gate is affected.
+
+*The duty:* if a signal is admitted whose author's public profile indicates mass automation, the
+account is **named in the verdict together with the reason it was or was not counted**. No number
+is invented after the fact — inventing a repository-count threshold now, with the case already in
+view, is the exact pattern pre-registration exists to prevent. This mirrors the owner-attested
+mechanism already carried by condition (3): the check that cannot be fully mechanised is written
+down in advance and disclosed when used.
+
+### 2026-08-20 — release timing recorded as an operational constraint
+
+*What changed:* nothing in any gate. Recorded here because it was previously an undocumented
+verbal constraint, which a reader had no way to check.
+
+*The constraint:* version 8.12.0 is not released while a measurement window is open. Its
+`[Unreleased]` block has been ready since 2026-08-14 and is deliberately held.
+
+*Honest about the evidence:* the confound is **not demonstrated** on the metric that matters.
+Release day 2026-08-10 carries the highest single-day `count` in the baseline (26) but only 6
+`uniques`, while the `uniques` peak in the same window (2026-08-13) has no release near it. A
+release plausibly moves views; on uniques it is unproven. The constraint is kept on asymmetry
+rather than evidence: a wrongly confounded reading cannot be recovered, a delayed release can.
+
+*The scheduled placement*, given that Gate 2's window opens at A0 and the median open→merged
+latency for external PRs at `jeremylongshore/claude-code-plugins-plus-skills` was measured at
+**1.17 days** (61 external merges, full result set: 876 returned against a limit of 3000): the
+release goes out after Observation R's snapshot and a full week before the submission PR, so its
+tail has decayed before A0 can start Gate 2's window. A release the day before D0 would have put
+its tail inside Gate 2 almost immediately.
