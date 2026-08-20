@@ -494,7 +494,7 @@ day overwrites that day's line rather than appending a duplicate), and never tou
 
 **The required cadence: at least once every 14 days, and on each reading date.** The daily
 workflow satisfies this with thirteen missed runs of slack — but only once `TRAFFIC_TOKEN` is
-set. Until then the manual command is the only thing producing lines. GitHub's traffic
+set, and see the caveat on this 14-day figure in [Amendments](#amendments). Until then the manual command is the only thing producing lines. GitHub's traffic
 API returns a rolling 14-day window and serves nothing older. That is a hard property of the API,
 not a default that can be raised.
 
@@ -528,9 +528,10 @@ Observation R still reads 2026-09-10, and the abandonment deadline is still 2026
 ### 2026-08-20 — collector moved from weekly to daily
 
 *What changed:* `.github/workflows/collect-traffic.yml` ran `cron: '17 6 * * 1'` (Mondays). It now
-runs `cron: '17 20 * * *'` — daily. The prose naming the cadence was corrected to match in this
-file, in the workflow header, and in `scripts/collect-traffic.sh`, whose header still claimed
-nothing scheduled the collector at all.
+runs `cron: '17 20 * * *'` — daily. Every prose description of **the workflow's own schedule** was
+corrected to match: in this file, in the workflow header, and in `scripts/collect-traffic.sh`,
+whose header still claimed nothing scheduled the collector at all. The separate 14-day floor on
+how long data survives is untouched — see *Deliberately not changed here* below.
 
 *Why:* 2026-09-10 — Observation R's reading date, fixed on 2026-08-11 — is a **Thursday**. The
 Mondays available before it were 08-24, 08-31 and **09-07**. Under the reading rule, the
