@@ -633,7 +633,17 @@ _OPCOV_DIM = "operational_coverage"
 _OPCOV_WEIGHTS = {**_OPCOV_COMMAND_WEIGHTS, **_OPCOV_DIRECTIVE_WEIGHTS}
 
 # Every instruction below names a CANONICAL EXAMPLE, and that example is what
-# the tests score. They are one object on purpose: the first version of this
+# the tests score.
+#
+# The examples are illustrations, not a recipe. Pasted verbatim they take any
+# AGENTS.md from 0 to 100 on this dimension — a Node repo with no pytest earns
+# full test credit for `pytest -q`, measured. A deterministic linter with no
+# repo access cannot tell a documented command from an invented one, so the
+# command instructions say "YOUR repo's" and point at `schliff check-commands`,
+# which is the tool that actually resolves a documented command against the
+# repository. Anti-gaming here lives in that command, not in the scorer.
+#
+# Example and fixture are one object on purpose: the first version of this
 # change advised `make` for build and a bare inline `pytest` for test, and the
 # tests passed anyway because their fixtures happened to use `npm run build`
 # and a fenced block. The advice was wrong where the fixtures were right, so a
@@ -650,20 +660,23 @@ _OPCOV_WEIGHTS = {**_OPCOV_COMMAND_WEIGHTS, **_OPCOV_DIRECTIVE_WEIGHTS}
 _OPCOV_FIX = {
     "setup": {
         "example": "## Setup\n\n```bash\nnpm install\n```",
-        "instruction": ("Add a fenced `npm install` / `uv sync` / `make bootstrap` block — how to "
-            "install dependencies. A bare verb like `make` does not count; it needs an operand."
+        "instruction": ("Add a fenced block with YOUR repo's install command — `npm install`, `uv sync`, "
+            "`make bootstrap`. A bare verb like `make` does not count; it needs an operand. "
+            "Verify it with `schliff check-commands`."
         ),
     },
     "build": {
         "example": "## Build\n\n```bash\nnpm run build\n```",
-        "instruction": ("Add a fenced `npm run build` / `cargo build` / `make build` block — the real "
-            "build command. `make` alone is not enough, it needs the target."
+        "instruction": ("Add a fenced block with YOUR repo's build command — `npm run build`, `cargo build`, "
+            "`make build`. `make` alone is not enough, it needs the target. "
+            "Verify it with `schliff check-commands`."
         ),
     },
     "test": {
         "example": "## Testing\n\n```bash\npytest -q\n```",
-        "instruction": ("Add a fenced `pytest -q` / `npm test` / `go test ./...` block — how to run the "
-            "tests. A bare `pytest` in prose does not count; fence it or give it a flag."
+        "instruction": ("Add a fenced block with YOUR repo's test command — `pytest -q`, `npm test`, "
+            "`go test ./...`. A bare `pytest` in prose does not count; fence it or give it a "
+            "flag. Verify it with `schliff check-commands`."
         ),
     },
     "code_style": {
@@ -701,12 +714,20 @@ def _compute_opcov_gradients(skill_path: str, dim_weight: float) -> list[dict]:
 
     Only meaningful for agents.md; the dimension does not run for other formats.
 
-    The delta is a floor, not a point estimate: credit is binary per category at
-    a known weight, so closing one category is worth at least ``weight *
-    dim_weight`` composite points. It can be worth more, because ``code_style``
-    also takes a heading-agnostic content fallback and a directive section can
-    satisfy it in passing — measured at +20.0 where the table says +6.0. Erring
-    low is the safe direction for a number shown next to "confidence: high".
+    The delta is this dimension's own arithmetic, and it is NOT the composite
+    change a user will see. Credit is binary per category at a known weight, so
+    closing one is worth ``weight * dim_weight`` inside operational_coverage —
+    but the composite moves by a different amount in both directions, measured:
+
+      - on a bare file, MORE: +20.0 against a stated +8.0, because one example
+        often credits several categories and a sparse file gains structure too
+      - on a saturated file, LESS: +2.8 against a stated +4.0, because the added
+        prose dilutes ``efficiency`` (95 -> 89), which carries 0.2 here
+
+    So confidence is "medium", not "high", and nothing here claims to be exact.
+    An earlier version of this docstring called the number a floor; that was
+    measured wrong, against the dimension score instead of the composite the CLI
+    actually prints.
     """
     from scoring.operational_coverage import score_operational_coverage
 
@@ -731,7 +752,9 @@ def _compute_opcov_gradients(skill_path: str, dim_weight: float) -> list[dict]:
             "op": "add",
             "instruction": _OPCOV_FIX[cat]["instruction"],
             "delta": round(_OPCOV_WEIGHTS[cat] * dim_weight, 1),
-            "confidence": "high",
+            # medium, not high: the number is exact for this dimension and
+            # approximate for the composite, which is what the user is shown.
+            "confidence": "medium",
             # Not EFFORT_SIMPLE: generate_patches has no handler for these, and
             # schliff cannot know which setup command a foreign repo needs. The
             # apply gate is confidence=="high" and effort<=EFFORT_SIMPLE, so

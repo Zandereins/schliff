@@ -121,9 +121,18 @@ def test_delta_tracks_the_registry_not_a_copy_of_it(tmp_path):
         assert g["delta"] == expected
 
 
-def test_ranking_uses_the_agents_md_profile(tmp_path):
-    """Under skill.md's table operational_coverage falls to the 0.10 default, which
-    ranked a 1.5-point TODO fix above a 4.0-point PR section on a real file."""
+def test_a_cheap_auto_patchable_fix_is_not_pushed_out(tmp_path):
+    """An earlier version of this test asserted the opposite and pinned a bug.
+
+    It claimed a PR section must outrank a TODO deletion, on the premise that the
+    TODO was worth 1.5 and the section 4.0. Both numbers were wrong: structure
+    deltas are scaled by skill.md's weights, so the TODO fix is really worth 4.0
+    on an AGENTS.md, and the PR section delivers 2.8 rather than 4.0 once the
+    added prose dilutes efficiency. The TODO fix is also EFFORT_SIMPLE and
+    auto-applicable by generate_patches, where the PR section is manual. Ranking
+    it below the section pushed the cheaper, larger, automatic fix out of
+    --top N. The correct order is the one this test now asserts.
+    """
     text = (
         BARE
         + "\n## Setup\n\n```bash\nnpm install\n```\n"
@@ -135,12 +144,26 @@ def test_ranking_uses_the_agents_md_profile(tmp_path):
     )
     path = _write(tmp_path, text)
     grads = text_gradient.compute_gradients(path, None, include_clarity=True, fmt="agents.md")
-    pr = next(g for g in grads if g["issue"] == "opcov_missing_pr")
     todo = [g for g in grads if g["issue"].startswith("has_todo")]
-    if todo:
-        assert pr["priority"] > todo[0]["priority"], (
-            "a 1.5-point TODO fix outranks a 4.0-point PR section"
+    pr = [g for g in grads if g["issue"] == "opcov_missing_pr"]
+    if todo and pr:
+        assert todo[0]["priority"] > pr[0]["priority"], (
+            "a manual section fix outranks a cheaper auto-applicable one"
         )
+
+
+def test_confidence_is_medium_because_the_composite_effect_varies(tmp_path):
+    """The delta is exact for the dimension and approximate for the composite.
+
+    Measured both directions: on a bare file the composite gains +20.0 against a
+    stated +8.0 (one example credits several categories), on a saturated file
+    +2.8 against +4.0 (added prose dilutes efficiency 95 -> 89). "high" would
+    claim a precision that does not exist, and it also inflated priority by 1/0.6.
+    """
+    path = _write(tmp_path, BARE)
+    grads = _opcov(path)
+    assert grads
+    assert all(g["confidence"] == "medium" for g in grads)
 
 
 def test_no_gradients_when_the_caller_omits_the_format(tmp_path):
