@@ -66,10 +66,12 @@ submission PR is opened at either marketplace until
 `docs/experiments/plugin-channel/s2-baseline.md` is on `main`. The S2 void rule below is
 conditional on D0, which means the loss it describes is triggered by an action the owner takes,
 not by a date that shows up in a calendar — so the block belongs on the action. Captured
-2026-08-20. Whether the precondition holds is not asserted here, it is checked:
+2026-08-20. Whether the precondition holds is not asserted here, it is checked against the
+remote rather than a local ref, which is only as fresh as the last fetch:
 
 ```bash
-git show origin/main:docs/experiments/plugin-channel/s2-baseline.md > /dev/null && echo OK
+gh api repos/Zandereins/schliff/contents/docs/experiments/plugin-channel/s2-baseline.md \
+  -f ref=main --jq .path
 ```
 
 **Abandonment deadline.** If no submission PR has been opened at either qualified marketplace by
@@ -447,9 +449,8 @@ the collector ran.
 make collect-traffic     # or: bash scripts/collect-traffic.sh
 ```
 
-**Or on a schedule, in CI.** `.github/workflows/collect-traffic.yml` runs it **twice daily, at
-12:17 and 20:17 UTC** *(amended 2026-08-20 — was weekly, Mondays 06:17 UTC; see
-[Amendments](#amendments))* so
+**Or on a schedule, in CI.** `.github/workflows/collect-traffic.yml` runs it **daily at 20:17
+UTC** *(amended 2026-08-20 — was weekly, Mondays 06:17 UTC; see [Amendments](#amendments))* so
 the record does not depend on anyone remembering. Nothing is installed on any machine — no cron
 job, no LaunchAgent.
 
@@ -491,20 +492,9 @@ It needs an authenticated `gh` and nothing else, is idempotent per UTC day (a se
 day overwrites that day's line rather than appending a duplicate), and never touches the seeded
 `"note":"baseline"` line.
 
-**The required cadence: at least once every 12 days, and on each reading date.** The twice-daily
-workflow satisfies this with wide margin, and covers every reading date by
-construction — but only once `TRAFFIC_TOKEN` is set.
-
-Twelve rather than the API's fourteen, and the two steps are separate. **The arithmetic gives
-thirteen:** a run answered at T-1 covers `[N-14, N-1]`, one answered at T-2 covers `[N-15, N-2]`
-(both measured — see [Amendments](#amendments)). If the run before a gap lands at T-2 and the one
-after it at T-1, spacing of 14 leaves day `N-1` in no snapshot at all — `UNMEASURED-COLLECTOR-GAP`
-— while 13 still closes flush. **Twelve is thirteen minus one day of reserve**, taken because the
-T-1/T-2 drift rests on three observations and a slower answer than any yet seen would break a
-bound set exactly at the arithmetic. The reserve is a deliberate margin, not a derivation; naming
-it as such is the point, since a number whose stated reasoning implies a different number is how
-this document loses its authority.
-Until then the manual command is the only thing producing lines. GitHub's traffic
+**The required cadence: at least once every 14 days, and on each reading date.** The daily
+workflow satisfies this with thirteen missed runs of slack — but only once `TRAFFIC_TOKEN` is
+set. Until then the manual command is the only thing producing lines. GitHub's traffic
 API returns a rolling 14-day window and serves nothing older. That is a hard property of the API,
 not a default that can be raised.
 
@@ -538,18 +528,18 @@ Observation R still reads 2026-09-10, and the abandonment deadline is still 2026
 ### 2026-08-20 — collector moved from weekly to daily
 
 *What changed:* `.github/workflows/collect-traffic.yml` ran `cron: '17 6 * * 1'` (Mondays). It now
-runs `'17 12 * * *'` and `'17 20 * * *'` — twice daily. Every prose description of the cadence was
-corrected to match, in this file, in the workflow, and in `scripts/collect-traffic.sh`; the last
-of those was missed on the first pass and caught in review.
+runs `cron: '17 20 * * *'` — daily. The prose naming the cadence was corrected to match in this
+file, in the workflow header, and in `scripts/collect-traffic.sh`, whose header still claimed
+nothing scheduled the collector at all.
 
 *Why:* 2026-09-10 — Observation R's reading date, fixed on 2026-08-11 — is a **Thursday**. The
 Mondays available before it were 08-24, 08-31 and **09-07**. Under the reading rule, the
 qualifying snapshot would have been the one from 09-07 — a 30-day observation read from a
 counter whose window ends around 09-05, leaving its last five days outside the number that
 decides it. *The dates that must be covered* already required 2026-09-10; the schedule could not
-deliver it. This is not
-`UNMEASURED-COLLECTOR-GAP` — a line would have existed and the 14-day chain was never broken. It
-is a snapshot on the wrong date, which the reading rule forbids substituting away.
+deliver it. This is not `UNMEASURED-COLLECTOR-GAP` — a line would have existed and the 14-day
+chain was never broken. It is a snapshot on the wrong date, which the reading rule forbids
+substituting away.
 
 *Why daily rather than a dated one-off:* the same requirement names a second date, A0+30, which
 cannot be wired in advance because A0 is the merge date of a submission not yet opened. A dated
@@ -561,9 +551,13 @@ counter: the traffic API never reports the day the call is made. Measured 2026-0
 (08-11T12:52 → ends 08-10; 08-17T06:28 → ends 08-15). What the hour buys is whether the window
 ends at T-1 or T-2: the 06:28 run came back at T-2, while calls at 10:12, 12:52 and 17:57 all
 came back at T-1. A late run therefore costs one day of lag instead of two — and **one day is the
-floor this API allows, not zero.** Under the old Monday schedule the 09-07 snapshot would have
-ended around 09-05, leaving the last five days of a 30-day observation outside the counter that
-decides it; under the new one it is one day. ~3.7h of slack remains before the 23:59 boundary.
+floor this API allows, not zero.**
+
+*Deliberately not changed here:* the 14-day cadence floor. That number predates this experiment
+and the drift measured above shows it is one day too generous in the worst pairing — a T-2 run
+followed 14 days later by a T-1 run leaves one day in no snapshot. Correcting it touches eleven
+sites across three files and is not what this change is for; it is filed separately so the fix
+that has a deadline is not held up by one that does not.
 
 *Cost:* ~30 observations per month on `experiment/traffic-data` instead of ~4. That branch holds
 data only.

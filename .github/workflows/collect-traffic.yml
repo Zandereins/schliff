@@ -3,12 +3,8 @@ name: Collect traffic
 # The plugin-channel experiment's measuring instrument, on a schedule.
 #
 # GitHub's traffic API serves a rolling 14-day window and nothing older. The
-# collector therefore has to run at least once every 12 days or the unsnapshotted
-# days are gone permanently. Twelve, not fourteen: the window's far end drifts by
-# a day depending on when in the UTC day the call lands (T-1 or T-2, measured), so
-# a 14-day spacing can leave one day covered by no snapshot at all. The arithmetic
-# actually allows 13; 12 keeps one day of reserve against a drift slower than the
-# three observations behind it — see "Operating the collector" in
+# collector therefore has to run at least once every 14 days or the unsnapshotted
+# days are gone permanently — see "Operating the collector" in
 # docs/specs/2026-08-11-plugin-channel-experiment.md, which names that outcome
 # UNMEASURED-COLLECTOR-GAP and calls it worse than any RED, because a RED is a
 # finding and a gap is a mistake.
@@ -31,8 +27,8 @@ name: Collect traffic
 
 on:
   schedule:
-    # Twice daily, 12:17 and 20:17 UTC. Off the hour on purpose: GitHub sheds
-    # scheduled jobs under load at popular times.
+    # Daily at 20:17 UTC. Off the hour on purpose: GitHub sheds scheduled jobs
+    # under load at popular times.
     #
     # Late in the day for a measured reason, and NOT the obvious one. The traffic
     # API never reports the day you ask on: measured 2026-08-20, a call at 10:12
@@ -41,14 +37,7 @@ on:
     # 08-15, while calls at 10:12, 12:52 and 17:57 all came back ending T-1. So a
     # late run costs one day of lag instead of two, and one day is the floor the
     # API allows, not zero. ~3.7h of slack remains before the 23:59 boundary.
-    #
-    # Twice a day, because a shed run on a reading date fails silently rather
-    # than loudly: no line is written for that UTC day, and the reading rule
-    # then selects the previous day's line on its own, with nothing erroring.
-    # The 12:17 run also answers at T-1 (measured), so it is a full-value
-    # fallback, and the script's per-day dedup overwrites in place — two runs
-    # produce one line, not two.
-    - cron: '17 12 * * *'
+
     - cron: '17 20 * * *'
   workflow_dispatch:
 
