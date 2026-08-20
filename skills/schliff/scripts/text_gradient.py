@@ -617,6 +617,81 @@ def _scale_delta_to_format(value, dimension, resolved_fmt):
         # The dimension does not count toward this format's score at all.
         return 0.0
     return round(value * (target / base), 2)
+# operational_coverage carries weight 0.4 in the agents.md profile — tied with
+# structure for the heaviest dimension — but had no fix path at all: a file
+# scoring 0/100 there was told to add examples for +2 while 40 points sat
+# untouched. Unlike every other generator here, the delta is not estimated. The
+# scorer awards binary per-category credit at known weights, so a missing
+# category is worth exactly weight x 0.4 composite points.
+_OPCOV_CATEGORY_WEIGHT = {
+    "setup": 20, "build": 20, "test": 20,
+    "code_style": 15, "gotchas": 15, "pr": 10,
+}
+_OPCOV_DIM_WEIGHT = 0.4  # scoring.registry weights for the agents.md profile
+
+_OPCOV_FIX = {
+    "setup": (
+        "Document how to install dependencies — one runnable command, e.g. "
+        "`npm install`, `uv sync` or `make bootstrap`. An agent cannot start without it.",
+        EFFORT_SIMPLE,
+    ),
+    "build": (
+        "Document the build command — e.g. `npm run build`, `cargo build`, `make`. "
+        "Name the real one this repo uses, not a generic placeholder.",
+        EFFORT_SIMPLE,
+    ),
+    "test": (
+        "Document how to run the tests — e.g. `pytest`, `npm test`, `go test ./...`. "
+        "This is what an agent runs to check its own work.",
+        EFFORT_SIMPLE,
+    ),
+    "code_style": (
+        "Add a code-style section with at least two normative rules and a concrete "
+        "code token (a real type, path, or identifier), not just 'write clean code'.",
+        EFFORT_MODERATE,
+    ),
+    "gotchas": (
+        "Add a Gotchas or Pitfalls section naming repo-specific traps — the things "
+        "that break for a newcomer and are not guessable from the code.",
+        EFFORT_MODERATE,
+    ),
+    "pr": (
+        "Add a section on commits or pull requests — branch naming, commit format, "
+        "what must pass before opening one.",
+        EFFORT_MODERATE,
+    ),
+}
+
+
+def _compute_opcov_gradients(skill_path: str) -> list[dict]:
+    """Invert operational_coverage's per-category credit into fix instructions.
+
+    Only meaningful for agents.md; the dimension does not run for other formats.
+    """
+    from scoring.operational_coverage import score_operational_coverage
+
+    result = score_operational_coverage(skill_path)
+    categories = result.get("details", {}).get("categories", {})
+    gradients = []
+
+    for cat, weight in _OPCOV_CATEGORY_WEIGHT.items():
+        entry = categories.get(cat)
+        if entry is None or entry.get("credited"):
+            continue
+        instruction, effort = _OPCOV_FIX[cat]
+        gradients.append({
+            "dimension": "operational_coverage",
+            "issue": f"opcov_missing_{cat}",
+            "target": "body",
+            "op": "add",
+            "instruction": instruction,
+            # Exact, not estimated: binary category credit at a known weight.
+            "delta": round(weight * _OPCOV_DIM_WEIGHT, 1),
+            "confidence": "high",
+            "effort": effort,
+            "reason": entry.get("reason", ""),
+        })
+    return gradients
 
 
 def compute_gradients(
@@ -628,8 +703,8 @@ def compute_gradients(
 ) -> list[dict]:
     """Compute all gradients, rank by priority (delta/effort), return top N.
 
-    For ``fmt == agents.md`` only the headline dims (structure, efficiency) are
-    inverted into fixes; the SKILL-only computers (triggers/quality/edges/
+    For ``fmt == agents.md`` only the headline dims (structure,
+    operational_coverage, efficiency) are inverted into fixes; the SKILL-only computers (triggers/quality/edges/
     composability/clarity) are suppressed so an AGENTS.md never receives
     nonsensical advice like "add YAML frontmatter" or "create eval-suite.json".
     See docs/specs/agents-md-scoring-profile.md (R2 fix-path).
@@ -650,6 +725,11 @@ def compute_gradients(
         structure_grads = [g for g in structure_grads if g["issue"] not in _SKILL_ONLY_STRUCTURE]
     gradients.extend(structure_grads)
     gradients.extend(_compute_efficiency_gradients(skill_path))
+
+    if agents_only:
+        # The third headline dimension. Weighted 0.4, same as structure, and
+        # until now it produced no fixes at all.
+        gradients.extend(_compute_opcov_gradients(skill_path))
 
     if not agents_only:
         gradients.extend(_compute_trigger_gradients(skill_path, eval_suite))
