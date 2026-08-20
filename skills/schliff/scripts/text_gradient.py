@@ -574,6 +574,30 @@ def _parse_delta(delta: Any) -> float:
     return 0.0
 
 
+def _scale_delta_to_format(value, dimension, resolved_fmt):
+    """Rescale a delta literal from the skill.md basis it was written on.
+
+    Every hardcoded delta in this module is a composite estimate sized against
+    skill.md's weight table — `missing_name: 1.5` is 10 dimension points times
+    structure's 0.15 there. Scored as an AGENTS.md the same fix is worth 10 x 0.4,
+    and reporting 1.5 understates it by a factor of ~2.7. Measured: removing a
+    TODO marker reports +1.5 and moves the composite +4.4.
+
+    Returns the value unchanged when the format is skill.md (factor 1.0, so the
+    current path does not move at all) and when the dimension is absent from the
+    skill.md table — operational_coverage computes its delta against the live
+    profile already and must not be scaled twice.
+    """
+    if not resolved_fmt or resolved_fmt == "skill.md":
+        return value
+    from scoring.registry import get_weights
+    base = get_weights("skill.md").get(dimension)
+    target = get_weights(resolved_fmt).get(dimension)
+    if not base or not target:
+        return value
+    return round(value * (target / base), 2)
+
+
 def compute_gradients(
     skill_path: str,
     eval_suite: Optional[dict] = None,
@@ -629,6 +653,11 @@ def compute_gradients(
         # Keep original string as display hint, normalize delta to float
         if isinstance(raw_delta, str):
             g["delta_display"] = raw_delta
+        parsed = _scale_delta_to_format(parsed, g["dimension"], resolved)
+        if isinstance(raw_delta, str) and parsed != _parse_delta(raw_delta):
+            # The "~2.0-5.0" hint was written on the skill.md basis; once
+            # rescaled it no longer describes the number beside it.
+            g.pop("delta_display", None)
         g["delta"] = parsed
         dim_weight = DIM_WEIGHTS.get(g["dimension"], 0.10)
         conf_mult = CONFIDENCE_MULT.get(g.get("confidence", "medium"), 0.6)
