@@ -76,7 +76,7 @@ gh api -X GET repos/Zandereins/schliff/contents/docs/experiments/plugin-channel/
 
 `-X GET` is not optional: `gh` switches to POST as soon as any `-f` field is present, the
 contents route has no POST handler, and the resulting 404 is indistinguishable from the file
-being absent — a permanently red gate that reads as "the baseline was never committed.
+being absent — a permanently red gate that reads as "the baseline was never committed".
 
 **Abandonment deadline.** If no submission PR has been opened at either qualified marketplace by
 **23:59 UTC on 2026-09-30**, the experiment is over. It is recorded in this file as
@@ -488,7 +488,7 @@ granted through the `permissions:` block at all.
 So the workflow reads a `TRAFFIC_TOKEN` repository secret — a fine-grained personal access token
 scoped to this repository with **Administration: Read** (and Contents: Read and write, so it can
 commit the observation). Until that secret exists the job exits green with a notice and collects
-nothing: a scheduled job that fails every week teaches its owner to ignore it, which is a worse
+nothing: a scheduled job that fails every day teaches its owner to ignore it, which is a worse
 failure than a missing measurement. **A green run is therefore not evidence that an observation
 was taken** — check that `traffic.jsonl` grew.
 
@@ -497,10 +497,15 @@ day overwrites that day's line rather than appending a duplicate), and never tou
 `"note":"baseline"` line.
 
 **The required cadence: at least once every 14 days, and on each reading date.** The daily
-workflow satisfies this comfortably — but only once `TRAFFIC_TOKEN` is set. No slack figure is
-quoted here on purpose: the 14-day floor is one day too generous in the worst pairing of window
-drifts, so any count derived from it is wrong by one. See *Deliberately not changed here* in
-[Amendments](#amendments) and issue #199. Until then the manual command is the only thing producing lines. GitHub's traffic
+workflow satisfies this comfortably, and `TRAFFIC_TOKEN` is configured — the 2026-08-17T06:28
+`schedule` run succeeded and produced commit `ca60a89` on `experiment/traffic-data`. Were the
+secret ever removed, the manual command would again be the only thing producing lines.
+
+No slack figure is quoted here on purpose: the 14-day floor is one day too generous in the worst
+pairing of window drifts, so any count derived from it is wrong by one — including the "15 days"
+below. See *Deliberately not changed here* in [Amendments](#amendments) and issue #199.
+
+GitHub's traffic
 API returns a rolling 14-day window and serves nothing older. That is a hard property of the API,
 not a default that can be raised.
 

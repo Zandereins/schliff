@@ -114,8 +114,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/experiments/plugin-channel/traffic.jsonl
+          # Commit that path only. The "Switch to the data branch" step above
+          # stages scripts/collect-traffic.sh via `git checkout origin/main --`,
+          # and a bare `git commit` would sweep it into the observation commit —
+          # inert while the script never changed, no longer inert now that it has.
           git commit -m "chore(experiment): collect traffic observation
 
           Automated by .github/workflows/collect-traffic.yml. One line per UTC
-          day; re-runs on the same day overwrite in place rather than appending."
+          day; re-runs on the same day overwrite in place rather than appending." \
+            -- docs/experiments/plugin-channel/traffic.jsonl
           git push origin HEAD:experiment/traffic-data
