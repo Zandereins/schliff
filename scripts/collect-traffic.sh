@@ -11,10 +11,13 @@
 # numbers: the analysis method can change later, the observation cannot be
 # retaken.
 #
-# Run it with `make collect-traffic` (or directly). Nothing schedules this:
-# no cron job and no LaunchAgent is installed by this repo. It must be run by
-# hand at least once every 14 days or the un-snapshotted days expire for good
-# — see the "Operating the collector" section of
+# Run it with `make collect-traffic` (or directly) for an ad-hoc observation.
+# On a schedule it is driven by .github/workflows/collect-traffic.yml, daily at
+# 20:17 UTC — nothing is installed on any machine, no cron job and no
+# LaunchAgent. Run by hand only if that workflow is disabled or TRAFFIC_TOKEN is
+# unset; the floor is one run every 14 days -- which is one day too generous in
+# the worst pairing of window drifts, see issue #199 -- or the un-snapshotted days
+# expire for good — see the "Operating the collector" section of
 # docs/specs/2026-08-11-plugin-channel-experiment.md.
 #
 # Idempotent per day: if the output file already has a line for today's UTC
