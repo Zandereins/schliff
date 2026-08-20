@@ -714,40 +714,29 @@ def _compute_opcov_gradients(skill_path: str, dim_weight: float) -> list[dict]:
     categories = result.get("details", {}).get("categories", {})
     gradients = []
 
-    # Two loops, not one, so `effort` is a literal at each emit site.
-    # measure_patch_ratio parses this file with ast and resolves only Constant and
-    # Name values; a subscript there silently degrades every command fix to
-    # MODERATE and skews the published deterministic-patch ratio.
-    for cat in ("setup", "build", "test"):
-        entry = categories.get(cat)
-        if entry is None or entry.get("credited"):
-            continue
-        spec = _OPCOV_FIX[cat]
-        gradients.append({
-            "dimension": "operational_coverage",
-            "issue": f"opcov_missing_{cat}",
-            "target": "body",
-            "op": "add",
-            "instruction": spec["instruction"],
-            "delta": round(_OPCOV_WEIGHTS[cat] * dim_weight, 1),
-            "confidence": "high",
-            "effort": EFFORT_MODERATE,
-            "reason": entry.get("reason", ""),
-        })
+    if not dim_weight:
+        # The dimension left the profile. Emitting six fixes at delta 0.0 and
+        # confidence "high" would print "[ +0]" six times, which is worse than
+        # saying nothing.
+        return []
 
-    for cat in ("code_style", "gotchas", "pr"):
+    for cat in ("setup", "build", "test", "code_style", "gotchas", "pr"):
         entry = categories.get(cat)
         if entry is None or entry.get("credited"):
             continue
-        spec = _OPCOV_FIX[cat]
         gradients.append({
             "dimension": "operational_coverage",
             "issue": f"opcov_missing_{cat}",
             "target": "body",
             "op": "add",
-            "instruction": spec["instruction"],
+            "instruction": _OPCOV_FIX[cat]["instruction"],
             "delta": round(_OPCOV_WEIGHTS[cat] * dim_weight, 1),
             "confidence": "high",
+            # Not EFFORT_SIMPLE: generate_patches has no handler for these, and
+            # schliff cannot know which setup command a foreign repo needs. The
+            # apply gate is confidence=="high" and effort<=EFFORT_SIMPLE, so
+            # SIMPLE here would inflate the published deterministic ratio with a
+            # patch that never materialises.
             "effort": EFFORT_MODERATE,
             "reason": entry.get("reason", ""),
         })

@@ -49,6 +49,15 @@ def test_bare_agents_md_gets_a_fix_for_every_category(tmp_path):
 
 
 def test_opcov_fix_outranks_the_previous_top_suggestion(tmp_path):
+    """Raw deltas are compared here, and they are NOT all on one scale.
+
+    opcov deltas are computed against the agents.md profile; structure and
+    efficiency deltas are hardcoded literals scaled by skill.md's weights, so on
+    an AGENTS.md they understate their own effect (no_real_examples reports 1.5
+    and delivers 4.0). The assertion below holds either way — 8.0 beats 4.0 as
+    well as 1.5 — but it must not be read as evidence that the scales agree.
+    See the mixed-scale issue tracked separately.
+    """
     path = _write(tmp_path, BARE)
     grads = text_gradient.compute_gradients(path, None, include_clarity=True, fmt="agents.md")
     opcov = [g for g in grads if g["dimension"] == "operational_coverage"]
