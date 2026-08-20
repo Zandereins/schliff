@@ -493,11 +493,17 @@ day overwrites that day's line rather than appending a duplicate), and never tou
 
 **The required cadence: at least once every 12 days, and on each reading date.** The twice-daily
 workflow satisfies this with wide margin, and covers every reading date by
-construction — but only once `TRAFFIC_TOKEN` is set. Twelve days rather than the API's fourteen
-because the window's end drifts: a run answered at T-1 covers `[N-14, N-1]`, one answered at T-2 covers
-`[N-15, N-2]` (measured — see [Amendments](#amendments)). If the run before a gap lands at T-2
-and the one after it at T-1, a 14-day spacing leaves exactly one day in no snapshot at all, which
-is `UNMEASURED-COLLECTOR-GAP`. Twelve is the figure that holds in the worst pairing.
+construction — but only once `TRAFFIC_TOKEN` is set.
+
+Twelve rather than the API's fourteen, and the two steps are separate. **The arithmetic gives
+thirteen:** a run answered at T-1 covers `[N-14, N-1]`, one answered at T-2 covers `[N-15, N-2]`
+(both measured — see [Amendments](#amendments)). If the run before a gap lands at T-2 and the one
+after it at T-1, spacing of 14 leaves day `N-1` in no snapshot at all — `UNMEASURED-COLLECTOR-GAP`
+— while 13 still closes flush. **Twelve is thirteen minus one day of reserve**, taken because the
+T-1/T-2 drift rests on three observations and a slower answer than any yet seen would break a
+bound set exactly at the arithmetic. The reserve is a deliberate margin, not a derivation; naming
+it as such is the point, since a number whose stated reasoning implies a different number is how
+this document loses its authority.
 Until then the manual command is the only thing producing lines. GitHub's traffic
 API returns a rolling 14-day window and serves nothing older. That is a hard property of the API,
 not a default that can be raised.

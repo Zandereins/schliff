@@ -15,8 +15,8 @@
 # On a schedule it is driven by .github/workflows/collect-traffic.yml, daily at
 # 12:17 and 20:17 UTC — nothing is installed on any machine, no cron job and no
 # LaunchAgent. Run by hand only if that workflow is disabled or TRAFFIC_TOKEN is
-# unset; the cadence floor is one run every 12 days or the un-snapshotted days
-# expire for good — see the "Operating the collector" section of
+# unset; the cadence floor is one run every 12 days (13 by the arithmetic, one
+# day held back as reserve) or the un-snapshotted days expire for good — see the "Operating the collector" section of
 # docs/specs/2026-08-11-plugin-channel-experiment.md.
 #
 # Idempotent per day: if the output file already has a line for today's UTC
