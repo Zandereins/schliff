@@ -93,11 +93,58 @@ def test_reported_delta_lands_near_the_real_composite_change(tmp_path):
 
 
 def test_range_hint_is_dropped_when_the_number_is_rescaled(tmp_path):
-    """A "~2.0-5.0" display hint was written on the skill.md basis; once the
-    number beside it is rescaled the hint describes something else."""
-    path = _write(tmp_path, "# P\n\nIt is important to note that this does things.\n", "h.md")
-    for g in text_gradient.compute_gradients(path, None, include_clarity=True, fmt="agents.md"):
+    """A "~2.0-5.0" hint was written on the skill.md basis; once the number
+    beside it is rescaled the hint labels something else.
+
+    The fixture must actually produce a string-delta gradient — efficiency ones
+    do. An earlier version of this test used a fixture that produced none, so
+    the loop body never ran and the assertion pinned nothing: replacing the
+    `delta_display` removal with `pass` left it green.
+    """
+    padded = (
+        "# P\n\n"
+        + "It is important to note that you might want to consider that this "
+        "does things, and as mentioned above, it should be noted that it is "
+        "generally advisable to perhaps review the output carefully.\n" * 4
+    )
+    path = _write(tmp_path, padded, "hint.md")
+    grads = text_gradient.compute_gradients(path, None, include_clarity=True, fmt="agents.md")
+
+    on_skill = text_gradient.compute_gradients(
+        path, None, include_clarity=True, fmt="skill.md"
+    )
+    assert any("delta_display" in g for g in on_skill), (
+        "fixture produces no string-delta gradient — the test would be vacuous"
+    )
+
+    for g in grads:
         if "delta_display" in g:
             assert g["delta"] == pytest.approx(
                 text_gradient._parse_delta(g["delta_display"]), abs=0.01
             ), f"{g['issue']}: display hint disagrees with the rescaled delta"
+
+
+def test_system_prompt_is_not_rescaled():
+    """Its literals are not on the skill.md basis, and scaling fires unevenly.
+
+    clarity would go x3 and efficiency x1.5 while structure is untouched — the
+    profile names it structure_prompt — so one ranking would mix two bases.
+    Measured before this was restricted: a clarity fix reported +7.5 against a
+    real composite move of +1.9.
+    """
+    assert text_gradient._scale_delta_to_format(2.5, "clarity", "system_prompt") == 2.5
+    assert text_gradient._scale_delta_to_format(1.5, "efficiency", "system_prompt") == 1.5
+
+
+def test_zero_target_weight_collapses_the_delta():
+    """A dimension the format does not count cannot yield composite points."""
+    import scoring.registry as registry
+
+    original = registry.WEIGHT_PROFILES.get("agents.md")
+    try:
+        registry.WEIGHT_PROFILES["agents.md"] = {**original, "structure": 0.0}
+        registry.get_weights.cache_clear() if hasattr(registry.get_weights, "cache_clear") else None
+        assert text_gradient._scale_delta_to_format(1.5, "structure", "agents.md") == 0.0
+    finally:
+        registry.WEIGHT_PROFILES["agents.md"] = original
+        registry.get_weights.cache_clear() if hasattr(registry.get_weights, "cache_clear") else None
