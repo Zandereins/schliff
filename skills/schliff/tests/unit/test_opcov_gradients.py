@@ -87,25 +87,36 @@ def test_the_example_the_instruction_gives_actually_earns_the_credit(tmp_path, c
 
 
 @pytest.mark.parametrize("category", CATEGORIES)
-def test_delta_is_a_floor_and_is_met(tmp_path, category):
-    """The promised delta must be achievable, and must not overpromise.
+def test_applying_the_fix_raises_the_composite(tmp_path, category):
+    """Measured against the COMPOSITE, which is the number the CLI prints.
 
-    Directive categories can pay MORE than the table says (code_style has a
-    heading-agnostic content fallback, so a gotchas section can satisfy it in
-    passing — measured at +20.0 where the table says +6.0). Erring low is the
-    safe direction next to "confidence: high"; erring high is not.
+    An earlier version of this test compared score_operational_coverage before
+    and after and called the delta a floor. That was the wrong quantity: adding
+    a section also moves other dimensions. Measured on a saturated file, the
+    `pr` fix states +4.0 and the composite gains +3.6, because the added prose
+    dilutes efficiency. On a bare file the same fix overshoots instead.
+
+    So the direction is asserted, not the magnitude — the magnitude is what
+    `confidence: medium` is admitting to. Do not tighten this into an equality
+    without first fixing the delta scale (see the mixed-scale issue).
     """
-    spec = text_gradient._OPCOV_FIX[category]
-    before_path = _write(tmp_path, BARE, "fb.md")
-    before = score_operational_coverage(before_path)["score"]
-    grad = next(g for g in _opcov(before_path) if g["issue"] == f"opcov_missing_{category}")
+    from scoring import compute_composite
+    from shared import build_scores
 
-    after_path = _write(tmp_path, BARE + "\n" + spec["example"] + "\n", f"fa_{category}.md")
-    after = score_operational_coverage(after_path)["score"]
-    dim_weight = get_weights("agents.md")["operational_coverage"]
-    actual = round((after - before) * dim_weight, 1)
-    assert actual >= grad["delta"] - 0.05, (
-        f"{category}: promised +{grad['delta']}, delivered +{actual} — overpromise"
+    def composite(path):
+        return compute_composite(
+            build_scores(path, None, include_runtime=True, fmt="agents.md"),
+            fmt="agents.md",
+        )["score"]
+
+    before_path = _write(tmp_path, BARE, "cb.md")
+    after_path = _write(
+        tmp_path,
+        BARE + "\n" + text_gradient._OPCOV_FIX[category]["example"] + "\n",
+        f"ca_{category}.md",
+    )
+    assert composite(after_path) > composite(before_path), (
+        f"{category}: following the advice does not raise the score the CLI shows"
     )
 
 
@@ -146,10 +157,14 @@ def test_a_cheap_auto_patchable_fix_is_not_pushed_out(tmp_path):
     grads = text_gradient.compute_gradients(path, None, include_clarity=True, fmt="agents.md")
     todo = [g for g in grads if g["issue"].startswith("has_todo")]
     pr = [g for g in grads if g["issue"] == "opcov_missing_pr"]
-    if todo and pr:
-        assert todo[0]["priority"] > pr[0]["priority"], (
-            "a manual section fix outranks a cheaper auto-applicable one"
-        )
+    # Not guarded with `if`: a guard turns this into a test that passes while
+    # pinning nothing, and has_todo emission is exactly what a structure-scorer
+    # change would alter.
+    assert todo, "fixture no longer produces a has_todo gradient"
+    assert pr, "fixture no longer produces an opcov_missing_pr gradient"
+    assert todo[0]["priority"] > pr[0]["priority"], (
+        "a manual section fix outranks a cheaper auto-applicable one"
+    )
 
 
 def test_confidence_is_medium_because_the_composite_effect_varies(tmp_path):

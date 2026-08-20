@@ -700,7 +700,7 @@ _OPCOV_FIX = {
     "pr": {
         "example": (
             "## Pull Requests\n\n- Branch names must use the `feat/` prefix.\n"
-            "- Always run `pytest -q` before opening one."
+            "- Always run the repo's own test suite before opening one."
         ),
         "instruction": ("Add a Pull Requests section: branch naming, commit format, what must pass "
             "first. Two DIFFERENT normative words and a concrete token like `feat/`."
