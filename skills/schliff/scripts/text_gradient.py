@@ -623,50 +623,102 @@ def _scale_delta_to_format(value, dimension, resolved_fmt):
 # untouched. Unlike every other generator here, the delta is not estimated. The
 # scorer awards binary per-category credit at known weights, so a missing
 # category is worth exactly weight x 0.4 composite points.
-_OPCOV_CATEGORY_WEIGHT = {
-    "setup": 20, "build": 20, "test": 20,
-    "code_style": 15, "gotchas": 15, "pr": 10,
-}
-_OPCOV_DIM_WEIGHT = 0.4  # scoring.registry weights for the agents.md profile
+_OPCOV_DIM = "operational_coverage"
 
+# Every instruction below names a CANONICAL EXAMPLE, and that example is what
+# the tests score. They are one object on purpose: the first version of this
+# change advised `make` for build and a bare inline `pytest` for test, and the
+# tests passed anyway because their fixtures happened to use `npm run build`
+# and a fenced block. The advice was wrong where the fixtures were right, so a
+# user following it verbatim earned +0 against a "confidence: high" promise.
+# Keeping example and fixture in one place makes that divergence impossible.
+#
+# The scorer's rules the examples have to satisfy:
+#   - a bare guarded verb is not a command: `make` scores nothing, `make build`
+#     does (_GUARDED needs an operand or a flag)
+#   - a verb-intrinsic name inline is not a command: `pytest` in prose scores
+#     nothing; fenced, or carrying a flag, it does
+#   - a directive section needs >=2 DISTINCT normative cue words: two rules both
+#     using "must" count once and score nothing
 _OPCOV_FIX = {
-    "setup": (
-        "Document how to install dependencies — one runnable command, e.g. "
-        "`npm install`, `uv sync` or `make bootstrap`. An agent cannot start without it.",
-        EFFORT_SIMPLE,
-    ),
-    "build": (
-        "Document the build command — e.g. `npm run build`, `cargo build`, `make`. "
-        "Name the real one this repo uses, not a generic placeholder.",
-        EFFORT_SIMPLE,
-    ),
-    "test": (
-        "Document how to run the tests — e.g. `pytest`, `npm test`, `go test ./...`. "
-        "This is what an agent runs to check its own work.",
-        EFFORT_SIMPLE,
-    ),
-    "code_style": (
-        "Add a code-style section with at least two normative rules and a concrete "
-        "code token (a real type, path, or identifier), not just 'write clean code'.",
-        EFFORT_MODERATE,
-    ),
-    "gotchas": (
-        "Add a Gotchas or Pitfalls section naming repo-specific traps — the things "
-        "that break for a newcomer and are not guessable from the code.",
-        EFFORT_MODERATE,
-    ),
-    "pr": (
-        "Add a section on commits or pull requests — branch naming, commit format, "
-        "what must pass before opening one.",
-        EFFORT_MODERATE,
-    ),
+    "setup": {
+        "weight": 20,
+        "example": "## Setup\n\n```bash\nnpm install\n```",
+        "instruction": (
+            "Document how to install dependencies as a runnable command in a fenced "
+            "block, e.g. ```bash / npm install / ``` (or `uv sync`, `make bootstrap`). "
+            "A bare verb like `make` on its own does not count — it needs an operand."
+        ),
+    },
+    "build": {
+        "weight": 20,
+        "example": "## Build\n\n```bash\nnpm run build\n```",
+        "instruction": (
+            "Document the build command in a fenced block, e.g. `npm run build`, "
+            "`cargo build` or `make build` — `make` alone is not enough, it needs the "
+            "target. Name the real one this repo uses, not a placeholder."
+        ),
+    },
+    "test": {
+        "weight": 20,
+        "example": "## Testing\n\n```bash\npytest -q\n```",
+        "instruction": (
+            "Document how to run the tests in a fenced block, e.g. ```bash / pytest -q "
+            "/ ``` (or `npm test`, `go test ./...`). A bare `pytest` mentioned in prose "
+            "does not count; fence it or give it a flag. This is what an agent runs to "
+            "check its own work."
+        ),
+    },
+    "code_style": {
+        "weight": 15,
+        "example": (
+            "## Code Style\n\n- Never import from `internal/` outside its package.\n"
+            "- Always use `snake_case` for module names."
+        ),
+        "instruction": (
+            "Add a code-style section with at least two rules using DIFFERENT normative "
+            "words (never/always/must/avoid — two rules both saying 'must' count once) "
+            "and a concrete code token, e.g. `snake_case` or `internal/`."
+        ),
+    },
+    "gotchas": {
+        "weight": 15,
+        "example": (
+            "## Gotchas\n\n- Never commit `.env`; the deploy reads it from the vault.\n"
+            "- Always wipe `build/` before a release or stale assets ship."
+        ),
+        "instruction": (
+            "Add a Gotchas or Pitfalls section naming repo-specific traps that are not "
+            "guessable from the code. Use at least two DIFFERENT normative words "
+            "(never/always/must/avoid) and name a real path or file, e.g. `.env`."
+        ),
+    },
+    "pr": {
+        "weight": 10,
+        "example": (
+            "## Pull Requests\n\n- Branch names must use the `feat/` prefix.\n"
+            "- Always run `pytest -q` before opening one."
+        ),
+        "instruction": (
+            "Add a section on commits or pull requests — branch naming, commit format, "
+            "what must pass first. At least two rules with DIFFERENT normative words "
+            "and a concrete token, e.g. `feat/`."
+        ),
+    },
 }
 
 
-def _compute_opcov_gradients(skill_path: str) -> list[dict]:
+def _compute_opcov_gradients(skill_path: str, dim_weight: float) -> list[dict]:
     """Invert operational_coverage's per-category credit into fix instructions.
 
     Only meaningful for agents.md; the dimension does not run for other formats.
+
+    The delta is a floor, not a point estimate: credit is binary per category at
+    a known weight, so closing one category is worth at least ``weight *
+    dim_weight`` composite points. It can be worth more, because ``code_style``
+    also takes a heading-agnostic content fallback and a directive section can
+    satisfy it in passing — measured at +20.0 where the table says +6.0. Erring
+    low is the safe direction for a number shown next to "confidence: high".
     """
     from scoring.operational_coverage import score_operational_coverage
 
@@ -674,21 +726,41 @@ def _compute_opcov_gradients(skill_path: str) -> list[dict]:
     categories = result.get("details", {}).get("categories", {})
     gradients = []
 
-    for cat, weight in _OPCOV_CATEGORY_WEIGHT.items():
+    # Two loops, not one, so `effort` is a literal at each emit site.
+    # measure_patch_ratio parses this file with ast and resolves only Constant and
+    # Name values; a subscript there silently degrades every command fix to
+    # MODERATE and skews the published deterministic-patch ratio.
+    for cat in ("setup", "build", "test"):
         entry = categories.get(cat)
         if entry is None or entry.get("credited"):
             continue
-        instruction, effort = _OPCOV_FIX[cat]
+        spec = _OPCOV_FIX[cat]
         gradients.append({
             "dimension": "operational_coverage",
             "issue": f"opcov_missing_{cat}",
             "target": "body",
             "op": "add",
-            "instruction": instruction,
-            # Exact, not estimated: binary category credit at a known weight.
-            "delta": round(weight * _OPCOV_DIM_WEIGHT, 1),
+            "instruction": spec["instruction"],
+            "delta": round(spec["weight"] * dim_weight, 1),
             "confidence": "high",
-            "effort": effort,
+            "effort": EFFORT_SIMPLE,
+            "reason": entry.get("reason", ""),
+        })
+
+    for cat in ("code_style", "gotchas", "pr"):
+        entry = categories.get(cat)
+        if entry is None or entry.get("credited"):
+            continue
+        spec = _OPCOV_FIX[cat]
+        gradients.append({
+            "dimension": "operational_coverage",
+            "issue": f"opcov_missing_{cat}",
+            "target": "body",
+            "op": "add",
+            "instruction": spec["instruction"],
+            "delta": round(spec["weight"] * dim_weight, 1),
+            "confidence": "high",
+            "effort": EFFORT_MODERATE,
             "reason": entry.get("reason", ""),
         })
     return gradients
@@ -711,6 +783,17 @@ def compute_gradients(
     """
     from scoring.registry import FORMAT_ALIASES
 
+    if fmt is None:
+        # dashboard.py, auto-improve.py and this module's own main() call without
+        # a format. Leaving `resolved` None there meant an AGENTS.md got neither
+        # the operational_coverage fixes nor the R2 suppression of SKILL-only
+        # advice — the exact symptom this fix path exists to remove.
+        from scoring.formats import detect_format
+        try:
+            fmt = detect_format(skill_path)
+        except Exception:
+            fmt = None
+
     resolved = FORMAT_ALIASES.get(fmt, fmt) if fmt is not None else None
     agents_only = resolved == "agents.md"
 
@@ -727,9 +810,13 @@ def compute_gradients(
     gradients.extend(_compute_efficiency_gradients(skill_path))
 
     if agents_only:
-        # The third headline dimension. Weighted 0.4, same as structure, and
-        # until now it produced no fixes at all.
-        gradients.extend(_compute_opcov_gradients(skill_path))
+        # The third headline dimension. Weighted the same as structure, and until
+        # now it produced no fixes at all. The weight is read from the registry,
+        # not restated here: a duplicated literal stays green while the profile
+        # moves under it.
+        from scoring.registry import get_weights as _gw
+        opcov_weight = _gw("agents.md").get(_OPCOV_DIM, 0.0)
+        gradients.extend(_compute_opcov_gradients(skill_path, opcov_weight))
 
     if not agents_only:
         gradients.extend(_compute_trigger_gradients(skill_path, eval_suite))
@@ -740,9 +827,12 @@ def compute_gradients(
         if include_clarity:
             gradients.extend(_compute_clarity_gradients(skill_path))
 
-    # Dimension weights from registry (match composite formula)
+    # Dimension weights from registry (match composite formula). The profile has
+    # to be the one that applies: under skill.md's table operational_coverage is
+    # absent and falls to the 0.10 default, which ranked a 1.5-point TODO fix
+    # (priority 0.2250) above a 4.0-point PR section (0.2000) on a real file.
     from scoring.registry import get_weights
-    DIM_WEIGHTS = get_weights("skill.md")
+    DIM_WEIGHTS = get_weights(resolved or "skill.md")
     # Remove security from weights — text_gradient doesn't compute security gradients
     DIM_WEIGHTS.pop("security", None)
     CONFIDENCE_MULT = {"high": 1.0, "medium": 0.6, "low": 0.3}
