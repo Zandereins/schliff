@@ -15,9 +15,9 @@ name: Collect traffic
 # Daily, not weekly. The 14-day window is not the binding constraint — the reading
 # rule is. Observation R reads "the last traffic.jsonl line whose collected_at is at
 # or before 23:59 UTC on 2026-09-10", and 2026-09-10 is a Thursday. On the previous
-# Monday-only schedule the nearest qualifying snapshot was 2026-09-07: a reading of a
-# 30-day window taken on day 27, from a rolling 14-day counter that never contained
-# 09-08 through 09-10. See "The dates that must be covered" in
+# Monday-only schedule the nearest qualifying snapshot was 2026-09-07, whose window
+# would have ended around 09-05 — leaving the last five days of a 30-day observation
+# outside the counter that decides it. See "The dates that must be covered" in
 # docs/specs/2026-08-11-plugin-channel-experiment.md.
 #
 # A dated one-off cron would have fixed that one date and left the same trap for the
@@ -28,10 +28,15 @@ name: Collect traffic
 on:
   schedule:
     # Daily at 20:17 UTC. Off the hour on purpose: GitHub sheds scheduled jobs
-    # under load at popular times. Late in the day on purpose too: the snapshot
-    # that decides a reading is the last one at or before 23:59 UTC that day, so
-    # 20:17 puts ~20 of 24 hours of the reading date into the counter while still
-    # leaving ~3.7h of slack before the boundary.
+    # under load at popular times.
+    #
+    # Late in the day for a measured reason, and NOT the obvious one. The traffic
+    # API never reports the day you ask on: measured 2026-08-20, a call at 10:12
+    # UTC returned a window ending 08-19. What the hour actually buys is whether
+    # the window ends at T-1 or T-2 — the 06:28 run on 08-17 came back ending
+    # 08-15, while calls at 10:12, 12:52 and 17:57 all came back ending T-1. So a
+    # late run costs one day of lag instead of two, and one day is the floor the
+    # API allows, not zero. ~3.7h of slack remains before the 23:59 boundary.
     - cron: '17 20 * * *'
   workflow_dispatch:
 
@@ -57,7 +62,7 @@ jobs:
           # (enforce_admins: true, six required checks), so a direct push is
           # rejected with GH006 — measured on 2026-08-11 in run 31519738229,
           # where collection succeeded and only the push failed. Opening a pull
-          # request per weekly line would trade that for a merge queue nobody
+          # request per daily line would trade that for a merge queue nobody
           # asked for. The branch is created from main on first run.
           if git ls-remote --exit-code --heads origin "${DATA_BRANCH}" > /dev/null 2>&1; then
             git fetch origin "${DATA_BRANCH}"

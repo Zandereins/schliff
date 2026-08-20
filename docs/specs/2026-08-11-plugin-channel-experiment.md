@@ -449,7 +449,7 @@ job, no LaunchAgent.
 `main` is protected with `enforce_admins: true` and six required status checks, so a workflow
 push to it is rejected outright — measured on 2026-08-11 in run `31519738229`, where collection
 succeeded and only the push failed with `GH006: Protected branch update failed`. Opening a pull
-request for each weekly line would trade that for a merge queue nobody asked for. The scheduled
+request for each daily line would trade that for a merge queue nobody asked for. The scheduled
 job therefore appends to `docs/experiments/plugin-channel/traffic.jsonl` **on that branch**, and
 `main` keeps only the seeded baseline until a reading is taken.
 
@@ -483,8 +483,9 @@ It needs an authenticated `gh` and nothing else, is idempotent per UTC day (a se
 day overwrites that day's line rather than appending a duplicate), and never touches the seeded
 `"note":"baseline"` line.
 
-**The required cadence: at least once every 14 days, and on each reading date.** The weekly
-workflow satisfies this with a full missed run of slack — but only once `TRAFFIC_TOKEN` is set.
+**The required cadence: at least once every 14 days, and on each reading date.** The daily
+workflow satisfies this with thirteen missed runs of slack against the 14-day limit, and covers
+every reading date by construction — but only once `TRAFFIC_TOKEN` is set.
 Until then the manual command is the only thing producing lines. GitHub's traffic
 API returns a rolling 14-day window and serves nothing older. That is a hard property of the API,
 not a default that can be raised.
@@ -524,16 +525,26 @@ corrected to match.
 
 *Why:* 2026-09-10 — Observation R's reading date, fixed on 2026-08-11 — is a **Thursday**. The
 Mondays available before it were 08-24, 08-31 and **09-07**. Under the reading rule, the
-qualifying snapshot would have been the one from 09-07: a 30-day window read on day 27, from a
-rolling 14-day counter that never contained 09-08 through 09-10. *The dates that must be covered*
-already required 2026-09-10; the schedule could not deliver it. This is not
+qualifying snapshot would have been the one from 09-07 — a 30-day observation read from a
+counter whose window ends around 09-05, leaving its last five days outside the number that
+decides it. *The dates that must be covered* already required 2026-09-10; the schedule could not
+deliver it. This is not
 `UNMEASURED-COLLECTOR-GAP` — a line would have existed and the 14-day chain was never broken. It
 is a snapshot on the wrong date, which the reading rule forbids substituting away.
 
 *Why daily rather than a dated one-off:* the same requirement names a second date, A0+30, which
 cannot be wired in advance because A0 is the merge date of a submission not yet opened. A dated
-cron would have fixed one instance of the defect and left the other. 20:17 UTC puts ~20 of 24
-hours of any reading date into the counter while leaving ~3.7h before the 23:59 boundary.
+cron would have fixed one instance of the defect and left the other.
+
+*What the 20:17 UTC hour does and does not buy.* It does **not** put the reading date into the
+counter: the traffic API never reports the day the call is made. Measured 2026-08-20, a call at
+10:12 UTC returned a window ending 2026-08-19, and all three committed snapshots agree
+(08-11T12:52 → ends 08-10; 08-17T06:28 → ends 08-15). What the hour buys is whether the window
+ends at T-1 or T-2: the 06:28 run came back at T-2, while calls at 10:12, 12:52 and 17:57 all
+came back at T-1. A late run therefore costs one day of lag instead of two — and **one day is the
+floor this API allows, not zero.** Under the old Monday schedule the 09-07 snapshot would have
+ended around 09-05, leaving the last five days of a 30-day observation outside the counter that
+decides it; under the new one it is one day. ~3.7h of slack remains before the 23:59 boundary.
 
 *Cost:* ~30 observations per month on `experiment/traffic-data` instead of ~4. That branch holds
 data only.
@@ -577,8 +588,10 @@ verbal constraint, which a reader had no way to check.
 `[Unreleased]` block has been ready since 2026-08-14 and is deliberately held.
 
 *Honest about the evidence:* the confound is **not demonstrated** on the metric that matters.
-Release day 2026-08-10 carries the highest single-day `count` in the baseline (26) but only 6
-`uniques`, while the `uniques` peak in the same window (2026-08-13) has no release near it. A
+Release day 2026-08-10 carries the highest single-day `count` in the baseline window
+(2026-07-28 … 2026-08-10) at 26, but only 6 `uniques` — while that window's `uniques` peak, 7 on
+2026-07-29, has no release near it. The highest `uniques` day recorded anywhere so far, 8 on
+2026-08-13, sits in the 08-17 snapshot's window and likewise has no release near it. A
 release plausibly moves views; on uniques it is unproven. The constraint is kept on asymmetry
 rather than evidence: a wrongly confounded reading cannot be recovered, a delayed release can.
 
