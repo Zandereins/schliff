@@ -70,9 +70,13 @@ not by a date that shows up in a calendar — so the block belongs on the action
 remote rather than a local ref, which is only as fresh as the last fetch:
 
 ```bash
-gh api repos/Zandereins/schliff/contents/docs/experiments/plugin-channel/s2-baseline.md \
+gh api -X GET repos/Zandereins/schliff/contents/docs/experiments/plugin-channel/s2-baseline.md \
   -f ref=main --jq .path
 ```
+
+`-X GET` is not optional: `gh` switches to POST as soon as any `-f` field is present, the
+contents route has no POST handler, and the resulting 404 is indistinguishable from the file
+being absent — a permanently red gate that reads as "the baseline was never committed.
 
 **Abandonment deadline.** If no submission PR has been opened at either qualified marketplace by
 **23:59 UTC on 2026-09-30**, the experiment is over. It is recorded in this file as
@@ -493,8 +497,10 @@ day overwrites that day's line rather than appending a duplicate), and never tou
 `"note":"baseline"` line.
 
 **The required cadence: at least once every 14 days, and on each reading date.** The daily
-workflow satisfies this with thirteen missed runs of slack — but only once `TRAFFIC_TOKEN` is
-set, and see the caveat on this 14-day figure in [Amendments](#amendments). Until then the manual command is the only thing producing lines. GitHub's traffic
+workflow satisfies this comfortably — but only once `TRAFFIC_TOKEN` is set. No slack figure is
+quoted here on purpose: the 14-day floor is one day too generous in the worst pairing of window
+drifts, so any count derived from it is wrong by one. See *Deliberately not changed here* in
+[Amendments](#amendments) and issue #199. Until then the manual command is the only thing producing lines. GitHub's traffic
 API returns a rolling 14-day window and serves nothing older. That is a hard property of the API,
 not a default that can be raised.
 
@@ -587,7 +593,11 @@ created 2026-06-21. It passes condition (2) as written. In this instance conditi
 anyway, because its interaction with this repository pre-dates D0, so no live gate is affected.
 
 *The duty:* if a signal is admitted whose author's public profile indicates mass automation, the
-account is **named in the verdict together with the reason it was or was not counted**. No number
+account is **named in the verdict, with the profile facts that prompted the note — and it still
+counts.** This adds disclosure only. It grants no discretion to exclude such an author: condition
+(2) as pre-registered decides that, and inventing an exclusion now, with `webbrain-one` already in
+view, is exactly what pre-registration forbids. A reader must be able to see which signals came
+from such accounts and judge the verdict themselves; that is the whole of the duty. No number
 is invented after the fact — inventing a repository-count threshold now, with the case already in
 view, is the exact pattern pre-registration exists to prevent. This mirrors the owner-attested
 mechanism already carried by condition (3): the check that cannot be fully mechanised is written
@@ -612,6 +622,9 @@ rather than evidence: a wrongly confounded reading cannot be recovered, a delaye
 *The scheduled placement*, given that Gate 2's window opens at A0 and the median open→merged
 latency for external PRs at `jeremylongshore/claude-code-plugins-plus-skills` was measured at
 **1.17 days** (61 external merges, full result set: 876 returned against a limit of 3000): the
-release goes out after Observation R's snapshot and a full week before the submission PR, so its
-tail has decayed before A0 can start Gate 2's window. A release the day before D0 would have put
-its tail inside Gate 2 almost immediately.
+release goes out after Observation R's snapshot and a full week before the submission PR. Note
+what does and does not follow: with release 09-11, D0 09-18 and A0 ≈ 09-19, the 14-day counter at
+A0 still contains release day, so the week of separation does **not** clear the tail out of the
+window. What protects the gate is that the quantitative branch reads a single snapshot at A0+30,
+by which point release day has long fallen out of a 14-day window entirely. The separation buys
+margin on the qualitative branch and on any reading taken earlier, not on the arithmetic.

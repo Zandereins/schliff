@@ -15,7 +15,8 @@
 # On a schedule it is driven by .github/workflows/collect-traffic.yml, daily at
 # 20:17 UTC — nothing is installed on any machine, no cron job and no
 # LaunchAgent. Run by hand only if that workflow is disabled or TRAFFIC_TOKEN is
-# unset; the floor is one run every 14 days or the un-snapshotted days
+# unset; the floor is one run every 14 days -- which is one day too generous in
+# the worst pairing of window drifts, see issue #199 -- or the un-snapshotted days
 # expire for good — see the "Operating the collector" section of
 # docs/specs/2026-08-11-plugin-channel-experiment.md.
 #
