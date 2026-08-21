@@ -496,21 +496,36 @@ It needs an authenticated `gh` and nothing else, is idempotent per UTC day (a se
 day overwrites that day's line rather than appending a duplicate), and never touches the seeded
 `"note":"baseline"` line.
 
-**The required cadence: at least once every 14 days, and on each reading date.** The daily
-workflow satisfies this comfortably, and `TRAFFIC_TOKEN` is configured — the 2026-08-17T06:28
-`schedule` run succeeded and produced commit `ca60a89` on `experiment/traffic-data`. Were the
-secret ever removed, the manual command would again be the only thing producing lines.
+<a id="the-cadence-rule"></a>
 
-No slack figure is quoted here on purpose: the 14-day floor is one day too generous in the worst
-pairing of window drifts, so any count derived from it is wrong by one — including the "15 days"
-below. See *Deliberately not changed here* in [Amendments](#amendments) and issue #199.
+**THE CADENCE RULE — stated once, referenced everywhere else.** *(amended 2026-08-21 — the
+previous figure and the reason it moved are in [Amendments](#amendments))*
 
-GitHub's traffic
-API returns a rolling 14-day window and serves nothing older. That is a hard property of the API,
-not a default that can be raised.
+> **Run the collector at least once every 12 days, and on each reading date.**
 
-**What happens if it is not run — the failure is silent and permanent.** Go 15 days without a
-run and the days that fell out of the window are gone; there is no backfill, no export, and no
+Twelve, and the two steps are separate. **The arithmetic gives thirteen:** the window's far end
+drifts by a day depending on when in the UTC day the call lands, measured — a run answered at
+T-1 covers `[N-14, N-1]`, one answered at T-2 covers `[N-15, N-2]`. If the run before a gap lands
+at T-2 and the one after it at T-1, a spacing of 14 leaves day `N-1` in no snapshot at all, while
+13 still closes flush. **Twelve is thirteen minus one day of reserve**, held back because the
+T-1/T-2 drift rests on a handful of observations and a slower answer than any yet seen would
+break a bound set exactly at the arithmetic. The reserve is a deliberate margin, not a
+derivation.
+
+Do not restate this number elsewhere. It appeared in eleven places before 2026-08-21, and each
+correction had to land in all eleven or contradict itself somewhere; `test_cadence_rule_stated_once.py`
+now fails if a second site quotes it.
+
+The daily workflow satisfies this comfortably, and `TRAFFIC_TOKEN` is configured — the
+2026-08-17T06:28 `schedule` run succeeded and produced commit `ca60a89` on
+`experiment/traffic-data`. Were the secret ever removed, the manual command would again be the
+only thing producing lines.
+
+GitHub's traffic API returns a rolling 14-day window and serves nothing older. That is a hard
+property of the API — the input to the rule above, not the rule itself.
+
+**What happens if it is not run — the failure is silent and permanent.** Exceed
+[the cadence rule](#the-cadence-rule) and the days that fell out of the window are gone; there is no backfill, no export, and no
 support request that recovers them. A gap does not produce an error, a warning, or a missing
 file — `traffic.jsonl` simply has no line covering that stretch, and the absence is only
 noticeable later, when a reading date arrives and the nearest qualifying snapshot is weeks stale
@@ -522,8 +537,8 @@ RED, because a RED is a finding and a gap is only a mistake.
 
 **The dates that must be covered**, given the windows fixed above: 2026-09-10 (Observation R),
 and A0+30 whenever Gate 1 passes. Running it on those two dates is not sufficient on its own —
-the 14-day rule still applies throughout, or the snapshot taken on the reading date will be
-correct but the record around it will have holes.
+[the cadence rule](#the-cadence-rule) still applies throughout, or the snapshot taken on the
+reading date will be correct but the record around it will have holes.
 
 ## Amendments
 
@@ -532,17 +547,24 @@ can separate what was fixed in advance from what was added later. `distributors.
 precedent: showing the correction is the point, silently editing it would be worse than the
 original error.
 
-**No threshold, window, date or gate criterion has been changed by any amendment below.** Gate 1
-is still "≥1 of N merges within D0+21", Gate 2's quantitative branch is still ≥96 uniques,
-Observation R still reads 2026-09-10, and the abandonment deadline is still 2026-09-30.
+**No GATE criterion, measurement window, or fixed date has been changed by any amendment
+below.** Gate 1 is still "≥1 of N merges within D0+21", Gate 2's quantitative branch is still
+≥96 uniques, Observation R still reads 2026-09-10, and the abandonment deadline is still
+2026-09-30.
+
+One *operating* threshold did change, and saying "no threshold changed" would have hidden it:
+the collector's cadence floor went from 14 days to 12 on 2026-08-21. It governs how the
+instrument is run, not what the instrument decides, and the correction makes it stricter — see
+[the cadence rule](#the-cadence-rule).
 
 ### 2026-08-20 — collector moved from weekly to daily
 
 *What changed:* `.github/workflows/collect-traffic.yml` ran `cron: '17 6 * * 1'` (Mondays). It now
 runs `cron: '17 20 * * *'` — daily. Every prose description of **the workflow's own schedule** was
 corrected to match: in this file, in the workflow header, and in `scripts/collect-traffic.sh`,
-whose header still claimed nothing scheduled the collector at all. The separate 14-day floor on
-how long data survives is untouched — see *Deliberately not changed here* below.
+whose header still claimed nothing scheduled the collector at all. The separate floor on how
+long data survives was untouched by THAT change and corrected the next day — see
+[the cadence rule](#the-cadence-rule) for the number and the amendment below for why.
 
 *Why:* 2026-09-10 — Observation R's reading date, fixed on 2026-08-11 — is a **Thursday**. The
 Mondays available before it were 08-24, 08-31 and **09-07**. Under the reading rule, the
@@ -565,14 +587,31 @@ ends at T-1 or T-2: the 06:28 run came back at T-2, while calls at 10:12, 12:52 
 came back at T-1. A late run therefore costs one day of lag instead of two — and **one day is the
 floor this API allows, not zero.**
 
-*Deliberately not changed here:* the 14-day cadence floor. That number predates this experiment
-and the drift measured above shows it is one day too generous in the worst pairing — a T-2 run
-followed 14 days later by a T-1 run leaves one day in no snapshot. Correcting it touches eleven
-sites across three files and is not what this change is for; it is filed separately so the fix
-that has a deadline is not held up by one that does not.
+*Deferred here, corrected separately:* the cadence floor. See the 2026-08-21 entry below.
 
 *Cost:* ~30 observations per month on `experiment/traffic-data` instead of ~4. That branch holds
 data only.
+
+### 2026-08-21 — cadence floor 14 → 12 days, and stated in one place
+
+*What changed:* the floor moved from 14 days to 12, and every other site now links to
+[the cadence rule](#the-cadence-rule) instead of restating it.
+
+*Why the number:* the window's far end drifts by a day depending on when in the UTC day the call
+lands — a run answered at T-1 covers `[N-14, N-1]`, one answered at T-2 covers `[N-15, N-2]`. If
+the run before a gap lands at T-2 and the one after it at T-1, a spacing of 14 leaves day `N-1`
+in no snapshot at all, while 13 closes flush. Twelve is thirteen minus a day of reserve, because
+the drift rests on a handful of observations. A margin, named as one.
+
+*Why one place is the actual fix:* the number was stated in eleven sites across three files, so
+every correction had to land eleven times. Three consecutive review rounds each found a site that
+had been missed — including one where the prose claimed the sweep was complete while two sites
+still disagreed. `test_cadence_rule_stated_once.py` now fails when a second statement appears,
+and its first version could itself be defeated by rewording, which is why it matches any stated
+duration rather than a list of phrasings.
+
+*Scope:* this is an operating threshold, not a gate. With the daily collector it bites only if
+the workflow is disabled or `TRAFFIC_TOKEN` is unset.
 
 ### 2026-08-20 — S2 baseline captured, and made a precondition of D0
 
