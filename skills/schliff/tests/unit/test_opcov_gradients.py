@@ -144,15 +144,11 @@ def test_a_cheap_auto_patchable_fix_is_not_pushed_out(tmp_path):
     it below the section pushed the cheaper, larger, automatic fix out of
     --top N. The correct order is the one this test now asserts.
     """
-    text = (
-        BARE
-        + "\n## Setup\n\n```bash\nnpm install\n```\n"
-        + "\n## Build\n\n```bash\nnpm run build\n```\n"
-        + "\n## Testing\n\n```bash\npytest -q\n```\n"
-        + "\n## Code Style\n\n- Never use `eval`.\n- Always type `foo.py`.\n"
-        + "\n## Gotchas\n\n- Never commit `.env`.\n- Always wipe `build/`.\n"
-        + "\nTODO: fix this later\n"
-    )
+    # Deliberately sparse: the strong opcov gradients (setup/build/test, the
+    # 0.96 ones) must be PRESENT for this to test anything. An earlier fixture
+    # satisfied every category, leaving only opcov_missing_pr at 0.48, and the
+    # assertion then held with or without the delta rescale — it pinned nothing.
+    text = BARE + "\nTODO: fix this later\n"
     path = _write(tmp_path, text)
     grads = text_gradient.compute_gradients(path, None, include_clarity=True, fmt="agents.md")
     todo = [g for g in grads if g["issue"].startswith("has_todo")]
@@ -162,8 +158,18 @@ def test_a_cheap_auto_patchable_fix_is_not_pushed_out(tmp_path):
     # change would alter.
     assert todo, "fixture no longer produces a has_todo gradient"
     assert pr, "fixture no longer produces an opcov_missing_pr gradient"
-    assert todo[0]["priority"] > pr[0]["priority"], (
+
+    # Stronger than "beats the pr fix": it must outrank EVERY opcov fix, and it
+    # must survive the top-5 truncation that suggest and the evolve prompt apply.
+    # Before the delta rescale it ranked sixth at 0.60 and the default view
+    # contained no applicable patch at all.
+    opcov = [g for g in grads if g["dimension"] == "operational_coverage"]
+    assert opcov, "fixture no longer produces operational_coverage gradients"
+    assert todo[0]["priority"] > max(g["priority"] for g in opcov), (
         "a manual section fix outranks a cheaper auto-applicable one"
+    )
+    assert text_gradient.generate_patches(path, grads[:5]), (
+        "the default top-5 contains no applicable patch"
     )
 
 
