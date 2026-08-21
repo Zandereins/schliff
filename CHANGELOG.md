@@ -9,7 +9,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 - **`operational_coverage` now produces fixes.** On an AGENTS.md the heaviest dimension —
   weight 0.4, tied with `structure` — had no fix path at all: a file scoring 0/100 there was
-  told to "add 2+ concrete examples" for +2 while forty composite points went unmentioned.
+  told to "add 2+ concrete examples" for +1.5 — the only applicable fix among eight, the
+  other seven being SKILL-only noise — while forty composite points went unmentioned.
   `text_gradient` now emits a ranked fix for every missing category (setup, build, test,
   code_style, gotchas, pr). Field evidence, 30 real AGENTS.md files: median
   `operational_coverage` 35/100, 17 of 30 below 40.
@@ -58,7 +59,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   still give 23.0 where the registry's set gives 35.0, which reads as a weak file rather
   than a bug. The dimension set now comes from the registry, so three hand-maintained
   copies become one source of truth. End to end on that file, the dashboard moves from
-  12.1 to 35.0. `text_gradient` also has a `--format` flag now, with `choices` — a typo
+  17.4 to 35.0. `text_gradient` also has a `--format` flag now, with `choices` — a typo
   used to exit 0 and print exactly the SKILL-only advice the flag exists to prevent.
 
 - **A line that *is* a command now counts as actionable content.** `efficiency` recognised
@@ -90,7 +91,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - The composite `dashboard.py` and `auto-improve.py` print **changes for non-SKILL
   formats**, because they now resolve the format and score through the registry. On an
   AGENTS.md it goes up, and by a lot — the dimension they never listed counted as zero
-  (a bare AGENTS.md: 12.1 -> 35.0).
+  (a bare AGENTS.md: 17.4 -> 35.0).
   On a CLAUDE.md or a `.cursorrules` the dimension set was already right, but the format
   now reaches the scorers and the weight table, so the number can still move (measured on
   a small CLAUDE.md: 25.3 -> 30.0). A SKILL.md is unaffected, byte for byte. Readings you
