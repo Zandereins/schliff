@@ -498,8 +498,8 @@ day overwrites that day's line rather than appending a duplicate), and never tou
 
 <a id="the-cadence-rule"></a>
 
-**THE CADENCE RULE — stated once, referenced everywhere else.** *(amended 2026-08-20; was
-"14 days", see [Amendments](#amendments))*
+**THE CADENCE RULE — stated once, referenced everywhere else.** *(amended 2026-08-21 — the
+previous figure and the reason it moved are in [Amendments](#amendments))*
 
 > **Run the collector at least once every 12 days, and on each reading date.**
 
@@ -512,7 +512,7 @@ T-1/T-2 drift rests on a handful of observations and a slower answer than any ye
 break a bound set exactly at the arithmetic. The reserve is a deliberate margin, not a
 derivation.
 
-Do not restate this number elsewhere. It appeared in eleven places before 2026-08-20, and each
+Do not restate this number elsewhere. It appeared in eleven places before 2026-08-21, and each
 correction had to land in all eleven or contradict itself somewhere; `test_cadence_rule_stated_once.py`
 now fails if a second site quotes it.
 
@@ -547,17 +547,24 @@ can separate what was fixed in advance from what was added later. `distributors.
 precedent: showing the correction is the point, silently editing it would be worse than the
 original error.
 
-**No threshold, window, date or gate criterion has been changed by any amendment below.** Gate 1
-is still "≥1 of N merges within D0+21", Gate 2's quantitative branch is still ≥96 uniques,
-Observation R still reads 2026-09-10, and the abandonment deadline is still 2026-09-30.
+**No GATE criterion, measurement window, or fixed date has been changed by any amendment
+below.** Gate 1 is still "≥1 of N merges within D0+21", Gate 2's quantitative branch is still
+≥96 uniques, Observation R still reads 2026-09-10, and the abandonment deadline is still
+2026-09-30.
+
+One *operating* threshold did change, and saying "no threshold changed" would have hidden it:
+the collector's cadence floor went from 14 days to 12 on 2026-08-21. It governs how the
+instrument is run, not what the instrument decides, and the correction makes it stricter — see
+[the cadence rule](#the-cadence-rule).
 
 ### 2026-08-20 — collector moved from weekly to daily
 
 *What changed:* `.github/workflows/collect-traffic.yml` ran `cron: '17 6 * * 1'` (Mondays). It now
 runs `cron: '17 20 * * *'` — daily. Every prose description of **the workflow's own schedule** was
 corrected to match: in this file, in the workflow header, and in `scripts/collect-traffic.sh`,
-whose header still claimed nothing scheduled the collector at all. The separate 14-day floor on
-how long data survives is untouched — see *Deliberately not changed here* below.
+whose header still claimed nothing scheduled the collector at all. The separate floor on how
+long data survives was untouched by THAT change and corrected the next day — see
+[the cadence rule](#the-cadence-rule) for the number and the amendment below for why.
 
 *Why:* 2026-09-10 — Observation R's reading date, fixed on 2026-08-11 — is a **Thursday**. The
 Mondays available before it were 08-24, 08-31 and **09-07**. Under the reading rule, the
@@ -580,15 +587,31 @@ ends at T-1 or T-2: the 06:28 run came back at T-2, while calls at 10:12, 12:52 
 came back at T-1. A late run therefore costs one day of lag instead of two — and **one day is the
 floor this API allows, not zero.**
 
-*Deferred here, corrected on 2026-08-21:* the cadence floor was 14 days, and the drift measured
-above shows that is one day too generous in the worst pairing — a T-2 run followed 14 days later
-by a T-1 run leaves one day in no snapshot. It was filed separately (#199) so the fix with a
-deadline was not held up by one without. It now lives in one place, [the cadence
-rule](#the-cadence-rule), which is the actual fix: the number was stated eleven times, so every
-correction had to land eleven times.
+*Deferred here, corrected separately:* the cadence floor. See the 2026-08-21 entry below.
 
 *Cost:* ~30 observations per month on `experiment/traffic-data` instead of ~4. That branch holds
 data only.
+
+### 2026-08-21 — cadence floor 14 → 12 days, and stated in one place
+
+*What changed:* the floor moved from 14 days to 12, and every other site now links to
+[the cadence rule](#the-cadence-rule) instead of restating it.
+
+*Why the number:* the window's far end drifts by a day depending on when in the UTC day the call
+lands — a run answered at T-1 covers `[N-14, N-1]`, one answered at T-2 covers `[N-15, N-2]`. If
+the run before a gap lands at T-2 and the one after it at T-1, a spacing of 14 leaves day `N-1`
+in no snapshot at all, while 13 closes flush. Twelve is thirteen minus a day of reserve, because
+the drift rests on a handful of observations. A margin, named as one.
+
+*Why one place is the actual fix:* the number was stated in eleven sites across three files, so
+every correction had to land eleven times. Three consecutive review rounds each found a site that
+had been missed — including one where the prose claimed the sweep was complete while two sites
+still disagreed. `test_cadence_rule_stated_once.py` now fails when a second statement appears,
+and its first version could itself be defeated by rewording, which is why it matches any stated
+duration rather than a list of phrasings.
+
+*Scope:* this is an operating threshold, not a gate. With the daily collector it bites only if
+the workflow is disabled or `TRAFFIC_TOKEN` is unset.
 
 ### 2026-08-20 — S2 baseline captured, and made a precondition of D0
 

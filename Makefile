@@ -31,7 +31,7 @@ lint: ## Run ruff on scripts + markdownlint on tracked docs (same as CI)
 	git ls-files '*.md' | xargs npx --yes markdownlint-cli2@0.23.2 \
 	  || echo "markdown lint needs node (npx); see .markdownlint-cli2.jsonc"
 
-collect-traffic: ## Snapshot GitHub traffic (run >=1x/14d or the data expires)
+collect-traffic: ## Snapshot GitHub traffic (spacing: see THE CADENCE RULE in the experiment spec)
 	bash scripts/collect-traffic.sh
 
 install: ## Install Schliff (copy mode)
