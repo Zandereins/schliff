@@ -574,6 +574,51 @@ def _parse_delta(delta: Any) -> float:
     return 0.0
 
 
+# Formats whose delta literals have been MEASURED against the skill.md basis.
+# The rescale is only sound where that basis actually holds, and it does not hold
+# everywhere: `ambiguous_pronouns: 2.5` divided by clarity's 0.05 implies 50
+# dimension points for a pronoun fix, which is not what anyone wrote down. Some
+# literals are freehand composite guesses, not points-times-weight.
+#
+# agents.md is verified: removing a TODO marker reports 1.5, and the structure
+# dimension really moves 75 -> 85, worth 10 x 0.4 = 4.00 composite (the observed
+# 4.40 total includes +0.40 from efficiency, which is a different fix's credit).
+# system_prompt is NOT on this list: scaling there fires on clarity (x3) and
+# efficiency (x1.5) but not on structure — its profile calls that
+# `structure_prompt` — so the result is partial and incoherent within one
+# ranking, and measured it overstates a clarity fix as +7.5 against a real +1.9.
+_DELTA_SCALED_FORMATS = frozenset({"agents.md"})
+
+
+def _scale_delta_to_format(value, dimension, resolved_fmt):
+    """Rescale a delta literal from the skill.md basis it was written on.
+
+    Hardcoded deltas here are composite estimates sized against skill.md's weight
+    table — `missing_name: 1.5` is 10 dimension points times structure's 0.15
+    there. Emitted unchanged on an AGENTS.md, where structure carries 0.4, the
+    same fix understates itself ~2.7x.
+
+    Returns the value untouched for any format not on ``_DELTA_SCALED_FORMATS``,
+    which includes skill.md itself, and for a dimension missing from either
+    profile — operational_coverage computes its delta against the live profile
+    already and must not be scaled twice.
+    """
+    if resolved_fmt not in _DELTA_SCALED_FORMATS:
+        return value
+    from scoring.registry import get_weights
+    base = get_weights("skill.md").get(dimension)
+    target = get_weights(resolved_fmt).get(dimension)
+    if base is None or target is None:
+        return value
+    if not base:
+        # A zero base cannot express a ratio; leave the estimate alone.
+        return value
+    if not target:
+        # The dimension does not count toward this format's score at all.
+        return 0.0
+    return round(value * (target / base), 2)
+
+
 def compute_gradients(
     skill_path: str,
     eval_suite: Optional[dict] = None,
@@ -629,6 +674,11 @@ def compute_gradients(
         # Keep original string as display hint, normalize delta to float
         if isinstance(raw_delta, str):
             g["delta_display"] = raw_delta
+        parsed = _scale_delta_to_format(parsed, g["dimension"], resolved)
+        if isinstance(raw_delta, str) and parsed != _parse_delta(raw_delta):
+            # The "~2.0-5.0" hint was written on the skill.md basis; once
+            # rescaled it no longer describes the number beside it.
+            g.pop("delta_display", None)
         g["delta"] = parsed
         dim_weight = DIM_WEIGHTS.get(g["dimension"], 0.10)
         conf_mult = CONFIDENCE_MULT.get(g.get("confidence", "medium"), 0.6)
