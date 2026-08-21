@@ -120,7 +120,8 @@ def _append_state(skill_path: str, entry: dict) -> None:
 
 # --- Scoring ---
 
-def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
+def _score_skill(skill_path: str, eval_suite: Optional[dict] = None,
+                 fmt: Optional[str] = None) -> dict:
     """Score a skill and return composite + dimensions."""
     # The registry decides which dimensions a format has. Hand-listing them here
     # scored an AGENTS.md without operational_coverage — weight 0.4 — and the
@@ -128,7 +129,13 @@ def _score_skill(skill_path: str, eval_suite: Optional[dict] = None) -> dict:
     # that ignored the file's heaviest dimension.
     from scoring.formats import detect_format
     from shared import build_scores
-    fmt = detect_format(skill_path)
+    # `fmt` is passed in by --dry-run, which scores a sibling temp file: the real
+    # AGENTS.md becomes AGENTS.dryrun.tmp, detect_format says "unknown", and the
+    # candidate would be scored under skill.md weights while the baseline uses
+    # agents.md. Measured on one file: 35.0 baseline vs 23.4 candidate, which
+    # inverts every keep/discard verdict — a +4.0 improvement reported as -11.3.
+    if fmt is None:
+        fmt = detect_format(skill_path)
     scores = build_scores(skill_path, eval_suite, include_runtime=False, fmt=fmt)
 
     # Runtime is opt-in (expensive, invokes claude CLI)
@@ -154,11 +161,13 @@ def _score_content(
     sibling lookups still resolve), score it, then remove it. Returns the same
     shape as _score_skill.
     """
+    from scoring.formats import detect_format
+    real_fmt = detect_format(skill_path)      # from the REAL name, not the temp one
     tmp_path = Path(skill_path).with_suffix(".dryrun.tmp")
     try:
         tmp_path.write_text(content, encoding="utf-8")
         scorer.invalidate_cache(str(tmp_path))
-        result = _score_skill(str(tmp_path), eval_suite)
+        result = _score_skill(str(tmp_path), eval_suite, fmt=real_fmt)
     finally:
         try:
             tmp_path.unlink()

@@ -78,20 +78,32 @@ def generate_dashboard(
             print(f"Warning: failed to parse eval-suite.json: {e}", file=sys.stderr)
 
     _na = {"score": -1, "issues": [], "details": {}}
-    fmt = None
+    # Resolved OUTSIDE the scorer branch: _try_import only warns, so if
+    # score_skill fails to import while text_gradient does not, a None fmt sends
+    # an AGENTS.md back down the SKILL-only advice path this function just fixed.
+    from scoring.formats import detect_format
+    try:
+        fmt = detect_format(skill_path)
+    except Exception:
+        fmt = None
     if scorer is not None:
         # Resolve the format once and pass it everywhere. Hand-listing dimensions
         # here meant an AGENTS.md was scored without operational_coverage — its
         # heaviest dimension, weight 0.4 — which the composite then counted as
         # zero: 27.0 where build_scores gives 39.0. The registry knows which
         # dimensions a format has; this file should not carry a second opinion.
-        from scoring.formats import detect_format
         from shared import build_scores
-        fmt = detect_format(skill_path)
         scores = build_scores(skill_path, eval_suite, include_runtime=False, fmt=fmt)
-        if not include_clarity:
+        if not include_clarity and fmt in ("skill.md", "claude.md", "cursorrules"):
             # --no-clarity is an opt-OUT; build_scores follows the registry, where
             # clarity is in the default set.
+            #
+            # Only for the skill.md family, where clarity carries 0.05 and dropping
+            # it is the long-standing behaviour. The composite uses a full
+            # denominator, so a popped dimension counts as ZERO rather than being
+            # renormalized away — on system_prompt, where clarity weighs 0.15, the
+            # flag turned 51.4 into 36.4 and added a warning telling the user to
+            # run /schliff:init to "score: clarity".
             scores.pop("clarity", None)
         composite = scorer.compute_composite(scores, fmt=fmt)
     else:

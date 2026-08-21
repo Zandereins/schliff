@@ -20,6 +20,8 @@ _SCRIPTS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "
 sys.path.insert(0, _SCRIPTS)
 sys.path.insert(0, os.path.join(_SCRIPTS, "scoring"))
 
+import text_gradient  # noqa: E402
+
 BARE_AGENTS = "# Proj\n\nA tool.\n\n## Overview\n\nIt reads.\n\nTODO: fix this later\n"
 SKILL_ONLY_ISSUES = {"no_frontmatter", "missing_name", "missing_description",
                      "no_trigger_eval_suite", "no_eval_suite_test_cases"}
@@ -125,3 +127,88 @@ def test_incomplete_score_dict_would_understate_the_composite(agents_md):
         fmt="agents.md",
     )["score"]
     assert partial < full, "fixture no longer demonstrates the gap"
+
+def test_dry_run_scores_under_the_same_format_as_the_baseline(tmp_path):
+    """--dry-run writes a sibling temp file, and its NAME decided the format.
+
+    `AGENTS.md` becomes `AGENTS.dryrun.tmp`, which detect_format calls "unknown",
+    so the candidate was scored with skill.md weights while the baseline used
+    agents.md. Measured on one file: 35.0 vs 23.4 — every keep/discard verdict
+    inverted, a +4.0 improvement reported as -11.3.
+    """
+    auto = _load("auto_improve_fmt", "auto-improve.py")
+    for name in ("AGENTS.md", "SKILL.md", "CLAUDE.md"):
+        p = tmp_path / name
+        p.write_text(BARE_AGENTS, encoding="utf-8")
+        baseline = auto._score_skill(str(p))["composite"]
+        candidate = auto._score_content(BARE_AGENTS, str(p))["composite"]
+        assert candidate == pytest.approx(baseline, abs=0.05), (
+            f"{name}: dry-run scores {candidate} against a baseline of {baseline}"
+        )
+
+
+@pytest.mark.parametrize("name,fmt", [
+    ("CLAUDE.md", "claude.md"),
+    ("AGENTS.md", "agents.md"),
+    (".cursorrules", "cursorrules"),
+])
+def test_no_frontmatter_is_not_advised_where_scoring_synthesises_it(tmp_path, name, fmt):
+    """build_scores normalizes every format except skill.md, so the frontmatter
+    is already credited and a patch for it is worth exactly 0.0 — which
+    auto-improve keeps, because its gate is `>= 0`. A CLAUDE.md came back with an
+    invented `---\nname: …\n---` block for no gain."""
+    p = tmp_path / name
+    p.write_text("# cm\n\nRun `make build` to build.\n", encoding="utf-8")
+    issues = {
+        g["issue"]
+        for g in text_gradient.compute_gradients(str(p), None, include_clarity=True, fmt=fmt)
+    }
+    assert not (issues & {"no_frontmatter", "missing_name", "missing_description"}), (
+        f"{fmt}: advises adding frontmatter that scoring already synthesises"
+    )
+
+
+def test_skill_md_still_gets_the_frontmatter_advice(tmp_path):
+    """The counter-case: skill.md is NOT normalized, so there the gradient is real."""
+    p = tmp_path / "SKILL.md"
+    p.write_text("# s\n\nRun `make build` to build.\n", encoding="utf-8")
+    issues = {
+        g["issue"]
+        for g in text_gradient.compute_gradients(str(p), None, include_clarity=True, fmt="skill.md")
+    }
+    assert "no_frontmatter" in issues
+
+
+def test_no_clarity_does_not_zero_a_headline_dimension(tmp_path):
+    """The composite uses a full denominator, so a popped dimension counts as
+    ZERO rather than being renormalized away. On system_prompt clarity weighs
+    0.15, and the opt-out turned 51.4 into 36.4."""
+    from scoring.registry import get_weights
+
+    dashboard = _load("dashboard_clarity", "dashboard.py")
+    p = tmp_path / "sys.prompt"
+    p.write_text(
+        "You are a helpful assistant.\n\nAlways cite sources.\n"
+        "Never invent a citation.\n\nReturn JSON with a `result` key.\n",
+        encoding="utf-8",
+    )
+    weight = get_weights("system_prompt").get("clarity")
+    assert weight and weight > 0.05, "fixture assumes clarity is a headline dim here"
+
+    full = dashboard.generate_dashboard(str(p))["composite_score"]
+    opted_out = dashboard.generate_dashboard(str(p), include_clarity=False)["composite_score"]
+    assert opted_out == pytest.approx(full, abs=0.05), (
+        f"--no-clarity dropped a 0.15-weight dimension to zero: {full} -> {opted_out}"
+    )
+
+
+def test_format_flag_rejects_a_typo():
+    """Without `choices`, `--format agentsmd` exited 0 and printed SKILL-only
+    advice, with no signal the flag had been ignored."""
+    out = subprocess.run(
+        [sys.executable, os.path.join(_SCRIPTS, "text_gradient.py"),
+         "x.md", "--format", "agentsmd"],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert out.returncode != 0
+    assert "invalid choice" in out.stderr
