@@ -375,3 +375,44 @@ real signature is positional. And `doctor`'s "Total context cost" sums SKILL.md 
 `references/*.md` (`shared.py:142`) while the score beside it measures only the SKILL.md, so the
 same file reads 7,748 tokens in one output and 1,044 in the other. That one is a labelling
 question, not an arithmetic error.
+
+## Amendment 2026-08-21 — the documented-command detector sees three shapes, not one
+
+This spec defined `_RE_DOCUMENTED_COMMAND` as a list-marker shape. It anchored on `^` plus a
+list marker, so it saw only top-level bullets — an indented sub-bullet and a markdown table row
+scored nothing, and the issue this closes (#194) measured that as roughly 40% of the documented
+commands in a 299-file corpus.
+
+**Contract change.** Production callers no longer use the pattern. They call
+`find_documented_commands(content)`, which covers all recognised shapes, so a fourth shape added
+later cannot leave a consumer behind. `test_no_production_caller_reaches_past_the_contract`
+enforces this by walking the whole scripts tree, not one hardcoded path.
+
+**The widening needed a filter, and that is the substantive part.** The two shapes do not carry
+the same evidence. In a list, the `—` asserts that what follows explains what precedes. In a
+table, `|` is only structure — so the row shape alone credits any two-column code reference. A
+first version without a filter admitted 9 non-commands against 2 real ones:
+`dynamic = 'force-dynamic'`, `app.ontoolresult = fn`, `new App(info, caps, {autoResize: true})`.
+
+`_RE_NOT_A_COMMAND` rejects a spaced assignment, a call, and a `new` expression. Spaced on
+purpose: `docker run -e FOO=bar` and `--limit=50` are real command text. The table shape also
+carries the same 10-character explanation floor as the list shape, without which
+a table row with a one-character cell counted while its list-form twin correctly did not.
+
+**Measurement log, corpus named.** Three different counts were quoted for this detector before
+anyone said which files they came from — 39/39 over "186 real files", 29/15/4 over 299 installed
+SKILL.md, 10/8/2 over 184. They are not reconcilable because they are different corpora.
+
+```text
+corpus: every *.md under ~/.claude and ~/Projects, excluding node_modules,
+        .venv and .git — 1732 files, 2026-08-21
+before: 79 hits      after: 155 hits      lost: 0
+new:    55 distinct, each classified rather than sampled —
+        53 genuine, 2 not commands (both rows of one error table)
+```
+
+Precision on the new shapes is 53/55. The two misses are accepted rather than filtered: the
+obvious discriminator would be the `...`, and `go test ./...` is a real command.
+
+**Score effect:** no file's score falls. Only credit is added, never withdrawn — the same
+monotonicity property this spec's §4 relies on.
