@@ -4,6 +4,10 @@ import re
 __all__ = [
     # Efficiency
     "_RE_ACTIONABLE_LINES",
+    # The raw patterns stay exported for tests that probe them directly. The
+    # contract for PRODUCTION callers is find_documented_commands, and
+    # test_documented_command_forms enforces that by grepping the scripts tree —
+    # __all__ cannot express "importable by tests, not by consumers".
     "_RE_DOCUMENTED_COMMAND",
     "_RE_DOCUMENTED_COMMAND_TABLE",
     "find_documented_commands",
@@ -86,14 +90,26 @@ _RE_ACTIONABLE_LINES = re.compile(
 # entry in the same shape is credited — `- `max_tokens int` — the maximum number of
 # tokens`. There is no structural signal that separates that from `- `make test` — run
 # the suite`, and inventing one would mean a wordlist of tool names, which is the design
-# this detector replaced. Measured over 186 real files: 39 hits, 39 of them genuine
-# commands, 0 option-list false positives — the two-token minimum already excludes the
-# common single-token option form (`- `max_tokens` — …`). Revisit if a field hit appears.
-# A documented command — a backticked command with its explanation beside it —
-# appears in three shapes in the field, and the original pattern saw only one.
-# Measured over 184 installed SKILL.md files: 10 top-level bullets were credited
-# while 8 table rows and 2 indented sub-bullets scored nothing, so half the
-# documented commands in the field went uncounted.
+# this detector replaced. The two-token minimum already excludes the common
+# single-token option form (`- `max_tokens` — …`).
+#
+# A documented command appears in three shapes, and the original pattern saw only
+# the first. MEASUREMENT LOG — corpus named, because three different counts were
+# quoted for this detector before anyone said which files they came from:
+#
+#   corpus: every *.md under ~/.claude and ~/Projects, excluding node_modules,
+#           .venv and .git — 1732 files, 2026-08-21
+#   before: 79 hits (top-level bullets only)
+#   after:  155 hits
+#   lost:   0 — no previously credited command stopped being credited
+#   new:    55 distinct, classified individually rather than sampled:
+#           53 genuine (`bun run test`, `vercel env pull`, `gh pr create`, …)
+#            2 not commands — both rows of one error table
+#           (`tls handshake failed ... bad certificate`)
+#
+# Precision on the new shapes is 53/55. The two misses are accepted rather than
+# filtered: the obvious discriminator would be the `...`, and `go test ./...` is a
+# real command.
 #
 # The command half is identical in all three: program-like head plus at least one
 # REAL argument. The `[^\s`]` is load-bearing — a dependency list aligns its
@@ -120,7 +136,12 @@ _RE_DOCUMENTED_COMMAND_TABLE = re.compile(
     r"^[ \t]*\|[ \t]*"
     + _CMD +
     r"[ \t]*\|[ \t]*"
-    r"(?:[^|\n]*\S[^|\n]*)",           # explanation cell, non-empty
+    # Same bar as the list shape: an explanation, not merely a non-empty cell.
+    # Without the length floor `| `git add` | x |` was credited while the list
+    # form `- `git add` — x` was correctly rejected, and a two-column error table
+    # ("| `tls handshake failed` | unknown certificate authority |") reads as a
+    # documented command.
+    r"(?:[^|\n]*\S[^|\n]{9,})",       # explanation cell, 10+ chars like the list form
     re.MULTILINE,
 )
 
@@ -136,7 +157,13 @@ _RE_NOT_A_COMMAND = re.compile(
     r"^[\w.\[\]]+[ \t]*=[ \t]"          # `dynamic = \'x\'` — spaced assignment.
                                         # Spaced on purpose: `docker run -e FOO=bar`
                                         # and `--flag=value` are real command text.
-    r"|^[A-Za-z_][\w.]*\("               # `fn(...)` — a call, not an invocation
+    r"|^[A-Za-z_][\w.]*[ \t]*\("          # `fn(...)` / `fn (...)` — a call.
+                                        # The `[ \t]*` is what makes this reachable:
+                                        # _CMD only yields a head followed by
+                                        # whitespace, so requiring `(` immediately
+                                        # after the head was dead code, and
+                                        # `app (x, y)` and `foo.bar (x)` were both
+                                        # credited as commands.
     r"|^new[ \t]"                        # `new App(...)`
 )
 

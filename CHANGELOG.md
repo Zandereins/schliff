@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **Documented commands in tables and indented bullets now count.** `efficiency`
+  credited a documented command only as a top-level bullet, so an indented
+  sub-bullet or a markdown command table scored nothing. Measured over 1732
+  markdown files: 79 hits before, 155 after, and **no previously credited
+  command lost**. The widening carries a filter — a table's `|` is structure,
+  not an assertion that the cell explains the command, so without one
+  `dynamic = 'force-dynamic'` and `new App(...)` were credited as commands.
+  Precision on the new shapes is 53/55.
+
 - **A line that *is* a command now counts as actionable content.** `efficiency` recognised
   English imperatives at line start, so `- \`tool score <file>\` — score one file` scored
   nothing while "Run the score command" scored. Only commands that carry their explanation

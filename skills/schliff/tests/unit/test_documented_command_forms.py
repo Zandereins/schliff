@@ -59,9 +59,49 @@ def test_list_marker_alone_on_a_line_credits_nothing():
     assert find_documented_commands("1.\n`npm run build` — build the bundle") == []
 
 
-def test_callers_go_through_the_contract():
-    """efficiency.py must not reach for an individual pattern: a fourth shape
-    added later would silently miss that consumer."""
-    src = open(os.path.join(_SCRIPTS, "scoring", "efficiency.py"), encoding="utf-8").read()
-    assert "find_documented_commands" in src
-    assert "_RE_DOCUMENTED_COMMAND" not in src
+def test_no_production_caller_reaches_past_the_contract():
+    """A fourth shape added later must not leave a consumer behind.
+
+    An earlier version of this test grepped exactly one hardcoded path
+    (efficiency.py), so a NEW module importing the raw pattern — the failure it
+    exists to prevent — would have passed it. It now walks the whole scripts
+    tree. Tests may still probe the patterns directly; the contract binds
+    production callers, which is a distinction __all__ cannot express.
+    """
+    import pathlib
+
+    offenders = []
+    for path in pathlib.Path(_SCRIPTS).rglob("*.py"):
+        if "test" in path.name:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if "_RE_DOCUMENTED_COMMAND" in text and path.name != "base.py":
+            offenders.append(str(path.relative_to(_SCRIPTS)))
+    assert not offenders, (
+        "these reach past find_documented_commands: " + ", ".join(offenders)
+    )
+
+    efficiency = pathlib.Path(_SCRIPTS, "scoring", "efficiency.py").read_text(encoding="utf-8")
+    assert "find_documented_commands" in efficiency, "the known consumer stopped using it"
+
+@pytest.mark.parametrize("text", [
+    # Branch 2 of _RE_NOT_A_COMMAND was unreachable: _CMD only ever yields a head
+    # followed by whitespace, so a `(` could never sit where the branch required
+    # it, and these were all credited as commands.
+    "| `app (x, y)` | Construct the app with two args |",
+    "| `foo.bar (x)` | Call the thing with one arg |",
+    "- `run (a, b)` — call the function with two args",
+])
+def test_call_expressions_are_not_commands(text):
+    assert find_documented_commands(text) == []
+
+
+@pytest.mark.parametrize("text,expected", [
+    # The table shape accepted ANY non-empty cell while the list shape required
+    # 10+ characters, so `| x |` counted where `— x` did not.
+    ("| `git add` | x |", []),
+    ("| `git add` | stages the given paths |", ["git add"]),
+    ("- `git add` — x", []),
+])
+def test_table_needs_a_real_explanation_like_the_list_form(text, expected):
+    assert find_documented_commands(text) == expected
