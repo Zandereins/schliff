@@ -7,9 +7,15 @@ because the shape that actually blew up has no nesting and no overlapping altern
 just an unbounded run before a required literal.
 
 Method: warm each pattern, then time `.search()` against a family of pathological
-filler alphabets at two sizes one doubling apart. Linear patterns come in near 2.0x;
-the measured defects were 3.9x-4.1x. The threshold is 3.0x with an absolute floor, so
-a loaded CI runner cannot flake it while the 4.0x class is still caught with margin.
+filler alphabets at two sizes one doubling apart. On the RAW scale linear patterns
+come in near 2.0x and the measured defects at 3.9x-4.1x — margins too close to
+separate reliably on a loaded runner.
+
+The ratio is therefore CALIBRATED: divided by the ratio of a known-linear scan of
+the same input, measured in the same process, so runner speed divides out. On that
+scale healthy patterns measure ~1.05 (max 1.08) and the defect class 2.4-2.8, and
+the threshold is 1.5x — see `_MAX_RATIO`. An absolute floor still applies, so a
+loaded CI runner cannot flake it while the 4.0x class is still caught with margin.
 
 Known limit, stated rather than glossed: this gate reaches exactly as far as its filler
 alphabet. That is not hypothetical — `manifest._FM` was quadratic on a frontmatter-shaped
@@ -113,12 +119,23 @@ _FILLERS = {
 }
 
 _N = 2000                 # base size; the comparison runs at 2*_N
-# Calibrated scale, not raw. Healthy patterns measure ~1.15 (max 1.21 over 20
-# runs); a quadratic `a*a*b` measures ~4.73. 2.0 sits between them with a factor
-# of ~1.65 to the nearest healthy sample and ~2.4 to the nearest defective one.
-# Raising this is NOT the way to fix a flake — above ~2.5 it stops separating
-# linear from quadratic at all.
-_MAX_RATIO = 2.0
+# Calibrated scale, not raw. Measured, with the DEFECT CLASS this gate exists for
+# — `[\w/]+:`, `[a-z]+@`, `a*b` on an all-`a` input, the module docstring's
+# 3.9x-4.1x shapes — not with a strawman:
+#
+#     healthy (rm -r+)        calibrated  1.05 median, 1.08 max
+#     defective ([\w/]+:)     calibrated  2.82 median, 2.40 MIN
+#
+# A first version of this threshold was 2.0, chosen against `a*a*b`. That pattern
+# is CUBIC (raw ~7.6 against the real class's ~3.9), so it flattered the margin:
+# review measured a real defective sample at 1.96, a false negative on an idle
+# machine. 1.5 sits between the classes with 39% headroom below and 60% above,
+# and leans toward the healthy side on purpose — for a security gate, crying wolf
+# once beats letting one defect through.
+#
+# Raising this is NOT how to fix a flake: past ~2.4 it stops separating the
+# classes at all.
+_MAX_RATIO = 1.5
 _MIN_ABS_SECONDS = 0.004  # below this, timing noise dominates — ignore the ratio
 
 
@@ -156,6 +173,23 @@ def _collect_patterns():
 _PATTERNS = _collect_patterns()
 
 
+def test_the_calibrator_does_not_blind_the_whole_gate():
+    """A None calibrator ratio makes every parametrized case pass vacuously.
+
+    `_ratio` returns None when the calibrator cannot be timed, and that verdict
+    is cached per input pair — so one bad measurement blinds all 224 cases for
+    the rest of the session, with nothing red to show for it. On a runner with a
+    coarse perf_counter this is not hypothetical.
+    """
+    make = _FILLERS["word"]
+    ratio = _calibrator_ratio(make(_N), make(_N * 2), reps=2)
+    assert ratio is not None, "the calibrator could not be timed; every case would pass vacuously"
+    assert 0.5 < ratio < 5.0, (
+        f"calibrator ratio {ratio:.2f} is implausible for a linear scan — "
+        "the division would distort every pattern's result"
+    )
+
+
 def test_the_gate_actually_sees_the_patterns():
     """A gate that collects nothing passes vacuously — and one that collects less than it
     used to has quietly stopped guarding part of the engine. 224 unique compiled patterns
@@ -189,11 +223,30 @@ _CALIBRATOR = re.compile(r"zzz-this-literal-is-not-present")
 _CALIBRATOR_CACHE: dict = {}
 
 
+def _timed_scans(rx, text: str, target_seconds: float = _MIN_ABS_SECONDS) -> float:
+    """Seconds per scan, averaged over enough scans to clear the timing floor.
+
+    A single `re.search` of the calibrator costs ~0.8 microseconds — three orders
+    of magnitude under `_MIN_ABS_SECONDS`, the floor this file applies to every
+    other measurement because below it noise dominates. Timing it the same way as
+    the pattern under test meant dividing by a number that was mostly jitter.
+    """
+    n = 64
+    while True:
+        start = time.perf_counter()
+        for _ in range(n):
+            rx.search(text)
+        elapsed = time.perf_counter() - start
+        if elapsed >= target_seconds or n >= 1_000_000:
+            return elapsed / n
+        n *= 8
+
+
 def _calibrator_ratio(small: str, large: str, reps: int):
-    key = (len(small), len(large), small[:8], large[:8], reps)
+    key = (len(small), len(large), small[:8], large[:8])
     if key not in _CALIBRATOR_CACHE:
-        c_small = _best_of(_CALIBRATOR, small, reps)
-        c_large = _best_of(_CALIBRATOR, large, reps)
+        c_small = _timed_scans(_CALIBRATOR, small)
+        c_large = _timed_scans(_CALIBRATOR, large)
         _CALIBRATOR_CACHE[key] = (
             c_large / c_small if c_small > 0 and c_large > 0 else None
         )
@@ -227,32 +280,41 @@ def _ratio(rx, make, n, reps):
     return (t_large / t_small) / calibrator_ratio, t_small, t_large
 
 
-def test_the_gate_still_separates_linear_from_quadratic():
+def test_the_gate_still_fires_on_the_real_defect_class():
     """A calibrated threshold is only worth having if it still fires.
 
-    Raising a flaky threshold is the obvious fix and the wrong one: the healthy
-    margin sits just under the old 3.0, so anything above ~2.5 stops separating
-    the two classes at all. This test is the evidence that 2.0 on the calibrated
-    scale did not buy stability by going blind.
+    Measured against the shapes this gate exists for — an unbounded run before a
+    required literal, the module docstring's 3.9x-4.1x defects — not against a
+    strawman. A first version of this test used `a*a*b`, which is CUBIC (raw ~7.6
+    vs the real class's ~3.9); it "passed" with room to spare while the threshold
+    it validated sat on top of the real class, where review measured a sample at
+    1.96 against a 2.0 gate.
 
-    Small inputs on purpose. `a*a*b` at the suite's own _N takes minutes, so
-    injecting it into a real pattern module hangs the run rather than failing it
-    — the gate has a floor (`_MIN_ABS_SECONDS`) but no ceiling.
+    There is no linear arm here on purpose. The first version had one, and it was
+    dead code: `a*b` on 600 chars runs in 0.2ms, under _MIN_ABS_SECONDS, so
+    `_ratio` returned None every time and the assertion never executed. `a*b` is
+    also not linear against an all-`a` input — it is itself a member of the defect
+    class. The healthy side is already covered by the 224 parametrized cases.
     """
-    quadratic = re.compile(r"a*a*b")            # scans every prefix; no 'b' in the input
-    linear = re.compile(r"a*b")
-    make = lambda n: "a" * n                    # noqa: E731
-
-    q_ratio, _, _ = _ratio(quadratic, make, 300, reps=3)
-    l_ratio, _, _ = _ratio(linear, make, 300, reps=3)
-
-    assert q_ratio is not None, "the quadratic sample fell under the timing floor"
-    assert q_ratio >= _MAX_RATIO, (
-        f"a genuinely quadratic pattern measured {q_ratio:.2f}, below the "
-        f"{_MAX_RATIO} threshold — the gate would not catch it"
+    make = lambda n: "a" * n                       # noqa: E731
+    defects = {
+        "[\\w/]+:": re.compile(r"[\w/]+:"),
+        "[a-z]+@": re.compile(r"[a-z]+@"),
+        "a*b": re.compile(r"a*b"),
+    }
+    missed = []
+    for label, rx in defects.items():
+        # 2000, not 600: at 600 two of these three run in under _MIN_ABS_SECONDS
+        # and _ratio returns None, so the test would report "unmeasured" for the
+        # very patterns it exists to catch. Measured at 2000: 8.4ms, 33ms, 71ms.
+        ratio, _, _ = _ratio(rx, make, 2000, reps=3)
+        if ratio is None:
+            missed.append(f"{label}: fell under the timing floor, unmeasured")
+        elif ratio < _MAX_RATIO:
+            missed.append(f"{label}: {ratio:.2f}, under the {_MAX_RATIO} threshold")
+    assert not missed, (
+        "the gate would not catch a known-defective pattern:\n  " + "\n  ".join(missed)
     )
-    if l_ratio is not None:
-        assert l_ratio < q_ratio, "linear and quadratic are no longer distinguishable"
 
 
 @pytest.mark.parametrize("path,rx", _PATTERNS, ids=[p for p, _ in _PATTERNS])
@@ -261,10 +323,14 @@ def test_pattern_scales_linearly(path, rx):
 
     Stage 1 is a cheap sweep over every filler. Anything it flags is re-measured in
     stage 2 with more repetitions AND at a second doubling, and only counts if BOTH
-    doublings are super-linear. A quadratic pattern shows ~4.0x at every doubling; a
-    scheduling hiccup shows once. Measured margin for the healthy patterns is 1.3-2.4x
-    against a 3.0x threshold, which is too thin to rest on a single sample — a flaky
-    gate gets disabled, and a disabled gate is worse than none.
+    doublings are super-linear. A quadratic pattern shows ~4.0x raw at every doubling;
+    a scheduling hiccup shows once.
+
+    On the raw scale the healthy margin was 1.3-2.4x against a 3.0x threshold, too
+    thin to rest on a single sample — and a CI runner duly produced 3.09x on a
+    pattern whose idle median is 2.07x. Calibration widens that: healthy ~1.05
+    against a 1.5x threshold. A flaky gate gets disabled, and a disabled gate is
+    worse than none.
     """
     offenders = []
     for filler_name, make in _FILLERS.items():
