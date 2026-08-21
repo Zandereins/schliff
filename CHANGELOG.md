@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **`operational_coverage` now produces fixes.** On an AGENTS.md the heaviest dimension —
+  weight 0.4, tied with `structure` — had no fix path at all: a file scoring 0/100 there was
+  told to "add 2+ concrete examples" for +2 while forty composite points went unmentioned.
+  `text_gradient` now emits a ranked fix for every missing category (setup, build, test,
+  code_style, gotchas, pr). Field evidence, 30 real AGENTS.md files: median
+  `operational_coverage` 35/100, 17 of 30 below 40.
+  The stated delta is exact for the dimension and approximate for the composite — on a
+  saturated file the `pr` fix states +4.0 and delivers +2.8, because the added prose dilutes
+  `efficiency`; on a bare file it undershoots instead. Confidence is `medium`, and these are
+  advice, not auto-applied patches. Each instruction carries a canonical example that the
+  tests score, so advice and fixture cannot drift apart — but the examples illustrate, they
+  are not a recipe: pasted verbatim they earn a Node repo full test credit for a `pytest` it
+  does not have. That is why every command instruction says *your* repo's command and points
+  at `schliff check-commands`, which resolves a documented command against the repository.
+
 ### Fixed
 
 - **Documented commands in tables and indented bullets now count.** `efficiency`
@@ -15,6 +32,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   not an assertion that the cell explains the command, so without one
   `dynamic = 'force-dynamic'` and `new App(...)` were credited as commands.
   Precision on the new shapes is 53/55.
+
+- **Fix deltas on an AGENTS.md no longer understate themselves by ~2.7x.** Every hardcoded
+  delta in `text_gradient.py` is a composite estimate sized against **skill.md's** weight
+  table — `missing_name: 1.5` is 10 dimension points times structure's 0.15 there — and the
+  same literal was emitted whatever the format. On an AGENTS.md, where `structure` carries
+  0.4, a file whose only defect was a TODO marker reported delta 1.5 while removing it moved
+  the composite 88.6 -> 93.0. Decomposed, structure contributes 10 x 0.4 = +4.00 and
+  `efficiency` the remaining +0.40; the gradient now reports exactly that 4.0. The wrong
+  number was not the only cost: under-reported structure fixes sank in the ranking, and
+  top-N truncation dropped the cheap auto-applicable ones first. The rescale applies to
+  `agents.md` alone, because that is the only basis that was measured — `skill.md`,
+  `claude.md` and `cursorrules` are unchanged, verified over 494 gradients across 60 corpus
+  files: issue for issue, delta for delta, priority for priority.
+
+- **`/schliff:auto` and the dashboard no longer advise an AGENTS.md as if it were a
+  SKILL.md.** Three callers resolved no format — `auto-improve.py`, `dashboard.py`, and
+  `text_gradient.py`'s own CLI, whose argparse had no `--format` flag at all.
+  `compute_gradients` uses the format to decide which fixes apply and `compute_composite`
+  to decide which dimensions count, so omitting it broke both halves at once: an AGENTS.md
+  was told to create an `eval-suite.json` worth 25 points, and never heard about
+  `operational_coverage`. Passing the format alone would not have been enough: both scripts
+  hand-listed their dimensions, and the composite counts a dimension missing from that list
+  as ZERO — on a bare AGENTS.md, `structure` and `efficiency` under the correct weights
+  still give 23.0 where the registry's set gives 35.0, which reads as a weak file rather
+  than a bug. The dimension set now comes from the registry, so three hand-maintained
+  copies become one source of truth. End to end on that file, the dashboard moves from
+  12.1 to 35.0. `text_gradient` also has a `--format` flag now, with `choices` — a typo
+  used to exit 0 and print exactly the SKILL-only advice the flag exists to prevent.
 
 - **A line that *is* a command now counts as actionable content.** `efficiency` recognised
   English imperatives at line start, so `- \`tool score <file>\` — score one file` scored
@@ -41,6 +86,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   instruction. A test now checks every documented invocation against the real parser.
 
 ### Notes
+
+- The composite `dashboard.py` and `auto-improve.py` print **changes for non-SKILL
+  formats**, because they now resolve the format and score through the registry. On an
+  AGENTS.md it goes up, and by a lot — the dimension they never listed counted as zero
+  (a bare AGENTS.md: 12.1 -> 35.0).
+  On a CLAUDE.md or a `.cursorrules` the dimension set was already right, but the format
+  now reaches the scorers and the weight table, so the number can still move (measured on
+  a small CLAUDE.md: 25.3 -> 30.0). A SKILL.md is unaffected, byte for byte. Readings you
+  recorded from an earlier version are not comparable for the non-SKILL formats.
 
 - Scores for files that document their commands or state an error contract go **up**; no
   file's score goes down. If you gate CI with `verify --min-score`, nothing you pass today
