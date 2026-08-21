@@ -142,16 +142,46 @@ class TestFrontmatterParseIsBoundedAndLinear:
     """
 
     def test_unterminated_frontmatter_parses_in_linear_time(self, tmp_path):
+        """Best-of-N per size, not a single sample.
+
+        This took one timing per size and compared consecutive ones against 3.0.
+        A single sample carries whatever the scheduler did during it, so the test
+        failed on an unmodified tree — reproduced locally as pass/fail/pass on
+        three consecutive runs. Scheduler noise only ever ADDS time, so the
+        minimum of several timings is the estimate closest to the true cost.
+
+        25 repetitions, measured rather than guessed. The FIRST size is the one
+        that flakes, because at ~0.27ms it sits in the noise:
+
+            reps= 3  ->  32k/16k max 3.19, over the 3.0 threshold in 1 of 15
+            reps=10  ->  max 2.78, 0 of 15
+            reps=25  ->  max 1.87, 0 of 15
+
+        Margin, not luck, is what keeps a gate off the re-run treadmill. The
+        whole loop costs ~75ms.
+
+        The sizes are NOT raised to stabilise it: parse_frontmatter reads at most
+        _FM_READ_CHARS (64k), so above that the time stops growing with the file
+        and the ratio collapses to ~1.05 — stable and blind. Measured at
+        64k/128k/256k while looking for a cheaper fix.
+        """
         import time
 
         from manifest import parse_frontmatter
         p = tmp_path / "SKILL.md"
+
+        def best_of(path, reps=25):
+            best = float("inf")
+            for _ in range(reps):
+                start = time.perf_counter()
+                parse_frontmatter(path)
+                best = min(best, time.perf_counter() - start)
+            return best
+
         prev = None
         for n in (16_000, 32_000, 64_000):
             p.write_text("---" + "\n" * n, encoding="utf-8")
-            start = time.perf_counter()
-            parse_frontmatter(p)
-            elapsed = time.perf_counter() - start
+            elapsed = best_of(p)
             if prev is not None:
                 assert elapsed / prev < 3.0, (
                     f"parse_frontmatter is super-linear: {prev * 1000:.1f}ms -> "

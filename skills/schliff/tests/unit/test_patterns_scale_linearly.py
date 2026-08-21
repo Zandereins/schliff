@@ -113,7 +113,12 @@ _FILLERS = {
 }
 
 _N = 2000                 # base size; the comparison runs at 2*_N
-_MAX_RATIO = 3.0          # linear ~2.0, the measured defects were 3.9-4.1
+# Calibrated scale, not raw. Healthy patterns measure ~1.15 (max 1.21 over 20
+# runs); a quadratic `a*a*b` measures ~4.73. 2.0 sits between them with a factor
+# of ~1.65 to the nearest healthy sample and ~2.4 to the nearest defective one.
+# Raising this is NOT the way to fix a flake — above ~2.5 it stops separating
+# linear from quadratic at all.
+_MAX_RATIO = 2.0
 _MIN_ABS_SECONDS = 0.004  # below this, timing noise dominates — ignore the ratio
 
 
@@ -172,13 +177,82 @@ def _best_of(rx, text, reps=2):
     return best
 
 
+# Calibrator: linear by construction — a literal that never matches, so it scans
+# the whole input once and nothing else. Measured in the SAME process on the SAME
+# text, so runner speed divides out of the comparison.
+_CALIBRATOR = re.compile(r"zzz-this-literal-is-not-present")
+
+# The calibrator's own ratio depends only on the two input strings, not on the
+# pattern under test, so measuring it per pattern multiplied the suite's runtime
+# by ~4 for no extra information. Keyed on lengths and first bytes: the fillers
+# are generated, so that identifies the pair without holding megabytes.
+_CALIBRATOR_CACHE: dict = {}
+
+
+def _calibrator_ratio(small: str, large: str, reps: int):
+    key = (len(small), len(large), small[:8], large[:8], reps)
+    if key not in _CALIBRATOR_CACHE:
+        c_small = _best_of(_CALIBRATOR, small, reps)
+        c_large = _best_of(_CALIBRATOR, large, reps)
+        _CALIBRATOR_CACHE[key] = (
+            c_large / c_small if c_small > 0 and c_large > 0 else None
+        )
+    return _CALIBRATOR_CACHE[key]
+
+
 def _ratio(rx, make, n, reps):
+    """Growth of `rx` relative to a known-linear scan of the same input.
+
+    The raw t_large/t_small ratio was the original gate, and it flaked: measured
+    over 50 runs of one healthy pattern, 8% of stage-1 samples crossed 3.0, and a
+    CI runner produced 3.09/3.03 on a pattern that is linear (idle median 2.07).
+    A loaded runner does not just add time, it widens the spread, and taking the
+    minimum of several timings does not help when every timing is affected.
+
+    Dividing by the calibrator's own ratio removes the shared component. Measured
+    over the same fillers: linear 2.07 raw -> 1.15 calibrated (max 1.21), while a
+    genuinely quadratic `a*a*b` goes 7.45 raw -> 4.73 calibrated (min ~4.7). The
+    margin widens from a factor of 1.25 against the old threshold to 3.9.
+    """
     small, large = make(n), make(n * 2)
     t_small = _best_of(rx, small, reps)
     t_large = _best_of(rx, large, reps)
     if t_large < _MIN_ABS_SECONDS or t_small <= 0:
         return None, t_small, t_large
-    return t_large / t_small, t_small, t_large
+
+    calibrator_ratio = _calibrator_ratio(small, large, reps)
+    if calibrator_ratio is None:
+        return None, t_small, t_large
+
+    return (t_large / t_small) / calibrator_ratio, t_small, t_large
+
+
+def test_the_gate_still_separates_linear_from_quadratic():
+    """A calibrated threshold is only worth having if it still fires.
+
+    Raising a flaky threshold is the obvious fix and the wrong one: the healthy
+    margin sits just under the old 3.0, so anything above ~2.5 stops separating
+    the two classes at all. This test is the evidence that 2.0 on the calibrated
+    scale did not buy stability by going blind.
+
+    Small inputs on purpose. `a*a*b` at the suite's own _N takes minutes, so
+    injecting it into a real pattern module hangs the run rather than failing it
+    — the gate has a floor (`_MIN_ABS_SECONDS`) but no ceiling.
+    """
+    quadratic = re.compile(r"a*a*b")            # scans every prefix; no 'b' in the input
+    linear = re.compile(r"a*b")
+    make = lambda n: "a" * n                    # noqa: E731
+
+    q_ratio, _, _ = _ratio(quadratic, make, 300, reps=3)
+    l_ratio, _, _ = _ratio(linear, make, 300, reps=3)
+
+    assert q_ratio is not None, "the quadratic sample fell under the timing floor"
+    assert q_ratio >= _MAX_RATIO, (
+        f"a genuinely quadratic pattern measured {q_ratio:.2f}, below the "
+        f"{_MAX_RATIO} threshold — the gate would not catch it"
+    )
+    if l_ratio is not None:
+        assert l_ratio < q_ratio, "linear and quadratic are no longer distinguishable"
 
 
 @pytest.mark.parametrize("path,rx", _PATTERNS, ids=[p for p, _ in _PATTERNS])
