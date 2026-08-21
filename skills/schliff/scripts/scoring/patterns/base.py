@@ -4,7 +4,13 @@ import re
 __all__ = [
     # Efficiency
     "_RE_ACTIONABLE_LINES",
+    # The raw patterns stay exported for tests that probe them directly. The
+    # contract for PRODUCTION callers is find_documented_commands, and
+    # test_documented_command_forms enforces that by grepping the scripts tree —
+    # __all__ cannot express "importable by tests, not by consumers".
     "_RE_DOCUMENTED_COMMAND",
+    "_RE_DOCUMENTED_COMMAND_TABLE",
+    "find_documented_commands",
     "normalize_command",
     "_RE_WHY_COUNT",
     "_RE_VERIFICATION_CMDS",
@@ -84,24 +90,99 @@ _RE_ACTIONABLE_LINES = re.compile(
 # entry in the same shape is credited — `- `max_tokens int` — the maximum number of
 # tokens`. There is no structural signal that separates that from `- `make test` — run
 # the suite`, and inventing one would mean a wordlist of tool names, which is the design
-# this detector replaced. Measured over 186 real files: 39 hits, 39 of them genuine
-# commands, 0 option-list false positives — the two-token minimum already excludes the
-# common single-token option form (`- `max_tokens` — …`). Revisit if a field hit appears.
+# this detector replaced. The two-token minimum already excludes the common
+# single-token option form (`- `max_tokens` — …`).
+#
+# A documented command appears in three shapes, and the original pattern saw only
+# the first. MEASUREMENT LOG — corpus named, because three different counts were
+# quoted for this detector before anyone said which files they came from:
+#
+#   corpus: every *.md under ~/.claude and ~/Projects, excluding node_modules,
+#           .venv and .git — 1732 files, 2026-08-21
+#   before: 79 hits (top-level bullets only)
+#   after:  155 hits
+#   lost:   0 — no previously credited command stopped being credited
+#   new:    55 distinct, classified individually rather than sampled:
+#           53 genuine (`bun run test`, `vercel env pull`, `gh pr create`, …)
+#            2 not commands — both rows of one error table
+#           (`tls handshake failed ... bad certificate`)
+#
+# Precision on the new shapes is 53/55. The two misses are accepted rather than
+# filtered: the obvious discriminator would be the `...`, and `go test ./...` is a
+# real command.
+#
+# The command half is identical in all three: program-like head plus at least one
+# REAL argument. The `[^\s`]` is load-bearing — a dependency list aligns its
+# entries with trailing spaces (`` `coverlet.collector     ` : Coverlet is a …
+# library ``), which otherwise reads as "program + argument" and credits a
+# package name as a command.
+_CMD = r"`([a-z][\w.@/-]*[ \t]+[^\s`][^`\n]*)`"
+
+# `[ \t]` not `\s` throughout — `\s` crosses a newline, so a bare "1." on its own
+# line would credit the backticked command on the NEXT line as documented.
 _RE_DOCUMENTED_COMMAND = re.compile(
-    # `[ \t]` not `\s` — third instance of the same class in this changeset. It was
-    # swept out of _RE_ERROR_BEHAVIOR and _RE_DEPENDENCY_DECL and then reintroduced
-    # here: `\s` after the list marker crosses a newline, so a bare "1." on its own
-    # line credited the backticked command on the NEXT line as documented.
-    r"^(?:\d+\.[ \t]*|[-*+][ \t]+)"     # list marker — a documented command is a list item
-    # Backticked: program-like head + at least one REAL argument. The `[^\s`]` is
-    # load-bearing — a dependency list aligns its entries with trailing spaces
-    # (`` `coverlet.collector     ` : Coverlet is a … library ``), which otherwise
-    # reads as "program + argument" and credits a package name as a command.
-    r"`([a-z][\w.@/-]*[ \t]+[^\s`][^`\n]*)`"
+    r"^[ \t]*"                          # indentation: sub-bullets count too
+    r"(?:\d+\.[ \t]*|[-*+][ \t]+)"      # list marker
+    + _CMD +
     r"[ \t]*[—–:-][ \t]+"               # separator between command and explanation
-    r"(\S[^\n]{9,})",                   # the explanation itself, on the same line
+    r"(?:\S[^\n]{9,})",                 # the explanation itself, on the same line
     re.MULTILINE,
 )
+
+# Table row: `| \`tool sub\` | what it does |`. The separator is the cell wall, not
+# a dash, so this cannot be folded into the pattern above as one alternation
+# without giving the command two different group numbers.
+_RE_DOCUMENTED_COMMAND_TABLE = re.compile(
+    r"^[ \t]*\|[ \t]*"
+    + _CMD +
+    r"[ \t]*\|[ \t]*"
+    # Same bar as the list shape: an explanation, not merely a non-empty cell.
+    # Without the length floor `| `git add` | x |` was credited while the list
+    # form `- `git add` — x` was correctly rejected, and a two-column error table
+    # ("| `tls handshake failed` | unknown certificate authority |") reads as a
+    # documented command.
+    r"(?:[^|\n]*\S[^|\n]{9,})",       # explanation cell, 10+ chars like the list form
+    re.MULTILINE,
+)
+
+
+# A table cell is not an explanation. In a list, the `—` separator asserts that
+# what follows explains what precedes; in a table the `|` is just structure, so
+# the row shape alone credits any two-column code reference. Measured over the
+# field: widening to tables without this filter admitted 9 non-commands against
+# 2 real ones — `dynamic = \'force-dynamic\'`, `app.ontoolresult = fn`,
+# `new App(info, caps, {autoResize: true})` — dropping precision from 39/39 to
+# 2/11. A command is an invocation, not an assignment or a constructor call.
+_RE_NOT_A_COMMAND = re.compile(
+    r"^[\w.\[\]]+[ \t]*=[ \t]"          # `dynamic = \'x\'` — spaced assignment.
+                                        # Spaced on purpose: `docker run -e FOO=bar`
+                                        # and `--flag=value` are real command text.
+    r"|^[A-Za-z_][\w.]*[ \t]*\("          # `fn(...)` / `fn (...)` — a call.
+                                        # The `[ \t]*` is what makes this reachable:
+                                        # _CMD only yields a head followed by
+                                        # whitespace, so requiring `(` immediately
+                                        # after the head was dead code, and
+                                        # `app (x, y)` and `foo.bar (x)` were both
+                                        # credited as commands.
+    r"|^new[ \t]"                        # `new App(...)`
+)
+
+
+def find_documented_commands(content: str) -> list[str]:
+    """Every documented command in the text, in all recognised shapes.
+
+    Callers must not reach for the individual patterns: this function is the
+    contract, so adding a fourth shape later cannot leave one consumer behind.
+    Returns raw command text; the caller decides identity via normalize_command.
+    """
+    out = []
+    for rx in (_RE_DOCUMENTED_COMMAND, _RE_DOCUMENTED_COMMAND_TABLE):
+        out.extend(
+            m.group(1) for m in rx.finditer(content)
+            if not _RE_NOT_A_COMMAND.match(m.group(1))
+        )
+    return out
+
 
 # Argument-like token: placeholder, flag, shell operator, or a file with an extension.
 # The operator branch covers the full set, not just `|`: an unstopped `&&`, `>` or `;`
