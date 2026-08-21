@@ -78,18 +78,22 @@ def generate_dashboard(
             print(f"Warning: failed to parse eval-suite.json: {e}", file=sys.stderr)
 
     _na = {"score": -1, "issues": [], "details": {}}
+    fmt = None
     if scorer is not None:
-        scores = {
-            "structure": scorer.score_structure(skill_path),
-            "triggers": scorer.score_triggers(skill_path, eval_suite),
-            "quality": scorer.score_quality(skill_path, eval_suite),
-            "edges": scorer.score_edges(skill_path, eval_suite),
-            "efficiency": scorer.score_efficiency(skill_path),
-            "composability": scorer.score_composability(skill_path),
-        }
-        if include_clarity:
-            scores["clarity"] = scorer.score_clarity(skill_path)
-        composite = scorer.compute_composite(scores)
+        # Resolve the format once and pass it everywhere. Hand-listing dimensions
+        # here meant an AGENTS.md was scored without operational_coverage — its
+        # heaviest dimension, weight 0.4 — which the composite then counted as
+        # zero: 27.0 where build_scores gives 39.0. The registry knows which
+        # dimensions a format has; this file should not carry a second opinion.
+        from scoring.formats import detect_format
+        from shared import build_scores
+        fmt = detect_format(skill_path)
+        scores = build_scores(skill_path, eval_suite, include_runtime=False, fmt=fmt)
+        if not include_clarity:
+            # --no-clarity is an opt-OUT; build_scores follows the registry, where
+            # clarity is in the default set.
+            scores.pop("clarity", None)
+        composite = scorer.compute_composite(scores, fmt=fmt)
     else:
         scores = {
             "structure": _na, "triggers": _na, "quality": _na,
@@ -103,7 +107,7 @@ def generate_dashboard(
     if gradient_engine is not None:
         gradients = gradient_engine.compute_gradients(
             skill_path, eval_suite=eval_suite,
-            include_clarity=include_clarity, top_n=5,
+            include_clarity=include_clarity, top_n=5, fmt=fmt,
         )
     else:
         gradients = []

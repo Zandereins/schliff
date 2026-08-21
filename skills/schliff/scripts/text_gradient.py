@@ -1226,6 +1226,11 @@ def main():
     parser.add_argument("--patch", action="store_true", help="Generate concrete patches for deterministic fixes")
     parser.add_argument("--apply", action="store_true", help="Apply deterministic patches directly to file")
     parser.add_argument("--dry-run", action="store_true", help="Show what --apply would do without writing")
+    parser.add_argument(
+        "--format", dest="fmt", default=None,
+        help="Instruction-file format (skill.md, agents.md, claude.md, cursorrules, "
+             "system_prompt). Detected from the file when omitted.",
+    )
     args = parser.parse_args()
 
     eval_suite = None
@@ -1261,11 +1266,18 @@ def main():
             )
             eval_suite = None
 
+    # Without a format this CLI advised an AGENTS.md to add YAML frontmatter and
+    # to create an eval-suite.json worth 25 points — neither exists for that
+    # format — and never mentioned operational_coverage, its heaviest dimension.
+    from scoring.formats import detect_format
+    fmt = args.fmt or detect_format(args.skill_path)
+
     gradients = compute_gradients(
         args.skill_path,
         eval_suite=eval_suite,
         include_clarity=args.clarity,
         top_n=args.top,
+        fmt=fmt,
     )
 
     if args.apply or (args.patch and args.dry_run):
