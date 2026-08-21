@@ -795,7 +795,13 @@ def compute_gradients(
     gradients = []
 
     structure_grads = _compute_structure_gradients(skill_path)
-    if agents_only:
+    # build_scores normalizes EVERY format except skill.md, synthesizing the
+    # frontmatter before scoring — so `no_frontmatter` is already credited there
+    # and a patch for it is worth exactly 0.0. auto-improve keeps zero-delta
+    # patches (its gate is `>= 0`), so a CLAUDE.md came back with an invented
+    # `---\nname: …\n---` block for no gain. The suppression therefore has to
+    # follow normalization, not just agents.md.
+    if resolved is not None and resolved != "skill.md":
         # AGENTS.md uses no SKILL-style YAML name/description frontmatter; the engine
         # synthesizes it before scoring (so the score is not penalized), and the fix-path
         # must not advise adding it. Suppress the frontmatter-family structure issues. (R2)
@@ -1226,6 +1232,19 @@ def main():
     parser.add_argument("--patch", action="store_true", help="Generate concrete patches for deterministic fixes")
     parser.add_argument("--apply", action="store_true", help="Apply deterministic patches directly to file")
     parser.add_argument("--dry-run", action="store_true", help="Show what --apply would do without writing")
+    # `choices` is not optional here. Without it a typo (`--format agentsmd`)
+    # falls through FORMAT_ALIASES.get(fmt, fmt) unrecognised, takes the
+    # not-agents.md branch, exits 0 and prints exactly the SKILL-only advice this
+    # flag exists to prevent — with no signal that the flag was ignored. cli.py
+    # guards the same flag this way.
+    #
+    # system_prompt is deliberately absent: compute_gradients has no branch for
+    # it, so offering it would advertise a format that gets SKILL.md advice.
+    _FORMAT_CHOICES = ["skill.md", "agents.md", "claude.md", "cursorrules"]
+    parser.add_argument(
+        "--format", dest="fmt", default=None, choices=_FORMAT_CHOICES,
+        help="Instruction-file format (%(choices)s). Detected from the file when omitted.",
+    )
     args = parser.parse_args()
 
     eval_suite = None
@@ -1261,11 +1280,18 @@ def main():
             )
             eval_suite = None
 
+    # Without a format this CLI advised an AGENTS.md to add YAML frontmatter and
+    # to create an eval-suite.json worth 25 points — neither exists for that
+    # format — and never mentioned operational_coverage, its heaviest dimension.
+    from scoring.formats import detect_format
+    fmt = args.fmt or detect_format(args.skill_path)
+
     gradients = compute_gradients(
         args.skill_path,
         eval_suite=eval_suite,
         include_clarity=args.clarity,
         top_n=args.top,
+        fmt=fmt,
     )
 
     if args.apply or (args.patch and args.dry_run):
