@@ -73,7 +73,7 @@ known-first-party = ["scoring", "shared", "nlp"]
 evolve = ["litellm>=1.40.0,<2.0.0"]
 # Phase-1 LLM-judge smoke-test only (skills/schliff/scripts/judge/judge_v0.py).
 # Core schliff stays zero-dependency; install with `uv pip install -e ".[judge]"`.
-judge = ["anthropic>=0.104,<1.0", "pydantic>=2.13,<3.0"]
+judge = ["anthropic>=0.104,<2.0", "pydantic>=2.13,<3.0"]
 # Phase 3b: mcp = ["mcp>=1.0.0,<2.0.0"]
 
 [tool.pytest.ini_options]
