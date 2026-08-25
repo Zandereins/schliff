@@ -83,15 +83,19 @@ class TestDependencyDeclaration:
 
 
 class TestVersionCompatibility:
-    r"""A version pin is a compatibility FACT: a stated version, in some syntax.
+    """A version pin is a compatibility FACT: a stated version, in some syntax.
 
     `tool@1.2.3` and the prose forms below qualify. The bare instruction
     `pin the version` does not — it names no version — and that alternative was
-    removed. If it is ever re-added, the ALTERNATIVE ITSELF must require a version
-    token (`pin\s+the\s+version\s+(?:to|at)\s+[\d.]+`), never the bare phrase:
-    an alternative matching the phrase alone hands `Pin the version.` 10 points
-    again, which is the whole defect. A narrowed form was tried and reverted for
-    separate reasons — see the spec — so check that history before rebuilding it.
+    removed.
+
+    If you are re-adding a phrase alternative: do not copy a regex from this
+    docstring. An earlier version of it prescribed one that matched
+    "Pin the version to 1.2.3.", which the negative cases below forbid, and that
+    still missed the backticked form. The negative cases ARE the specification —
+    run any candidate against them, and against the reverted narrowed form
+    recorded in docs/specs/2026-08-13-structural-signal-detection.md, before
+    believing it works.
     """
     @pytest.mark.parametrize("text", [
         # schliff's own line — a pin, in the syntax people actually use.

@@ -444,10 +444,13 @@ error directions at once:
   always inside backticks;
 - it **credited** "Pin the version in step 2.1." — a step number is not a version.
 
-The field settles it: all 10 occurrences of the phrase across 2304 local `.md` files write it as
-``Pin the version in CI: `tool@version` ``, which the `@` alternative already credits. So the
-alternative is not needed at all, and a re-added one must require a version token rather than the
-phrase.
+The field settles it, and the numbers agree with the loss count above: the phrase occurs **20
+times across 9 files** in that corpus. Six of those files also carry a `tool@version` pin, which
+the `@` alternative credits on its own — so removing the phrase costs them nothing. The remaining
+**3 are the files listed above as losing the credit**, and none of them names a version anywhere:
+they are instructions (`Pin the version pair precisely`) and notes about this defect. There is no
+file in the corpus that states a version through this phrase and through nothing else, which is
+the case a phrase alternative would have to exist for.
 
 *What is deliberately NOT fixed — an SSH target is still credited as a pin.*
 `ssh root@100.127.18.39` has digits after the `@` and earns the 10 points. Four review rounds
