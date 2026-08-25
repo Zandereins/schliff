@@ -94,6 +94,10 @@ class TestVersionCompatibility:
         "Requires node >= 18.0",
         "Minimum version 3.9.",
         "Compatible with Python 3.12",
+        # Four-part pins are real — V8 numbers them this way — and the SSH
+        # discriminator below must not swallow them. `288` is not a valid
+        # octet, so this cannot be an address.
+        "Built against v8@6.7.288.46.",
     ])
     def test_states_compatibility(self, text):
         assert _RE_VERSION_COMPAT.search(text), f"not recognised: {text!r}"
@@ -101,6 +105,13 @@ class TestVersionCompatibility:
     @pytest.mark.parametrize("text", [
         "Email the maintainer at user@example.com for access.",
         "The versioning policy is documented separately.",
+        # An SSH target is a host, not a compatibility fact. Measured on the
+        # 8.12.0 scorer: these lifted composability 20 -> 30 for free.
+        "Deploy with `ssh root@100.127.18.39` once the build is green.",
+        "Copy it over: `scp deploy@10.0.0.5:/srv/app .`",
+        # An instruction to pin is not a pin. The credited thing is a stated
+        # compatibility FACT; this sentence names no version at all.
+        "Pin the version.",
     ])
     def test_addresses_are_not_version_pins(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"

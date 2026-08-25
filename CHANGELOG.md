@@ -71,7 +71,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **`composability` recognises an error contract, a prerequisite and a version pin as
   facts, not as phrasings.** "Errors go to stderr with a non-zero exit" now counts as a
   declared error contract, `uv` counts as a declared prerequisite (the tool wordlist could
-  never be completed), and `tool@1.2.3` counts as a compatibility statement.
+  never be completed), and `tool@1.2.3` counts as a compatibility statement. A version pin
+  is a stated compatibility *fact*, so two things that merely look like one are excluded:
+  an SSH target (`ssh root@100.127.18.39` — an address, not a version) and the bare
+  instruction "pin the version", which names no version at all. The address test is a real
+  IPv4 check rather than "four dot-separated parts", because four-part versions exist —
+  `v8@6.7.288.46` keeps its credit, since `288` is not a valid octet.
 - **`doctor` no longer counts vendored copies as installed skills.** A repo with one skill
   reported six — three of them the same file inside virtualenvs and a uv cache archive —
   inflating the skill count, the grade distribution and the headline "Total context cost"

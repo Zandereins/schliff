@@ -144,11 +144,25 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 # exists). 64 covers the longest real package name by a wide margin
 # (`@vercel/microfrontends` is 22); a bounded run costs O(bound) per start position
 # and keeps the pattern linear.
+#
+# What the `@` shape does NOT keep out is an SSH target: `ssh root@100.127.18.39` has
+# digits after the `@` and was credited as a pin (measured: composability 20 -> 30 for
+# free). The discriminator is a real IPv4 test — four 0-255 octets — not "four dot-parts",
+# because four-part VERSIONS are real: V8 numbers itself `6.7.288.46`, and `288` is not a
+# valid octet, so the octet test keeps that pin while dropping the address.
+#
+# Known limit, stated rather than hidden: a four-part version whose every part happens to
+# be 0-255 (`v8@10.2.154.26`, `zlib@1.2.13.1`) is indistinguishable from an address by
+# shape alone and loses the credit. That is the conservative direction for a scorer —
+# withholding credit costs an author points, granting it wrongly is free score for anyone
+# who writes a deploy command.
+_IPV4_OCTET = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
+_IPV4 = rf"{_IPV4_OCTET}(?:\.{_IPV4_OCTET}){{3}}(?!\.?\d)"
 _RE_VERSION_COMPAT = re.compile(
     r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
     r"requires?\s+\w+\s*[><=]+\s*[\d.]+|minimum\s+version|"
     r"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+|"
-    r"[\w.-]{1,64}@\d+\.\d+|pin\s+the\s+version)"
+    rf"[\w.-]{{1,64}}@(?!{_IPV4})\d+\.\d+)"
 )
 
 # --- Trigger patterns (SKILL.md-specific) ---
