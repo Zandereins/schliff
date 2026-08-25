@@ -103,6 +103,10 @@ class TestVersionCompatibility:
         # `1.2.3.4` here and drops a legal pin. Without this case the whole
         # suite stays green through that mutation.
         "Requires pkg@1.2.3.4.5.",
+        # "Pin the version" is narrowed, not deleted: naming a version makes it
+        # a stated fact, and no other alternative picks these up.
+        "Pin the version to 8.8.2.",
+        "Pin the version at release time to 3.11.",
     ])
     def test_states_compatibility(self, text):
         assert _RE_VERSION_COMPAT.search(text), f"not recognised: {text!r}"
@@ -119,6 +123,12 @@ class TestVersionCompatibility:
         "Deploy with `ssh root@010.1.2.3`.",
         "Run `ssh root@01.02.03.04` on the jump host.",
         "Try `ssh root@10.00.0.1` first.",
+        # Padding is not capped at three characters. inet_aton resolves
+        # `0100.1.2.3` to 64.1.2.3 and `00010.1.2.3` to 8.1.2.3, so these
+        # connect by the same mechanism and must be excluded too.
+        "Deploy with `ssh root@0100.1.2.3`.",
+        "Deploy with `ssh root@00010.1.2.3`.",
+        "Reach it at `ssh root@0000.0.0.1`.",
     ])
     def test_addresses_are_not_version_pins(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"

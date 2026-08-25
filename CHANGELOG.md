@@ -74,7 +74,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   never be completed), and `tool@1.2.3` counts as a compatibility statement. A version pin
   is a stated compatibility *fact*, so two things that merely look like one are excluded:
   an SSH target (`ssh root@100.127.18.39` — an address, not a version) and the bare
-  instruction "pin the version", which names no version at all. The address test is a real
+  instruction "pin the version" *when it names no version*. "Pin the version to 8.8.2" still
+  counts, because it states one. The address test is a real
   IPv4 check rather than "four dot-separated parts", because four-part versions exist —
   `v8@6.7.288.46` keeps its credit, since `288` is not a valid octet. **The limit, stated
   plainly:** a four-part pin whose parts are *all* 0–255 is indistinguishable from an

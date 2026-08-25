@@ -161,16 +161,29 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 # line the free +10 this exclusion exists to withdraw. The job here is recognising a deploy
 # target, not validating a canonical address, so the class is permissive on shape and strict
 # on the 255 ceiling, which is what keeps `288` a version.
-_IPV4_OCTET = r"(?:25[0-5]|2[0-4]\d|[01]?\d?\d)"
+#
+# The zero run is a BOUNDED prefix rather than part of the digit class, because padding is
+# not limited to three characters: `inet_aton` resolves `0100.1.2.3` to 64.1.2.3 and
+# `00010.1.2.3` to 8.1.2.3, so both connect and both must be excluded. `0{0,3}` covers the
+# padding widths that occur while staying linear — an unbounded `0*` would put a second
+# quantifier in front of an already-quantified class and give the linearity gate a reason
+# to complain. No real version has a four-digit zero-padded part.
+_IPV4_OCTET = r"(?:0{0,3})(?:25[0-5]|2[0-4]\d|[01]?\d?\d)"
 # The trailing guard is load-bearing: without it the lookahead matches the first four parts
 # of a LONGER dotted version, so `pkg@1.2.3.4.5` would lose its credit to an address test.
 # Five parts is not an address. Covered by a positive fixture, since deleting this guard
 # otherwise leaves the suite fully green.
 _IPV4 = rf"{_IPV4_OCTET}(?:\.{_IPV4_OCTET}){{3}}(?!\.?\d)"
+# "Pin the version" is NARROWED, not deleted. The defect was that the bare imperative — an
+# instruction naming no version — counted as a stated compatibility fact. "Pin the version
+# to 8.8.2" does name one, and no other alternative picks it up (`version\s*[><=!]` needs an
+# operator), so deleting the alternative outright would drop a real fact. The intervening
+# word run is bounded, which keeps it linear.
+_PIN_TO_VERSION = r"pin\s+the\s+version\s+(?:\w+\s+){0,4}?(?:to\s+)?v?\d+\.\d"
 _RE_VERSION_COMPAT = re.compile(
     r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
     r"requires?\s+\w+\s*[><=]+\s*[\d.]+|minimum\s+version|"
-    r"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+|"
+    rf"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+|{_PIN_TO_VERSION}|"
     rf"[\w.-]{{1,64}}@(?!{_IPV4})\d+\.\d+)"
 )
 
