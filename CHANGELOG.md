@@ -74,9 +74,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   never be completed), and `tool@1.2.3` counts as a compatibility statement. The bare
   instruction "pin the version" does **not** count — it is an instruction, naming no
   version. Write the pin itself and it counts:
-  ``Pin the version in CI: `tool@1.2.3`.`` is credited by the `tool@version` rule. Be aware
-  that it is the `tool@version` syntax that carries it, not the presence of a number — a
-  prose "Pin the version to 1.2.3" matches nothing, here or in any earlier release.
+  ``Pin the version in CI: `tool@1.2.3`.`` is credited by the `tool@version` rule. Note which part
+  carries it: the pin, not the phrase. A prose "Pin the version to 1.2.3" matches nothing,
+  here or in any earlier release. (Other prose forms are credited by their own unchanged
+  patterns — "Minimum version 3.9." and "Compatible with Python 3.12" both count.)
   **Known limit:** an SSH target is credited as a pin — `ssh root@100.127.18.39` earns the
   10 points. Separating an address from a version by pattern turned out not to be decidable
   in either direction: by number shape (`root@127.1` and `root@0000100.1.2.3` are credited and

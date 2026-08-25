@@ -433,6 +433,22 @@ both arriving in the unreleased work above, so no published score moves. Against
 one instruction (`Pin the version pair precisely`) and two notes written *about* this defect. Of
 159 installed `SKILL.md`, **0** are affected.
 
+*A narrowed phrase alternative was tried and reverted, and the reason belongs here* — the
+test docstring sends the next implementer to this section before rebuilding it. The narrowed
+form was `pin\s+the\s+version\s+(?:\w+\s+){0,4}?(?:to\s+)?v?\d+\.\d`, an attempt to keep
+crediting "Pin the version to 8.8.2" while dropping the bare phrase. Measured, it opened both
+error directions at once:
+
+- it **missed** ``Pin the version to `8.8.2`.`` — the bounded word run is `\w`-tokens separated
+  by whitespace, so any punctuation ends it, and in Markdown the version literal is almost
+  always inside backticks;
+- it **credited** "Pin the version in step 2.1." — a step number is not a version.
+
+The field settles it: all 10 occurrences of the phrase across 2304 local `.md` files write it as
+``Pin the version in CI: `tool@version` ``, which the `@` alternative already credits. So the
+alternative is not needed at all, and a re-added one must require a version token rather than the
+phrase.
+
 *What is deliberately NOT fixed — an SSH target is still credited as a pin.*
 `ssh root@100.127.18.39` has digits after the `@` and earns the 10 points. Four review rounds
 established that separating an address from a version by pattern is not decidable, and that each

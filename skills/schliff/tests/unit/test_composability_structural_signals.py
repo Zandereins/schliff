@@ -138,6 +138,10 @@ class TestVersionCompatibility:
         "Pin the version.",
         "Pin the version before release.",
         "Pin the version in step 2.1.",
+        # CHANGELOG states this matches nothing. Without the case, a re-added
+        # phrase alternative would leave the suite green and the CHANGELOG
+        # documenting behaviour the code no longer has.
+        "Pin the version to 1.2.3.",
     ])
     def test_bare_imperative_is_not_a_version_pin(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"

@@ -307,12 +307,16 @@ class TestNamespaceIsolation:
 # ---------------------------------------------------------------------------
 
 class TestVersionCompat:
-    """Tests for _RE_VERSION_COMPAT.
+    r"""Tests for _RE_VERSION_COMPAT.
 
-    Pattern (line 95-99):
-        (?i)(version\\s*[><=!]+\\s*[\\d.]+|compatible\\s+with\\s+\\w+\\s+v?\\d|
-             requires?\\s+\\w+\\s*[><=]+\\s*[\\d.]+|minimum\\s+version|
-             supported\\s+versions?|works\\s+with\\s+\\w+\\s+v?\\d+\\.\\d+)
+    Defined in `scoring/patterns/skill_md.py`. The transcription that used to sit
+    here went stale — it predated the `tool@1.2.3` alternative and so implied that
+    a pin is not credited, the opposite of the truth. Read the pattern at its
+    definition; the KNOWN LIMIT comment beside it explains why an SSH target is
+    credited too.
+
+    Prose forms covered below; `tool@1.2.3` and the bare-phrase exclusion are
+    covered in test_composability_structural_signals.py.
     """
 
     # --- Should match ---
