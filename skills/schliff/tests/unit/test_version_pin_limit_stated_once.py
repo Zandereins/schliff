@@ -11,65 +11,110 @@ That is the failure #209 fixed for the collector's cadence rule, and this guard
 is the same shape: the argument lives in the spec amendment, every other site
 names the limit and links to it.
 
-WHAT THIS GUARD CANNOT DO, stated because a guard giving false assurance is
-worse than none (the lesson `test_cadence_rule_stated_once.py` records about its
-own first version): it keys on the concrete EVIDENCE — an address form, a
-command, a version literal — not on the shape of the argument. Someone who
-restates the reasoning with fresh examples defeats it. It catches the copy-paste
-case, which is the one that actually happened four times.
+The FIRST version of this guard listed six file paths and skipped missing ones.
+It was defeated three ways, each demonstrated: pasting the whole argument into a
+file not on the list, renaming a listed file, and writing it into a test
+docstring — the very place two of the four original homes sat. A guard that
+gives false assurance is worse than none, because the spec then tells future
+editors it will catch them. It now enumerates from `git ls-files`, so a new file
+is covered the moment it is tracked, and it reads the test file's docstrings.
+
+WHAT IT STILL CANNOT DO: it keys on the concrete EVIDENCE — an address form, a
+function name, a version literal — not on the shape of the argument. Someone who
+restates the reasoning with fresh examples defeats it. It catches copy-paste,
+which is the case that actually happened four times.
 """
+import ast
 import os
+import subprocess
 
 import pytest
 
 _REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-# Prose sites that describe the limit. Test files are deliberately absent: an
-# assertion naming `v8@10.2.154.26` is a check, not a restatement of the
-# argument, and the positive set has to name it for the guard on the shape rule's
-# error direction to exist at all.
-_SITES = [
-    "CHANGELOG.md",
-    "README.md",
-    "skills/schliff/scripts/scoring/patterns/skill_md.py",
-    "skills/schliff/scripts/scoring/composability.py",
-    "docs/specs/2026-08-13-structural-signal-detection.md",
-    "docs/SCORING.md",
-]
-
-# The evidence the argument is built from. Each is a literal a copy-paste would
-# carry along; none is a phrasing that can be reworded while keeping the point.
-_EVIDENCE = [
-    "inet_aton",            # the shape rule cannot be completed
-    "0000100.1.2.3",        # ...demonstrated by this address
-    "git clone git@",       # the wordlist misses this
-    "admin@192.168.1.1",    # ...and this
-    "v8@10.2.154.26",       # the shape rule drops this honest pin
-    "ruff@0.4.2",           # the wordlist drops this honest pin
-]
-
 _HOME = "docs/specs/2026-08-13-structural-signal-detection.md"
+_GUARD = "skills/schliff/tests/unit/test_version_pin_limit_stated_once.py"
+
+# The file whose ASSERTIONS legitimately name two of these literals: they are
+# test data for the honest-pin guards, one per error direction, not a
+# restatement of the argument. Its docstrings are still checked — that is where
+# two of the four original homes were.
+_ASSERTS = "skills/schliff/tests/unit/test_composability_structural_signals.py"
+
+# Evidence carried by copy-paste. Split by whether it may also appear as test
+# data, so the first group can be required to sit in exactly one place.
+_PROSE_ONLY = [
+    "inet_aton",              # the shape rule cannot be completed
+    "0000100.1.2.3",          # ...demonstrated by this address
+    "git clone git@10.0.0.5",  # the wordlist misses this (the example, not a real clone line)
+    "admin@192.168.1.1",      # ...and this
+]
+_ALSO_TEST_DATA = [
+    "v8@10.2.154.26",  # the honest pin the shape rule drops
+    "ruff@0.4.2",      # the honest pin the wordlist drops
+]
 
 
-def _sites_containing(needle: str):
-    found = []
-    for rel in _SITES:
-        path = os.path.join(_REPO, rel)
-        if not os.path.exists(path):
+def _tracked(*globs):
+    out = subprocess.run(
+        ["git", "ls-files", *globs],
+        cwd=_REPO, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    return [p for p in out if p not in (_GUARD,)]
+
+
+def _read(rel):
+    with open(os.path.join(_REPO, rel), encoding="utf-8") as fh:
+        return fh.read()
+
+
+def _sites_containing(needle, allow=()):
+    hits = []
+    for rel in _tracked("*.md", "*.py"):
+        if rel in allow:
             continue
-        with open(path, encoding="utf-8") as fh:
-            if needle in fh.read():
-                found.append(rel)
-    return found
+        if needle in _read(rel):
+            hits.append(rel)
+    return hits
 
 
-@pytest.mark.parametrize("needle", _EVIDENCE)
-def test_evidence_appears_in_exactly_one_prose_site(needle):
+@pytest.mark.parametrize("needle", _PROSE_ONLY)
+def test_prose_evidence_appears_in_exactly_one_file(needle):
     sites = _sites_containing(needle)
-    assert len(sites) <= 1, (
-        f"{needle!r} is stated in {len(sites)} places: {sites}.\n"
-        f"The argument has one home ({_HOME}); other sites name the limit and "
-        f"link to it. Restating the evidence is how it drifted four times."
+    assert sites == [_HOME], (
+        f"{needle!r} is in {sites}, expected only {_HOME!r}.\n"
+        f"The argument has one home; other sites name the limit and link to it. "
+        f"Restating the evidence is how it drifted four times."
+    )
+
+
+@pytest.mark.parametrize("needle", _ALSO_TEST_DATA)
+def test_test_data_evidence_is_in_the_home_and_at_most_the_assertions(needle):
+    sites = _sites_containing(needle, allow=(_ASSERTS,))
+    assert sites == [_HOME], (
+        f"{needle!r} is in {sites}, expected only {_HOME!r} (plus assertions in "
+        f"{_ASSERTS}). It is evidence for the argument, not a phrase to repeat."
+    )
+
+
+@pytest.mark.parametrize("needle", _PROSE_ONLY + _ALSO_TEST_DATA)
+def test_the_assertions_file_does_not_restate_the_argument_in_prose(needle):
+    """Two of the four original homes were docstrings in this very file.
+
+    Excluding it wholesale would leave the place the drift actually sat
+    unguarded, so only its executable lines get the exemption.
+    """
+    tree = ast.parse(_read(_ASSERTS))
+    prose = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef)):
+            doc = ast.get_docstring(node)
+            if doc:
+                prose.append(doc)
+    offenders = [d.splitlines()[0][:60] for d in prose if needle in d]
+    assert not offenders, (
+        f"{needle!r} appears in a docstring of {_ASSERTS}: {offenders}.\n"
+        f"Assertions may name it; prose may not — restate nothing, link instead."
     )
 
 
@@ -79,27 +124,27 @@ def test_the_home_actually_carries_the_argument():
     Round 10 found exactly that: the test docstring sent the reader to the spec
     for history the spec did not have.
     """
-    with open(os.path.join(_REPO, _HOME), encoding="utf-8") as fh:
-        home = fh.read()
-    missing = [n for n in _EVIDENCE if n not in home]
+    home = _read(_HOME)
+    missing = [n for n in _PROSE_ONLY + _ALSO_TEST_DATA if n not in home]
     assert not missing, (
         f"the spec amendment is the stated home of this argument but does not "
         f"contain: {missing}"
     )
 
 
-def test_every_pointer_names_a_section_that_exists():
-    """The three linking sites name an anchor. It has to be there."""
+def test_every_pointer_names_a_target_that_exists():
+    """The linking sites name a file and a heading. Both have to be there."""
     anchor = "Amendment 2026-08-25"
-    with open(os.path.join(_REPO, _HOME), encoding="utf-8") as fh:
-        assert f"## {anchor}" in fh.read(), f"{_HOME} has no '## {anchor}' heading"
+    assert f"## {anchor}" in _read(_HOME), f"{_HOME} has no '## {anchor}' heading"
 
-    pointers = [
-        "skills/schliff/scripts/scoring/patterns/skill_md.py",
-        "CHANGELOG.md",
-        "skills/schliff/tests/unit/test_composability_structural_signals.py",
-    ]
-    for rel in pointers:
-        with open(os.path.join(_REPO, rel), encoding="utf-8") as fh:
-            text = fh.read()
+    for rel in ("skills/schliff/scripts/scoring/patterns/skill_md.py",
+                "CHANGELOG.md", _ASSERTS):
+        text = _read(rel)
         assert anchor in text, f"{rel} no longer points at the argument's home"
+        # The path must survive a plain grep. An earlier version of the pattern
+        # comment wrapped it across a line break, so `grep <filename>` found
+        # nothing at the one site whose only job is to point at the home.
+        assert os.path.basename(_HOME) in text, (
+            f"{rel} names the anchor but no greppable path to {_HOME} — check "
+            f"whether a line break splits the filename"
+        )

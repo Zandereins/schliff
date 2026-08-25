@@ -149,8 +149,9 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 # points this signal is worth. Deliberate, not an oversight. The bare phrase
 # `pin the version` was removed for naming no version at all.
 #
-# WHY, both attempted fixes and every measurement: docs/specs/2026-08-13-structural-signal-
-# detection.md, "Amendment 2026-08-25". That is the single home, enforced by
+# WHY, both attempted fixes and every measurement live in one place:
+# `docs/specs/2026-08-13-structural-signal-detection.md`, "Amendment 2026-08-25".
+# That single home is enforced by
 # test_version_pin_limit_stated_once.py — this reasoning had four homes and four review
 # rounds each found one out of step, the failure #209 fixed for the cadence rule.
 _RE_VERSION_COMPAT = re.compile(

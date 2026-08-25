@@ -369,8 +369,9 @@ skill, because `tests/fixtures/self-skill-baseline/SKILL.md` is scanned. A SKILL
 under `playground/.venv/lib/python3.12/site-packages/`; in a user's repo that would be
 `node_modules` and `.venv`. Next after this.
 
-`benchmarks/anti-gaming/` runs in no CI job — `grep -rn 'anti-gaming\|benchmarks' .github/ Makefile`
-returns nothing — and its own `test_benchmark.py` is red: two assertions expect 6 benchmarks where
+`benchmarks/anti-gaming/` runs in no CI job — `grep -rn 'anti-gaming\|benchmarks' .github/workflows/
+Makefile` returns nothing (the wider `.github/` does hit one line, an option label in
+`ISSUE_TEMPLATE/feature_request.yml`, which runs nothing) — and its own `test_benchmark.py` is red: two assertions expect 6 benchmarks where
 `BENCHMARKS` holds 7, and `pyproject.toml`'s `testpaths` excludes the directory, so no default run
 collects it. Until both are fixed, adding a gaming vector there buys a line nobody runs. The vector
 for the SSH-address limit (Amendment 2026-08-25) is blocked on exactly this.
