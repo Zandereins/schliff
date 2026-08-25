@@ -103,10 +103,11 @@ class TestVersionCompatibility:
         # `1.2.3.4` here and drops a legal pin. Without this case the whole
         # suite stays green through that mutation.
         "Requires pkg@1.2.3.4.5.",
-        # "Pin the version" is narrowed, not deleted: naming a version makes it
-        # a stated fact, and no other alternative picks these up.
-        "Pin the version to 8.8.2.",
-        "Pin the version at release time to 3.11.",
+        # The discriminator is the command, not the number: with no deploy
+        # command on the line, a version keeps its credit whatever it looks
+        # like — including shapes that are valid addresses.
+        "Pin the version in CI: `uvx schliff@8.8.2`.",
+        "Bundled runtime is v8@10.2.154.26.",
     ])
     def test_states_compatibility(self, text):
         assert _RE_VERSION_COMPAT.search(text), f"not recognised: {text!r}"
@@ -118,28 +119,46 @@ class TestVersionCompatibility:
         # 8.12.0 scorer: these lifted composability 20 -> 30 for free.
         "Deploy with `ssh root@100.127.18.39` once the build is green.",
         "Copy it over: `scp deploy@10.0.0.5:/srv/app .`",
-        # Leading zeros still address a host — `ssh root@010.1.2.3` connects.
-        # A strict-form octet class would let these through the exclusion.
+        # Every one of these resolves and connects, and no shape rule catches
+        # them all — which is the point of keying on the command instead.
+        # inet_aton: 010.1.2.3 -> 8.1.2.3, 0100.1.2.3 -> 64.1.2.3,
+        # 00010.1.2.3 -> 8.1.2.3, 127.1 -> 127.0.0.1, 0x7f.1 -> 127.0.0.1.
         "Deploy with `ssh root@010.1.2.3`.",
         "Run `ssh root@01.02.03.04` on the jump host.",
-        "Try `ssh root@10.00.0.1` first.",
-        # Padding is not capped at three characters. inet_aton resolves
-        # `0100.1.2.3` to 64.1.2.3 and `00010.1.2.3` to 8.1.2.3, so these
-        # connect by the same mechanism and must be excluded too.
         "Deploy with `ssh root@0100.1.2.3`.",
         "Deploy with `ssh root@00010.1.2.3`.",
-        "Reach it at `ssh root@0000.0.0.1`.",
+        "Reach it at `ssh root@0000100.1.2.3`.",
+        # Two- and three-part forms resolve too, and an octet rule that only
+        # knows the four-part shape never sees them.
+        "Reach it at `ssh root@127.1`.",
+        "Reach it at `ssh root@10.0.1`.",
+        # Other transports carry the same target.
+        "Copy it over: `scp deploy@10.0.0.5:/srv/app .`",
+        "Sync with `rsync deploy@10.0.0.5:/srv/ .`",
     ])
     def test_addresses_are_not_version_pins(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"
 
     @pytest.mark.parametrize("text", [
-        # An instruction to pin is not a pin. The credited thing is a stated
-        # compatibility FACT; this sentence names no version at all. Kept
-        # apart from the address cases because the two exclusions are
-        # independent — one is a lookahead, this one is a removed alternative.
+        # An instruction to pin is not a pin — it names no version at all.
+        # The alternative that used to credit this phrase is gone entirely:
+        # narrowing it missed quoted versions and credited step numbers.
         "Pin the version.",
         "Pin the version before release.",
+        "Pin the version in step 2.1.",
     ])
     def test_bare_imperative_is_not_a_version_pin(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"
+
+    def test_a_version_on_a_deploy_line_still_counts_elsewhere(self):
+        """The exclusion is per line, not per document.
+
+        A SKILL.md that documents a deploy command AND states a version must
+        keep its credit — otherwise the fix would punish honest files that
+        happen to mention `ssh`.
+        """
+        body = (
+            "Deploy with `ssh root@10.0.0.5`.\n"
+            "Requires node >= 18.0.\n"
+        )
+        assert _RE_VERSION_COMPAT.search(body)

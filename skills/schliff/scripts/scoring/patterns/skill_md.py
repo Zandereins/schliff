@@ -156,35 +156,36 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 # shape alone and loses the credit. That is the conservative direction for a scorer —
 # withholding credit costs an author points, granting it wrongly is free score for anyone
 # who writes a deploy command.
-# Leading zeros are ACCEPTED on purpose. `ssh root@010.1.2.3` connects, so it is a real
-# deploy command — a strict-form octet class (`[1-9]?\d`) would reject `010` and hand that
-# line the free +10 this exclusion exists to withdraw. The job here is recognising a deploy
-# target, not validating a canonical address, so the class is permissive on shape and strict
-# on the 255 ceiling, which is what keeps `288` a version.
+# What the `@` shape does NOT keep out is an SSH target: `ssh root@100.127.18.39` has digits
+# after the `@` and was credited as a pin (measured: composability 20 -> 30 for free).
 #
-# The zero run is a BOUNDED prefix rather than part of the digit class, because padding is
-# not limited to three characters: `inet_aton` resolves `0100.1.2.3` to 64.1.2.3 and
-# `00010.1.2.3` to 8.1.2.3, so both connect and both must be excluded. `0{0,3}` covers the
-# padding widths that occur while staying linear — an unbounded `0*` would put a second
-# quantifier in front of an already-quantified class and give the linearity gate a reason
-# to complain. No real version has a four-digit zero-padded part.
-_IPV4_OCTET = r"(?:0{0,3})(?:25[0-5]|2[0-4]\d|[01]?\d?\d)"
-# The trailing guard is load-bearing: without it the lookahead matches the first four parts
-# of a LONGER dotted version, so `pkg@1.2.3.4.5` would lose its credit to an address test.
-# Five parts is not an address. Covered by a positive fixture, since deleting this guard
-# otherwise leaves the suite fully green.
-_IPV4 = rf"{_IPV4_OCTET}(?:\.{_IPV4_OCTET}){{3}}(?!\.?\d)"
-# "Pin the version" is NARROWED, not deleted. The defect was that the bare imperative — an
-# instruction naming no version — counted as a stated compatibility fact. "Pin the version
-# to 8.8.2" does name one, and no other alternative picks it up (`version\s*[><=!]` needs an
-# operator), so deleting the alternative outright would drop a real fact. The intervening
-# word run is bounded, which keeps it linear.
-_PIN_TO_VERSION = r"pin\s+the\s+version\s+(?:\w+\s+){0,4}?(?:to\s+)?v?\d+\.\d"
+# The discriminator is the COMMAND, not the shape of the number. Three rounds of review
+# established that "does this look like an address" is not decidable by pattern: `inet_aton`
+# resolves `127.1` to 127.0.0.1, `0000100.1.2.3` to 64.1.2.3, and `0x7f.1` to 127.0.0.1, so
+# every shape rule — four parts, octet ranges, bounded zero padding — is complete only until
+# someone writes the next form. Each round closed one width and left the next one open.
+#
+# A deploy command on the same line is decidable, and it is what actually separates the two
+# in the field: measured over 2304 local `.md` files, all 28 `user@number` occurrences on a
+# line carrying ssh/scp/rsync are addresses, and all 40 without one are versions
+# (`iconv@2.1.4`, `acorn@5.2`, `v8@6.7.288.46`). No shape arithmetic is needed, and the
+# number is never inspected — which is why `127.1` and `0x7f.1` need no special case.
+#
+# The tempered run is bounded to one line by `[^\n]` and measured linear (~2.0x per
+# doubling), so the ReDoS gate is satisfied without an octet class.
+_DEPLOY_CMD = r"(?:ssh|scp|rsync|sftp|ssh-copy-id|mosh)"
+_AT_PIN = rf"^(?:(?!\b{_DEPLOY_CMD}\b)[^\n])*?[\w.-]{{1,64}}@\d+\.\d+"
+# `pin the version` is GONE as an alternative rather than narrowed. It was added for
+# schliff's own line, and narrowing it opened both error directions at once: it missed
+# `Pin the version to `8.8.2`.` (punctuation ends the word run) while crediting
+# `Pin the version in step 2.1.` (a step number is not a version). The field says it is not
+# needed — all 10 occurrences of the phrase across 2304 local `.md` files write it as
+# `Pin the version in CI: `tool@version``, which the `@` alternative already credits.
 _RE_VERSION_COMPAT = re.compile(
-    r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
+    r"(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
     r"requires?\s+\w+\s*[><=]+\s*[\d.]+|minimum\s+version|"
-    rf"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+|{_PIN_TO_VERSION}|"
-    rf"[\w.-]{{1,64}}@(?!{_IPV4})\d+\.\d+)"
+    rf"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+|{_AT_PIN})",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 # --- Trigger patterns (SKILL.md-specific) ---

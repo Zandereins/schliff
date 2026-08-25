@@ -72,19 +72,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   facts, not as phrasings.** "Errors go to stderr with a non-zero exit" now counts as a
   declared error contract, `uv` counts as a declared prerequisite (the tool wordlist could
   never be completed), and `tool@1.2.3` counts as a compatibility statement. A version pin
-  is a stated compatibility *fact*, so two things that merely look like one are excluded:
-  an SSH target (`ssh root@100.127.18.39` — an address, not a version) and the bare
-  instruction "pin the version" *when it names no version*. "Pin the version to 8.8.2" still
-  counts, because it states one. The address test is a real
-  IPv4 check rather than "four dot-separated parts", because four-part versions exist —
-  `v8@6.7.288.46` keeps its credit, since `288` is not a valid octet. **The limit, stated
-  plainly:** a four-part pin whose parts are *all* 0–255 is indistinguishable from an
-  address by shape alone and loses the credit — `pkg@1.0.0.0` (the .NET assembly form) and
-  `protobuf@4.25.3.1` are affected. Five-part pins are unaffected (`pkg@1.2.3.4.5` is not
-  an address). If this costs you points, state the compatibility in prose as well —
-  "Compatible with protobuf 4.25.3.1" and "Requires protobuf >= 4.25.3.1" are both credited
-  by different, unchanged patterns. (Note the operator: a bare "requires protobuf 4.25.3.1"
-  is *not* credited, and never was.)
+  is a stated compatibility *fact*, so two things that merely look like one are excluded.
+  **An SSH target is not a version:** `ssh root@100.127.18.39` used to earn the credit. The
+  test is whether a deploy command (`ssh`, `scp`, `rsync`, `sftp`, `mosh`) shares the line —
+  not what the number looks like, because address forms are open-ended (`127.1`,
+  `0100.1.2.3` and `0x7f.1` all resolve to real hosts). Keying on the command means your
+  version keeps its credit whatever its shape: `v8@6.7.288.46` and `pkg@1.2.3.4.5` count,
+  and so does `v8@10.2.154.26` even though it would pass for an address. The exclusion is
+  **per line** — a file that documents a deploy command and states a version elsewhere keeps
+  the credit. **And "pin the version" on its own no longer counts:** it is an instruction,
+  naming no version. Write the version — `Pin the version in CI: \`tool@1.2.3\`` is credited,
+  as are "Compatible with protobuf 4.25.3.1" and "Requires protobuf >= 4.25.3.1". (Note the
+  operator: a bare "requires protobuf 4.25.3.1" is *not* credited, and never was.)
 - **`doctor` no longer counts vendored copies as installed skills.** A repo with one skill
   reported six — three of them the same file inside virtualenvs and a uv cache archive —
   inflating the skill count, the grade distribution and the headline "Total context cost"
