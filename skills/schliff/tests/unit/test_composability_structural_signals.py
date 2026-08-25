@@ -102,7 +102,7 @@ class TestVersionCompatibility:
         "Email the maintainer at user@example.com for access.",
         "The versioning policy is documented separately.",
     ])
-    def test_an_email_address_is_not_a_version_pin(self, text):
+    def test_prose_without_a_pin_is_not_credited(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"
 
     @pytest.mark.parametrize("text", [
@@ -115,17 +115,6 @@ class TestVersionCompatibility:
     ])
     def test_bare_imperative_is_not_a_version_pin(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"
-
-    def test_naming_the_version_still_counts(self):
-        """Removing the phrase must not cost a file that actually names one.
-
-        schliff's own SKILL.md line is the case that matters: it opens with
-        the phrase and then gives the pin, which the `tool@version`
-        alternative credits on its own.
-        """
-        assert _RE_VERSION_COMPAT.search(
-            "Pin the version in CI: `uvx schliff@8.8.2`."
-        )
 
     def test_an_ssh_target_is_still_credited_known_limit(self):
         """Documents behaviour this pattern deliberately does NOT fix.

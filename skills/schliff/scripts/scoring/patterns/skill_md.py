@@ -145,41 +145,27 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 # (`@vercel/microfrontends` is 22); a bounded run costs O(bound) per start position
 # and keeps the pattern linear.
 #
-# KNOWN LIMIT — an SSH target is credited as a pin. `ssh root@100.127.18.39` has digits
-# after the `@` and earns the 10 points this signal is worth.
+# KNOWN LIMIT — an SSH target is credited as a pin: `ssh root@100.127.18.39` earns the 10
+# points this signal is worth. It is recorded rather than fixed, because neither available
+# discriminator is decidable, and each fails where the other does not. Counter-examples,
+# not statistics, because these reproduce anywhere:
 #
-# How often it fires: measured over 2304 local `.md` files, 28 lines carry a
-# `user@<number>` next to a deploy command (ssh/scp/rsync) — every one of them an address.
-# The other 40 `user@<number>` lines carry no deploy command and are all genuine versions
-# (`iconv@2.1.4`, `acorn@5.2`, `v8@6.7.288.46`). So the limit is live, not theoretical.
+#   - By NUMBER SHAPE: `socket.inet_aton` resolves `127.1`, `0x7f.1` and `0000100.1.2.3`
+#     to real hosts, so an octet rule is complete only until the next form is written.
+#     Two attempts on this pattern closed zero-padding at three and then six characters;
+#     seven was never reached.
+#   - By DEPLOY COMMAND on the line: a wordlist misses `git clone git@10.0.0.5` and
+#     `curl http://admin@192.168.1.1` — both caught by the shape rule — while stripping
+#     the credit from an honest "Deploy over ssh; pin `ruff@0.4.2` in CI."
 #
-# It is recorded rather than fixed because separating the two by pattern is not decidable,
-# in either direction — established by review, with counter-examples, not by argument:
+# Withholding the point from an honest file costs more than the limit does, and no
+# attempted rule avoided that cost. Same treatment as the bare-`stderr` limit above
+# (:87) and the option-shape limit in `base.py`: documented, not papered over.
 #
-#   - By NUMBER SHAPE: `inet_aton` resolves `127.1` to 127.0.0.1, `0000100.1.2.3` to
-#     64.1.2.3 and `0x7f.1` to 127.0.0.1, so an octet rule is complete only until someone
-#     writes the next form. Two attempts closed padding at three and then six characters;
-#     seven was never reached, which is why `0000100.1.2.3` above still defeats the rule.
-#   - By COMMAND on the line: the wordlist has the identical property. `ssh|scp|rsync`
-#     misses `git clone git@10.0.0.5`, `psql postgres://admin@10.0.0.5` and
-#     `curl http://admin@192.168.1.1`, all of which the shape rule caught — while
-#     simultaneously destroying honest pins, since "Deploy over ssh; pin `ruff@0.4.2`"
-#     loses its credit to the word `ssh` sitting earlier in the sentence.
-#
-# Both directions of error are worse than the limit itself: withholding credit from an
-# honest file is a real cost, and no attempted discriminator avoided it. This follows the
-# treatment already given to the assertion-credit limit — documented rather than fixed by
-# a rule that cannot be made correct.
-#
-# REVISIT IF: a discriminator appears that needs neither a number-shape rule nor a command
-# wordlist — for example a scorer that sees the fenced-block language, which would separate
-# a shell block from prose without enumerating anything.
-#
-# The gaming vector belongs in `benchmarks/anti-gaming/`, and is NOT added yet because that
-# harness cannot currently report it: it runs in no CI job (`.github/workflows/test.yml`
-# collects `tests/unit/` only), and `pytest benchmarks/anti-gaming/test_benchmark.py` is red
-# today — `test_six_benchmarks_defined` and `test_returns_list` both assert 6 where 7 exist.
-# Adding a vector before that is fixed buys a line nobody runs.
+# REVISIT IF: the scorer gains fenced-block language, which would separate a shell block
+# from prose without enumerating number forms or command names. The gaming vector belongs
+# in `benchmarks/anti-gaming/` and is not added yet — that harness runs in no CI job and
+# `test_benchmark.py` is red today (two assertions expect 6 benchmarks where 7 exist).
 _RE_VERSION_COMPAT = re.compile(
     r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
     r"requires?\s+\w+\s*[><=]+\s*[\d.]+|minimum\s+version|"

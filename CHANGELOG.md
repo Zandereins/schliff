@@ -73,7 +73,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   declared error contract, `uv` counts as a declared prerequisite (the tool wordlist could
   never be completed), and `tool@1.2.3` counts as a compatibility statement. The bare
   instruction "pin the version" does **not** count — it is an instruction, naming no
-  version. Write the pin itself and it counts, in that same sentence:
+  version. Write the pin itself and it counts:
   ``Pin the version in CI: `tool@1.2.3`.`` is credited by the `tool@version` rule. Be aware
   that it is the `tool@version` syntax that carries it, not the presence of a number — a
   prose "Pin the version to 1.2.3" matches nothing, here or in any earlier release.
