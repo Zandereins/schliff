@@ -415,7 +415,7 @@ Precision on the new shapes is 53/55. The two misses are accepted rather than fi
 obvious discriminator would be the `...`, and `go test ./...` is a real command.
 
 **Score effect:** no file's score falls. Only credit is added, never withdrawn — the same
-monotonicity property this spec's Requirement 5 relies on.
+monotonicity property Requirement 5 states.
 
 ## Amendment 2026-08-25 — `VERSION_COMPAT` credits the pin, not the phrase
 
@@ -425,13 +425,18 @@ credited the *instruction to pin*, which names no version and is therefore not t
 fact the signal is defined on. `Pin the version.` earned the full 10 points on an otherwise empty
 file.
 
-*Score effect, and why it amends Requirement 5 (monotonicity):* credit is withdrawn here, which the
-original spec's "only credit is added, never withdrawn" did not anticipate. The rule it amends is Requirement 5 ("No file's score may fall"), not Requirement 4. It holds against the
-**released** version regardless: `v8.11.1` carries neither this phrase nor the `@` alternative,
-both arriving in the unreleased work above, so no published score moves. Against the unreleased
-`main`, measured over `~/schliff` + `~/.claude`, `*.md`, 2304 files: **3 files lose the credit** —
-one instruction (`Pin the version pair precisely`) and two notes written *about* this defect. Of
-159 installed `SKILL.md`, **0** are affected.
+*Score effect, and why it amends Requirement 5 (monotonicity):* credit is withdrawn here, which
+Requirement 5 ("No file's score may fall") forbids as written, and which the 2026-08-21
+amendment's restatement — "only credit is added, never withdrawn" — did not anticipate either.
+This amends Requirement 5; it does not touch Requirement 4.
+
+It holds against the **released** version regardless: `v8.11.1` carries neither this phrase nor
+the `@` alternative, both arriving in the unreleased work above, so no published score moves.
+Against the unreleased `main`, measured over `~/schliff` + `~/.claude`, `*.md`: **3 files lose the
+credit** — one instruction (`Pin the version pair precisely`) and two notes written *about* this
+defect. Of 159 installed `SKILL.md`, **0** are affected. (That corpus is a working directory, not
+a fixture, so its file count drifts between runs — around 2300 at the time of writing. The counts
+that carry the argument are the 3 and the 0, which are enumerated above rather than sampled.)
 
 *A narrowed phrase alternative was tried and reverted, and the reason belongs here* — the
 test docstring sends the next implementer to this section before rebuilding it. The narrowed

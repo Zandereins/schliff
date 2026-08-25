@@ -155,8 +155,9 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 #     (`v8@10.2.154.26`, `zlib@1.2.13.1`), which are indistinguishable by shape.
 #   - By DEPLOY COMMAND on the line: a wordlist misses `git clone git@10.0.0.5` and
 #     `curl http://admin@192.168.1.1`, and strips the credit from an honest
-#     "Deploy over ssh; pin `ruff@0.4.2` in CI." — asserted in the positive set of
-#     test_composability_structural_signals.py so it outlives the limit test below.
+#     "Deploy over ssh; pin `ruff@0.4.2` in CI." — asserted in the POSITIVE set of
+#     test_composability_structural_signals.py, so it outlives that file's limit test,
+#     which carries an instruction to delete it once an exclusion works.
 #
 # Same treatment as the KNOWN LIMIT on `_RE_ERROR_BEHAVIOR` above. Full history, including
 # the two abandoned attempts, in docs/specs/2026-08-13-structural-signal-detection.md. The

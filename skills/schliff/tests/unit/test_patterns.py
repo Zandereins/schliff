@@ -1,4 +1,7 @@
-"""Tests for recently modified regex patterns in scoring/patterns.py.
+"""Tests for regex patterns in the `scoring/patterns` package.
+
+Patterns live in `scoring/patterns/skill_md.py` (and `base.py` for
+`_RE_ACTIONABLE_LINES`); there is no `scoring/patterns.py`.
 
 Covers:
 - Five new composability patterns (v6.0.1)

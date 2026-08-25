@@ -142,13 +142,30 @@ class TestVersionCompatibility:
         "Pin the version.",
         "Pin the version before release.",
         "Pin the version in step 2.1.",
-        # CHANGELOG states this matches nothing. Without the case, a re-added
-        # phrase alternative would leave the suite green and the CHANGELOG
-        # documenting behaviour the code no longer has.
-        "Pin the version to 1.2.3.",
     ])
     def test_bare_imperative_is_not_a_version_pin(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"
+
+    def test_the_phrase_with_a_version_is_currently_not_credited(self):
+        """CURRENT BEHAVIOUR, not a required property. Change it if you must.
+
+        Nothing credits "Pin the version to 1.2.3" today, and CHANGELOG says so,
+        which is why this is pinned: a re-added phrase alternative would
+        otherwise leave the suite green while the CHANGELOG described behaviour
+        the code no longer had.
+
+        But do not read it as a rule that the form MUST stay uncredited. The
+        spec records the reverted narrowed alternative's failure to credit
+        ``Pin the version to `8.8.2`.`` as one of its two error directions — so
+        a genuinely correct prose alternative, crediting the backticked and the
+        plain form alike, would be an improvement and would land here as a red
+        test. Update this test and the CHANGELOG line together in that case.
+
+        The form does not occur in the field: measured over the local corpus,
+        every "pin the version … <version>" line without a `tool@version` beside
+        it was documentation about this very defect.
+        """
+        assert not _RE_VERSION_COMPAT.search("Pin the version to 1.2.3.")
 
     def test_an_ssh_target_is_still_credited_known_limit(self):
         """Documents behaviour this pattern deliberately does NOT fix.
