@@ -80,13 +80,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   patterns — "Minimum version 3.9." and "Compatible with Python 3.12" both count.)
   **Known limit:** an SSH target is credited as a pin — `ssh root@100.127.18.39` earns the
   10 points. Separating an address from a version by pattern turned out not to be decidable
-  in either direction: by number shape (`root@127.1` and `root@0000100.1.2.3` are credited and
-  both resolve through `socket.inet_aton`, so any octet rule is complete only until the next form is
-  written — and it also drops genuine four-part versions whose parts all fall in 0–255, such
-  as `v8@10.2.154.26`) or by looking for a deploy command on
-  the line (which misses `git clone git@10.0.0.5` and `curl http://admin@192.168.1.1`, while
-  stripping the credit from an honest ``Deploy over ssh; pin `ruff@0.4.2` in CI.``). Both
-  error directions cost more than the limit, so it is documented rather than papered over.
+  without taking the credit from honest files, so it is documented rather than papered over.
+  The two attempted discriminators, why each failed and what was measured are recorded in
+  `docs/specs/2026-08-13-structural-signal-detection.md` under "Amendment 2026-08-25".
 - **`doctor` no longer counts vendored copies as installed skills.** A repo with one skill
   reported six — three of them the same file inside virtualenvs and a uv cache archive —
   inflating the skill count, the grade distribution and the headline "Total context cost"

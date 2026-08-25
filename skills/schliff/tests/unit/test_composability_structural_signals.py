@@ -85,17 +85,14 @@ class TestDependencyDeclaration:
 class TestVersionCompatibility:
     """A version pin is a compatibility FACT: a stated version, in some syntax.
 
-    `tool@1.2.3` and the prose forms below qualify. The bare instruction
-    `pin the version` does not — it names no version — and that alternative was
-    removed.
+    `tool@1.2.3` and the prose forms below qualify; the bare instruction
+    `pin the version` does not, and that alternative was removed.
 
-    If you are re-adding a phrase alternative: do not copy a regex from this
-    docstring. An earlier version of it prescribed one that matched
-    "Pin the version to 1.2.3.", which the negative cases below forbid, and that
-    still missed the backticked form. The negative cases ARE the specification —
-    run any candidate against them, and against the reverted narrowed form
-    recorded in docs/specs/2026-08-13-structural-signal-detection.md, before
-    believing it works.
+    Re-adding a phrase alternative: the negative cases below are the
+    specification — run any candidate against them. Do not copy a regex out of a
+    docstring; an earlier one prescribed here was wrong in both directions. The
+    reasoning and both reverted attempts live in
+    docs/specs/2026-08-13-structural-signal-detection.md, "Amendment 2026-08-25".
     """
     @pytest.mark.parametrize("text", [
         # schliff's own line — a pin, in the syntax people actually use.
@@ -168,20 +165,12 @@ class TestVersionCompatibility:
         assert not _RE_VERSION_COMPAT.search("Pin the version to 1.2.3.")
 
     def test_an_ssh_target_is_still_credited_known_limit(self):
-        """Documents behaviour this pattern deliberately does NOT fix.
+        """Asserts behaviour this pattern deliberately does NOT fix.
 
-        `ssh root@<ipv4>` is credited as a version pin. Two discriminators were
-        tried, and each cost an honest file its point:
-
-        - number shape: `root@127.1` and `root@0000100.1.2.3` are credited and
-          both resolve, so an octet rule cannot be completed — and it drops
-          genuine four-part versions whose parts all fall in 0-255, such as
-          `v8@10.2.154.26`;
-        - command wordlist: misses `git@`/`psql`/`curl` targets, and strips the
-          credit from `Deploy over ssh; pin `ruff@0.4.2` in CI.`, which is
-          asserted in the positive set above precisely so it outlives this test.
-
-        This test asserts the CURRENT behaviour. If a future change makes the
-        exclusion work, delete it — do not weaken it.
+        Reasoning and the two reverted discriminators: see the spec amendment
+        named in this class's docstring. If a future change makes an exclusion
+        work, DELETE this test — do not weaken it. The honest-pin case that a
+        wordlist exclusion would break is asserted in the positive set above, so
+        it survives that deletion.
         """
         assert _RE_VERSION_COMPAT.search("Deploy with `ssh root@100.127.18.39`.")
