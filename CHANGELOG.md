@@ -73,8 +73,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   declared error contract, `uv` counts as a declared prerequisite (the tool wordlist could
   never be completed), and `tool@1.2.3` counts as a compatibility statement. The bare
   instruction "pin the version" does **not** count — it is an instruction, naming no
-  version. Name one and it counts, including in that same sentence:
-  ``Pin the version in CI: `tool@1.2.3`.`` is credited by the `tool@version` rule.
+  version. Write the pin itself and it counts, in that same sentence:
+  ``Pin the version in CI: `tool@1.2.3`.`` is credited by the `tool@version` rule. Be aware
+  that it is the `tool@version` syntax that carries it, not the presence of a number — a
+  prose "Pin the version to 1.2.3" matches nothing, here or in any earlier release.
   **Known limit:** an SSH target is credited as a pin — `ssh root@100.127.18.39` earns the
   10 points. Separating an address from a version by pattern turned out not to be decidable
   in either direction: by number shape (`127.1` and `0x7f.1` both resolve to real hosts, so

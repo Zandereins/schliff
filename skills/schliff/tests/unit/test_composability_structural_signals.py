@@ -102,7 +102,7 @@ class TestVersionCompatibility:
         "Email the maintainer at user@example.com for access.",
         "The versioning policy is documented separately.",
     ])
-    def test_addresses_are_not_version_pins(self, text):
+    def test_an_email_address_is_not_a_version_pin(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"
 
     @pytest.mark.parametrize("text", [
@@ -127,7 +127,7 @@ class TestVersionCompatibility:
             "Pin the version in CI: `uvx schliff@8.8.2`."
         )
 
-    def test_an_ssh_target_is_a_known_limit_not_a_pin(self):
+    def test_an_ssh_target_is_still_credited_known_limit(self):
         """Documents behaviour this pattern deliberately does NOT fix.
 
         `ssh root@<ipv4>` is credited as a version pin. Four review rounds
