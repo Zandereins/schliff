@@ -145,47 +145,32 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 # (`@vercel/microfrontends` is 22); a bounded run costs O(bound) per start position
 # and keeps the pattern linear.
 #
-# What the `@` shape does NOT keep out is an SSH target: `ssh root@100.127.18.39` has
-# digits after the `@` and was credited as a pin (measured: composability 20 -> 30 for
-# free). The discriminator is a real IPv4 test — four 0-255 octets — not "four dot-parts",
-# because four-part VERSIONS are real: V8 numbers itself `6.7.288.46`, and `288` is not a
-# valid octet, so the octet test keeps that pin while dropping the address.
+# KNOWN LIMIT — an SSH target is credited as a pin. `ssh root@100.127.18.39` has digits
+# after the `@` and earns the 10 points this signal is worth. It is recorded here rather
+# than fixed, because four rounds of review established that separating the two by pattern
+# is not decidable, in either direction:
 #
-# Known limit, stated rather than hidden: a four-part version whose every part happens to
-# be 0-255 (`v8@10.2.154.26`, `zlib@1.2.13.1`) is indistinguishable from an address by
-# shape alone and loses the credit. That is the conservative direction for a scorer —
-# withholding credit costs an author points, granting it wrongly is free score for anyone
-# who writes a deploy command.
-# What the `@` shape does NOT keep out is an SSH target: `ssh root@100.127.18.39` has digits
-# after the `@` and was credited as a pin (measured: composability 20 -> 30 for free).
+#   - By NUMBER SHAPE: `inet_aton` resolves `127.1` to 127.0.0.1, `0000100.1.2.3` to
+#     64.1.2.3 and `0x7f.1` to 127.0.0.1, so an octet rule is complete only until someone
+#     writes the next form. Three successive attempts each closed one width — 3-digit
+#     padding, then 6, then 7 — and left the next open.
+#   - By COMMAND on the line: the wordlist has the identical property. `ssh|scp|rsync`
+#     misses `git clone git@10.0.0.5`, `psql postgres://admin@10.0.0.5` and
+#     `curl http://admin@192.168.1.1`, all of which the shape rule caught — while
+#     simultaneously destroying honest pins, since "Deploy over ssh; pin `ruff@0.4.2`"
+#     loses its credit to the word `ssh` sitting earlier in the sentence.
 #
-# The discriminator is the COMMAND, not the shape of the number. Three rounds of review
-# established that "does this look like an address" is not decidable by pattern: `inet_aton`
-# resolves `127.1` to 127.0.0.1, `0000100.1.2.3` to 64.1.2.3, and `0x7f.1` to 127.0.0.1, so
-# every shape rule — four parts, octet ranges, bounded zero padding — is complete only until
-# someone writes the next form. Each round closed one width and left the next one open.
-#
-# A deploy command on the same line is decidable, and it is what actually separates the two
-# in the field: measured over 2304 local `.md` files, all 28 `user@number` occurrences on a
-# line carrying ssh/scp/rsync are addresses, and all 40 without one are versions
-# (`iconv@2.1.4`, `acorn@5.2`, `v8@6.7.288.46`). No shape arithmetic is needed, and the
-# number is never inspected — which is why `127.1` and `0x7f.1` need no special case.
-#
-# The tempered run is bounded to one line by `[^\n]` and measured linear (~2.0x per
-# doubling), so the ReDoS gate is satisfied without an octet class.
-_DEPLOY_CMD = r"(?:ssh|scp|rsync|sftp|ssh-copy-id|mosh)"
-_AT_PIN = rf"^(?:(?!\b{_DEPLOY_CMD}\b)[^\n])*?[\w.-]{{1,64}}@\d+\.\d+"
-# `pin the version` is GONE as an alternative rather than narrowed. It was added for
-# schliff's own line, and narrowing it opened both error directions at once: it missed
-# `Pin the version to `8.8.2`.` (punctuation ends the word run) while crediting
-# `Pin the version in step 2.1.` (a step number is not a version). The field says it is not
-# needed — all 10 occurrences of the phrase across 2304 local `.md` files write it as
-# `Pin the version in CI: `tool@version``, which the `@` alternative already credits.
+# Both directions of error are worse than the limit itself: withholding credit from an
+# honest file is a real cost, and no attempted discriminator avoided it. This follows the
+# treatment already given to the assertion-credit limit — documented, with a benchmark
+# vector, rather than fixed by a rule that cannot be made correct. Add the gaming vector
+# to `benchmarks/anti-gaming/` once that harness actually runs and its `caught` predicate
+# is bound to the detection field.
 _RE_VERSION_COMPAT = re.compile(
-    r"(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
+    r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
     r"requires?\s+\w+\s*[><=]+\s*[\d.]+|minimum\s+version|"
-    rf"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+|{_AT_PIN})",
-    re.IGNORECASE | re.MULTILINE,
+    r"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+|"
+    r"[\w.-]{1,64}@\d+\.\d+)"
 )
 
 # --- Trigger patterns (SKILL.md-specific) ---

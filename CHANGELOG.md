@@ -71,19 +71,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **`composability` recognises an error contract, a prerequisite and a version pin as
   facts, not as phrasings.** "Errors go to stderr with a non-zero exit" now counts as a
   declared error contract, `uv` counts as a declared prerequisite (the tool wordlist could
-  never be completed), and `tool@1.2.3` counts as a compatibility statement. A version pin
-  is a stated compatibility *fact*, so two things that merely look like one are excluded.
-  **An SSH target is not a version:** `ssh root@100.127.18.39` used to earn the credit. The
-  test is whether a deploy command (`ssh`, `scp`, `rsync`, `sftp`, `mosh`) shares the line —
-  not what the number looks like, because address forms are open-ended (`127.1`,
-  `0100.1.2.3` and `0x7f.1` all resolve to real hosts). Keying on the command means your
-  version keeps its credit whatever its shape: `v8@6.7.288.46` and `pkg@1.2.3.4.5` count,
-  and so does `v8@10.2.154.26` even though it would pass for an address. The exclusion is
-  **per line** — a file that documents a deploy command and states a version elsewhere keeps
-  the credit. **And "pin the version" on its own no longer counts:** it is an instruction,
-  naming no version. Write the version — `Pin the version in CI: \`tool@1.2.3\`` is credited,
-  as are "Compatible with protobuf 4.25.3.1" and "Requires protobuf >= 4.25.3.1". (Note the
-  operator: a bare "requires protobuf 4.25.3.1" is *not* credited, and never was.)
+  never be completed), and `tool@1.2.3` counts as a compatibility statement. The bare
+  instruction "pin the version" does **not** count — it is an instruction, naming no
+  version. Name one and it counts, including in that same sentence:
+  ``Pin the version in CI: `tool@1.2.3`.`` is credited by the `tool@version` rule.
+  **Known limit:** an SSH target is credited as a pin — `ssh root@100.127.18.39` earns the
+  10 points. Separating an address from a version by pattern turned out not to be decidable
+  in either direction: by number shape (`127.1` and `0x7f.1` both resolve to real hosts, so
+  any octet rule is complete only until the next form) or by looking for a deploy command on
+  the line (which misses `git clone git@10.0.0.5` and `curl http://admin@192.168.1.1`, while
+  stripping the credit from an honest ``Deploy over ssh; pin `ruff@0.4.2` in CI.``). Both
+  error directions cost more than the limit, so it is documented rather than papered over.
 - **`doctor` no longer counts vendored copies as installed skills.** A repo with one skill
   reported six — three of them the same file inside virtualenvs and a uv cache archive —
   inflating the skill count, the grade distribution and the headline "Total context cost"
