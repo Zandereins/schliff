@@ -73,6 +73,10 @@ known-first-party = ["scoring", "shared", "nlp"]
 evolve = ["litellm>=1.40.0,<2.0.0"]
 # Phase-1 LLM-judge smoke-test only (skills/schliff/scripts/judge/judge_v0.py).
 # Core schliff stays zero-dependency; install with `uv pip install -e ".[judge]"`.
+# The <1.0 cap is deliberate and Dependabot is told not to raise it (see the
+# `ignore` entry in .github/dependabot.yml): no CI job installs this extra, and
+# the only judge test runs with mock=True, so CI cannot observe a break here.
+# Lift the cap by hand, together with a job that actually installs and runs it.
 judge = ["anthropic>=0.104,<1.0", "pydantic>=2.13,<3.0"]
 # Phase 3b: mcp = ["mcp>=1.0.0,<2.0.0"]
 

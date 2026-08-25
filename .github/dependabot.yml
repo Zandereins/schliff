@@ -24,3 +24,10 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    # No CI job installs the `[judge]` extra and the only judge test runs with
+    # mock=True, so a green check on an anthropic major bump proves nothing about
+    # the judge. Widening that range is a decision to make by hand, after the
+    # extra is actually exercised in CI — not a PR to merge on a green tick.
+    ignore:
+      - dependency-name: "anthropic"
+        update-types: ["version-update:semver-major"]
