@@ -159,8 +159,9 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 #     the credit from an honest "Deploy over ssh; pin `ruff@0.4.2` in CI."
 #
 # Withholding the point from an honest file costs more than the limit does, and no
-# attempted rule avoided that cost. Same treatment as the bare-`stderr` limit above
-# (:87) and the option-shape limit in `base.py`: documented, not papered over.
+# attempted rule avoided that cost. Same treatment as the KNOWN LIMIT on
+# `_RE_ERROR_BEHAVIOR` above and the option-shape limit in `base.py`: documented,
+# not papered over.
 #
 # REVISIT IF: the scorer gains fenced-block language, which would separate a shell block
 # from prose without enumerating number forms or command names. The gaming vector belongs

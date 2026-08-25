@@ -416,3 +416,39 @@ obvious discriminator would be the `...`, and `go test ./...` is a real command.
 
 **Score effect:** no file's score falls. Only credit is added, never withdrawn — the same
 monotonicity property this spec's §4 relies on.
+
+## Amendment 2026-08-25 — `VERSION_COMPAT` credits the pin, not the phrase
+
+*What changed:* the `pin\s+the\s+version` alternative is removed. Requirement 4 above says the
+detector "recognises a version pin (`tool@1.2.3`)"; the phrase alternative went further and
+credited the *instruction to pin*, which names no version and is therefore not the compatibility
+fact the signal is defined on. `Pin the version.` earned the full 10 points on an otherwise empty
+file.
+
+*Score effect, and why it does not break §4's monotonicity:* credit is withdrawn here, which the
+original spec's "only credit is added, never withdrawn" did not anticipate. It holds against the
+**released** version regardless: `v8.11.1` carries neither this phrase nor the `@` alternative,
+both arriving in the unreleased work above, so no published score moves. Against the unreleased
+`main`, measured over `~/schliff` + `~/.claude`, `*.md`, 2304 files: **3 files lose the credit** —
+one instruction (`Pin the version pair precisely`) and two notes written *about* this defect. Of
+159 installed `SKILL.md`, **0** are affected.
+
+*What is deliberately NOT fixed — an SSH target is still credited as a pin.*
+`ssh root@100.127.18.39` has digits after the `@` and earns the 10 points. Four review rounds
+established that separating an address from a version by pattern is not decidable, and that each
+candidate discriminator fails where the other does not:
+
+| discriminator | fails on |
+| --- | --- |
+| IPv4 shape (octet ranges, bounded padding) | `socket.inet_aton` resolves `127.1`, `0x7f.1` and `0000100.1.2.3` to real hosts, so any shape rule is complete only until the next form is written |
+| a deploy command on the same line | misses `git clone git@10.0.0.5` and `curl http://admin@192.168.1.1` — both caught by the shape rule — while stripping the credit from an honest ``Deploy over ssh; pin `ruff@0.4.2` in CI.`` |
+
+Two successive shape attempts closed zero-padding at three and then six characters; seven was
+never reached. The command-wordlist attempt was worse than the shape rule in **both** directions
+and was reverted. Withholding the point from an honest file costs more than the limit does, so
+the limit is documented at the pattern and in the CHANGELOG, and pinned by a test that asserts
+current behaviour. The honest-pin counter-example is asserted in the *positive* set, so it
+survives the deletion of that limit test if an exclusion is ever made to work.
+
+The gaming vector belongs in `benchmarks/anti-gaming/` and is not added yet: that harness runs in
+no CI job, and `test_benchmark.py` is red (two assertions expect 6 benchmarks where 7 exist).

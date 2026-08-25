@@ -83,7 +83,14 @@ class TestDependencyDeclaration:
 
 
 class TestVersionCompatibility:
-    """A version pin is a compatibility statement, whatever syntax expresses it."""
+    """A version pin is a compatibility FACT — and it is the `tool@1.2.3` syntax
+    that carries it, not the presence of a number.
+
+    The phrase `pin the version` was credited as a pin until this was removed; an
+    instruction naming no version is not a fact. Do not add a phrasing alternative
+    back without a field measurement showing the phrasing occurs without a pin
+    beside it — it did not, in 2304 local `.md` files.
+    """
 
     @pytest.mark.parametrize("text", [
         # schliff's own line — a pin, in the syntax people actually use.
@@ -94,6 +101,14 @@ class TestVersionCompatibility:
         "Requires node >= 18.0",
         "Minimum version 3.9.",
         "Compatible with Python 3.12",
+        # An honest pin on a line that also mentions a deploy command. This is
+        # the counter-example the SSH limit below rests on: a command-wordlist
+        # exclusion would strip this file's credit. It lives HERE, in the
+        # positive set, on purpose — the limit test below carries an
+        # instruction to delete it once an exclusion works, and after that
+        # deletion this assertion is the only thing left that notices if the
+        # new exclusion takes honest pins with it.
+        "Deploy over ssh; pin `ruff@0.4.2` in CI.",
     ])
     def test_states_compatibility(self, text):
         assert _RE_VERSION_COMPAT.search(text), f"not recognised: {text!r}"
@@ -108,7 +123,8 @@ class TestVersionCompatibility:
     @pytest.mark.parametrize("text", [
         # An instruction to pin is not a pin: the credited thing is a stated
         # compatibility FACT, and these name no version at all. Measured on the
-        # 8.12.0 scorer, the bare phrase lifted composability by 10 for free.
+        # unreleased scorer this branch forked from (`main` at 922fd92), the bare
+        # phrase lifted composability by 10 on an otherwise empty file.
         "Pin the version.",
         "Pin the version before release.",
         "Pin the version in step 2.1.",
