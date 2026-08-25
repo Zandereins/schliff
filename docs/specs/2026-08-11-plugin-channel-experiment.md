@@ -547,10 +547,19 @@ can separate what was fixed in advance from what was added later. `distributors.
 precedent: showing the correction is the point, silently editing it would be worse than the
 original error.
 
-**No GATE criterion, measurement window, or fixed date has been changed by any amendment
-below.** Gate 1 is still "≥1 of N merges within D0+21", Gate 2's quantitative branch is still
-≥96 uniques, Observation R still reads 2026-09-10, and the abandonment deadline is still
-2026-09-30.
+**No fixed date and no measurement window has been changed by any amendment below.** Gate 1 is
+still "≥1 of N merges within D0+21", Gate 2's threshold is still ≥96 uniques, Observation R still
+reads 2026-09-10 against baseline 32, and the abandonment deadline is still 2026-09-30.
+
+**One gate criterion HAS been narrowed, on 2026-08-25, and this line exists so that no reader has
+to find it buried:** Gate 2's quantitative branch (`uniques ≥ 96`) is **void** for a window in
+which a submission or listing outside the plugin channel lands, leaving Gate 2 to be decided on
+its qualitative branch alone. It was written before any such submission existed and before any
+Gate 2 data existed, and it removes a route to GREEN rather than adding one — it makes the gate
+**harder** to pass. The earlier wording of this paragraph ("no GATE criterion … has been
+changed") was accurate when written and is corrected here rather than quietly deleted, per the
+`distributors.md` precedent stated above. See
+[the 2026-08-25 amendment](#2026-08-25--four-measurement-defects-named-dates-after-2026-09-30-fixed-and-one-gate-narrowed).
 
 One *operating* threshold did change, and saying "no threshold changed" would have hidden it:
 the collector's cadence floor went from 14 days to 12 on 2026-08-21. It governs how the
@@ -672,3 +681,154 @@ A0 still contains release day, so the week of separation does **not** clear the 
 window. What protects the gate is that the quantitative branch reads a single snapshot at A0+30,
 by which point release day has long fallen out of a 14-day window entirely. The separation buys
 margin on the qualitative branch and on any reading taken earlier, not on the arithmetic.
+
+### 2026-08-25 — four measurement defects named, dates after 2026-09-30 fixed, and one gate narrowed
+
+*Deadline this was written against:* the last snapshot on `experiment/traffic-data` at the time
+of this commit is `collected_at: 2026-08-24T20:28:05Z`, and its daily array ends **2026-08-23** —
+so no snapshot in hand contains a single day of Observation R's window. The next run to carry one
+lands 2026-08-28. **Everything from 2026-08-25 onward is blind at the time of writing**, which is
+the property that makes the entries below pre-registration rather than post-hoc commentary. The
+chain in hand is gapless — `2026-07-28 .. 2026-08-23`, `missing: []` — verifiable with the
+coverage check in [Operating the collector](#operating-the-collector).
+
+**E-1 — Observation R cannot see the intervention's onset.** R reads the snapshot at 2026-09-10,
+whose 14-day T-1 window is **2026-08-27 … 2026-09-09**. The intervention (README change
+`97beb01`) shipped 2026-08-11, sixteen days before that window opens. Whatever the README did in
+its first two weeks — including the highest `uniques` day recorded anywhere so far, 8 on
+2026-08-13 — is arithmetically outside the number that gets written down. R measures a *tail*,
+not an onset. This is a limit on what R can conclude, and it is recorded rather than fixed:
+moving the reading date would be changing a pre-registered date after watching data accumulate,
+which is precisely what this document forbids. **The reading date stays 2026-09-10.**
+
+*Explicitly NOT a defect, so that nobody "fixes" it later:* the window-type incompatibility
+first suspected here is **refuted**. The baseline line (`collected_at 2026-08-11T12:52:19Z`)
+carries a 14-day array ending 2026-08-10 — a T-1 window — and R's reading rule produces the same
+14-day T-1 shape. Baseline and R are the same estimator on the same instrument. They are
+comparable; only the *placement* of R's window is the problem.
+
+**E-2 — the baseline window was noisy in a way the R window is not, and the direction is not
+assumed.** The baseline window (2026-07-28 … 2026-08-10) contained **8 releases** — `v8.8.0`,
+`v8.8.1`, `v8.8.2`, `v8.9.0`, `v8.10.0`, `v8.10.1`, `v8.11.0`, `v8.11.1` — and 40 commits on
+`main`. Observation R's window falls inside the visible-surface freeze, so it will contain zero
+releases. The two windows therefore differ in repository activity, not only in the intervention.
+
+*Stated in both directions, because only one direction is convenient and that is the reason to
+write both down:*
+
+- **Baseline inflated** → the comparison flatters the README, and a delta at R is partly the
+  absence of release noise being read as intervention effect. Convenient direction.
+- **Baseline is the honest reference** → this repository's normal state includes shipping, the
+  freeze makes the R window *abnormally quiet*, and R therefore **understates** what the README
+  does under ordinary operation. Inconvenient direction.
+
+Which one holds is not decidable from the data available, and this document does not pick. What
+it forbids is picking on 2026-09-10, once the number is known. Note also that the 2026-08-20
+amendment already records the honest state of the evidence: on `uniques` — the metric R actually
+reads — a release effect is **unproven**, and both recorded `uniques` peaks sit away from any
+release. E-2 is a named uncertainty, not a demonstrated bias.
+
+**E-3 — `fpaul.dev` is a self-created referrer, and R has no channel attribution.** From the
+2026-08-21 snapshot onward, `fpaul.dev` appears in `referrers` (1–2 uniques; 2 as of the
+2026-08-24 snapshot). R reads `views.uniques` for the repository page as a single scalar: it
+cannot separate a visitor who arrived because the README changed from one the owner's own site
+sent. Any R reading above baseline is therefore **partly self-supplied, by an amount R cannot
+report**. Recorded, not corrected — subtracting a referrer count from a de-duplicated `uniques`
+field is not arithmetically valid (a visitor can appear in both), and inventing a correction
+after the fact is worse than naming the limit. When R is written down on 2026-09-10, the
+`referrers` array of the same snapshot line is recorded beside it, so a reader can see the size
+of this term instead of being told it is small.
+
+**E-4 — Gate 1's base rate is 35 %, and the 1.17-day median is the wrong statistic.** The
+2026-08-20 amendment cites a median open→merged latency of **1.17 days** at
+`jeremylongshore/claude-code-plugins-plus-skills`. That figure is computed over *merged PRs only*
+and is therefore survivorship-biased: it answers "given a merge, how fast", not "given a
+submission, how likely". Measured 2026-08-25 over the complete result set (1137 PRs returned
+against a limit of 3000, so not truncated), counting external non-owner non-bot PRs whose full
+21-day window has already elapsed:
+
+| Cohort (external PRs opened in…) | Merged within 21 days |
+| --- | --- |
+| the last 90 days | **14/40 = 35.0 %** |
+| the last 180 days | 43/87 = 49.4 % |
+| the last 365 days | 59/107 = 55.1 % |
+
+**The base rate is strongly window-sensitive, and that is disclosed rather than resolved.** The
+90-day figure is the reference because 90 days is the window `distributors.md` already qualifies
+channels on — not because it is the most favourable; it is in fact the least favourable of the
+three. What all three say jointly: **Gate 1 failing is a common outcome at a healthy channel**,
+not evidence of rejection. A `RED-DISTRIBUTION` verdict must be read against this number, and
+this table is what it is read against.
+
+*Censoring, pre-registered:* an external PR still open when its 21 days elapse is a **censored
+observation** — 16 external PRs at that repository are open right now, several older than 21
+days. Applied to Gate 1: if schliff's submission PR is still open at 23:59 UTC on D0+21, Gate 1
+resolves `RED-DISTRIBUTION` as pre-registered — **the criterion does not change** — but the
+verdict records it as **censored (open, not rejected)** in the same sentence, because "not merged
+within 21 days" and "declined" are different findings, and the base rate above shows the first is
+the ordinary case.
+
+**Dates after 2026-09-30, which existed nowhere until this commit.** These are derived from rules
+already in this document; nothing is chosen freshly here:
+
+| Event | Date | Derived from |
+| --- | --- | --- |
+| D0 (planned) | 2026-09-18 | operational plan; still the event that fixes the clock |
+| Gate 1 resolves | **23:59 UTC 2026-10-09** | D0+21, per *The clock* |
+| Gate 2 opens | A0, 00:00 UTC | A0 = `mergedAt` of the first merged submission PR |
+| Gate 2 resolves | 23:59 UTC on A0+30 | single snapshot, per Gate 2's quantitative branch |
+
+**The outcome with no A0 is named here, in advance:** if Gate 1 resolves without a merge, A0
+never exists, Gate 2 is **never opened and never read**, and the demand question stays untested by
+this branch. That is reported as `RED-DISTRIBUTION` with Gate 2 recorded as `NOT-REACHED` — not as
+`RED-DEMAND`, and not as a pending item that quietly stays open forever. If D0 itself never
+happens by 23:59 UTC 2026-09-30, `ABANDONED-UNSUBMITTED` governs and every date in the table
+above is void.
+
+**Collector operating commitment.** `.github/workflows/collect-traffic.yml` runs daily until at
+least **A0+31**, or — if Gate 1 resolves without a merge — until Gate 1's resolution date. Issue
+#198 stays open until then and is the place where a collector outage is recorded. The instrument
+is not switched off at the first verdict, because Gate 2 reads a snapshot 30 days after a merge
+that may not yet have happened when Gate 1 resolves.
+
+**Secondary quantity, pre-registered as NON-CONFIRMATORY.** Alongside R's scalar, this will be
+computed on 2026-09-10: the per-day union of `views.views[]` across all snapshots, and from it
+the mean `uniques`/day for **2026-07-28 … 2026-08-10** (pre) against **2026-08-11 … 2026-09-09**
+(post). The pre value is already fixed and is stated now: 42 unique-days over 14 days =
+**3.00/day**. The post value is deliberately **not** computed here.
+
+*The estimator discrepancy is disclosed up front:* summing the daily array is **not** the same
+statistic as the window field. On the baseline line the daily array sums to **42** while
+`views.uniques` reports **32** — a visitor returning on several days is counted once by the
+window field and once per day by the sum. The two measure different things; neither is wrong, and
+the 10-visitor gap is the size of the effect.
+
+**Hard limits on this quantity, so it cannot be used to rescue a result:** it may not move the
+96-uniques threshold, may not overturn or soften a RED verdict, and may not be reported as the
+headline. It exists because the daily array is finer-grained data the experiment already collects
+and currently discards, and pre-registering it now is the only way it can ever be reported
+without being a post-hoc fishing expedition.
+
+**One gate criterion IS narrowed by this amendment — Gate 2's quantitative branch can be
+voided.** This is the first amendment to touch a gate:
+
+> If a submission or listing **outside the plugin channel** (for example the pending
+> `awesome-claude-code` #1620, or a `travisvn` directory submission) lands or is merged during
+> Gate 2's window, the quantitative branch (`uniques ≥ 96`) is **void** for that window, and
+> Gate 2 is decided **on its qualitative branch alone**.
+
+*Why, and why now:* Gate 2's branches are an OR, so the weaker branch decides the gate. A listing
+in a 38.9k-star or 14.8k-star index could push `uniques` past 96 through a channel that is not
+the one under test, and Gate 2 would read GREEN for the wrong reason. The qualitative branch
+already requires attribution to the plugin path, so it is immune to this by construction.
+
+*The direction of the change is the point:* this makes Gate 2 **harder** to pass, never easier —
+it removes a route to GREEN and keeps only the branch carrying the attribution duty. It is
+written now, **before any such submission exists and before any Gate 2 data exists**, by someone
+who wants those listings to happen. That is the disclosure: this amendment runs against the
+author's own interest in the outcome, which is what makes it admissible at all. An amendment
+*adding* a route to GREEN, written at this point, would not be.
+
+*Unchanged by all of the above:* D0 stays 2026-09-18. Gate 1 stays "≥1 of N merges within D0+21".
+Gate 2's threshold stays 96 uniques and its qualitative branch is untouched. Observation R still
+reads 2026-09-10 against baseline 32. The abandonment deadline stays 2026-09-30.
