@@ -98,6 +98,11 @@ class TestVersionCompatibility:
         # discriminator below must not swallow them. `288` is not a valid
         # octet, so this cannot be an address.
         "Built against v8@6.7.288.46.",
+        # Five parts is not an address either. This one guards the trailing
+        # `(?!\\.?\\d)` in _IPV4: delete that guard and the lookahead matches
+        # `1.2.3.4` here and drops a legal pin. Without this case the whole
+        # suite stays green through that mutation.
+        "Requires pkg@1.2.3.4.5.",
     ])
     def test_states_compatibility(self, text):
         assert _RE_VERSION_COMPAT.search(text), f"not recognised: {text!r}"
@@ -109,9 +114,22 @@ class TestVersionCompatibility:
         # 8.12.0 scorer: these lifted composability 20 -> 30 for free.
         "Deploy with `ssh root@100.127.18.39` once the build is green.",
         "Copy it over: `scp deploy@10.0.0.5:/srv/app .`",
-        # An instruction to pin is not a pin. The credited thing is a stated
-        # compatibility FACT; this sentence names no version at all.
-        "Pin the version.",
+        # Leading zeros still address a host — `ssh root@010.1.2.3` connects.
+        # A strict-form octet class would let these through the exclusion.
+        "Deploy with `ssh root@010.1.2.3`.",
+        "Run `ssh root@01.02.03.04` on the jump host.",
+        "Try `ssh root@10.00.0.1` first.",
     ])
     def test_addresses_are_not_version_pins(self, text):
+        assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"
+
+    @pytest.mark.parametrize("text", [
+        # An instruction to pin is not a pin. The credited thing is a stated
+        # compatibility FACT; this sentence names no version at all. Kept
+        # apart from the address cases because the two exclusions are
+        # independent — one is a lookahead, this one is a removed alternative.
+        "Pin the version.",
+        "Pin the version before release.",
+    ])
+    def test_bare_imperative_is_not_a_version_pin(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"

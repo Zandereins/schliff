@@ -76,7 +76,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   an SSH target (`ssh root@100.127.18.39` — an address, not a version) and the bare
   instruction "pin the version", which names no version at all. The address test is a real
   IPv4 check rather than "four dot-separated parts", because four-part versions exist —
-  `v8@6.7.288.46` keeps its credit, since `288` is not a valid octet.
+  `v8@6.7.288.46` keeps its credit, since `288` is not a valid octet. **The limit, stated
+  plainly:** a four-part pin whose parts are *all* 0–255 is indistinguishable from an
+  address by shape alone and loses the credit — `pkg@1.0.0.0` (the .NET assembly form) and
+  `protobuf@4.25.3.1` are affected. Five-part pins are unaffected (`pkg@1.2.3.4.5` is not
+  an address). If this costs you points, state the compatibility in prose as well —
+  "Compatible with protobuf 4.25.3.1" and "Requires protobuf >= 4.25.3.1" are both credited
+  by different, unchanged patterns. (Note the operator: a bare "requires protobuf 4.25.3.1"
+  is *not* credited, and never was.)
 - **`doctor` no longer counts vendored copies as installed skills.** A repo with one skill
   reported six — three of them the same file inside virtualenvs and a uv cache archive —
   inflating the skill count, the grade distribution and the headline "Total context cost"

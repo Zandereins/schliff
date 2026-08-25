@@ -156,7 +156,16 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 # shape alone and loses the credit. That is the conservative direction for a scorer —
 # withholding credit costs an author points, granting it wrongly is free score for anyone
 # who writes a deploy command.
-_IPV4_OCTET = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
+# Leading zeros are ACCEPTED on purpose. `ssh root@010.1.2.3` connects, so it is a real
+# deploy command — a strict-form octet class (`[1-9]?\d`) would reject `010` and hand that
+# line the free +10 this exclusion exists to withdraw. The job here is recognising a deploy
+# target, not validating a canonical address, so the class is permissive on shape and strict
+# on the 255 ceiling, which is what keeps `288` a version.
+_IPV4_OCTET = r"(?:25[0-5]|2[0-4]\d|[01]?\d?\d)"
+# The trailing guard is load-bearing: without it the lookahead matches the first four parts
+# of a LONGER dotted version, so `pkg@1.2.3.4.5` would lose its credit to an address test.
+# Five parts is not an address. Covered by a positive fixture, since deleting this guard
+# otherwise leaves the suite fully green.
 _IPV4 = rf"{_IPV4_OCTET}(?:\.{_IPV4_OCTET}){{3}}(?!\.?\d)"
 _RE_VERSION_COMPAT = re.compile(
     r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
