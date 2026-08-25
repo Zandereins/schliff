@@ -80,7 +80,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   **Known limit:** an SSH target is credited as a pin — `ssh root@100.127.18.39` earns the
   10 points. Separating an address from a version by pattern turned out not to be decidable
   in either direction: by number shape (`root@127.1` and `root@0000100.1.2.3` are credited and
-  both resolve to real hosts, so
+  both resolve to real hosts, and an octet rule also drops genuine four-part versions whose
+  parts all fall in 0–255, such as `v8@10.2.154.26` — so
   any octet rule is complete only until the next form) or by looking for a deploy command on
   the line (which misses `git clone git@10.0.0.5` and `curl http://admin@192.168.1.1`, while
   stripping the credit from an honest ``Deploy over ssh; pin `ruff@0.4.2` in CI.``). Both
@@ -111,7 +112,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   recorded from an earlier version are not comparable for the non-SKILL formats.
 
 - Scores for files that document their commands or state an error contract go **up**; no
-  file's score goes down. If you gate CI with `verify --min-score`, nothing you pass today
+  file's score goes down **relative to 8.11.1**, the released version. (Within this
+  unreleased block one change withdraws credit: dropping the bare `pin the version`
+  phrase. Measured over 2304 local `.md`, 3 files lose 10 composability points against
+  the unreleased `main`; 0 of 159 installed skills, and 0 against 8.11.1, which never
+  credited the phrase.) If you gate CI with `verify --min-score`, nothing you pass today
   starts failing.
 - A denominator cap that would have stopped `efficiency` from penalising long files was
   implemented and reverted before release: it decoupled the score from length, which let

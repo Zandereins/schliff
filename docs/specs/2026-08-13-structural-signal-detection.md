@@ -415,7 +415,7 @@ Precision on the new shapes is 53/55. The two misses are accepted rather than fi
 obvious discriminator would be the `...`, and `go test ./...` is a real command.
 
 **Score effect:** no file's score falls. Only credit is added, never withdrawn — the same
-monotonicity property this spec's §4 relies on.
+monotonicity property this spec's Requirement 5 relies on.
 
 ## Amendment 2026-08-25 — `VERSION_COMPAT` credits the pin, not the phrase
 

@@ -83,14 +83,15 @@ class TestDependencyDeclaration:
 
 
 class TestVersionCompatibility:
-    """A version pin is a compatibility FACT: a stated version, in some syntax.
+    r"""A version pin is a compatibility FACT: a stated version, in some syntax.
 
-    `tool@1.2.3` and the prose forms below both qualify. What does NOT is the bare
-    instruction `pin the version`, which names no version — that alternative was
-    removed. Before adding a phrasing alternative back, measure that the phrasing
-    occurs NAMING A VERSION with no `tool@version` pin beside it; over 2304 local
-    `.md` files it did not. (Files do carry the bare phrase — three lose the credit
-    by this change — but none of them names a version, which is the whole point.)
+    `tool@1.2.3` and the prose forms below qualify. The bare instruction
+    `pin the version` does not — it names no version — and that alternative was
+    removed. If it is ever re-added, the ALTERNATIVE ITSELF must require a version
+    token (`pin\s+the\s+version\s+(?:to|at)\s+[\d.]+`), never the bare phrase:
+    an alternative matching the phrase alone hands `Pin the version.` 10 points
+    again, which is the whole defect. A narrowed form was tried and reverted for
+    separate reasons — see the spec — so check that history before rebuilding it.
     """
     @pytest.mark.parametrize("text", [
         # schliff's own line — a pin, in the syntax people actually use.
@@ -113,12 +114,21 @@ class TestVersionCompatibility:
     def test_states_compatibility(self, text):
         assert _RE_VERSION_COMPAT.search(text), f"not recognised: {text!r}"
 
-    @pytest.mark.parametrize("text", [
-        "Email the maintainer at user@example.com for access.",
-        "The versioning policy is documented separately.",
-    ])
-    def test_prose_without_a_pin_is_not_credited(self, text):
-        assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"
+    def test_an_email_address_is_not_a_version_pin(self):
+        r"""Pins the `@\d+\.\d+` digit requirement.
+
+        The module comment on `_RE_VERSION_COMPAT` relies on exactly this: the
+        digit after the `@` is what keeps an address out. Widening the alternative
+        to `@[\w.]+` must break here.
+        """
+        assert not _RE_VERSION_COMPAT.search(
+            "Email the maintainer at user@example.com for access."
+        )
+
+    def test_prose_about_versioning_is_not_a_pin(self):
+        assert not _RE_VERSION_COMPAT.search(
+            "The versioning policy is documented separately."
+        )
 
     @pytest.mark.parametrize("text", [
         # An instruction to pin is not a pin: the credited thing is a stated
@@ -135,12 +145,16 @@ class TestVersionCompatibility:
     def test_an_ssh_target_is_still_credited_known_limit(self):
         """Documents behaviour this pattern deliberately does NOT fix.
 
-        `ssh root@<ipv4>` is credited as a version pin. Four review rounds
-        established that no pattern separates an address from a version in
-        either direction — by number shape (`127.1` and `0000100.1.2.3` are credited and resolve)
-        or by command wordlist (which misses `git@`/`psql`/`curl` while
-        destroying honest pins that merely mention ssh in prose). The limit
-        is recorded, with the cost named, rather than papered over.
+        `ssh root@<ipv4>` is credited as a version pin. Two discriminators were
+        tried, and each cost an honest file its point:
+
+        - number shape: `root@127.1` and `root@0000100.1.2.3` are credited and
+          both resolve, so an octet rule cannot be completed — and it drops
+          genuine four-part versions whose parts all fall in 0-255, such as
+          `v8@10.2.154.26`;
+        - command wordlist: misses `git@`/`psql`/`curl` targets, and strips the
+          credit from `Deploy over ssh; pin `ruff@0.4.2` in CI.`, which is
+          asserted in the positive set above precisely so it outlives this test.
 
         This test asserts the CURRENT behaviour. If a future change makes the
         exclusion work, delete it — do not weaken it.
