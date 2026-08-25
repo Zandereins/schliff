@@ -786,10 +786,10 @@ happens by 23:59 UTC 2026-09-30, `ABANDONED-UNSUBMITTED` governs and every date 
 above is void.
 
 **Collector operating commitment.** `.github/workflows/collect-traffic.yml` runs daily until at
-least **A0+31**, or — if Gate 1 resolves without a merge — until Gate 1's resolution date. Issue
-#198 stays open until then and is the place where a collector outage is recorded. The instrument
-is not switched off at the first verdict, because Gate 2 reads a snapshot 30 days after a merge
-that may not yet have happened when Gate 1 resolves.
+least **A0+31**, or — if Gate 1 resolves without a merge — until Gate 1's resolution date.
+Issue #198 stays open until then and is the place where a collector outage is recorded. The
+instrument is not switched off at the first verdict, because Gate 2 reads a snapshot 30 days
+after a merge that may not yet have happened when Gate 1 resolves.
 
 **Secondary quantity, pre-registered as NON-CONFIRMATORY.** Alongside R's scalar, this will be
 computed on 2026-09-10: the per-day union of `views.views[]` across all snapshots, and from it
