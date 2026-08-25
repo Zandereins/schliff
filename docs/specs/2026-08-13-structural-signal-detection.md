@@ -425,8 +425,8 @@ credited the *instruction to pin*, which names no version and is therefore not t
 fact the signal is defined on. `Pin the version.` earned the full 10 points on an otherwise empty
 file.
 
-*Score effect, and why it does not break §4's monotonicity:* credit is withdrawn here, which the
-original spec's "only credit is added, never withdrawn" did not anticipate. It holds against the
+*Score effect, and why it amends Requirement 5 (monotonicity):* credit is withdrawn here, which the
+original spec's "only credit is added, never withdrawn" did not anticipate. The rule it amends is Requirement 5 ("No file's score may fall"), not Requirement 4. It holds against the
 **released** version regardless: `v8.11.1` carries neither this phrase nor the `@` alternative,
 both arriving in the unreleased work above, so no published score moves. Against the unreleased
 `main`, measured over `~/schliff` + `~/.claude`, `*.md`, 2304 files: **3 files lose the credit** —
@@ -440,7 +440,7 @@ candidate discriminator fails where the other does not:
 
 | discriminator | fails on |
 | --- | --- |
-| IPv4 shape (octet ranges, bounded padding) | `socket.inet_aton` resolves `127.1`, `0x7f.1` and `0000100.1.2.3` to real hosts, so any shape rule is complete only until the next form is written |
+| IPv4 shape (octet ranges, bounded padding) | `root@127.1` and `root@0000100.1.2.3` are credited today and both resolve through `socket.inet_aton`, so any shape rule is complete only until the next form is written — and it drops genuine four-part versions whose parts all fall in 0-255 (`v8@10.2.154.26`) |
 | a deploy command on the same line | misses `git clone git@10.0.0.5` and `curl http://admin@192.168.1.1` — both caught by the shape rule — while stripping the credit from an honest ``Deploy over ssh; pin `ruff@0.4.2` in CI.`` |
 
 Two successive shape attempts closed zero-padding at three and then six characters; seven was

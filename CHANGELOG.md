@@ -79,7 +79,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   prose "Pin the version to 1.2.3" matches nothing, here or in any earlier release.
   **Known limit:** an SSH target is credited as a pin — `ssh root@100.127.18.39` earns the
   10 points. Separating an address from a version by pattern turned out not to be decidable
-  in either direction: by number shape (`127.1` and `0x7f.1` both resolve to real hosts, so
+  in either direction: by number shape (`root@127.1` and `root@0000100.1.2.3` are credited and
+  both resolve to real hosts, so
   any octet rule is complete only until the next form) or by looking for a deploy command on
   the line (which misses `git clone git@10.0.0.5` and `curl http://admin@192.168.1.1`, while
   stripping the credit from an honest ``Deploy over ssh; pin `ruff@0.4.2` in CI.``). Both

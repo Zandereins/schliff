@@ -83,15 +83,15 @@ class TestDependencyDeclaration:
 
 
 class TestVersionCompatibility:
-    """A version pin is a compatibility FACT — and it is the `tool@1.2.3` syntax
-    that carries it, not the presence of a number.
+    """A version pin is a compatibility FACT: a stated version, in some syntax.
 
-    The phrase `pin the version` was credited as a pin until this was removed; an
-    instruction naming no version is not a fact. Do not add a phrasing alternative
-    back without a field measurement showing the phrasing occurs without a pin
-    beside it — it did not, in 2304 local `.md` files.
+    `tool@1.2.3` and the prose forms below both qualify. What does NOT is the bare
+    instruction `pin the version`, which names no version — that alternative was
+    removed. Before adding a phrasing alternative back, measure that the phrasing
+    occurs NAMING A VERSION with no `tool@version` pin beside it; over 2304 local
+    `.md` files it did not. (Files do carry the bare phrase — three lose the credit
+    by this change — but none of them names a version, which is the whole point.)
     """
-
     @pytest.mark.parametrize("text", [
         # schliff's own line — a pin, in the syntax people actually use.
         "Pin the version in CI: `uvx schliff@8.8.2 verify <file> --min-score 75`.",
@@ -137,7 +137,7 @@ class TestVersionCompatibility:
 
         `ssh root@<ipv4>` is credited as a version pin. Four review rounds
         established that no pattern separates an address from a version in
-        either direction — by number shape (`127.1`, `0x7f.1` both resolve)
+        either direction — by number shape (`127.1` and `0000100.1.2.3` are credited and resolve)
         or by command wordlist (which misses `git@`/`psql`/`curl` while
         destroying honest pins that merely mention ssh in prose). The limit
         is recorded, with the cost named, rather than papered over.
