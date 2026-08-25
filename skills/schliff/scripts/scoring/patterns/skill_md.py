@@ -146,14 +146,13 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 # and keeps the pattern linear.
 #
 # KNOWN LIMIT — an SSH target is credited as a pin: `ssh root@100.127.18.39` earns the 10
-# points this signal is worth. Two discriminators were tried and both cost an honest file its
-# point, which is worse than the limit itself; the bare phrase `pin the version` was removed
-# for naming no version at all.
+# points this signal is worth. Deliberate, not an oversight. The bare phrase
+# `pin the version` was removed for naming no version at all.
 #
-# ONE HOME for the reasoning, both failed attempts and the field measurements:
-# docs/specs/2026-08-13-structural-signal-detection.md, "Amendment 2026-08-25". Do not
-# restate it here — this comment had four homes and every review round found one of them
-# out of step with the others, the same failure #209 fixed for the cadence rule.
+# WHY, both attempted fixes and every measurement: docs/specs/2026-08-13-structural-signal-
+# detection.md, "Amendment 2026-08-25". That is the single home, enforced by
+# test_version_pin_limit_stated_once.py — this reasoning had four homes and four review
+# rounds each found one out of step, the failure #209 fixed for the cadence rule.
 _RE_VERSION_COMPAT = re.compile(
     r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
     r"requires?\s+\w+\s*[><=]+\s*[\d.]+|minimum\s+version|"

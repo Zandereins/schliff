@@ -369,6 +369,12 @@ skill, because `tests/fixtures/self-skill-baseline/SKILL.md` is scanned. A SKILL
 under `playground/.venv/lib/python3.12/site-packages/`; in a user's repo that would be
 `node_modules` and `.venv`. Next after this.
 
+`benchmarks/anti-gaming/` runs in no CI job — `grep -rn 'anti-gaming\|benchmarks' .github/ Makefile`
+returns nothing — and its own `test_benchmark.py` is red: two assertions expect 6 benchmarks where
+`BENCHMARKS` holds 7, and `pyproject.toml`'s `testpaths` excludes the directory, so no default run
+collects it. Until both are fixed, adding a gaming vector there buys a line nobody runs. The vector
+for the SSH-address limit (Amendment 2026-08-25) is blocked on exactly this.
+
 Two smaller items, unowned: `commands/schliff/analyze.md` step 7 documents
 `run-eval.sh <skill> --eval-suite <suite>`, which exits `Error: unknown option --eval-suite` — the
 real signature is positional. And `doctor`'s "Total context cost" sums SKILL.md plus
@@ -434,7 +440,9 @@ It holds against the **released** version regardless: `v8.11.1` carries neither 
 the `@` alternative, both arriving in the unreleased work above, so no published score moves.
 Against the unreleased `main`, measured over `~/schliff` + `~/.claude`, `*.md`: **3 files lose the
 credit** — one instruction (`Pin the version pair precisely`) and two notes written *about* this
-defect. Of 159 installed `SKILL.md`, **0** are affected. (That corpus is a working directory, not
+defect. Of the installed skills under `~/.claude` — **159** `SKILL.md` at this HEAD, against the 299
+the Result section above records, because the vendored-copy filter in this same unreleased block
+stopped counting cache and virtualenv duplicates — **0** are affected. (That corpus is a working directory, not
 a fixture, so its file count drifts between runs — around 2300 at the time of writing. The counts
 that carry the argument are the 3 and the 0, which are enumerated above rather than sampled.)
 
@@ -474,5 +482,5 @@ the limit is documented at the pattern and in the CHANGELOG, and pinned by a tes
 current behaviour. The honest-pin counter-example is asserted in the *positive* set, so it
 survives the deletion of that limit test if an exclusion is ever made to work.
 
-The gaming vector belongs in `benchmarks/anti-gaming/` and is not added yet: that harness runs in
-no CI job, and `test_benchmark.py` is red (two assertions expect 6 benchmarks where 7 exist).
+The gaming vector for this limit is listed under
+[Follow-up](#follow-up-agreed-but-not-in-this-branch), with the reason it is not added yet.

@@ -111,8 +111,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Scores for files that document their commands or state an error contract go **up**; no
   file's score goes down **relative to 8.11.1**, the released version. (Within this
   unreleased block one change withdraws credit: dropping the bare `pin the version`
-  phrase. Measured over 2304 local `.md`, 3 files lose 10 composability points against
-  the unreleased `main`; 0 of 159 installed skills, and 0 against 8.11.1, which never
+  phrase. Measured against the unreleased `main`, 3 local files lose 10 composability
+  points; 0 of 159 installed skills, and 0 against 8.11.1, which never
   credited the phrase.) If you gate CI with `verify --min-score`, nothing you pass today
   starts failing.
 - A denominator cap that would have stopped `efficiency` from penalising long files was

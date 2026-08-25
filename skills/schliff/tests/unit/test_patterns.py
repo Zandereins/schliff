@@ -304,8 +304,8 @@ class TestVersionCompat:
     Defined in `scoring/patterns/skill_md.py`. The transcription that used to sit
     here went stale — it predated the `tool@1.2.3` alternative and so implied that
     a pin is not credited, the opposite of the truth. Read the pattern at its
-    definition; the KNOWN LIMIT comment beside it explains why an SSH target is
-    credited too.
+    definition; the KNOWN LIMIT comment beside it names the SSH-address limit and
+    points at the spec amendment that argues it.
 
     Prose forms covered below; `tool@1.2.3` and the bare-phrase exclusion are
     covered in test_composability_structural_signals.py.

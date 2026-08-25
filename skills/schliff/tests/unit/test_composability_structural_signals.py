@@ -103,14 +103,18 @@ class TestVersionCompatibility:
         "Requires node >= 18.0",
         "Minimum version 3.9.",
         "Compatible with Python 3.12",
-        # An honest pin on a line that also mentions a deploy command. This is
-        # the counter-example the SSH limit below rests on: a command-wordlist
-        # exclusion would strip this file's credit. It lives HERE, in the
-        # positive set, on purpose — the limit test below carries an
-        # instruction to delete it once an exclusion works, and after that
-        # deletion this assertion is the only thing left that notices if the
-        # new exclusion takes honest pins with it.
+        # The two honest pins each attempted exclusion would have destroyed.
+        # They live HERE, in the positive set, on purpose: the limit test below
+        # carries an instruction to delete it once an exclusion works, and after
+        # that deletion these are the only assertions left that notice a new
+        # exclusion taking real pins with it. One per error direction, because
+        # covering only the wordlist would leave the shape rule unguarded.
+        #
+        # a wordlist keyed on `ssh` would strip this:
         "Deploy over ssh; pin `ruff@0.4.2` in CI.",
+        # an IPv4-shape rule would strip this — every part falls in 0-255, so it
+        # is indistinguishable from an address by shape alone:
+        "Bundled runtime is v8@10.2.154.26.",
     ])
     def test_states_compatibility(self, text):
         assert _RE_VERSION_COMPAT.search(text), f"not recognised: {text!r}"
