@@ -250,6 +250,95 @@ def test_a_grouped_row_carries_no_runnable_action(tmp_path):
     )
 
 
+def test_two_copies_with_the_same_broken_suite_still_collapse(tmp_path):
+    """The failure reason must be path-free.
+
+    Folding the formatted exception into the digest put an absolute path in the
+    identity, so two genuine copies of one broken skill got different digests and
+    were billed twice — the exact double-count this key removes. Only a reason
+    reaches the identity; the detail goes to stderr.
+    """
+    a = _skill(tmp_path, "cached", BODY)
+    b = _skill(tmp_path, "vendored", BODY)
+    for name in ("cached", "vendored"):
+        (tmp_path / name / "eval-suite.json").mkdir()
+
+    unique, duplicates = doctor._collapse_duplicate_copies([a, b])
+
+    assert len(unique) == 1, "same skill, same breakage — one install"
+    assert len(duplicates) == 1
+
+
+def test_a_symlinked_reference_is_read_like_any_other(tmp_path):
+    """stow, chezmoi and worktrees symlink reference files.
+
+    Skipping them was inherited from ``estimate_token_cost`` while
+    ``read_skill_safe`` and ``load_eval_suite`` both follow links. Measured, a
+    stow-managed copy charged 12 tokens against 1,182 for its byte-identical
+    plain twin, and the two did not collapse.
+    """
+    import os
+
+    real = tmp_path / "guide.md"
+    real.write_text("word " * 900, encoding="utf-8")
+    plain = _skill(tmp_path, "plain", BODY, refs={"guide.md": "word " * 900})
+    stow = _skill(tmp_path, "stow", BODY, refs={"placeholder.md": ""})
+    (tmp_path / "stow" / "references" / "placeholder.md").unlink()
+    os.symlink(real, tmp_path / "stow" / "references" / "guide.md")
+
+    import shared
+
+    assert shared.estimate_token_cost(stow["path"]) == shared.estimate_token_cost(plain["path"])
+    unique, duplicates = doctor._collapse_duplicate_copies([plain, stow])
+    assert len(unique) == 1, "byte-identical payloads, one symlinked, are one install"
+
+    # A link to a directory, and a dangling one, are still dropped.
+    broken = _skill(tmp_path, "broken", BODY, refs={"placeholder.md": ""})
+    (tmp_path / "broken" / "references" / "placeholder.md").unlink()
+    os.symlink(tmp_path / "plain", tmp_path / "broken" / "references" / "dir.md")
+    os.symlink(tmp_path / "nowhere.md", tmp_path / "broken" / "references" / "dead.md")
+    assert shared._payload_files(broken["path"]) == []
+
+
+def test_a_repaired_suite_clears_its_recorded_failure(tmp_path):
+    """The registry is module state; a stale entry outlives the file.
+
+    Only the "absent" branch cleared it, so a suite that failed once and was
+    then repaired produced a self-contradictory row: 7-of-7 dimensions and an
+    action saying to fix the file.
+    """
+    import shared
+
+    skill = _skill(tmp_path, "s", BODY)
+    suite = tmp_path / "s" / "eval-suite.json"
+
+    suite.write_text("{ broken", encoding="utf-8")
+    assert shared.load_eval_suite(skill["path"]) is None
+    assert shared.eval_suite_error.get(str(suite))
+
+    suite.write_text('{"assertions": []}', encoding="utf-8")
+    assert shared.load_eval_suite(skill["path"]) is not None
+    assert shared.eval_suite_error.get(str(suite)) is None, "a repaired suite must clear its entry"
+
+
+def test_an_unreadable_suite_is_not_counted_as_missing(tmp_path):
+    """The aggregate must not contradict the row.
+
+    Counting it as missing put it in "Run /schliff:init on N skills missing eval
+    suites" — the command that writes over the file the row three lines above
+    says to repair.
+    """
+    _skill(tmp_path, "broken", BODY)
+    (tmp_path / "broken" / "eval-suite.json").mkdir()
+
+    report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    rendered = doctor.format_doctor_report(report)
+
+    assert report["no_eval_suite"] == 0
+    assert report["broken_eval_suite"] == 1
+    assert "Run /schliff:init on" not in rendered
+
+
 def test_cost_and_digest_read_the_same_files(tmp_path, monkeypatch):
     """The invariant behind the whole key, gated on BOTH sides.
 

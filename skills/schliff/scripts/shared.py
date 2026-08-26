@@ -37,6 +37,12 @@ _file_cache: dict[str, str] = {}
 # every failure to None so one bad file cannot end a doctor run — but "absent"
 # and "present and broken" must not look the same in a report: the second earns
 # `/schliff:init`, which would then write over the file that caused it.
+#
+# The value is a path-free REASON, never the formatted exception. It is folded
+# into `skill_payload_digest`, and an OSError message carries the absolute path —
+# which gave two genuine copies of one broken skill different identities, so they
+# stopped collapsing and were billed twice. That is the defect this key exists to
+# remove. Details still reach stderr; only the reason reaches the identity.
 eval_suite_error: dict[str, str] = {}
 
 # Known scoring dimensions for validation
@@ -156,15 +162,32 @@ def _payload_files(skill_path: str) -> list[Path]:
 
     One enumeration, two consumers: ``estimate_token_cost`` charges for these
     files and ``skill_payload_digest`` hashes them. They were hand-mirrored,
-    guard for guard, which is the shape that already produced three defects in
-    this area — a domain re-derived instead of asked for. Sorted for a stable
-    digest; symlinked reference files and a symlinked ``references/`` are skipped,
-    and oversized files are dropped by the caller that reads them.
+    guard for guard, which is the shape that already produced several defects in
+    this area — a domain re-derived instead of asked for.
+
+    **Symlinks are followed**, like ``read_skill_safe`` and ``load_eval_suite``,
+    and for the reason ``read_skill_safe``'s docstring gives: stow, chezmoi,
+    ``claude --worktree`` and shared ``~/.claude/skills`` layouts all produce
+    them. Skipping them was inherited from ``estimate_token_cost`` and measured
+    wrong in both directions — a stow-managed copy reported 12 tokens against
+    1,182 for its byte-identical plain twin, and the two did not collapse. The
+    resolved target must still be a regular file, so a link to a directory or a
+    dangling one is dropped rather than read.
+
+    Sorted for a stable digest; oversized files are dropped by whichever consumer
+    reads them.
     """
     refs_dir = Path(skill_path).parent / "references"
-    if not refs_dir.is_dir() or refs_dir.is_symlink():
+    if not refs_dir.is_dir():
         return []
-    return [f for f in sorted(refs_dir.glob("*.md")) if not f.is_symlink()]
+    out = []
+    for f in sorted(refs_dir.glob("*.md")):
+        try:
+            if f.resolve().is_file():
+                out.append(f)
+        except OSError:
+            continue
+    return out
 
 
 def estimate_token_cost(skill_path: str) -> int:
@@ -297,10 +320,12 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
             print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
             eval_suite_error[str(auto_path)] = "exceeds the size limit"
             return None
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        eval_suite_error.pop(str(auto_path), None)
+        return parsed
     except json.JSONDecodeError as e:
         print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
-        eval_suite_error[str(auto_path)] = f"malformed: {e}"
+        eval_suite_error[str(auto_path)] = "malformed"
     except RecursionError:
         # json.loads recurses per nesting level on CPython below 3.14, and
         # MAX_SKILL_SIZE leaves room for ~200k levels. Not an OSError and not a
@@ -311,7 +336,7 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
         eval_suite_error[str(auto_path)] = "nests too deeply to parse"
     except (OSError, ValueError) as e:
         print(f"Warning: could not read eval-suite.json: {e}", file=sys.stderr)
-        eval_suite_error[str(auto_path)] = f"unreadable: {e}"
+        eval_suite_error[str(auto_path)] = "unreadable"
     return None
 
 

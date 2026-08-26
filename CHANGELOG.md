@@ -25,6 +25,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **A broken `eval-suite.json` no longer ends the run.** `schliff score`, `bench`, `eval`, `auto`
+  and `doctor` all raised on a suite that is a directory, unreadable, not UTF-8, or nested deeply
+  enough to exhaust the parser's recursion (the last only below Python 3.14, so CI's newest leg
+  stayed green while the oldest failed). Every failure now degrades to "no suite" with a warning
+  on stderr. `doctor` distinguishes it from an absent suite: `--json` gains `eval_suite_error`
+  per row and `broken_eval_suite` in the summary, and such a skill is kept out of the
+  `/schliff:init` recommendation — that command would write over the file that failed to load.
+
 - **`doctor` counts one install per skill, not one per copy on disk.** A plugin present in both
   `plugins/cache/` and `plugins/marketplaces/` was scored and billed twice, inflating the skill
   count, the grade distribution and the headline "Total context cost". Copies are now collapsed

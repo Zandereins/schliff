@@ -240,14 +240,15 @@ def run_doctor(
     unique_skills, duplicate_copies = _collapse_duplicate_copies(skills)
     # path -> the other install locations, so a row carries its own signal. A
     # --json consumer acting on `action` would otherwise have to join against
-    # duplicate_copies to learn that the path it was handed is one arbitrary
-    # choice among several.
+    # duplicate_copies to learn that the path it was handed is whichever member
+    # sorted first, usually the plugin cache.
     copies_by_path = {d["counted"]: d["also_installed_at"] for d in duplicate_copies}
 
     results = []
     healthy = 0
     needs_work = 0
     no_eval = 0
+    broken_eval = 0
     failed = 0
 
     for skill in unique_skills:
@@ -271,8 +272,8 @@ def run_doctor(
             **score_result,
         }
         # Present only when this row stands for more than one install. `path` and
-        # therefore `action` name one arbitrary member of the group; the spec is
-        # explicit that the path is not interchangeable to a reader.
+        # therefore `action` name whichever member sorted first — usually the
+        # plugin cache, which the next update overwrites.
         if path in copies_by_path:
             result["also_installed_at"] = copies_by_path[path]
             # `path` is one member of a group, picked by sort order rather than
@@ -282,7 +283,13 @@ def run_doctor(
             result["action"] = "Resolve the duplicate install first"
         results.append(result)
 
-        if not score_result["has_eval_suite"]:
+        if score_result.get("eval_suite_error"):
+            # Present but unreadable. Counting it as "missing" would put it in
+            # the /schliff:init recommendation below, which writes eval-suite.json
+            # over the file that failed to load — contradicting this same row's
+            # own action three lines above.
+            broken_eval += 1
+        elif not score_result["has_eval_suite"]:
             no_eval += 1
         elif score_result["composite"] >= 80:
             healthy += 1
@@ -309,6 +316,8 @@ def run_doctor(
         summary_parts.append(f"{needs_work} need work")
     if no_eval:
         summary_parts.append(f"{no_eval} missing eval suite")
+    if broken_eval:
+        summary_parts.append(f"{broken_eval} unreadable eval suite")
     if failed:
         summary_parts.append(f"{failed} failed to score")
     if mesh_issues:
@@ -352,6 +361,7 @@ def run_doctor(
         "healthy": healthy,
         "needs_work": needs_work,
         "no_eval_suite": no_eval,
+        "broken_eval_suite": broken_eval,
         "total_tokens": total_tokens,
         # Physical files on disk, before collapsing copies. `skills_found` is the
         # deduplicated count; without this the difference is only recoverable by
@@ -437,7 +447,9 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
         dims = f"{r['measured']}/{r['total_dims']}"
         tokens = r.get("tokens", 0)
         issues = r["issue_count"]
-        action = r["action"][:35]
+        # The reason is the whole payload of a repair action, so keep it whole
+        # rather than truncating to "Fix eval-suite.json first (unreadab".
+        action = r["action"] if r.get("eval_suite_error") else r["action"][:35]
 
         lines.append(f"  {name:<25s} {score:>5.0f} {grade:s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
 
@@ -501,12 +513,18 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
 
     # Top-level recommendations
     no_eval = report.get("no_eval_suite", 0)
+    broken_eval = report.get("broken_eval_suite", 0)
     needs_work = report.get("needs_work", 0)
 
-    if no_eval > 0 or needs_work > 0:
+    if no_eval > 0 or needs_work > 0 or broken_eval > 0:
         lines.append("  Recommended next steps:")
         if no_eval > 0:
             lines.append(f"    1. Run /schliff:init on {no_eval} skills missing eval suites")
+        if broken_eval > 0:
+            lines.append(
+                f"    {'2' if no_eval else '1'}. Repair {broken_eval} unreadable "
+                f"eval-suite.json — do NOT run /schliff:init on these, it writes over them"
+            )
         if needs_work > 0:
             lines.append(f"    {'2' if no_eval else '1'}. Run /schliff:auto on {needs_work} low-scoring skills")
         lines.append("")

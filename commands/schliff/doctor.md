@@ -53,8 +53,9 @@ Run a comprehensive health check on all installed skills.
 
 4. A row with `eval_suite_error` has a suite that is present but unreadable —
    report the reason and do not suggest `/schliff:init`, which would write over
-   that file. A row with `also_installed_at` names one arbitrary member of a
-   group; use its `action` verbatim rather than composing a command from `path`.
+   that file. A row with `also_installed_at` names whichever member sorted
+   first — usually the plugin cache; use its `action` verbatim rather than
+   composing a command from `path`.
 
 5. For skills with grade D or F, suggest specific next steps:
    - "Run `/schliff:init <path>` to set up improvement tracking"
