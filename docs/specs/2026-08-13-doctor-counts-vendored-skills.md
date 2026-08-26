@@ -116,7 +116,8 @@ recorded in the 2026-08-25 amendment to
 **The rule instead.** `shared.skill_payload_digest` — sha256 over SKILL.md, `references/*.md`
 and `eval-suite.json`, length-prefixed. It carries no vendor names and does not grow.
 
-**The key covers exactly what a doctor row is derived from, and that was got wrong twice:**
+**The key covers what a row's SCORE and COST are derived from, and that was got wrong three
+times — each time by re-deriving a domain instead of asking the code that owns it:**
 
 * *Cost.* Hashing SKILL.md alone collapses installs that cost different amounts — two
   byte-identical SKILL.md with different `references/` came to 9,013 and 9,591 tokens. The
@@ -127,8 +128,21 @@ and `eval-suite.json`, length-prefixed. It carries no vendor names and does not 
   SKILL.md, one with the suite beside it, scored **38.3 [E]** and **93.0 [A]**. Ignoring it let
   path sort order decide which the reader saw — a 55-point swing settled by a string comparison.
 
-Both are pinned by mutation-verified tests in
+* *The loader's own discovery.* The first eval-suite branch copied
+  `estimate_token_cost`'s symlink skip. `load_eval_suite` has no such guard — it follows the
+  link — so a stow/chezmoi layout was scored 7-of-7 and hashed as if it had no suite, and the
+  two copies collapsed again. The digest now calls `load_eval_suite` instead of re-deriving
+  where the file is, which makes the domains identical by construction rather than by review.
+
+All three are pinned by mutation-verified tests in
 `skills/schliff/tests/unit/test_doctor_collapses_duplicate_copies.py`.
+
+**Known limit, deliberately not closed.** The `Issues` column can still differ between two
+copies with the same digest: `structure`'s dangling-reference lint resolves declared paths such
+as `scripts/run.py` against the skill directory and its plugin/git ancestors, which lie outside
+the digest's domain. Measured over the 20 real groups: 0 divergences, and that lint does not
+score. Widening the digest to every path a skill might declare is the enumeration trap again;
+reporting the union of issues across a group is the fix if a field case ever appears.
 
 **What is deliberately not decided.** Which copy of a genuine duplicate is *counted* is
 arbitrary: after the digest they are identical in everything measured. The path is not

@@ -219,6 +219,11 @@ def run_doctor(
         }
 
     unique_skills, duplicate_copies = _collapse_duplicate_copies(skills)
+    # path -> the other install locations, so a row carries its own signal. A
+    # --json consumer acting on `action` would otherwise have to join against
+    # duplicate_copies to learn that the path it was handed is one arbitrary
+    # choice among several.
+    copies_by_path = {d["counted"]: d["also_installed_at"] for d in duplicate_copies}
 
     results = []
     healthy = 0
@@ -246,6 +251,11 @@ def run_doctor(
             "path": path,
             **score_result,
         }
+        # Present only when this row stands for more than one install. `path` and
+        # therefore `action` name one arbitrary member of the group; the spec is
+        # explicit that the path is not interchangeable to a reader.
+        if path in copies_by_path:
+            result["also_installed_at"] = copies_by_path[path]
         results.append(result)
 
         if not score_result["has_eval_suite"]:
@@ -366,9 +376,10 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
     duplicate_copies = report.get("duplicate_copies", [])
     if duplicate_copies:
         extra = sum(len(d["also_installed_at"]) for d in duplicate_copies)
+        n = len(duplicate_copies)
         lines.append(
-            f"  {len(duplicate_copies)} skills are installed more than once "
-            f"({extra} extra copies, counted once):"
+            f"  {n} {'skill is' if n == 1 else 'skills are'} installed more than "
+            f"once ({extra} extra {'copy' if extra == 1 else 'copies'}, counted once):"
         )
         lines.append(
             "    Which copy is counted is arbitrary — pick the one you control "

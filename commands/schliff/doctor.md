@@ -34,16 +34,20 @@ Run a comprehensive health check on all installed skills.
    Summary: X skills scanned, Y healthy, Z need attention
    ```
 
-3. If `duplicate_copies` is non-empty, report it under the table. The same skill
-   installed twice (typically a plugin present in both `plugins/cache/` and
-   `plugins/marketplaces/`) is counted once, so `skills_found` is lower than
-   `skills_discovered` — say so, or the drop looks like skills went missing:
+3. If `duplicate_copies` is non-empty, report it **above** the table — the CLI
+   renderer prints it there, and the two surfaces should not disagree on shape.
+   The same skill installed twice (typically a plugin present in both
+   `plugins/cache/` and `plugins/marketplaces/`) is counted once:
 
    ```
    N skills are installed more than once (M extra copies, counted once).
    Which copy is counted is arbitrary — name every path in the group and let
    the reader pick the one they control before acting on it.
    ```
+
+   Do not explain the whole `skills_discovered` − `skills_found` gap as
+   duplicates: a skill that fails to score widens it too. The duplicate share is
+   the sum of `also_installed_at` lengths; the rest is `failed`.
 
 4. For skills with grade D or F, suggest specific next steps:
    - "Run `/schliff:init <path>` to set up improvement tracking"

@@ -182,7 +182,16 @@ def skill_payload_digest(skill_path: str) -> str:
 
     That is SKILL.md, its ``references/*.md``, and ``eval-suite.json`` — the file
     list ``estimate_token_cost`` charges for, plus the one ``load_eval_suite``
-    reads. A digest whose domain is smaller than the quantities it indexes is not
+    reads. The suite is fetched through that loader rather than re-discovered, so
+    the two cannot drift; the references walk mirrors the cost walk, guard for
+    guard.
+
+    Scope, stated exactly: this covers what the SCORE and the COST are derived
+    from. The ``Issues`` column can still differ between two copies with the same
+    digest — ``structure``'s dangling-reference lint resolves declared paths like
+    ``scripts/run.py`` against the skill directory and its plugin/git ancestors,
+    which are outside this domain. Measured over the 20 real duplicate groups: 0
+    divergences today, and the lint does not score. A digest whose domain is smaller than the quantities it indexes is not
     a simpler key, it is a wrong one; that was got wrong once per quantity, and
     both mistakes are recorded with their measurements in docs/specs/2026-08-13-doctor-counts-vendored-skills.md,
     "Amendment 2026-08-26". Not restated here.
@@ -223,16 +232,16 @@ def skill_payload_digest(skill_path: str) -> str:
             if len(ref_content) <= MAX_SKILL_SIZE:
                 _absorb(f"references/{ref_file.name}", ref_content)
 
-    # Same discovery and same size guard as load_eval_suite. Its presence moves a
-    # row from 4-of-7 dimensions to 7-of-7, so it belongs to the identity.
-    suite = path.parent / "eval-suite.json"
-    if suite.is_file() and not suite.is_symlink():
-        try:
-            raw = suite.read_text(encoding="utf-8", errors="replace")
-        except (OSError, PermissionError):
-            raw = ""
-        if raw and len(raw) <= MAX_SKILL_SIZE:
-            _absorb("eval-suite.json", raw)
+    # Ask load_eval_suite itself rather than re-deriving its file discovery. The
+    # first attempt copied the symlink guard from estimate_token_cost, but
+    # load_eval_suite has no such guard — it follows the link. A stow/chezmoi
+    # layout, where eval-suite.json is symlinked, was therefore scored but not
+    # hashed, and the 4-of-7 and 7-of-7 copies collapsed again. Calling the real
+    # loader makes the domains identical by construction, and keeps them
+    # identical if its discovery ever changes.
+    suite = load_eval_suite(str(path))
+    if suite is not None:
+        _absorb("eval-suite.json", json.dumps(suite, sort_keys=True, default=str))
 
     return digest.hexdigest()
 

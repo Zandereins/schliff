@@ -116,6 +116,34 @@ def test_eval_suite_presence_splits_two_otherwise_identical_installs(tmp_path):
     assert duplicates == []
 
 
+def test_a_symlinked_eval_suite_also_splits_two_installs(tmp_path):
+    """The digest must follow the loader, not a copied guard.
+
+    ``load_eval_suite`` follows a symlink; the first version of the digest
+    copied ``estimate_token_cost``'s symlink skip and therefore did not. A
+    stow/chezmoi layout was scored 7-of-7 and hashed as if it had no suite, so
+    the two copies collapsed and sort order picked the grade again.
+
+    Reinstate a ``not suite.is_symlink()`` guard in ``skill_payload_digest`` and
+    this goes red.
+    """
+    import os
+
+    real = tmp_path / "shared-suite.json"
+    real.write_text(
+        '{"assertions": [{"name": "x", "type": "contains", "value": "Usage"}]}',
+        encoding="utf-8",
+    )
+    a = _skill(tmp_path, "no-suite", BODY)
+    b = _skill(tmp_path, "symlinked", BODY)
+    os.symlink(real, tmp_path / "symlinked" / "eval-suite.json")
+
+    unique, duplicates = doctor._collapse_duplicate_copies([a, b])
+
+    assert len(unique) == 2, "a symlinked suite still makes this a different install"
+    assert duplicates == []
+
+
 def test_mesh_receives_every_physical_copy(tmp_path, monkeypatch):
     """Dedup is for the report, not for discovery.
 
