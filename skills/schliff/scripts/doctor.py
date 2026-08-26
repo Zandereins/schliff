@@ -22,7 +22,12 @@ import skill_mesh
 from terminal_art import grade_colored, score_to_grade
 
 from scoring.formats import detect_format
-from shared import EXCLUDED_DIRS, estimate_token_cost, skill_payload_digest
+from shared import (
+    EXCLUDED_DIRS,
+    estimate_token_cost,
+    eval_suite_error,
+    skill_payload_digest,
+)
 
 # Filenames to match (lowercase) for instruction file discovery
 _INSTRUCTION_FILENAMES = {"claude.md", ".cursorrules", "agents.md"}
@@ -107,7 +112,15 @@ def _score_single_skill(skill_path: str) -> dict:
     score = composite["score"]
     has_eval = eval_suite is not None
 
-    if not has_eval:
+    # A suite that is present but unreadable is not the same as no suite. It was
+    # degraded to None so one bad file cannot end the run, but telling the user
+    # to run /schliff:init here would write eval-suite.json over the very file
+    # that failed to load.
+    suite_error = eval_suite_error.get(str(Path(skill_path).parent / "eval-suite.json"))
+
+    if suite_error:
+        action = f"Fix eval-suite.json first ({suite_error})"
+    elif not has_eval:
         action = f"/schliff:init {skill_path}"
     elif score < 50:
         action = f"/schliff:auto {skill_path}"
@@ -130,6 +143,7 @@ def _score_single_skill(skill_path: str) -> dict:
         "issue_count": len(all_issues),
         "issues": all_issues,
         "action": action,
+        "eval_suite_error": suite_error,
         "tokens": tokens,
         "recommendations": recommendations,
         # Vendor + line only, never the value (ADR 0014).
@@ -149,9 +163,14 @@ def _collapse_duplicate_copies(skills: list[dict]) -> tuple[list[dict], list[dic
     "Amendment 2026-08-26".
 
     Nothing is deleted; every path in a group is reported and the caller decides
-    (ADR 0019). Which copy is counted is arbitrary — after the digest they are
-    identical in everything measured — so the report says so rather than implying
-    the surviving path is the canonical one.
+    (ADR 0019). The counted copy is the first in discovery order, which sorts by
+    path — so for the dominant real case ``plugins/cache/…`` wins over
+    ``plugins/marketplaces/…`` and over ``~/.claude/skills/…``. That is not
+    arbitrary, it is a systematic bias toward the one copy the reader should NOT
+    act on: a plugin cache is overwritten on the next update. The copies are
+    identical in everything measured, so preferring another member would need a
+    path wordlist — the enumeration this whole key exists to avoid. Instead the
+    row for a group carries no runnable ``action``.
 
     Skills whose digest could not be computed are all kept: an empty digest is
     not an identity, so they must not collapse together.
@@ -256,6 +275,11 @@ def run_doctor(
         # explicit that the path is not interchangeable to a reader.
         if path in copies_by_path:
             result["also_installed_at"] = copies_by_path[path]
+            # `path` is one member of a group, picked by sort order rather than
+            # by merit, and it is usually the plugin cache. Emitting
+            # `/schliff:auto <that path>` would write .schliff/ history into a
+            # directory the next plugin update deletes.
+            result["action"] = "Resolve the duplicate install first"
         results.append(result)
 
         if not score_result["has_eval_suite"]:
@@ -382,8 +406,8 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
             f"once ({extra} extra {'copy' if extra == 1 else 'copies'}, counted once):"
         )
         lines.append(
-            "    Which copy is counted is arbitrary — pick the one you control "
-            "before acting on its path."
+            "    The counted path is whichever sorted first, which is usually the "
+            "plugin cache — act on the copy you control."
         )
         for d in duplicate_copies[:10]:
             lines.append(f"    {d['name']}")

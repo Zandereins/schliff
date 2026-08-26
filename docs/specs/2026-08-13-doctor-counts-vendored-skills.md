@@ -160,11 +160,23 @@ the digest's domain. Measured over the 20 real groups: 0 divergences, and that l
 score. Widening the digest to every path a skill might declare is the enumeration trap again;
 reporting the union of issues across a group is the fix if a field case ever appears.
 
-**What is deliberately not decided.** Which copy of a genuine duplicate is *counted* is
-arbitrary: after the digest they are identical in everything measured. The path is not
-interchangeable to a reader — `/schliff:auto` writes `.schliff/` history beside the file, and a
-plugin cache directory is overwritten on the next update — so the report prints every path in a
-group and says the choice is arbitrary. Nothing is deleted (ADR 0019).
+**Which copy is counted, and why the row carries no command.** Not arbitrary: `discover_skills`
+sorts by path and the first wins, so `plugins/cache/…` beats `plugins/marketplaces/…` and
+`~/.claude/skills/…` every time. That is a systematic bias toward the one copy a reader should
+*not* act on — `/schliff:auto` writes `.schliff/` history beside the file, and a plugin cache is
+overwritten on the next update. Preferring another member would require a path wordlist, the
+enumeration this key exists to avoid, so instead a grouped row states the duplicate rather than
+emitting a command against one member. Every path in the group is printed; nothing is deleted
+(ADR 0019).
+
+**A broken eval suite is not an absent one.** `load_eval_suite` degrades every failure to `None`
+so one bad file cannot end a run — including `RecursionError`, which `json.loads` raises on deeply
+nested input below CPython 3.14 and which is neither `OSError` nor `ValueError`. That version
+dependence is the dangerous part: the newest CI leg stays green while the oldest tracebacks.
+Degrading is not enough on its own, though — "absent" and "present but broken" produce different
+rows, so the failure is recorded in `shared.eval_suite_error`, reported per row as
+`eval_suite_error`, folded into the digest so the two do not collapse, and the row's action says
+to fix the file rather than `/schliff:init`, which would write over it.
 
 **Still open, unchanged by this:** `doctor --json` reports `mesh_issue_count: 0` under
 `incremental=True` while a fresh analysis finds 49. Present on `main` before this change.

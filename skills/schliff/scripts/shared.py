@@ -33,6 +33,12 @@ MAX_CACHE_ENTRIES = 500
 # Module-level file cache to avoid redundant reads within a single invocation
 _file_cache: dict[str, str] = {}
 
+# Why an eval suite was not loaded, keyed by its path. `load_eval_suite` degrades
+# every failure to None so one bad file cannot end a doctor run — but "absent"
+# and "present and broken" must not look the same in a report: the second earns
+# `/schliff:init`, which would then write over the file that caused it.
+eval_suite_error: dict[str, str] = {}
+
 # Known scoring dimensions for validation
 VALID_DIMENSIONS = {
     "structure", "triggers", "quality", "edges",
@@ -164,7 +170,9 @@ def _payload_files(skill_path: str) -> list[Path]:
 def estimate_token_cost(skill_path: str) -> int:
     """Estimate token cost when this skill is loaded into context.
 
-    Counts words in SKILL.md + all files in references/ directory.
+    Counts words in SKILL.md plus the ``references/*.md`` that ``_payload_files``
+    enumerates — not every file in that directory. Widening it means widening
+    that helper, which moves the digest with it.
     Uses 1.3 tokens/word approximation (standard for English text with code).
     Returns estimated token count.
     """
@@ -193,9 +201,9 @@ def skill_payload_digest(skill_path: str) -> str:
 
     That is SKILL.md, its ``references/*.md``, and ``eval-suite.json`` — the file
     list ``estimate_token_cost`` charges for, plus the one ``load_eval_suite``
-    reads. The suite is fetched through that loader rather than re-discovered, so
-    the two cannot drift; the references walk mirrors the cost walk, guard for
-    guard.
+    reads. Neither half is re-derived: the references walk and the cost walk
+    share ``_payload_files``, and the suite is fetched through ``load_eval_suite``
+    itself, so no domain can drift from the one it indexes.
 
     Scope, stated exactly: this covers what the SCORE and the COST are derived
     from. The ``Issues`` column can still differ between two copies with the same
@@ -226,7 +234,7 @@ def skill_payload_digest(skill_path: str) -> str:
     # with and without one is one install rather than two.
     try:
         _absorb("SKILL.md", read_skill_safe(str(path)))
-    except (OSError, PermissionError, FileNotFoundError, ValueError):
+    except (OSError, ValueError):
         return ""
 
     for ref_file in _payload_files(str(path)):
@@ -246,7 +254,21 @@ def skill_payload_digest(skill_path: str) -> str:
     # identical if its discovery ever changes.
     suite = load_eval_suite(str(path))
     if suite is not None:
-        _absorb("eval-suite.json", json.dumps(suite, sort_keys=True, default=str))
+        try:
+            _absorb("eval-suite.json", json.dumps(suite, sort_keys=True, default=str))
+        except (RecursionError, TypeError, ValueError):
+            # A suite that parsed but will not serialise still made the row
+            # 7-of-7. Record that fact rather than silently hashing as if there
+            # were no suite at all.
+            _absorb("eval-suite.json", "<unserialisable>")
+    else:
+        # "absent" and "present but broken" produce different rows — different
+        # `action`, different `eval_suite_error` — so they must not collapse onto
+        # each other. Without this the domain is again smaller than what the row
+        # reports, which is the defect this key exists to prevent.
+        failure = eval_suite_error.get(str(path.parent / "eval-suite.json"))
+        if failure:
+            _absorb("eval-suite.json:error", failure)
 
     return digest.hexdigest()
 
@@ -268,16 +290,28 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
     auto_path = skill_dir / "eval-suite.json"
     try:
         if not auto_path.exists():
+            eval_suite_error.pop(str(auto_path), None)
             return None
         raw = auto_path.read_text(encoding="utf-8")
         if len(raw) > MAX_SKILL_SIZE:
             print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
+            eval_suite_error[str(auto_path)] = "exceeds the size limit"
             return None
         return json.loads(raw)
     except json.JSONDecodeError as e:
         print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
+        eval_suite_error[str(auto_path)] = f"malformed: {e}"
+    except RecursionError:
+        # json.loads recurses per nesting level on CPython below 3.14, and
+        # MAX_SKILL_SIZE leaves room for ~200k levels. Not an OSError and not a
+        # ValueError, so the handler below does not see it — and it only raises
+        # on the older interpreters, which means CI's newest leg stays green
+        # while the oldest tracebacks.
+        print("Warning: eval-suite.json nests too deeply to parse, skipping", file=sys.stderr)
+        eval_suite_error[str(auto_path)] = "nests too deeply to parse"
     except (OSError, ValueError) as e:
         print(f"Warning: could not read eval-suite.json: {e}", file=sys.stderr)
+        eval_suite_error[str(auto_path)] = f"unreadable: {e}"
     return None
 
 

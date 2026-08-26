@@ -144,7 +144,7 @@ def test_a_symlinked_eval_suite_also_splits_two_installs(tmp_path):
     assert duplicates == []
 
 
-@pytest.mark.parametrize("kind", ["directory", "binary", "unreadable"])
+@pytest.mark.parametrize("kind", ["directory", "binary", "unreadable", "deeply-nested"])
 def test_a_broken_eval_suite_degrades_instead_of_crashing_the_run(tmp_path, kind):
     """doctor scans other people's directories; it reports, never gates.
 
@@ -163,7 +163,17 @@ def test_a_broken_eval_suite_degrades_instead_of_crashing_the_run(tmp_path, kind
         suite.mkdir()
     elif kind == "binary":
         suite.write_bytes(b"\xff\xfe\x00\x01")
+    elif kind == "deeply-nested":
+        # json.loads recurses per level below CPython 3.14, and MAX_SKILL_SIZE
+        # leaves room for ~200k of them. RecursionError is neither OSError nor
+        # ValueError, so the first hardening did not catch it — and it does not
+        # raise on the newest interpreter, so CI's newest leg stayed green while
+        # the oldest tracebacked.
+        depth = 100_000
+        suite.write_text("[" * depth + "]" * depth, encoding="utf-8")
     else:
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            pytest.skip("chmod 0 does not deny root; the case would pass vacuously")
         suite.write_text("{}", encoding="utf-8")
         os.chmod(suite, 0)
 
@@ -179,40 +189,105 @@ def test_a_broken_eval_suite_degrades_instead_of_crashing_the_run(tmp_path, kind
     assert report["skills_found"] >= 1, "a broken suite must not empty the report"
 
 
-def test_cost_and_digest_read_the_same_files(tmp_path):
-    """The invariant behind the whole key, asserted directly.
+def test_a_broken_suite_is_not_the_same_install_as_no_suite(tmp_path):
+    """"Absent" and "present but broken" produce different rows.
 
-    Three defects in this area were a domain re-derived instead of asked for.
-    Rather than test each guard, this pins the property they exist for: whatever
-    ``estimate_token_cost`` charges for must be what ``skill_payload_digest``
-    hashes. Both now go through ``shared._payload_files``.
+    Degrading a broken suite to ``None`` stopped the crash, but it also made the
+    two look identical to the digest — so they collapsed, and the row that told
+    the reader to fix the file vanished into ``also_installed_at``. The row now
+    carries ``eval_suite_error`` and a different ``action``, so the failure state
+    belongs to the identity.
 
-    Add a file type to one walk and not the other — the drift is primed, since
-    ``estimate_token_cost``'s docstring says "all files in references/" while the
-    code globs ``*.md`` — and this goes red.
+    Drop the ``eval_suite_error`` branch from ``skill_payload_digest`` and this
+    goes red.
     """
-    import os
+    a = _skill(tmp_path, "no-suite", BODY)
+    b = _skill(tmp_path, "broken-suite", BODY)
+    (tmp_path / "broken-suite" / "eval-suite.json").mkdir()
 
+    unique, duplicates = doctor._collapse_duplicate_copies([a, b])
+
+    assert len(unique) == 2, "a broken suite is not the same install as no suite"
+    assert duplicates == []
+
+
+def test_a_broken_suite_row_does_not_send_you_to_overwrite_it(tmp_path):
+    """The emitted action must be runnable.
+
+    With the suite degraded to ``None`` the row read ``has_eval_suite: False``
+    and the action became ``/schliff:init <path>`` — which writes
+    ``eval-suite.json`` over the very file that failed to load.
+    """
+    _skill(tmp_path, "broken", BODY)
+    (tmp_path / "broken" / "eval-suite.json").mkdir()
+
+    report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    row = next(r for r in report["results"] if "broken" in r["path"])
+
+    assert row["eval_suite_error"], "the failure must reach the report, not just stderr"
+    assert "/schliff:init" not in (row["action"] or "")
+
+
+def test_a_grouped_row_carries_no_runnable_action(tmp_path):
+    """The counted path is sort order, not merit — and usually the plugin cache.
+
+    ``discover_skills`` sorts by path and the first wins, so
+    ``plugins/cache/…`` beats ``plugins/marketplaces/…`` and ``~/.claude/skills/…``
+    every time. Emitting ``/schliff:auto <that path>`` writes ``.schliff/``
+    history into a directory the next plugin update deletes. Preferring another
+    member would need a path wordlist — the enumeration this key avoids — so the
+    row says what to do instead.
+    """
+    _skill(tmp_path, "cache-copy", BODY)
+    _skill(tmp_path, "user-copy", BODY)
+
+    report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    grouped = [r for r in report["results"] if "also_installed_at" in r]
+
+    assert len(grouped) == 1
+    assert "/schliff:" not in (grouped[0]["action"] or ""), (
+        "a grouped row must not hand out a command against one arbitrary copy"
+    )
+
+
+def test_cost_and_digest_read_the_same_files(tmp_path, monkeypatch):
+    """The invariant behind the whole key, gated on BOTH sides.
+
+    Four defects in this area were a domain re-derived instead of asked for, so
+    this pins the property they exist for: whatever ``estimate_token_cost``
+    charges for is what ``skill_payload_digest`` hashes.
+
+    The first version asserted only what ``_payload_files`` returns and that the
+    cost path uses it. Verified false negative: giving the digest its own
+    ``glob("*")`` walk left all tests green, so it gated exactly one of the two
+    sides it names. Both are now observed through the same monkeypatch.
+    """
     import shared
 
     a = _skill(tmp_path, "s", BODY, refs={"keep.md": "counted\n"})
     refs = tmp_path / "s" / "references"
-    (refs / "ignored.txt").write_text("not markdown\n", encoding="utf-8")
-    (refs / "nested").mkdir()
-    (refs / "nested" / "deep.md").write_text("not walked\n", encoding="utf-8")
-    os.symlink(refs / "keep.md", refs / "linked.md")
+    (refs / "extra.md").write_text("also counted\n", encoding="utf-8")
 
-    listed = shared._payload_files(a["path"])
+    real = shared._payload_files
+    calls = []
 
-    # The enumeration is the contract: exactly the files both sides consume.
-    assert [f.name for f in listed] == ["keep.md"]
+    def _spy(path):
+        calls.append(path)
+        return real(path)
 
-    # And it really is the one the cost path uses: removing its only entry must
-    # move the token total.
-    before = shared.estimate_token_cost(a["path"])
-    (refs / "keep.md").unlink()
+    monkeypatch.setattr(shared, "_payload_files", _spy)
+
+    cost_before = shared.estimate_token_cost(a["path"])
+    digest_before = shared.skill_payload_digest(a["path"])
+    assert len(calls) == 2, "both consumers must go through the shared enumeration"
+
+    # Narrowing the shared list must move BOTH. A consumer walking the directory
+    # itself would keep its old value and this goes red.
+    monkeypatch.setattr(shared, "_payload_files", lambda p: real(p)[:1])
     shared.invalidate_cache(a["path"])
-    assert shared.estimate_token_cost(a["path"]) < before
+
+    assert shared.estimate_token_cost(a["path"]) < cost_before, "cost side ignored the enumeration"
+    assert shared.skill_payload_digest(a["path"]) != digest_before, "digest side ignored the enumeration"
 
 
 def test_mesh_receives_every_physical_copy(tmp_path, monkeypatch):
