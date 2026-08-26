@@ -134,8 +134,24 @@ times — each time by re-deriving a domain instead of asking the code that owns
   two copies collapsed again. The digest now calls `load_eval_suite` instead of re-deriving
   where the file is, which makes the domains identical by construction rather than by review.
 
-All three are pinned by mutation-verified tests in
+* *The loader's error contract.* Calling `load_eval_suite` fixed the discovery mismatch and
+  created a new one: it caught only `JSONDecodeError`, so a suite that is a directory,
+  unreadable, or not UTF-8 raised. That was survivable while its only caller sat inside
+  `_score_single_skill`'s `except Exception` — one row went to `failed` — and stopped being
+  survivable the moment the digest called it before the scoring loop. One malformed
+  `eval-suite.json` anywhere under `~/.claude` turned `doctor` into a traceback. Fixed at the
+  loader: every failure degrades to `None`, so digest and score see the same value by
+  construction rather than one crashing where the other degraded.
+
+All four are pinned by mutation-verified tests in
 `skills/schliff/tests/unit/test_doctor_collapses_duplicate_copies.py`.
+
+**The shape behind all four.** Each was a domain re-derived instead of asked for. The
+`references/*.md` enumeration is now `shared._payload_files`, called by both
+`estimate_token_cost` and `skill_payload_digest`, so the cost domain and the identity domain
+cannot drift apart. The drift was already primed: `estimate_token_cost`'s docstring says "all
+files in references/" while its code globbed `*.md`; making the code match would have widened
+the cost and not the digest.
 
 **Known limit, deliberately not closed.** The `Issues` column can still differ between two
 copies with the same digest: `structure`'s dangling-reference lint resolves declared paths such

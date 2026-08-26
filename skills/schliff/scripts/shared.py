@@ -145,6 +145,22 @@ def extract_description(content: str) -> str:
     return ""
 
 
+def _payload_files(skill_path: str) -> list[Path]:
+    """The ``references/*.md`` a skill loads alongside its SKILL.md.
+
+    One enumeration, two consumers: ``estimate_token_cost`` charges for these
+    files and ``skill_payload_digest`` hashes them. They were hand-mirrored,
+    guard for guard, which is the shape that already produced three defects in
+    this area — a domain re-derived instead of asked for. Sorted for a stable
+    digest; symlinked reference files and a symlinked ``references/`` are skipped,
+    and oversized files are dropped by the caller that reads them.
+    """
+    refs_dir = Path(skill_path).parent / "references"
+    if not refs_dir.is_dir() or refs_dir.is_symlink():
+        return []
+    return [f for f in sorted(refs_dir.glob("*.md")) if not f.is_symlink()]
+
+
 def estimate_token_cost(skill_path: str) -> int:
     """Estimate token cost when this skill is loaded into context.
 
@@ -161,18 +177,13 @@ def estimate_token_cost(skill_path: str) -> int:
     except (FileNotFoundError, ValueError):
         return 0
 
-    # Check for references/ directory alongside SKILL.md
-    refs_dir = Path(skill_path).parent / "references"
-    if refs_dir.is_dir() and not refs_dir.is_symlink():
-        for ref_file in sorted(refs_dir.glob("*.md")):
-            if ref_file.is_symlink():
-                continue
-            try:
-                ref_content = ref_file.read_text(encoding="utf-8", errors="replace")
-                if len(ref_content) <= MAX_SKILL_SIZE:
-                    total_words += len(ref_content.split())
-            except (OSError, PermissionError):
-                continue
+    for ref_file in _payload_files(skill_path):
+        try:
+            ref_content = ref_file.read_text(encoding="utf-8", errors="replace")
+            if len(ref_content) <= MAX_SKILL_SIZE:
+                total_words += len(ref_content.split())
+        except (OSError, PermissionError):
+            continue
 
     return round(total_words * 1.3)
 
@@ -218,19 +229,13 @@ def skill_payload_digest(skill_path: str) -> str:
     except (OSError, PermissionError, FileNotFoundError, ValueError):
         return ""
 
-    # Same traversal, same guards as estimate_token_cost: sorted for a stable
-    # digest, symlinks skipped, oversized files ignored rather than hashed.
-    refs_dir = path.parent / "references"
-    if refs_dir.is_dir() and not refs_dir.is_symlink():
-        for ref_file in sorted(refs_dir.glob("*.md")):
-            if ref_file.is_symlink():
-                continue
-            try:
-                ref_content = ref_file.read_text(encoding="utf-8", errors="replace")
-            except (OSError, PermissionError):
-                continue
-            if len(ref_content) <= MAX_SKILL_SIZE:
-                _absorb(f"references/{ref_file.name}", ref_content)
+    for ref_file in _payload_files(str(path)):
+        try:
+            ref_content = ref_file.read_text(encoding="utf-8", errors="replace")
+        except (OSError, PermissionError):
+            continue
+        if len(ref_content) <= MAX_SKILL_SIZE:
+            _absorb(f"references/{ref_file.name}", ref_content)
 
     # Ask load_eval_suite itself rather than re-deriving its file discovery. The
     # first attempt copied the symlink guard from estimate_token_cost, but
@@ -247,18 +252,32 @@ def skill_payload_digest(skill_path: str) -> str:
 
 
 def load_eval_suite(skill_path: str) -> Optional[dict]:
-    """Auto-discover and load eval-suite.json from skill directory."""
+    """Auto-discover and load eval-suite.json from skill directory.
+
+    Every failure degrades to ``None``. Only ``JSONDecodeError`` was caught
+    before, so a suite that is a directory, unreadable, or not UTF-8 raised
+    ``IsADirectoryError`` / ``PermissionError`` / ``UnicodeDecodeError``. That was
+    survivable while the only caller sat inside ``_score_single_skill``'s
+    ``except Exception`` — one row went to ``failed``. It stopped being
+    survivable when ``skill_payload_digest`` began calling this before the
+    scoring loop: one malformed suite anywhere under ``~/.claude`` turned the
+    whole run into a traceback. Doctor scans directories that are usually not
+    yours; it reports and never gates (ADR 0014, ADR 0019).
+    """
     skill_dir = Path(skill_path).parent
     auto_path = skill_dir / "eval-suite.json"
-    if auto_path.exists():
-        try:
-            raw = auto_path.read_text(encoding="utf-8")
-            if len(raw) > MAX_SKILL_SIZE:
-                print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
-                return None
-            return json.loads(raw)
-        except json.JSONDecodeError as e:
-            print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
+    try:
+        if not auto_path.exists():
+            return None
+        raw = auto_path.read_text(encoding="utf-8")
+        if len(raw) > MAX_SKILL_SIZE:
+            print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
+            return None
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
+    except (OSError, ValueError) as e:
+        print(f"Warning: could not read eval-suite.json: {e}", file=sys.stderr)
     return None
 
 

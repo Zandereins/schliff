@@ -47,7 +47,9 @@ Run a comprehensive health check on all installed skills.
 
    Do not explain the whole `skills_discovered` − `skills_found` gap as
    duplicates: a skill that fails to score widens it too. The duplicate share is
-   the sum of `also_installed_at` lengths; the rest is `failed`.
+   the sum over `duplicate_copies[].also_installed_at`; the rest is `failed`.
+   Result rows carry an `also_installed_at` too, but only on rows that scored —
+   summing those undercounts whenever a duplicated skill failed.
 
 4. For skills with grade D or F, suggest specific next steps:
    - "Run `/schliff:init <path>` to set up improvement tracking"

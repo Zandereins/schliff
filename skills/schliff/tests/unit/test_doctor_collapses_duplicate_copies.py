@@ -144,6 +144,74 @@ def test_a_symlinked_eval_suite_also_splits_two_installs(tmp_path):
     assert duplicates == []
 
 
+@pytest.mark.parametrize("kind", ["directory", "binary", "unreadable"])
+def test_a_broken_eval_suite_degrades_instead_of_crashing_the_run(tmp_path, kind):
+    """doctor scans other people's directories; it reports, never gates.
+
+    Routing the digest through ``load_eval_suite`` moved that call out of
+    ``_score_single_skill``'s ``except Exception`` and in front of the scoring
+    loop. The loader caught only ``JSONDecodeError``, so one malformed suite
+    anywhere under ``~/.claude`` turned the whole run into a traceback instead of
+    one row marked failed (ADR 0014, ADR 0019).
+    """
+    import os
+
+    _skill(tmp_path, "a", BODY)
+    _skill(tmp_path, "b", BODY)
+    suite = tmp_path / "b" / "eval-suite.json"
+    if kind == "directory":
+        suite.mkdir()
+    elif kind == "binary":
+        suite.write_bytes(b"\xff\xfe\x00\x01")
+    else:
+        suite.write_text("{}", encoding="utf-8")
+        os.chmod(suite, 0)
+
+    try:
+        report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    finally:
+        if kind == "unreadable":
+            os.chmod(suite, 0o644)
+
+    assert report["skills_found"] >= 1, "a broken suite must not empty the report"
+
+
+def test_cost_and_digest_read_the_same_files(tmp_path):
+    """The invariant behind the whole key, asserted directly.
+
+    Three defects in this area were a domain re-derived instead of asked for.
+    Rather than test each guard, this pins the property they exist for: whatever
+    ``estimate_token_cost`` charges for must be what ``skill_payload_digest``
+    hashes. Both now go through ``shared._payload_files``.
+
+    Add a file type to one walk and not the other — the drift is primed, since
+    ``estimate_token_cost``'s docstring says "all files in references/" while the
+    code globs ``*.md`` — and this goes red.
+    """
+    import os
+
+    import shared
+
+    a = _skill(tmp_path, "s", BODY, refs={"keep.md": "counted\n"})
+    refs = tmp_path / "s" / "references"
+    (refs / "ignored.txt").write_text("not markdown\n", encoding="utf-8")
+    (refs / "nested").mkdir()
+    (refs / "nested" / "deep.md").write_text("not walked\n", encoding="utf-8")
+    os.symlink(refs / "keep.md", refs / "linked.md")
+
+    listed = shared._payload_files(a["path"])
+
+    # The enumeration is the contract: exactly the files both sides consume.
+    assert [f.name for f in listed] == ["keep.md"]
+
+    # And it really is the one the cost path uses: removing its only entry must
+    # move the token total.
+    before = shared.estimate_token_cost(a["path"])
+    (refs / "keep.md").unlink()
+    shared.invalidate_cache(a["path"])
+    assert shared.estimate_token_cost(a["path"]) < before
+
+
 def test_mesh_receives_every_physical_copy(tmp_path, monkeypatch):
     """Dedup is for the report, not for discovery.
 
