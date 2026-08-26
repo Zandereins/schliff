@@ -83,8 +83,17 @@ class TestDependencyDeclaration:
 
 
 class TestVersionCompatibility:
-    """A version pin is a compatibility statement, whatever syntax expresses it."""
+    """A version pin is a compatibility FACT: a stated version, in some syntax.
 
+    `tool@1.2.3` and the prose forms below qualify; the bare instruction
+    `pin the version` does not, and that alternative was removed.
+
+    Re-adding a phrase alternative: the negative cases below are the
+    specification — run any candidate against them. Do not copy a regex out of a
+    docstring; an earlier one prescribed here was wrong in both directions. The
+    reasoning and both reverted attempts live in
+    docs/specs/2026-08-13-structural-signal-detection.md, "Amendment 2026-08-25".
+    """
     @pytest.mark.parametrize("text", [
         # schliff's own line — a pin, in the syntax people actually use.
         "Pin the version in CI: `uvx schliff@8.8.2 verify <file> --min-score 75`.",
@@ -94,13 +103,78 @@ class TestVersionCompatibility:
         "Requires node >= 18.0",
         "Minimum version 3.9.",
         "Compatible with Python 3.12",
+        # The two honest pins each attempted exclusion would have destroyed.
+        # They live HERE, in the positive set, on purpose: the limit test below
+        # carries an instruction to delete it once an exclusion works, and after
+        # that deletion these are the only assertions left that notice a new
+        # exclusion taking real pins with it. One per error direction, because
+        # covering only the wordlist would leave the shape rule unguarded.
+        #
+        # a wordlist keyed on `ssh` would strip this:
+        "Deploy over ssh; pin `ruff@0.4.2` in CI.",
+        # an IPv4-shape rule would strip this — every part falls in 0-255, so it
+        # is indistinguishable from an address by shape alone:
+        "Bundled runtime is v8@10.2.154.26.",
     ])
     def test_states_compatibility(self, text):
         assert _RE_VERSION_COMPAT.search(text), f"not recognised: {text!r}"
 
+    def test_an_email_address_is_not_a_version_pin(self):
+        r"""Pins the `@\d+\.\d+` digit requirement.
+
+        The module comment on `_RE_VERSION_COMPAT` relies on exactly this: the
+        digit after the `@` is what keeps an address out. Widening the alternative
+        to `@[\w.]+` must break here.
+        """
+        assert not _RE_VERSION_COMPAT.search(
+            "Email the maintainer at user@example.com for access."
+        )
+
+    def test_prose_about_versioning_is_not_a_pin(self):
+        assert not _RE_VERSION_COMPAT.search(
+            "The versioning policy is documented separately."
+        )
+
     @pytest.mark.parametrize("text", [
-        "Email the maintainer at user@example.com for access.",
-        "The versioning policy is documented separately.",
+        # An instruction to pin is not a pin: the credited thing is a stated
+        # compatibility FACT, and these name no version at all. Measured on the
+        # unreleased scorer this branch forked from (`main` at 922fd92), the bare
+        # phrase lifted composability by 10 on an otherwise empty file.
+        "Pin the version.",
+        "Pin the version before release.",
+        "Pin the version in step 2.1.",
     ])
-    def test_addresses_are_not_version_pins(self, text):
+    def test_bare_imperative_is_not_a_version_pin(self, text):
         assert not _RE_VERSION_COMPAT.search(text), f"false positive: {text!r}"
+
+    def test_the_phrase_with_a_version_is_currently_not_credited(self):
+        """CURRENT BEHAVIOUR, not a required property. Change it if you must.
+
+        Nothing credits "Pin the version to 1.2.3" today, and CHANGELOG says so,
+        which is why this is pinned: a re-added phrase alternative would
+        otherwise leave the suite green while the CHANGELOG described behaviour
+        the code no longer had.
+
+        But do not read it as a rule that the form MUST stay uncredited. The
+        spec records the reverted narrowed alternative's failure to credit
+        ``Pin the version to `8.8.2`.`` as one of its two error directions — so
+        a genuinely correct prose alternative, crediting the backticked and the
+        plain form alike, would be an improvement and would land here as a red
+        test. Update this test and the CHANGELOG line together in that case.
+
+        The form does not occur in the field: measured over the local corpus,
+        every "pin the version … <version>" line without a `tool@version` beside
+        it was documentation about this very defect.
+        """
+        assert not _RE_VERSION_COMPAT.search("Pin the version to 1.2.3.")
+
+    def test_an_ssh_target_is_still_credited_known_limit(self):
+        """Asserts behaviour this pattern deliberately does NOT fix.
+
+        Reasoning and the two reverted discriminators: see the spec amendment
+        named in this class's docstring. If a future change makes an exclusion
+        work, DELETE this test — do not weaken it. The honest-pin case that a
+        wordlist exclusion would break is asserted in the positive set above, so
+        it survives that deletion.
+        """
+        assert _RE_VERSION_COMPAT.search("Deploy with `ssh root@100.127.18.39`.")

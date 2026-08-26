@@ -71,7 +71,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **`composability` recognises an error contract, a prerequisite and a version pin as
   facts, not as phrasings.** "Errors go to stderr with a non-zero exit" now counts as a
   declared error contract, `uv` counts as a declared prerequisite (the tool wordlist could
-  never be completed), and `tool@1.2.3` counts as a compatibility statement.
+  never be completed), and `tool@1.2.3` counts as a compatibility statement. The bare
+  instruction "pin the version" does **not** count — it is an instruction, naming no
+  version. Write the pin itself and it counts:
+  ``Pin the version in CI: `tool@1.2.3`.`` is credited by the `tool@version` rule. Note which part
+  carries it: the pin, not the phrase. A prose "Pin the version to 1.2.3" matches nothing,
+  here or in any earlier release. (Other prose forms are credited by their own unchanged
+  patterns — "Minimum version 3.9." and "Compatible with Python 3.12" both count.)
+  **Known limit:** an SSH target is credited as a pin — `ssh root@100.127.18.39` earns the
+  10 points. Separating an address from a version by pattern turned out not to be decidable
+  without taking the credit from honest files, so it is documented rather than papered over.
+  The two attempted discriminators, why each failed and what was measured are recorded in
+  `docs/specs/2026-08-13-structural-signal-detection.md` under "Amendment 2026-08-25".
 - **`doctor` no longer counts vendored copies as installed skills.** A repo with one skill
   reported six — three of them the same file inside virtualenvs and a uv cache archive —
   inflating the skill count, the grade distribution and the headline "Total context cost"
@@ -98,7 +109,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   recorded from an earlier version are not comparable for the non-SKILL formats.
 
 - Scores for files that document their commands or state an error contract go **up**; no
-  file's score goes down. If you gate CI with `verify --min-score`, nothing you pass today
+  file's score goes down **relative to 8.11.1**, the released version. (Within this
+  unreleased block one change withdraws credit: dropping the bare `pin the version`
+  phrase. Measured against the unreleased `main`, 3 local files lose 10 composability
+  points; 0 of 159 installed skills, and 0 against 8.11.1, which never
+  credited the phrase.) If you gate CI with `verify --min-score`, nothing you pass today
   starts failing.
 - A denominator cap that would have stopped `efficiency` from penalising long files was
   implemented and reverted before release: it decoupled the score from length, which let

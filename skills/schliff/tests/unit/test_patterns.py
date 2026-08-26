@@ -1,13 +1,18 @@
-"""Tests for recently modified regex patterns in scoring/patterns.py.
+"""Tests for regex patterns in the `scoring/patterns` package.
+
+Patterns live in `scoring/patterns/skill_md.py` (and `base.py` for
+`_RE_ACTIONABLE_LINES`); there is no `scoring/patterns.py`.
 
 Covers:
 - Five new composability patterns (v6.0.1)
 - False positive guards for common skill prose
 - Efficiency deduplication logic
 
-Three pattern bugs are documented inline. Tests are written against
-actual current behavior; known bugs are marked with BUG comments so
-they fail visibly when the bug is fixed and need to be updated.
+Tests are written against actual current behaviour. The three "known bugs" this
+file once documented have all been fixed since; the sections below now assert the
+fixed behaviour, and the names say so. Patterns are NOT transcribed into
+docstrings here — every previous copy drifted from the definition in
+`scoring/patterns/skill_md.py` without a single test failing.
 """
 import sys
 from pathlib import Path
@@ -45,19 +50,12 @@ def matches(pattern, text: str) -> bool:
 class TestErrorBehavior:
     """Tests for _RE_ERROR_BEHAVIOR.
 
-    Pattern (line 78-81 of patterns.py):
-        (?i)(on\\s+error|error\\s+handling|if\\s+\\w+\\s+fails?|when\\s+\\w+\\s+fails?|
-             graceful(?:ly)?\\s+(?:handle|degrade|fail)|recover(?:y|s)?\\s+(?:from|when))
-
-    KNOWN BUG #1: 'if the command fails' does NOT match.
-        Cause: if\\s+\\w+\\s+fails? allows only ONE \\w+ token between 'if' and 'fails'.
-        'the command' is two words. Only 'if <single_word> fails' matches.
-        Example that does work: 'if it fails', 'if script fails'.
-
-    KNOWN BUG #2: 'graceful degradation' does NOT match.
-        Cause: pattern is graceful(?:ly)?\\s+(?:handle|degrade|fail).
-        'degradation' is not in the alternation. Only the verb forms match.
-        Example that does work: 'gracefully degrade', 'graceful failure'.
+    Defined in `scoring/patterns/skill_md.py`. No transcription here on purpose:
+    the copy that used to sit in this docstring went stale and ended up asserting
+    two KNOWN BUGs that had been fixed — `if the command fails` and
+    `graceful degradation` both match today, as the tests below assert. It also
+    predated the 2026-08-13 additions (`stderr`, non-zero exit, exit status), so
+    it implied a stated error contract earns nothing.
     """
 
     # --- Should match ---
@@ -105,7 +103,7 @@ class TestErrorBehavior:
         # 'if something is missing from the description' — no 'fails'
         assert not matches(_RE_ERROR_BEHAVIOR, "if something is missing from the description")
 
-    # --- KNOWN BUGS (document current behavior; update tests when fixed) ---
+    # --- Formerly documented as bugs; fixed, and asserted fixed here ---
 
     def test_if_multi_word_fails_matched(self):
         """'if the command fails' matches with multi-word subjects."""
@@ -125,9 +123,8 @@ class TestErrorBehavior:
 class TestIdempotency:
     """Tests for _RE_IDEMPOTENCY.
 
-    Pattern (line 82-85):
-        (?i)(idempotent|safe to (?:re-?run|run (?:again|twice|multiple))|
-             running (?:again|twice)|no side.?effects?|re-?entrant)
+    Defined in `scoring/patterns/skill_md.py`. Read it there — a copy here drifts
+    from the definition without anything failing.
     """
 
     # --- Should match ---
@@ -183,16 +180,12 @@ class TestIdempotency:
 class TestDependencyDecl:
     """Tests for _RE_DEPENDENCY_DECL.
 
-    Pattern (line 86-90):
-        (?i)(requires?:\\s*\\w|depends? on|prerequisite|
-             needs?\\s+(?:python|node|npm|pip|git|jq|bash|ruby|go)\\b|
-             install\\s+\\w+\\s+first)
-
-    KNOWN BUG #3: 'requires python 3.9' does NOT match.
-        Cause: The 'requires?' branch needs a colon (requires?:\\s*\\w).
-        The bare 'requires python' without colon is not covered.
-        The 'needs?' branch covers 'needs python' but not 'requires python'.
-        Fix: add a branch like requires?\\s+(?:python|node|npm|pip|git|...)\\b
+    Defined in `scoring/patterns/skill_md.py`. No transcription here on purpose:
+    the previous copy asserted a KNOWN BUG that `requires python 3.9` needs a
+    colon to match. It does not — `test_requires_python_without_colon_matched`
+    below asserts the opposite. The copy also predated the 2026-08-13 additions
+    (`anywhere X is available`, `requires X to be installed`, `needs X on the
+    PATH`).
     """
 
     # --- Should match ---
@@ -236,7 +229,7 @@ class TestDependencyDecl:
         # 'needs' but not followed by a known tool name
         assert not matches(_RE_DEPENDENCY_DECL, "this needs improvement")
 
-    # --- KNOWN BUG ---
+    # --- Formerly documented as a bug; fixed, and asserted fixed here ---
 
     def test_requires_python_without_colon_matched(self):
         """'requires python 3.9' matches with space separator."""
@@ -252,9 +245,8 @@ class TestDependencyDecl:
 class TestNamespaceIsolation:
     """Tests for _RE_NAMESPACE_ISOLATION.
 
-    Pattern (line 91-94):
-        (?i)(namespace\\s+\\w+|namespaced?\\b|__\\w+__|
-             @[\\w-]+/[\\w-]+|plugin[_-]\\w+|scoped\\s+to\\b)
+    Defined in `scoring/patterns/skill_md.py`. Read it there — a copy here drifts
+    from the definition without anything failing.
     """
 
     # --- Should match ---
@@ -307,12 +299,16 @@ class TestNamespaceIsolation:
 # ---------------------------------------------------------------------------
 
 class TestVersionCompat:
-    """Tests for _RE_VERSION_COMPAT.
+    r"""Tests for _RE_VERSION_COMPAT.
 
-    Pattern (line 95-99):
-        (?i)(version\\s*[><=!]+\\s*[\\d.]+|compatible\\s+with\\s+\\w+\\s+v?\\d|
-             requires?\\s+\\w+\\s*[><=]+\\s*[\\d.]+|minimum\\s+version|
-             supported\\s+versions?|works\\s+with\\s+\\w+\\s+v?\\d+\\.\\d+)
+    Defined in `scoring/patterns/skill_md.py`. The transcription that used to sit
+    here went stale — it predated the `tool@1.2.3` alternative and so implied that
+    a pin is not credited, the opposite of the truth. Read the pattern at its
+    definition; the KNOWN LIMIT comment beside it names the SSH-address limit and
+    points at the spec amendment that argues it.
+
+    Prose forms covered below; `tool@1.2.3` and the bare-phrase exclusion are
+    covered in test_composability_structural_signals.py.
     """
 
     # --- Should match ---

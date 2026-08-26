@@ -369,6 +369,13 @@ skill, because `tests/fixtures/self-skill-baseline/SKILL.md` is scanned. A SKILL
 under `playground/.venv/lib/python3.12/site-packages/`; in a user's repo that would be
 `node_modules` and `.venv`. Next after this.
 
+`benchmarks/anti-gaming/` runs in no CI job — `grep -rn 'anti-gaming\|benchmarks' .github/workflows/
+Makefile` returns nothing (the wider `.github/` does hit one line, an option label in
+`ISSUE_TEMPLATE/feature_request.yml`, which runs nothing) — and its own `test_benchmark.py` is red: two assertions expect 6 benchmarks where
+`BENCHMARKS` holds 7, and `pyproject.toml`'s `testpaths` excludes the directory, so no default run
+collects it. Until both are fixed, adding a gaming vector there buys a line nobody runs. The vector
+for the SSH-address limit (Amendment 2026-08-25) is blocked on exactly this.
+
 Two smaller items, unowned: `commands/schliff/analyze.md` step 7 documents
 `run-eval.sh <skill> --eval-suite <suite>`, which exits `Error: unknown option --eval-suite` — the
 real signature is positional. And `doctor`'s "Total context cost" sums SKILL.md plus
@@ -415,4 +422,66 @@ Precision on the new shapes is 53/55. The two misses are accepted rather than fi
 obvious discriminator would be the `...`, and `go test ./...` is a real command.
 
 **Score effect:** no file's score falls. Only credit is added, never withdrawn — the same
-monotonicity property this spec's §4 relies on.
+monotonicity property Requirement 5 states.
+
+## Amendment 2026-08-25 — `VERSION_COMPAT` credits the pin, not the phrase
+
+*What changed:* the `pin\s+the\s+version` alternative is removed. Requirement 4 above says the
+detector "recognises a version pin (`tool@1.2.3`)"; the phrase alternative went further and
+credited the *instruction to pin*, which names no version and is therefore not the compatibility
+fact the signal is defined on. `Pin the version.` earned the full 10 points on an otherwise empty
+file.
+
+*Score effect, and why it amends Requirement 5 (monotonicity):* credit is withdrawn here, which
+Requirement 5 ("No file's score may fall") forbids as written, and which the 2026-08-21
+amendment's restatement — "only credit is added, never withdrawn" — did not anticipate either.
+This amends Requirement 5; it does not touch Requirement 4.
+
+It holds against the **released** version regardless: `v8.11.1` carries neither this phrase nor
+the `@` alternative, both arriving in the unreleased work above, so no published score moves.
+Against the unreleased `main`, measured over `~/schliff` + `~/.claude`, `*.md`: **3 files lose the
+credit** — one instruction (`Pin the version pair precisely`) and two notes written *about* this
+defect. Of the installed skills under `~/.claude` — **159** `SKILL.md` at this HEAD, against the 299
+the Result section above records, because the vendored-copy filter in this same unreleased block
+stopped counting cache and virtualenv duplicates — **0** are affected. (That corpus is a working directory, not
+a fixture, so its file count drifts between runs — around 2300 at the time of writing. The counts
+that carry the argument are the 3 and the 0, which are enumerated above rather than sampled.)
+
+*A narrowed phrase alternative was tried and reverted, and the reason belongs here* — the
+test docstring sends the next implementer to this section before rebuilding it. The narrowed
+form was `pin\s+the\s+version\s+(?:\w+\s+){0,4}?(?:to\s+)?v?\d+\.\d`, an attempt to keep
+crediting "Pin the version to 8.8.2" while dropping the bare phrase. Measured, it opened both
+error directions at once:
+
+- it **missed** ``Pin the version to `8.8.2`.`` — the bounded word run is `\w`-tokens separated
+  by whitespace, so any punctuation ends it, and in Markdown the version literal is almost
+  always inside backticks;
+- it **credited** "Pin the version in step 2.1." — a step number is not a version.
+
+The field settles it, and the numbers agree with the loss count above: the phrase occurs **20
+times across 9 files** in that corpus. Six of those files also carry a `tool@version` pin, which
+the `@` alternative credits on its own — so removing the phrase costs them nothing. The remaining
+**3 are the files listed above as losing the credit**, and none of them names a version anywhere:
+they are instructions (`Pin the version pair precisely`) and notes about this defect. There is no
+file in the corpus that states a version through this phrase and through nothing else, which is
+the case a phrase alternative would have to exist for.
+
+*What is deliberately NOT fixed — an SSH target is still credited as a pin.*
+`ssh root@100.127.18.39` has digits after the `@` and earns the 10 points. Four review rounds
+established that separating an address from a version by pattern is not decidable, and that each
+candidate discriminator fails where the other does not:
+
+| discriminator | fails on |
+| --- | --- |
+| IPv4 shape (octet ranges, bounded padding) | `root@127.1` and `root@0000100.1.2.3` are credited today and both resolve through `socket.inet_aton`, so any shape rule is complete only until the next form is written — and it drops genuine four-part versions whose parts all fall in 0-255 (`v8@10.2.154.26`) |
+| a deploy command on the same line | misses `git clone git@10.0.0.5` and `curl http://admin@192.168.1.1` — both caught by the shape rule — while stripping the credit from an honest ``Deploy over ssh; pin `ruff@0.4.2` in CI.`` |
+
+Two successive shape attempts closed zero-padding at three and then six characters; seven was
+never reached. The command-wordlist attempt was worse than the shape rule in **both** directions
+and was reverted. Withholding the point from an honest file costs more than the limit does, so
+the limit is documented at the pattern and in the CHANGELOG, and pinned by a test that asserts
+current behaviour. The honest-pin counter-example is asserted in the *positive* set, so it
+survives the deletion of that limit test if an exclusion is ever made to work.
+
+The gaming vector for this limit is listed under
+[Follow-up](#follow-up-agreed-but-not-in-this-branch), with the reason it is not added yet.

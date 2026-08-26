@@ -144,11 +144,21 @@ _RE_NAMESPACE_ISOLATION = re.compile(
 # exists). 64 covers the longest real package name by a wide margin
 # (`@vercel/microfrontends` is 22); a bounded run costs O(bound) per start position
 # and keeps the pattern linear.
+#
+# KNOWN LIMIT — an SSH target is credited as a pin: `ssh root@100.127.18.39` earns the 10
+# points this signal is worth. Deliberate, not an oversight. The bare phrase
+# `pin the version` was removed for naming no version at all.
+#
+# WHY, both attempted fixes and every measurement live in one place:
+# `docs/specs/2026-08-13-structural-signal-detection.md`, "Amendment 2026-08-25".
+# That single home is enforced by
+# test_version_pin_limit_stated_once.py — this reasoning had four homes and four review
+# rounds each found one out of step, the failure #209 fixed for the cadence rule.
 _RE_VERSION_COMPAT = re.compile(
     r"(?i)(version\s*[><=!]+\s*[\d.]+|compatible\s+with\s+\w+\s+v?\d|"
     r"requires?\s+\w+\s*[><=]+\s*[\d.]+|minimum\s+version|"
     r"supported\s+versions?|works\s+with\s+\w+\s+v?\d+\.\d+|"
-    r"[\w.-]{1,64}@\d+\.\d+|pin\s+the\s+version)"
+    r"[\w.-]{1,64}@\d+\.\d+)"
 )
 
 # --- Trigger patterns (SKILL.md-specific) ---
