@@ -171,7 +171,10 @@ def test_a_broken_eval_suite_degrades_instead_of_crashing_the_run(tmp_path, kind
         report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
     finally:
         if kind == "unreadable":
-            os.chmod(suite, 0o644)
+            # 0o600, not 0o644: this only has to let pytest's tmp_path cleanup
+            # remove the file. Granting world read here is what CodeQL's
+            # py/overly-permissive-file flags, and it is right to.
+            os.chmod(suite, 0o600)
 
     assert report["skills_found"] >= 1, "a broken suite must not empty the report"
 
