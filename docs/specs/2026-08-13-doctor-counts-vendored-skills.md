@@ -179,6 +179,20 @@ an OOM; `skill_mesh` confines resolved paths to the scan root for the same reaso
 real and the case was not. If a field case appears, the fix is confinement plus a
 `stat().st_size` check before the read, not a bare `resolve()`.
 
+**One reader for every file this module opens.** `shared._read_bounded` checks *regular file*,
+then *size*, then reads — and the ordering of those three is the whole point. `read_text` on a
+FIFO blocks forever (measured: still blocked after six seconds) and `st_size` is 0 for one, so a
+size gate alone lets it through; reading before the size check raises `MemoryError` on a
+multi-gigabyte target, which is neither `OSError` nor `ValueError`. Both were survivable while
+every caller sat inside `_score_single_skill`'s handler and stopped being survivable when the
+digest began reading before the scoring loop. The same two-line omission produced five defects
+here, which is why the check exists once rather than at each call site.
+
+**A suite that is not a JSON object is a broken suite.** `null` parses to `None`, which was
+indistinguishable from "no file" and routed the row to `/schliff:init` — the command that
+overwrites it. A list or string was accepted outright, while `cli._load_eval_suite_from_args`
+rejects the identical content; the auto-discovery half was the permissive one.
+
 **The loader checks size before reading.** `read_text` on a multi-gigabyte target raises
 `MemoryError`, which none of the handlers above catch, and the digest calls the loader before the
 scoring loop — so one such file ended the run rather than marking one row failed.

@@ -401,6 +401,95 @@ def test_a_grouped_row_is_not_counted_as_missing_an_eval_suite(tmp_path):
     assert report["no_eval_suite"] == 0, "a grouped row must not join the init recommendation"
 
 
+def test_a_fifo_where_a_file_is_expected_does_not_hang(tmp_path):
+    """A plugin can put a FIFO where a skill file goes; doctor must not block.
+
+    ``read_text`` on a FIFO waits for a writer that never comes — measured, still
+    blocked after six seconds — and ``st_size`` is 0, so a size gate alone lets
+    it through. The digest reads these before the scoring loop, so nothing was
+    reported at all. ``_read_bounded`` checks ``is_file()`` first.
+    """
+    import os
+
+    import shared
+
+    skill = _skill(tmp_path, "s", BODY, refs={"placeholder.md": ""})
+    (tmp_path / "s" / "references" / "placeholder.md").unlink()
+    os.mkfifo(tmp_path / "s" / "references" / "pipe.md")
+    os.mkfifo(tmp_path / "s" / "eval-suite.json")
+
+    # Both readers must return rather than block.
+    assert shared.estimate_token_cost(skill["path"]) >= 0
+    assert shared.load_eval_suite(skill["path"]) is None
+    assert shared.skill_payload_digest(skill["path"])
+
+
+def test_an_oversized_reference_is_never_read(tmp_path, monkeypatch):
+    """Size before read on the references side too.
+
+    The loader got this guard first; the reference walk kept reading before
+    checking, under a handler that catches neither ``MemoryError``. Since the
+    digest runs before the scoring loop, one huge file ended the whole run
+    instead of marking a row failed.
+    """
+    import shared
+
+    skill = _skill(tmp_path, "s", BODY, refs={"big.md": "x" * (shared.MAX_SKILL_SIZE + 1000)})
+
+    reads = []
+    real_read = pathlib.Path.read_text
+
+    def _spy(self, *a, **kw):
+        if self.name == "big.md":
+            reads.append(str(self))
+        return real_read(self, *a, **kw)
+
+    monkeypatch.setattr(pathlib.Path, "read_text", _spy)
+    shared.skill_payload_digest(skill["path"])
+    shared.estimate_token_cost(skill["path"])
+    assert reads == [], "an oversized reference must not be read into memory"
+
+
+@pytest.mark.parametrize("content", ["null", "[1, 2, 3]", '"hello"'])
+def test_a_suite_that_is_not_an_object_is_a_broken_suite(tmp_path, content):
+    """`null` was indistinguishable from "no file" and routed to /schliff:init.
+
+    A list or a string parsed fine here while `cli._load_eval_suite_from_args`
+    rejects the same content outright — the auto-discovery half was the
+    permissive one.
+    """
+    import shared
+
+    skill = _skill(tmp_path, "s", BODY)
+    (tmp_path / "s" / "eval-suite.json").write_text(content, encoding="utf-8")
+
+    assert shared.load_eval_suite(skill["path"]) is None
+    assert shared.eval_suite_error.get(str(tmp_path / "s" / "eval-suite.json")) == "not a JSON object"
+
+    report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    row = report["results"][0]
+    assert "/schliff:init" not in (row["action"] or "")
+
+
+def test_every_scanned_row_lands_in_exactly_one_bucket(tmp_path):
+    """Grouped rows were in no tally at all — 20 of 138 on the real install."""
+    _skill(tmp_path, "cached", BODY)
+    _skill(tmp_path, "vendored", BODY)
+    _skill(tmp_path, "solo", BODY)
+
+    r = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    buckets = (
+        r["healthy"] + r["needs_work"] + r["no_eval_suite"]
+        + r["broken_eval_suite"] + r["grouped_duplicates"] + r["failed"]
+    )
+
+    assert buckets == r["skills_found"]
+    assert r["skills_discovered"] - r["skills_found"] == sum(
+        len(g["also_installed_at"]) for g in r["duplicate_copies"]
+    )
+    assert f"{r['grouped_duplicates']} duplicate install" in doctor.format_doctor_report(r)
+
+
 def test_cost_and_digest_read_the_same_files(tmp_path, monkeypatch):
     """The invariant behind the whole key, gated on BOTH sides.
 

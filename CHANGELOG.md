@@ -29,8 +29,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   and `doctor` all raised on a suite that is a directory, unreadable, not UTF-8, or nested deeply
   enough to exhaust the parser's recursion (the last only below Python 3.14, so CI's newest leg
   stayed green while the oldest failed). Every failure now degrades to "no suite" with a warning
-  on stderr. `doctor` distinguishes it from an absent suite: The loader also checks `stat().st_size` before reading, so an oversized suite is
-  never pulled into memory. `--json` gains `eval_suite_error` per row plus
+  on stderr. `doctor` distinguishes it from an absent suite via `eval_suite_error` and a per-row
+  action that says to repair rather than overwrite. Every file this module opens is now checked
+  for being a regular file and for its size *before* it is read, so a FIFO cannot hang the scan
+  and an oversized file cannot exhaust memory. `--json` gains `eval_suite_error` per row plus
   `broken_eval_suite`, `grouped_duplicates` and `skills_discovered` in the summary, and such a skill is kept out of the
   `/schliff:init` recommendation — that command would write over the file that failed to load.
 

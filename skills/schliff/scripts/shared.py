@@ -157,6 +157,36 @@ def extract_description(content: str) -> str:
     return ""
 
 
+def _read_bounded(path: Path) -> Optional[str]:
+    """Read a file only if it is safe to: regular, and within the size limit.
+
+    One helper because the same two-line omission produced five defects in this
+    area. Both halves matter and both were learned the hard way:
+
+    * **Regular file, checked first.** ``read_text`` on a FIFO blocks forever —
+      measured, still hung after six seconds — and on a character device it reads
+      until memory runs out. ``st_size`` is 0 for both, so a size gate alone lets
+      them through. doctor walks directories that belong to other people, so a
+      plugin can put either where a skill file is expected.
+    * **Size before read, not after.** Reading first raises ``MemoryError`` on a
+      multi-gigabyte target, and ``MemoryError`` is not ``OSError`` and not
+      ``ValueError``. That was survivable while every caller sat inside
+      ``_score_single_skill``'s handler; it stopped being survivable when the
+      digest began reading these files before the scoring loop.
+
+    Returns ``None`` when the file cannot or should not be read. Callers treat
+    that as "no content", never as an error to propagate.
+    """
+    try:
+        if not path.is_file():
+            return None
+        if path.stat().st_size > MAX_SKILL_SIZE:
+            return None
+        return path.read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        return None
+
+
 def _payload_files(skill_path: str) -> list[Path]:
     """The ``references/*.md`` a skill loads alongside its SKILL.md.
 
@@ -221,12 +251,9 @@ def estimate_token_cost(skill_path: str) -> int:
         return 0
 
     for ref_file in _payload_files(skill_path):
-        try:
-            ref_content = ref_file.read_text(encoding="utf-8", errors="replace")
-            if len(ref_content) <= MAX_SKILL_SIZE:
-                total_words += len(ref_content.split())
-        except (OSError, PermissionError):
-            continue
+        ref_content = _read_bounded(ref_file)
+        if ref_content is not None:
+            total_words += len(ref_content.split())
 
     return round(total_words * 1.3)
 
@@ -273,11 +300,8 @@ def skill_payload_digest(skill_path: str) -> str:
         return ""
 
     for ref_file in _payload_files(str(path)):
-        try:
-            ref_content = ref_file.read_text(encoding="utf-8", errors="replace")
-        except (OSError, PermissionError):
-            continue
-        if len(ref_content) <= MAX_SKILL_SIZE:
+        ref_content = _read_bounded(ref_file)
+        if ref_content is not None:
             _absorb(f"references/{ref_file.name}", ref_content)
 
     # Ask load_eval_suite itself rather than re-deriving its file discovery. The
@@ -327,23 +351,24 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
         if not auto_path.exists():
             eval_suite_error.pop(str(auto_path), None)
             return None
-        # Size BEFORE read, like `cli._load_eval_suite_from_args` already does —
-        # the OOM-safe loading the changelog promised, which this loader never
-        # got. Reading first raises MemoryError on a multi-gigabyte target, and
-        # MemoryError is neither OSError nor ValueError nor RecursionError, so
-        # nothing below catches it. This path follows symlinks, and since
-        # `skill_payload_digest` calls it before the scoring loop, one such file
-        # ended the whole run instead of marking one row failed.
-        if auto_path.stat().st_size > MAX_SKILL_SIZE:
-            print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
-            eval_suite_error[str(auto_path)] = "exceeds the size limit"
-            return None
-        raw = auto_path.read_text(encoding="utf-8")
-        if len(raw) > MAX_SKILL_SIZE:
-            print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
-            eval_suite_error[str(auto_path)] = "exceeds the size limit"
+        # One reader for every file this module opens: regular-file check before
+        # the size check before the read. See `_read_bounded` for why each half
+        # is there and what it cost to learn.
+        raw = _read_bounded(auto_path)
+        if raw is None:
+            print("Warning: eval-suite.json could not be read, skipping", file=sys.stderr)
+            eval_suite_error[str(auto_path)] = "unreadable"
             return None
         parsed = json.loads(raw)
+        # `null` parses to None, which is indistinguishable from "no file" and
+        # routed the row to /schliff:init — the command that overwrites it. And a
+        # list or string parsed fine here while `cli._load_eval_suite_from_args`
+        # rejects the same content outright; the auto-discovery half was the
+        # permissive one. A suite that is not an object is a broken suite.
+        if not isinstance(parsed, dict):
+            print("Warning: eval-suite.json is not a JSON object, skipping", file=sys.stderr)
+            eval_suite_error[str(auto_path)] = "not a JSON object"
+            return None
         eval_suite_error.pop(str(auto_path), None)
         return parsed
     except json.JSONDecodeError as e:

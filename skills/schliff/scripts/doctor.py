@@ -338,6 +338,10 @@ def run_doctor(
         summary_parts.append(f"{no_eval} missing eval suite")
     if broken_eval:
         summary_parts.append(f"{broken_eval} unreadable eval suite")
+    if grouped:
+        # Excluded from every other bucket on purpose, so without this line these
+        # rows appear in no tally at all — 20 of 138 on a real installation.
+        summary_parts.append(f"{grouped} duplicate install")
     if failed:
         summary_parts.append(f"{failed} failed to score")
     if mesh_issues:
