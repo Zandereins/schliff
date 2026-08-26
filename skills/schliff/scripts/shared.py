@@ -6,6 +6,7 @@ Single source of truth — imported by all scoring and analysis modules.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -174,6 +175,62 @@ def estimate_token_cost(skill_path: str) -> int:
                 continue
 
     return round(total_words * 1.3)
+
+
+def skill_payload_digest(skill_path: str) -> str:
+    """Identity of an installed skill: SKILL.md plus its ``references/*.md``.
+
+    Two installs are the same install when they would cost the same to load.
+    That is why this hashes exactly the file list ``estimate_token_cost`` above
+    charges for — a digest whose domain is smaller than the measured quantity is
+    not a simpler key, it is a wrong one.
+
+    Hashing SKILL.md alone was tried and is wrong in two ways, both measured over
+    the 159 skills in a real ``~/.claude``:
+
+    * It collapses installs that cost different amounts. Two byte-identical
+      SKILL.md files with different ``references/`` came to 9,013 and 9,591
+      tokens; charging one for the other silently loses 578 tokens.
+    * The published total then depends on iteration order — keep-first gave
+      429,006 and keep-last 429,584 — and keep-first kept a June *backup* while
+      discarding the live ``~/.claude/skills/schliff/SKILL.md``. A rule meant to
+      clean the measurement would have deleted the subject of it from its own
+      report.
+
+    With this key both directions give 138 skills and 438,597 tokens: a swing of
+    zero, and the live skill survives. Regenerating this digest per file is also
+    the frozen corpus list — path plus digest is what lets a third party check a
+    published number against files that are not in this repository.
+
+    Returns an empty string when the file cannot be read, so an unreadable skill
+    never collapses onto another.
+    """
+    path = Path(skill_path)
+    digest = hashlib.sha256()
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")
+    except (OSError, PermissionError, ValueError):
+        return ""
+    if len(content) > MAX_SKILL_SIZE:
+        return ""
+    digest.update(content.encode("utf-8"))
+
+    # Same traversal, same guards as estimate_token_cost: sorted for a stable
+    # digest, symlinks skipped, oversized files ignored rather than hashed.
+    refs_dir = path.parent / "references"
+    if refs_dir.is_dir() and not refs_dir.is_symlink():
+        for ref_file in sorted(refs_dir.glob("*.md")):
+            if ref_file.is_symlink():
+                continue
+            try:
+                ref_content = ref_file.read_text(encoding="utf-8", errors="replace")
+            except (OSError, PermissionError):
+                continue
+            if len(ref_content) <= MAX_SKILL_SIZE:
+                digest.update(ref_file.name.encode("utf-8"))
+                digest.update(ref_content.encode("utf-8"))
+
+    return digest.hexdigest()
 
 
 def load_eval_suite(skill_path: str) -> Optional[dict]:

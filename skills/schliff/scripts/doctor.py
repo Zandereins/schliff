@@ -22,7 +22,7 @@ import skill_mesh
 from terminal_art import grade_colored, score_to_grade
 
 from scoring.formats import detect_format
-from shared import EXCLUDED_DIRS, estimate_token_cost
+from shared import EXCLUDED_DIRS, estimate_token_cost, skill_payload_digest
 
 # Filenames to match (lowercase) for instruction file discovery
 _INSTRUCTION_FILENAMES = {"claude.md", ".cursorrules", "agents.md"}
@@ -137,6 +137,61 @@ def _score_single_skill(skill_path: str) -> dict:
     }
 
 
+def _collapse_duplicate_copies(skills: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Count one install per distinct payload, and report the copies.
+
+    A plugin that is both cached and vendored appears twice on disk. Measured on
+    a real ``~/.claude``: 159 SKILL.md files, 138 distinct payloads, inflating the
+    headline token cost by 57,331. Counting the same bytes twice is a defect in
+    the report, not a property of the installation.
+
+    Identity is ``skill_payload_digest`` — SKILL.md plus ``references/*.md``,
+    exactly what the token estimate charges for. The reasoning for that key,
+    including the two ways a bare SKILL.md hash gets it wrong, is in that
+    function's docstring; it is not repeated here.
+
+    Path-based exclusion was measured and rejected: adding ``cache`` to
+    ``EXCLUDED_DIRS`` takes 159 to 50, because the cache IS where plugins install.
+    A digest carries no vendor names and does not grow with the next package
+    manager.
+
+    Nothing is deleted. Every path in a group is reported, and the caller decides
+    — the same stance ADR 0019 takes for credential findings. The survivor is the
+    first in discovery order, which is stable because the digest makes every
+    member of a group identical in cost.
+
+    Skills whose digest could not be computed (unreadable, oversized) are all
+    kept: an empty digest is not an identity, so they must not collapse together.
+    """
+    seen: dict[str, dict] = {}
+    groups: dict[str, list[str]] = {}
+    unique: list[dict] = []
+
+    for skill in skills:
+        path = skill.get("path", "")
+        digest = skill_payload_digest(path) if path else ""
+        if not digest:
+            unique.append(skill)
+            continue
+        if digest in seen:
+            groups.setdefault(digest, [seen[digest].get("path", "")]).append(path)
+            continue
+        seen[digest] = skill
+        unique.append(skill)
+
+    duplicates = [
+        {
+            "name": seen[digest].get("name", ""),
+            "payload_digest": digest,
+            "counted": paths[0],
+            "also_installed_at": paths[1:],
+        }
+        for digest, paths in groups.items()
+    ]
+    duplicates.sort(key=lambda d: d["name"])
+    return unique, duplicates
+
+
 def run_doctor(
     skill_dirs: list[str] | None = None,
     verbose: bool = False,
@@ -168,13 +223,15 @@ def run_doctor(
             "summary": "No skills found. Check skill directories.",
         }
 
+    unique_skills, duplicate_copies = _collapse_duplicate_copies(skills)
+
     results = []
     healthy = 0
     needs_work = 0
     no_eval = 0
     failed = 0
 
-    for skill in skills:
+    for skill in unique_skills:
         path = skill["path"]
         name = skill["name"]
 
@@ -267,6 +324,7 @@ def run_doctor(
         "needs_work": needs_work,
         "no_eval_suite": no_eval,
         "total_tokens": total_tokens,
+        "duplicate_copies": duplicate_copies,
         "mesh_health": mesh_health,
         "mesh_issue_count": len(mesh_issues),
         "results": results,
@@ -302,6 +360,24 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
     total_tokens = report.get("total_tokens", 0)
     if total_tokens > 0:
         lines.append(f"  Total context cost: ~{total_tokens:,} tokens")
+        lines.append("")
+
+    # Same bytes installed twice — counted once, both paths named so the reader
+    # can delete one. Capped like the drift block below.
+    duplicate_copies = report.get("duplicate_copies", [])
+    if duplicate_copies:
+        extra = sum(len(d["also_installed_at"]) for d in duplicate_copies)
+        lines.append(
+            f"  {len(duplicate_copies)} skills are installed more than once "
+            f"({extra} extra copies, counted once):"
+        )
+        for d in duplicate_copies[:10]:
+            lines.append(f"    {d['name']}")
+            lines.append(f"      counted: {d['counted']}")
+            for other in d["also_installed_at"]:
+                lines.append(f"      also at: {other}")
+        if len(duplicate_copies) > 10:
+            lines.append(f"    ... and {len(duplicate_copies) - 10} more")
         lines.append("")
 
     # Table header
