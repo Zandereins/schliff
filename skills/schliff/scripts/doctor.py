@@ -280,7 +280,11 @@ def run_doctor(
             # by merit, and it is usually the plugin cache. Emitting
             # `/schliff:auto <that path>` would write .schliff/ history into a
             # directory the next plugin update deletes.
-            result["action"] = "Resolve the duplicate install first"
+            reason = result.get("eval_suite_error")
+            result["action"] = (
+                f"Resolve the duplicate install first; eval-suite.json is {reason}"
+                if reason else "Resolve the duplicate install first"
+            )
         results.append(result)
 
         if score_result.get("eval_suite_error"):
@@ -518,15 +522,19 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
 
     if no_eval > 0 or needs_work > 0 or broken_eval > 0:
         lines.append("  Recommended next steps:")
+        step = 0
         if no_eval > 0:
-            lines.append(f"    1. Run /schliff:init on {no_eval} skills missing eval suites")
+            step += 1
+            lines.append(f"    {step}. Run /schliff:init on {no_eval} skills missing eval suites")
         if broken_eval > 0:
+            step += 1
             lines.append(
-                f"    {'2' if no_eval else '1'}. Repair {broken_eval} unreadable "
-                f"eval-suite.json — do NOT run /schliff:init on these, it writes over them"
+                f"    {step}. Repair {broken_eval} unreadable eval-suite.json — "
+                f"do NOT run /schliff:init on these, it writes over them"
             )
         if needs_work > 0:
-            lines.append(f"    {'2' if no_eval else '1'}. Run /schliff:auto on {needs_work} low-scoring skills")
+            step += 1
+            lines.append(f"    {step}. Run /schliff:auto on {needs_work} low-scoring skills")
         lines.append("")
 
     # Skill-specific recommendations

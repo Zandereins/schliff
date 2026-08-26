@@ -57,7 +57,11 @@ Run a comprehensive health check on all installed skills.
    first — usually the plugin cache; use its `action` verbatim rather than
    composing a command from `path`.
 
-5. For skills with grade D or F, suggest specific next steps:
+5. For skills with grade D or F, suggest specific next steps — **except** on rows
+   carrying `eval_suite_error` or `also_installed_at`, whose own `action` already
+   says what to do and must be used verbatim. A broken suite often scores F, so
+   the blanket recommendation would otherwise hand out the command that
+   overwrites it.
    - "Run `/schliff:init <path>` to set up improvement tracking"
    - "Run `/schliff:analyze <path>` for detailed gap analysis"
 

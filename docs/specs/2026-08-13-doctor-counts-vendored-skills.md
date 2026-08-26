@@ -116,7 +116,7 @@ recorded in the 2026-08-25 amendment to
 **The rule instead.** `shared.skill_payload_digest` — sha256 over SKILL.md, `references/*.md`
 and `eval-suite.json`, length-prefixed. It carries no vendor names and does not grow.
 
-**The key covers what a row's SCORE and COST are derived from, and that was got wrong three
+**The key covers what a row's SCORE and COST are derived from, and that was got wrong four
 times — each time by re-deriving a domain instead of asking the code that owns it:**
 
 * *Cost.* Hashing SKILL.md alone collapses installs that cost different amounts — two
@@ -168,6 +168,16 @@ overwritten on the next update. Preferring another member would require a path w
 enumeration this key exists to avoid, so instead a grouped row states the duplicate rather than
 emitting a command against one member. Every path in the group is printed; nothing is deleted
 (ADR 0019).
+
+**Symlinked `references/` stay rejected.** `estimate_token_cost` has rejected them since a
+shipped security fix, and `_payload_files` inherits that. It was briefly reversed here so a stow
+layout would collapse with its plain twin — on the strength of a self-written fixture. Measured
+afterwards: **0 symlinks across the 41 skills in the real installation that have a `references/`
+directory**. doctor walks other people's directories, so following a link there turns a word
+count into a filesystem oracle and reading before the size check turns a link to a huge file into
+an OOM; `skill_mesh` confines resolved paths to the scan root for the same reason. The cost was
+real and the case was not. If a field case appears, the fix is confinement plus a
+`stat().st_size` check before the read, not a bare `resolve()`.
 
 **A broken eval suite is not an absent one.** `load_eval_suite` degrades every failure to `None`
 so one bad file cannot end a run — including `RecursionError`, which `json.loads` raises on deeply

@@ -165,29 +165,31 @@ def _payload_files(skill_path: str) -> list[Path]:
     guard for guard, which is the shape that already produced several defects in
     this area — a domain re-derived instead of asked for.
 
-    **Symlinks are followed**, like ``read_skill_safe`` and ``load_eval_suite``,
-    and for the reason ``read_skill_safe``'s docstring gives: stow, chezmoi,
-    ``claude --worktree`` and shared ``~/.claude/skills`` layouts all produce
-    them. Skipping them was inherited from ``estimate_token_cost`` and measured
-    wrong in both directions — a stow-managed copy reported 12 tokens against
-    1,182 for its byte-identical plain twin, and the two did not collapse. The
-    resolved target must still be a regular file, so a link to a directory or a
-    dangling one is dropped rather than read.
+    **Symlinks are rejected**, unlike ``read_skill_safe`` and ``load_eval_suite``
+    which follow them. The asymmetry is deliberate and it is a shipped security
+    fix: "symlink rejection on ``references/`` directory and files in
+    ``estimate_token_cost``". doctor walks directories that belong to other
+    people, so a plugin can put whatever it likes in ``references/``; following a
+    link there turns a word count into a filesystem oracle, and reading before
+    the size check turns a link to a huge file into an OOM. ``skill_mesh``
+    confines resolved SKILL.md paths to the scan root and ``structure``'s ref
+    linter requires refs to resolve back inside their base, for the same reason.
+
+    I briefly reversed this to make a stow layout collapse with its plain twin,
+    on the strength of a fixture I had written myself. Measured afterwards over
+    the real installation: **0 symlinks across the 41 skills that have a
+    ``references/`` directory**. The cost of the reversal was real and the case
+    it bought was not, so the rejection stands. If a field case ever appears, the
+    fix is confinement plus a ``stat().st_size`` check before the read — not a
+    bare ``resolve()``.
 
     Sorted for a stable digest; oversized files are dropped by whichever consumer
     reads them.
     """
     refs_dir = Path(skill_path).parent / "references"
-    if not refs_dir.is_dir():
+    if not refs_dir.is_dir() or refs_dir.is_symlink():
         return []
-    out = []
-    for f in sorted(refs_dir.glob("*.md")):
-        try:
-            if f.resolve().is_file():
-                out.append(f)
-        except OSError:
-            continue
-    return out
+    return [f for f in sorted(refs_dir.glob("*.md")) if not f.is_symlink()]
 
 
 def estimate_token_cost(skill_path: str) -> int:

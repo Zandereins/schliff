@@ -269,35 +269,48 @@ def test_two_copies_with_the_same_broken_suite_still_collapse(tmp_path):
     assert len(duplicates) == 1
 
 
-def test_a_symlinked_reference_is_read_like_any_other(tmp_path):
-    """stow, chezmoi and worktrees symlink reference files.
+def test_a_symlinked_reference_is_rejected_not_followed(tmp_path):
+    """A shipped security fix, kept deliberately.
 
-    Skipping them was inherited from ``estimate_token_cost`` while
-    ``read_skill_safe`` and ``load_eval_suite`` both follow links. Measured, a
-    stow-managed copy charged 12 tokens against 1,182 for its byte-identical
-    plain twin, and the two did not collapse.
+    doctor walks other people's directories, so a plugin controls what sits in
+    its ``references/``. Following a link there turns a word count into a
+    filesystem oracle, and reading before the size check turns a link to a huge
+    file into an OOM — which is why ``estimate_token_cost`` rejected them and why
+    ``skill_mesh`` confines resolved paths to the scan root.
+
+    I reversed this once, to make a stow layout collapse with its plain twin, on
+    the strength of a fixture I wrote myself. The field says 0 symlinks across
+    the 41 real skills that have a ``references/``. Restore ``resolve()``-and-
+    follow here and this goes red.
     """
     import os
 
-    real = tmp_path / "guide.md"
-    real.write_text("word " * 900, encoding="utf-8")
-    plain = _skill(tmp_path, "plain", BODY, refs={"guide.md": "word " * 900})
-    stow = _skill(tmp_path, "stow", BODY, refs={"placeholder.md": ""})
-    (tmp_path / "stow" / "references" / "placeholder.md").unlink()
-    os.symlink(real, tmp_path / "stow" / "references" / "guide.md")
+    import shared
+
+    outside = tmp_path / "outside.md"
+    outside.write_text("word " * 900, encoding="utf-8")
+    skill = _skill(tmp_path, "s", BODY, refs={"placeholder.md": ""})
+    (tmp_path / "s" / "references" / "placeholder.md").unlink()
+    os.symlink(outside, tmp_path / "s" / "references" / "linked.md")
+
+    assert shared._payload_files(skill["path"]) == [], "a symlinked ref must not be read"
+    # ...and the file outside the skill directory contributes nothing.
+    assert shared.estimate_token_cost(skill["path"]) < 100
+
+
+def test_a_symlinked_references_directory_is_rejected(tmp_path):
+    """Same fix, the directory half of it."""
+    import os
 
     import shared
 
-    assert shared.estimate_token_cost(stow["path"]) == shared.estimate_token_cost(plain["path"])
-    unique, duplicates = doctor._collapse_duplicate_copies([plain, stow])
-    assert len(unique) == 1, "byte-identical payloads, one symlinked, are one install"
+    real_refs = tmp_path / "elsewhere"
+    real_refs.mkdir()
+    (real_refs / "guide.md").write_text("word " * 900, encoding="utf-8")
+    skill = _skill(tmp_path, "s", BODY)
+    os.symlink(real_refs, tmp_path / "s" / "references")
 
-    # A link to a directory, and a dangling one, are still dropped.
-    broken = _skill(tmp_path, "broken", BODY, refs={"placeholder.md": ""})
-    (tmp_path / "broken" / "references" / "placeholder.md").unlink()
-    os.symlink(tmp_path / "plain", tmp_path / "broken" / "references" / "dir.md")
-    os.symlink(tmp_path / "nowhere.md", tmp_path / "broken" / "references" / "dead.md")
-    assert shared._payload_files(broken["path"]) == []
+    assert shared._payload_files(skill["path"]) == []
 
 
 def test_a_repaired_suite_clears_its_recorded_failure(tmp_path):
