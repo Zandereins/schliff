@@ -229,6 +229,8 @@ def run_doctor(
             "total_tokens": 0,
             "skills_discovered": 0,
             "duplicate_copies": [],
+            "broken_eval_suite": 0,
+            "grouped_duplicates": 0,
             "mesh_health": 100,
             "mesh_issue_count": 0,
             "results": [],
@@ -249,6 +251,7 @@ def run_doctor(
     needs_work = 0
     no_eval = 0
     broken_eval = 0
+    grouped = 0
     failed = 0
 
     for skill in unique_skills:
@@ -287,7 +290,14 @@ def run_doctor(
             )
         results.append(result)
 
-        if score_result.get("eval_suite_error"):
+        if path in copies_by_path:
+            # A grouped row's own action says to resolve the duplicate, and its
+            # path is the plugin cache. Counting it as "missing an eval suite"
+            # would put it in the /schliff:init recommendation below — writing
+            # into a directory the next plugin update deletes, and contradicting
+            # the row three lines above. Same carve-out doctor.md step 5 makes.
+            grouped += 1
+        elif score_result.get("eval_suite_error"):
             # Present but unreadable. Counting it as "missing" would put it in
             # the /schliff:init recommendation below, which writes eval-suite.json
             # over the file that failed to load — contradicting this same row's
@@ -313,7 +323,13 @@ def run_doctor(
     mesh_issues = mesh_result.get("issues", [])
     mesh_health = mesh_result.get("health", {}).get("score", 100)
 
-    summary_parts = [f"{len(results)} skills scanned"]
+    discovered = len(skills)
+    scanned = (
+        f"{len(results)} skills scanned"
+        if discovered == len(results)
+        else f"{len(results)} skills scanned ({discovered} files, duplicates counted once)"
+    )
+    summary_parts = [scanned]
     if healthy:
         summary_parts.append(f"{healthy} healthy")
     if needs_work:
@@ -366,6 +382,7 @@ def run_doctor(
         "needs_work": needs_work,
         "no_eval_suite": no_eval,
         "broken_eval_suite": broken_eval,
+        "grouped_duplicates": grouped,
         "total_tokens": total_tokens,
         # Physical files on disk, before collapsing copies. `skills_found` is the
         # deduplicated count; without this the difference is only recoverable by

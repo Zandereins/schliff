@@ -175,6 +175,16 @@ def _payload_files(skill_path: str) -> list[Path]:
     confines resolved SKILL.md paths to the scan root and ``structure``'s ref
     linter requires refs to resolve back inside their base, for the same reason.
 
+    **The scope of the check, stated exactly:** ``is_symlink()`` tests the last
+    component, which is enough to stop a reference escaping the directory. It
+    does NOT stop a ``references/`` reached *through* a symlinked skill
+    directory — ``is_dir()`` resolves everything above. That is the caller's
+    confinement to make, and ``discover_skills`` makes it (``relative_to`` the
+    scan root), so a default run cannot reach it; ``--skill-dirs <link>`` and an
+    explicit ``score``/``bench`` path can, and there the caller named the link.
+    A ``realpath`` check here would be dead code: the base resolves with the
+    target, so it can never fail. Measured before writing that down.
+
     I briefly reversed this to make a stow layout collapse with its plain twin,
     on the strength of a fixture I had written myself. Measured afterwards over
     the real installation: **0 symlinks across the 41 skills that have a
@@ -316,6 +326,17 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
     try:
         if not auto_path.exists():
             eval_suite_error.pop(str(auto_path), None)
+            return None
+        # Size BEFORE read, like `cli._load_eval_suite_from_args` already does —
+        # the OOM-safe loading the changelog promised, which this loader never
+        # got. Reading first raises MemoryError on a multi-gigabyte target, and
+        # MemoryError is neither OSError nor ValueError nor RecursionError, so
+        # nothing below catches it. This path follows symlinks, and since
+        # `skill_payload_digest` calls it before the scoring loop, one such file
+        # ended the whole run instead of marking one row failed.
+        if auto_path.stat().st_size > MAX_SKILL_SIZE:
+            print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
+            eval_suite_error[str(auto_path)] = "exceeds the size limit"
             return None
         raw = auto_path.read_text(encoding="utf-8")
         if len(raw) > MAX_SKILL_SIZE:

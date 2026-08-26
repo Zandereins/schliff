@@ -179,6 +179,17 @@ an OOM; `skill_mesh` confines resolved paths to the scan root for the same reaso
 real and the case was not. If a field case appears, the fix is confinement plus a
 `stat().st_size` check before the read, not a bare `resolve()`.
 
+**The loader checks size before reading.** `read_text` on a multi-gigabyte target raises
+`MemoryError`, which none of the handlers above catch, and the digest calls the loader before the
+scoring loop — so one such file ended the run rather than marking one row failed.
+`cli._load_eval_suite_from_args` had done `stat().st_size` first since the OOM-safe-loading fix;
+the shared loader never received it. It does now.
+
+**A grouped row is not "missing an eval suite".** Its own action says to resolve the duplicate,
+and its path is the plugin cache. Counting it as missing put all 20 real groups into "Run
+/schliff:init on N skills missing eval suites" — writing into a directory the next plugin update
+deletes, and contradicting the row itself. Counted separately as `grouped_duplicates`.
+
 **A broken eval suite is not an absent one.** `load_eval_suite` degrades every failure to `None`
 so one bad file cannot end a run — including `RecursionError`, which `json.loads` raises on deeply
 nested input below CPython 3.14 and which is neither `OSError` nor `ValueError`. That version

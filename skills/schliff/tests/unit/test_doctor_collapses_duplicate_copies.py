@@ -8,6 +8,8 @@ Each test here is named after the mutation it has to survive. Two of them exist
 because the first version of this file did not discriminate: they were green
 against the very mutations their docstrings quoted.
 """
+import pathlib
+
 import doctor
 import pytest
 
@@ -350,6 +352,53 @@ def test_an_unreadable_suite_is_not_counted_as_missing(tmp_path):
     assert report["no_eval_suite"] == 0
     assert report["broken_eval_suite"] == 1
     assert "Run /schliff:init on" not in rendered
+
+
+def test_an_oversized_eval_suite_is_never_read(tmp_path, monkeypatch):
+    """Size before read — the OOM-safe loading the changelog promised.
+
+    ``read_text`` on a multi-gigabyte target raises ``MemoryError``, which is
+    neither ``OSError`` nor ``ValueError`` nor ``RecursionError``. The digest
+    calls this before the scoring loop and outside any handler, so one such file
+    ended the whole run. ``cli._load_eval_suite_from_args`` already checked
+    ``stat().st_size`` first; the shared loader never did.
+
+    Remove the ``stat().st_size`` guard and this goes red — the file gets read.
+    """
+    import shared
+
+    skill = _skill(tmp_path, "s", BODY)
+    suite = tmp_path / "s" / "eval-suite.json"
+    suite.write_text("{" + " " * (shared.MAX_SKILL_SIZE + 1000) + "}", encoding="utf-8")
+
+    reads = []
+    real_read = pathlib.Path.read_text
+
+    def _spy(self, *a, **kw):
+        if self.name == "eval-suite.json":
+            reads.append(str(self))
+        return real_read(self, *a, **kw)
+
+    monkeypatch.setattr(pathlib.Path, "read_text", _spy)
+    assert shared.load_eval_suite(skill["path"]) is None
+    assert reads == [], "an oversized suite must not be read into memory at all"
+
+
+def test_a_grouped_row_is_not_counted_as_missing_an_eval_suite(tmp_path):
+    """The footer must not contradict the row, for duplicates either.
+
+    A grouped row's action says to resolve the duplicate and its path is the
+    plugin cache. Counting it as "missing an eval suite" put it in "Run
+    /schliff:init on N skills" — writing into a directory the next plugin update
+    deletes. Field-measured before the fix: all 20 groups landed in that count.
+    """
+    _skill(tmp_path, "cached", BODY)
+    _skill(tmp_path, "vendored", BODY)
+
+    report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+
+    assert report["grouped_duplicates"] == 1
+    assert report["no_eval_suite"] == 0, "a grouped row must not join the init recommendation"
 
 
 def test_cost_and_digest_read_the_same_files(tmp_path, monkeypatch):

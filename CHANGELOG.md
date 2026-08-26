@@ -29,8 +29,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   and `doctor` all raised on a suite that is a directory, unreadable, not UTF-8, or nested deeply
   enough to exhaust the parser's recursion (the last only below Python 3.14, so CI's newest leg
   stayed green while the oldest failed). Every failure now degrades to "no suite" with a warning
-  on stderr. `doctor` distinguishes it from an absent suite: `--json` gains `eval_suite_error`
-  per row and `broken_eval_suite` in the summary, and such a skill is kept out of the
+  on stderr. `doctor` distinguishes it from an absent suite: The loader also checks `stat().st_size` before reading, so an oversized suite is
+  never pulled into memory. `--json` gains `eval_suite_error` per row plus
+  `broken_eval_suite`, `grouped_duplicates` and `skills_discovered` in the summary, and such a skill is kept out of the
   `/schliff:init` recommendation — that command would write over the file that failed to load.
 
 - **`doctor` counts one install per skill, not one per copy on disk.** A plugin present in both
