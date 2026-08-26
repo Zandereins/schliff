@@ -178,42 +178,36 @@ def estimate_token_cost(skill_path: str) -> int:
 
 
 def skill_payload_digest(skill_path: str) -> str:
-    """Identity of an installed skill: SKILL.md plus its ``references/*.md``.
+    """Identity of an installed skill: everything a doctor row is derived from.
 
-    Two installs are the same install when they would cost the same to load.
-    That is why this hashes exactly the file list ``estimate_token_cost`` above
-    charges for — a digest whose domain is smaller than the measured quantity is
-    not a simpler key, it is a wrong one.
+    That is SKILL.md, its ``references/*.md``, and ``eval-suite.json`` — the file
+    list ``estimate_token_cost`` charges for, plus the one ``load_eval_suite``
+    reads. A digest whose domain is smaller than the quantities it indexes is not
+    a simpler key, it is a wrong one; that was got wrong once per quantity, and
+    both mistakes are recorded with their measurements in docs/specs/2026-08-13-doctor-counts-vendored-skills.md,
+    "Amendment 2026-08-26". Not restated here.
 
-    Hashing SKILL.md alone was tried and is wrong in two ways, both measured over
-    the 159 skills in a real ``~/.claude``:
-
-    * It collapses installs that cost different amounts. Two byte-identical
-      SKILL.md files with different ``references/`` came to 9,013 and 9,591
-      tokens; charging one for the other silently loses 578 tokens.
-    * The published total then depends on iteration order — keep-first gave
-      429,006 and keep-last 429,584 — and keep-first kept a June *backup* while
-      discarding the live ``~/.claude/skills/schliff/SKILL.md``. A rule meant to
-      clean the measurement would have deleted the subject of it from its own
-      report.
-
-    With this key both directions give 138 skills and 438,597 tokens: a swing of
-    zero, and the live skill survives. Regenerating this digest per file is also
-    the frozen corpus list — path plus digest is what lets a third party check a
-    published number against files that are not in this repository.
-
-    Returns an empty string when the file cannot be read, so an unreadable skill
+    Returns an empty string when SKILL.md cannot be read, so an unreadable skill
     never collapses onto another.
     """
     path = Path(skill_path)
     digest = hashlib.sha256()
+
+    def _absorb(label: str, text: str) -> None:
+        # Length-prefixed: without a separator, a file named `b.md` holding "X"
+        # and a file `a.md` holding "Xb.md" hash the same, so two unrelated
+        # skills would collapse and one would vanish from the report as a copy
+        # of the other.
+        blob = text.encode("utf-8")
+        digest.update(f"{label}:{len(blob)}\0".encode("utf-8"))
+        digest.update(blob)
+
+    # read_skill_safe, not read_text: it strips the BOM, so the same skill saved
+    # with and without one is one install rather than two.
     try:
-        content = path.read_text(encoding="utf-8", errors="replace")
-    except (OSError, PermissionError, ValueError):
+        _absorb("SKILL.md", read_skill_safe(str(path)))
+    except (OSError, PermissionError, FileNotFoundError, ValueError):
         return ""
-    if len(content) > MAX_SKILL_SIZE:
-        return ""
-    digest.update(content.encode("utf-8"))
 
     # Same traversal, same guards as estimate_token_cost: sorted for a stable
     # digest, symlinks skipped, oversized files ignored rather than hashed.
@@ -227,8 +221,18 @@ def skill_payload_digest(skill_path: str) -> str:
             except (OSError, PermissionError):
                 continue
             if len(ref_content) <= MAX_SKILL_SIZE:
-                digest.update(ref_file.name.encode("utf-8"))
-                digest.update(ref_content.encode("utf-8"))
+                _absorb(f"references/{ref_file.name}", ref_content)
+
+    # Same discovery and same size guard as load_eval_suite. Its presence moves a
+    # row from 4-of-7 dimensions to 7-of-7, so it belongs to the identity.
+    suite = path.parent / "eval-suite.json"
+    if suite.is_file() and not suite.is_symlink():
+        try:
+            raw = suite.read_text(encoding="utf-8", errors="replace")
+        except (OSError, PermissionError):
+            raw = ""
+        if raw and len(raw) <= MAX_SKILL_SIZE:
+            _absorb("eval-suite.json", raw)
 
     return digest.hexdigest()
 

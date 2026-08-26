@@ -86,3 +86,55 @@ vendored path segment; the count of files excluded *without* one is 0.
 
 Full suite: **2121 passed**. `EXCLUDED_DIRS` is shared, so the three added entries also
 apply to `sync.py` and the AGENTS.md walk — same semantics, no test moved.
+
+## Amendment 2026-08-26 — path exclusion does not reach the duplicate-install case
+
+The section above solved *vendored copies* — a skill sitting inside `site-packages` or a uv
+cache archive — by extending `EXCLUDED_DIRS`. That fix stands. It does not reach the case
+below, and extending the set further would break the measurement rather than repair it.
+
+**The case.** A Claude Code plugin is installed under `~/.claude/plugins/cache/…` and also
+appears under `~/.claude/plugins/marketplaces/…`. Both copies are real, both are the same
+bytes, and both were counted.
+
+**Measured on a real `~/.claude` at `c651d13`** — this is the single home for these numbers;
+the code comments point here rather than restating them:
+
+| | before | after |
+| --- | --- | --- |
+| skills counted | 159 | 138 |
+| headline context cost | 495,928 tokens | 438,597 tokens |
+| duplicate groups reported | — | 20 (21 extra copies) |
+
+**Why not `EXCLUDED_DIRS`.** Adding `cache` takes the count from **159 to 50**: the cache *is*
+where plugins install, so the exclusion would delete the majority of real skills instead of the
+duplicates. The set has already needed three extensions (`site-packages`, `.cache`, `.vercel`);
+a path wordlist is complete only until the next package manager. This is the enumeration trap
+recorded in the 2026-08-25 amendment to
+`docs/specs/2026-08-13-structural-signal-detection.md`, in a different file.
+
+**The rule instead.** `shared.skill_payload_digest` — sha256 over SKILL.md, `references/*.md`
+and `eval-suite.json`, length-prefixed. It carries no vendor names and does not grow.
+
+**The key covers exactly what a doctor row is derived from, and that was got wrong twice:**
+
+* *Cost.* Hashing SKILL.md alone collapses installs that cost different amounts — two
+  byte-identical SKILL.md with different `references/` came to 9,013 and 9,591 tokens. The
+  published total then depended on iteration order (keep-first 429,006, keep-last 429,584), and
+  keep-first kept a June **backup** while discarding the live
+  `~/.claude/skills/schliff/SKILL.md`: the cure deleting the subject of the measurement.
+* *Score.* `eval-suite.json` moves a row from 4-of-7 dimensions to 7-of-7. Two byte-identical
+  SKILL.md, one with the suite beside it, scored **38.3 [E]** and **93.0 [A]**. Ignoring it let
+  path sort order decide which the reader saw — a 55-point swing settled by a string comparison.
+
+Both are pinned by mutation-verified tests in
+`skills/schliff/tests/unit/test_doctor_collapses_duplicate_copies.py`.
+
+**What is deliberately not decided.** Which copy of a genuine duplicate is *counted* is
+arbitrary: after the digest they are identical in everything measured. The path is not
+interchangeable to a reader — `/schliff:auto` writes `.schliff/` history beside the file, and a
+plugin cache directory is overwritten on the next update — so the report prints every path in a
+group and says the choice is arbitrary. Nothing is deleted (ADR 0019).
+
+**Still open, unchanged by this:** `doctor --json` reports `mesh_issue_count: 0` under
+`incremental=True` while a fresh analysis finds 49. Present on `main` before this change.

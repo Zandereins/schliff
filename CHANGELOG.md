@@ -25,6 +25,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **`doctor` counts one install per skill, not one per copy on disk.** A plugin present in both
+  `plugins/cache/` and `plugins/marketplaces/` was scored and billed twice, inflating the skill
+  count, the grade distribution and the headline "Total context cost". Copies are now collapsed
+  by a digest over SKILL.md, `references/*.md` and `eval-suite.json` — the files a row is
+  actually derived from — and every path in a group is printed so you can delete one. Nothing is
+  removed for you. `--json` gains `duplicate_copies` and `skills_discovered` (the physical file
+  count, next to the deduplicated `skills_found`). Path-based exclusion was measured and
+  rejected; see `docs/specs/2026-08-13-doctor-counts-vendored-skills.md`, "Amendment 2026-08-26".
+
 - **Documented commands in tables and indented bullets now count.** `efficiency`
   credited a documented command only as a top-level bullet, so an indented
   sub-bullet or a markdown command table scored nothing. Measured over 1732

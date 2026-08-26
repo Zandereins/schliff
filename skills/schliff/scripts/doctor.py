@@ -140,28 +140,21 @@ def _score_single_skill(skill_path: str) -> dict:
 def _collapse_duplicate_copies(skills: list[dict]) -> tuple[list[dict], list[dict]]:
     """Count one install per distinct payload, and report the copies.
 
-    A plugin that is both cached and vendored appears twice on disk. Measured on
-    a real ``~/.claude``: 159 SKILL.md files, 138 distinct payloads, inflating the
-    headline token cost by 57,331. Counting the same bytes twice is a defect in
-    the report, not a property of the installation.
+    A plugin that is both cached and vendored appears twice on disk, so the
+    count, the grades and the headline token cost were all inflated. Identity is
+    ``shared.skill_payload_digest``.
 
-    Identity is ``skill_payload_digest`` — SKILL.md plus ``references/*.md``,
-    exactly what the token estimate charges for. The reasoning for that key,
-    including the two ways a bare SKILL.md hash gets it wrong, is in that
-    function's docstring; it is not repeated here.
+    Why a digest and not another ``EXCLUDED_DIRS`` entry — the path exclusion
+    was measured and rejected — plus the before/after numbers: docs/specs/2026-08-13-doctor-counts-vendored-skills.md,
+    "Amendment 2026-08-26".
 
-    Path-based exclusion was measured and rejected: adding ``cache`` to
-    ``EXCLUDED_DIRS`` takes 159 to 50, because the cache IS where plugins install.
-    A digest carries no vendor names and does not grow with the next package
-    manager.
+    Nothing is deleted; every path in a group is reported and the caller decides
+    (ADR 0019). Which copy is counted is arbitrary — after the digest they are
+    identical in everything measured — so the report says so rather than implying
+    the surviving path is the canonical one.
 
-    Nothing is deleted. Every path in a group is reported, and the caller decides
-    — the same stance ADR 0019 takes for credential findings. The survivor is the
-    first in discovery order, which is stable because the digest makes every
-    member of a group identical in cost.
-
-    Skills whose digest could not be computed (unreadable, oversized) are all
-    kept: an empty digest is not an identity, so they must not collapse together.
+    Skills whose digest could not be computed are all kept: an empty digest is
+    not an identity, so they must not collapse together.
     """
     seen: dict[str, dict] = {}
     groups: dict[str, list[str]] = {}
@@ -215,6 +208,8 @@ def run_doctor(
             "needs_work": 0,
             "no_eval_suite": 0,
             "total_tokens": 0,
+            "skills_discovered": 0,
+            "duplicate_copies": [],
             "mesh_health": 100,
             "mesh_issue_count": 0,
             "results": [],
@@ -324,6 +319,10 @@ def run_doctor(
         "needs_work": needs_work,
         "no_eval_suite": no_eval,
         "total_tokens": total_tokens,
+        # Physical files on disk, before collapsing copies. `skills_found` is the
+        # deduplicated count; without this the difference is only recoverable by
+        # summing `also_installed_at`.
+        "skills_discovered": len(skills),
         "duplicate_copies": duplicate_copies,
         "mesh_health": mesh_health,
         "mesh_issue_count": len(mesh_issues),
@@ -370,6 +369,10 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
         lines.append(
             f"  {len(duplicate_copies)} skills are installed more than once "
             f"({extra} extra copies, counted once):"
+        )
+        lines.append(
+            "    Which copy is counted is arbitrary — pick the one you control "
+            "before acting on its path."
         )
         for d in duplicate_copies[:10]:
             lines.append(f"    {d['name']}")
