@@ -21,13 +21,9 @@ import score_skill as scorer
 import skill_mesh
 from terminal_art import grade_colored, score_to_grade
 
+import shared
 from scoring.formats import detect_format
-from shared import (
-    EXCLUDED_DIRS,
-    estimate_token_cost,
-    eval_suite_error,
-    skill_payload_digest,
-)
+from shared import EXCLUDED_DIRS, estimate_token_cost, skill_payload_digest
 
 # Filenames to match (lowercase) for instruction file discovery
 _INSTRUCTION_FILENAMES = {"claude.md", ".cursorrules", "agents.md"}
@@ -116,10 +112,13 @@ def _score_single_skill(skill_path: str) -> dict:
     # degraded to None so one bad file cannot end the run, but telling the user
     # to run /schliff:init here would write eval-suite.json over the very file
     # that failed to load.
-    suite_error = eval_suite_error.get(str(Path(skill_path).parent / "eval-suite.json"))
+    # `shared.eval_suite_error`, not a bound alias: a later per-run reset in
+    # shared would leave an import-time binding reading a dead dict, and every
+    # row would silently report no suite error.
+    suite_error = shared.eval_suite_error.get(str(Path(skill_path).parent / "eval-suite.json"))
 
     if suite_error:
-        action = f"Fix eval-suite.json first ({suite_error})"
+        action = f"Fix eval-suite.json first: {suite_error}"
     elif not has_eval:
         action = f"/schliff:init {skill_path}"
     elif score < 50:
@@ -285,7 +284,7 @@ def run_doctor(
             # directory the next plugin update deletes.
             reason = result.get("eval_suite_error")
             result["action"] = (
-                f"Resolve the duplicate install first; eval-suite.json is {reason}"
+                f"Resolve the duplicate install first; eval-suite.json: {reason}"
                 if reason else "Resolve the duplicate install first"
             )
         results.append(result)
@@ -444,6 +443,10 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
             "    The counted path is whichever sorted first, which is usually the "
             "plugin cache — act on the copy you control."
         )
+        lines.append(
+            "    Mesh findings below are counted per file, not per install, so "
+            "these copies appear there too."
+        )
         for d in duplicate_copies[:10]:
             lines.append(f"    {d['name']}")
             lines.append(f"      counted: {d['counted']}")
@@ -474,7 +477,9 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
         issues = r["issue_count"]
         # The reason is the whole payload of a repair action, so keep it whole
         # rather than truncating to "Fix eval-suite.json first (unreadab".
-        action = r["action"] if r.get("eval_suite_error") else r["action"][:35]
+        # A repair action carries its reason, which is the payload; cap it
+        # wide rather than at 35 so a grouped-and-broken row does not run away.
+        action = r["action"][:70] if r.get("eval_suite_error") else r["action"][:35]
 
         lines.append(f"  {name:<25s} {score:>5.0f} {grade:s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
 

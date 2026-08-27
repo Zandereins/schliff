@@ -106,6 +106,12 @@ the code comments point here rather than restating them:
 | headline context cost | 495,928 tokens | 438,597 tokens |
 | duplicate groups reported | — | 20 (21 extra copies) |
 
+Measured 2026-08-26 on that installation. **It drifts**: a re-run the next day found 157 files and
+19 groups, with `skills counted` and the token total unchanged, because the two files that had
+gone were both duplicate copies. Plugins get installed and removed; the numbers above are a dated
+observation, not a fixture. What does not drift is the shape — every removed copy takes a group
+member with it and leaves the counted total alone, which is the property being claimed.
+
 **Why not `EXCLUDED_DIRS`.** Adding `cache` takes the count from **159 to 50**: the cache *is*
 where plugins install, so the exclusion would delete the majority of real skills instead of the
 duplicates. The set has already needed three extensions (`site-packages`, `.cache`, `.vercel`);
@@ -179,7 +185,13 @@ an OOM; `skill_mesh` confines resolved paths to the scan root for the same reaso
 real and the case was not. If a field case appears, the fix is confinement plus a
 `stat().st_size` check before the read, not a bare `resolve()`.
 
-**One reader for every file this module opens.** `shared._read_bounded` checks *regular file*,
+**One reader for every file on the discovery and scoring path.** `discover_skills` reads
+SKILL.md and is therefore the *first* file doctor opens — the guard has to start there, not
+downstream of it. A FIFO named SKILL.md blocked discovery past eight seconds before the reader
+below was ever reached. `read_skill_safe` is deliberately excluded: it reads before checking size
+to close the TOCTOU race, and its callers sit inside a handler.
+
+**The reader itself.** `shared._read_bounded` checks *regular file*,
 then *size*, then reads — and the ordering of those three is the whole point. `read_text` on a
 FIFO blocks forever (measured: still blocked after six seconds) and `st_size` is 0 for one, so a
 size gate alone lets it through; reading before the size check raises `MemoryError` on a

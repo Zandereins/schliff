@@ -23,6 +23,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
+import shared
+
 # Import scorer functions for tokenization and description extraction
 from nlp import tokenize_meaningful
 from shared import EXCLUDED_DIRS, extract_description
@@ -97,13 +99,14 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
                 continue
             seen_paths.add(real_path)
 
-            try:
-                content = resolved.read_text(encoding="utf-8", errors="replace")
-            except (OSError, PermissionError):
-                continue
-
-            # Skip files > 1MB
-            if len(content) > 1_000_000:
+            # The shared reader, not a local read: regular-file check, then size,
+            # then read. Reading first blocks forever on a FIFO named SKILL.md
+            # (measured) and raises MemoryError on a multi-gigabyte one, which
+            # neither handler here catches. This is the first file doctor opens,
+            # so it decides whether the scan can be hung at all — the guard in
+            # `_read_bounded` is downstream of it.
+            content = shared._read_bounded(resolved)
+            if content is None:
                 continue
 
             # Extract metadata

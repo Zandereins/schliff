@@ -401,6 +401,28 @@ def test_a_grouped_row_is_not_counted_as_missing_an_eval_suite(tmp_path):
     assert report["no_eval_suite"] == 0, "a grouped row must not join the init recommendation"
 
 
+def test_a_fifo_named_skill_md_does_not_hang_discovery(tmp_path):
+    """The first file doctor opens decides whether the scan can be hung at all.
+
+    ``discover_skills`` read SKILL.md directly, so a FIFO there blocked before
+    ``_read_bounded`` was ever reached — the guard was downstream of the hazard.
+    Measured: blocked past eight seconds, nothing discovered, nothing reported.
+    It uses the shared reader now.
+
+    Restore a bare ``read_text`` in ``discover_skills`` and this hangs rather
+    than failing, which is the defect reproduced.
+    """
+    import os
+
+    import skill_mesh
+
+    d = tmp_path / "skills" / "s"
+    d.mkdir(parents=True)
+    os.mkfifo(d / "SKILL.md")
+
+    assert skill_mesh.discover_skills([str(tmp_path)]) == []
+
+
 def test_a_fifo_where_a_file_is_expected_does_not_hang(tmp_path):
     """A plugin can put a FIFO where a skill file goes; doctor must not block.
 
