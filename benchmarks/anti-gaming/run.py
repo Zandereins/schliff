@@ -208,6 +208,21 @@ def main():
     clean_path = str(_SKILLS_DIR / CLEAN_CONTROL)
     clean_composite = score_skill(clean_path)["composite"] if Path(clean_path).exists() else None
 
+    # A gate that cannot tell "nothing gamed" from "nothing measured" makes every
+    # green run before it unprovable, retroactively. Measured on f202bc1: renaming
+    # a single skill file leaves this at exit 0 while the headline quietly drops
+    # from 7/7 to 6/7 — so the strongest vector stops being tested, and the CI
+    # wrapper, which asserts only `returncode == 0`, never notices. A rename is
+    # the most ordinary edit there is.
+    #
+    # The corpus state travels in the output rather than short-circuiting it, so
+    # `--json` stays parseable and a consumer can see WHY the run failed. Same
+    # reason `doctor` reports `digest_degraded` instead of warning on stderr: a
+    # degraded result that looks identical to a clean one is the failure.
+    incomplete = [r["file"] for r in results if "error" in r]
+    if clean_composite is None:
+        incomplete.append(CLEAN_CONTROL)
+
     violations = []
     if clean_composite is not None:
         for r in results:
@@ -217,16 +232,22 @@ def main():
     if use_json:
         output = [{k: v for k, v in r.items() if k != "target_details"} for r in results]
         print(json.dumps({"clean_composite": clean_composite,
+                          "incomplete": incomplete,
                           "violations": violations, "results": output}, indent=2))
     else:
         print(format_markdown(results))
         print(f"\nClean control composite: {clean_composite}")
+        if incomplete:
+            print("CORPUS INCOMPLETE — these vectors were not measured at all:")
+            for f in incomplete:
+                print(f"  {f}")
+            print("Every separation result above is unproven until they are restored.")
         if violations:
             print("SEPARATION FAILURES (gamed >= clean):")
             for f, c in violations:
                 print(f"  {f}: {c}")
 
-    sys.exit(1 if violations else 0)
+    sys.exit(1 if violations or incomplete else 0)
 
 
 if __name__ == "__main__":

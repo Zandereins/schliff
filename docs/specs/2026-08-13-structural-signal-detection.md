@@ -369,12 +369,28 @@ skill, because `tests/fixtures/self-skill-baseline/SKILL.md` is scanned. A SKILL
 under `playground/.venv/lib/python3.12/site-packages/`; in a user's repo that would be
 `node_modules` and `.venv`. Next after this.
 
-`benchmarks/anti-gaming/` runs in no CI job — `grep -rn 'anti-gaming\|benchmarks' .github/workflows/
-Makefile` returns nothing (the wider `.github/` does hit one line, an option label in
-`ISSUE_TEMPLATE/feature_request.yml`, which runs nothing) — and its own `test_benchmark.py` is red: two assertions expect 6 benchmarks where
-`BENCHMARKS` holds 7, and `pyproject.toml`'s `testpaths` excludes the directory, so no default run
-collects it. Until both are fixed, adding a gaming vector there buys a line nobody runs. The vector
-for the SSH-address limit (Amendment 2026-08-25) is blocked on exactly this.
+~~`benchmarks/anti-gaming/` runs in no CI job~~ — **CORRECTED 2026-08-28, and the correction is the
+lesson.** The grep this claim rested on is accurate: `grep -rn 'anti-gaming\|benchmarks'
+.github/workflows/ Makefile` returns nothing. The conclusion drawn from it was not.
+`skills/schliff/tests/unit/test_composite_unified.py:187` runs `run.py` as a subprocess and asserts
+`returncode == 0`, and `test.yml` invokes `pytest tests/unit/` with an explicit path, which
+overrides `testpaths`. The gate has therefore been **enforced in five of the six required contexts**
+(`test 3.10`–`3.13`, `test-macos`) the whole time. A true observation with a false conclusion, which
+is harder to catch than a false observation.
+
+What was actually wrong is narrower and was fixed on 2026-08-28: the gate could not tell "no vector
+gamed" from "no vector measured". Renaming one skill file left it at exit 0 while the headline
+dropped from 7/7 to 6/7. `main()` now reports `incomplete` and exits 1, so a vector that stops being
+measured reddens CI instead of vanishing.
+
+Still open, and NOT what blocks a new vector: `test_benchmark.py` is red (two assertions expect 6
+benchmarks where `BENCHMARKS` holds 7) and `pyproject.toml`'s `testpaths` excludes the directory, so
+no default run collects that file. What actually blocks adding a vector is the opposite of what this
+paragraph assumed — it is not that nobody would run it, it is that everybody does: a vector whose
+composite reaches the clean control makes `violations` non-empty and reddens five required contexts,
+with `enforce_admins: true` and no override. Score every new vector locally with `run.py --json`
+before committing it. The SSH-address vector (Amendment 2026-08-25) is gated on that, not on CI
+coverage.
 
 Two smaller items, unowned: `commands/schliff/analyze.md` step 7 documents
 `run-eval.sh <skill> --eval-suite <suite>`, which exits `Error: unknown option --eval-suite` — the

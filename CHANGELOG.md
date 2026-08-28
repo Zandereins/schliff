@@ -25,6 +25,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **The anti-gaming gate reports an incomplete corpus instead of passing quietly.** It could not
+  distinguish "no vector gamed" from "no vector measured": renaming a single skill file under
+  `benchmarks/anti-gaming/skills/` left `run.py` at exit 0 while its headline dropped from 7/7 to
+  6/7, so the vector stopped being tested and the CI job — which asserts only `returncode == 0` —
+  stayed green. Since the gate is enforced in five of the six required status checks, that made
+  every earlier green run unprovable in retrospect. `main()` now lists the unmeasured files, says
+  the separation results are unproven until they are restored, and exits 1; `--json` gains
+  `incomplete`. The corpus state travels in the output rather than short-circuiting it, so a
+  consumer can still see why the run failed.
+
 - **A broken `eval-suite.json` no longer ends the run.** `schliff score`, `bench`, `eval`, `auto`
   and `doctor` all raised on a suite that is a directory, unreadable, not UTF-8, or nested deeply
   enough to exhaust the parser's recursion (the last only below Python 3.14, so CI's newest leg

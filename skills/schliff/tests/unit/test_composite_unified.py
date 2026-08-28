@@ -192,6 +192,39 @@ def test_anti_gaming_benchmark_gate():
     assert proc.returncode == 0, f"anti-gaming separation failed:\n{proc.stdout}"
 
 
+def test_the_anti_gaming_gate_fails_on_an_incomplete_corpus(monkeypatch, capsys):
+    """"No vector gamed" and "no vector measured" must not both be exit 0.
+
+    The gate above asserts only ``returncode == 0``. Measured on f202bc1, before
+    this: renaming ONE skill file left the run at exit 0 while the headline
+    quietly dropped from 7/7 to 6/7 — the strongest vector stopped being tested
+    and CI stayed green. A rename is the most ordinary edit there is, and a gate
+    that can silently stop measuring makes every earlier green unprovable.
+
+    This is the unit half; the subprocess test above covers the real corpus.
+    """
+    import pytest
+
+    repo = Path(__file__).resolve().parents[4]
+    bench_dir = str(repo / "benchmarks" / "anti-gaming")
+    if bench_dir not in sys.path:
+        sys.path.insert(0, bench_dir)
+    import run as bench
+
+    monkeypatch.setattr(sys, "argv", ["run.py"])
+    monkeypatch.setattr(
+        bench, "run_benchmarks",
+        lambda: [{"file": "renamed-away.md", "error": "File not found: renamed-away.md"}])
+
+    with pytest.raises(SystemExit) as exc:
+        bench.main()
+
+    assert exc.value.code == 1, "an unmeasured vector must not pass as a clean run"
+    out = capsys.readouterr().out
+    assert "CORPUS INCOMPLETE" in out, out[-400:]
+    assert "renamed-away.md" in out, "the report must name what it did not measure"
+
+
 def test_evolve_score_file_matches_cli(tmp_path):
     """evolve._score_file must return the same headline composite as the CLI path."""
     import importlib
