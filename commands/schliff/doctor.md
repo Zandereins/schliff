@@ -34,11 +34,40 @@ Run a comprehensive health check on all installed skills.
    Summary: X skills scanned, Y healthy, Z need attention
    ```
 
-3. For skills with grade D or F, suggest specific next steps:
+3. If `duplicate_copies` is non-empty, report it **above** the table — the CLI
+   renderer prints it there, and the two surfaces should not disagree on shape.
+   A skill whose scored payload (SKILL.md, `references/*.md`, `eval-suite.json`)
+   is identical at several paths is counted once. Report the comparison, never a
+   conclusion about the filesystem: the directories are not compared, so members
+   may be different versions of the same plugin, and both may be live installs.
+
+   ```
+   N skills have an identical scored payload at M paths — each counted once (K paths collapsed).
+   The counted path is whichever sorted first, an artifact of sort order rather
+   than a recommendation. Name every path so the reader can check them.
+   ```
+
+   Do not explain the whole `skills_discovered` − `skills_found` gap as
+   duplicates: a skill that fails to score widens it too. The duplicate share is
+   the sum over `duplicate_copies[].also_installed_at`; the rest is `failed`.
+   Result rows carry an `also_installed_at` too, but only on rows that scored —
+   summing those undercounts whenever a duplicated skill failed.
+
+4. A row with `eval_suite_error` has a suite that is present but unreadable —
+   report the reason and do not suggest `/schliff:init`, which would write over
+   that file. A row with `also_installed_at` names whichever member sorted
+   first, which is picked by sort order and not by merit; use its `action`
+   verbatim rather than composing a command from `path`.
+
+5. For skills with grade D or F, suggest specific next steps — **except** on rows
+   carrying `eval_suite_error` or `also_installed_at`, whose own `action` already
+   says what to do and must be used verbatim. A broken suite often scores F, so
+   the blanket recommendation would otherwise hand out the command that
+   overwrites it.
    - "Run `/schliff:init <path>` to set up improvement tracking"
    - "Run `/schliff:analyze <path>` for detailed gap analysis"
 
-4. If `--verbose` flag is provided, show per-dimension breakdowns for each skill.
+6. If `--verbose` flag is provided, show per-dimension breakdowns for each skill.
 
 ## Flags
 

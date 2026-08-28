@@ -25,6 +25,55 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **A broken `eval-suite.json` no longer ends the run.** `schliff score`, `bench`, `eval`, `auto`
+  and `doctor` all raised on a suite that is a directory, unreadable, not UTF-8, or nested deeply
+  enough to exhaust the parser's recursion (the last only below Python 3.14, so CI's newest leg
+  stayed green while the oldest failed). Every failure now degrades to "no suite" with a warning
+  on stderr. `doctor` distinguishes it from an absent suite via `eval_suite_error` and a per-row
+  action that says to repair rather than overwrite. Every file read on the discovery and scoring path — SKILL.md,
+  `references/*.md` and `eval-suite.json` — is now checked for being a regular file and for its
+  size *before* it is read, so a FIFO cannot hang the scan and an oversized file cannot exhaust
+  memory. Those two checks run on the descriptor the read is about to use (`O_NONBLOCK` open,
+  then `fstat`), not on the path: checking the path first leaves a window in which it can be
+  swapped for a FIFO afterwards, and anyone able to plant the FIFO can also win that race.
+  (`read_skill_safe` still reads before checking size, deliberately: it resolves the
+  TOCTOU race the other way and its callers sit inside a handler.) `--json` gains `eval_suite_error` per row plus
+  `broken_eval_suite`, `grouped_duplicates` and `skills_discovered` in the summary, and such a skill is kept out of the
+  `/schliff:init` recommendation — that command would write over the file that failed to load.
+
+- **`doctor` counts one install per skill, not one per copy on disk.** A plugin present in both
+  `plugins/cache/` and `plugins/marketplaces/` was scored and billed twice, inflating the skill
+  count, the grade distribution and the headline "Total context cost". Copies are now collapsed
+  by a digest over SKILL.md, `references/*.md` and `eval-suite.json` — the files a row is
+  actually derived from — and every path in a group is printed. Nothing is removed for you, and
+  the report states only that comparison: the directories are not compared, so members of a group
+  may be different versions of the same plugin and may both be live installs. `--json` gains `duplicate_copies` and `skills_discovered` (the physical file
+  count, next to the deduplicated `skills_found`). Path-based exclusion was measured and
+  rejected; see `docs/specs/2026-08-13-doctor-counts-vendored-skills.md`, "Amendment 2026-08-26".
+  The report describes the counted path as what it is, whichever member sorted first, and draws no
+  conclusion from that: it had advised acting on "the copy you control", which under the default
+  directories is the reader's own project copy. A duplicated skill also no longer draws
+  skill-specific advice telling you to edit it, which contradicted its own row.
+
+- **An oversized `eval-suite.json` says so.** It reported `unreadable`, the same word as a
+  permission error, so the fix suggested was to repair a file whose only problem was its size.
+  A grouped-and-broken row also truncated its own reason mid-word (`not a JSON objec`), because
+  the column was two characters narrower than the string it was widened to keep whole; the
+  width is now derived from the reasons the loader can actually produce and asserted by a test,
+  so a new reason cannot silently re-open it. And each `eval-suite.json` is read and parsed
+  once per run instead of twice — the duplicate read also printed every warning twice. And a
+  suite that parses but will not serialise no longer hashes as a fixed marker: two skills with
+  different unserialisable suites shared one identity, so the second was reported as a copy of
+  the first — and the same held for two suites broken in different ways, which shared the coarse
+  reason string. A duplicated skill whose suite is also broken now keeps the "do NOT run
+  `/schliff:init` on these" warning, which fell through the counters that gate it. The bounded
+  reader no longer references `os.O_NONBLOCK` directly, a Unix-only constant whose absence on
+  Windows raised an `AttributeError` past every guard on every scan path. The size guard is now
+  asserted through behaviour rather than by spying on `pathlib.Path.read_text`, which stopped
+  observing anything when the reader moved to `os.open` — deleting the guard had left its own test
+  green. And a run whose duplicate detection failed reports `digest_degraded`, so an uncollapsed
+  count can no longer be mistaken for a scan that found no duplicates.
+
 - **Documented commands in tables and indented bullets now count.** `efficiency`
   credited a documented command only as a top-level bullet, so an indented
   sub-bullet or a markdown command table scored nothing. Measured over 1732

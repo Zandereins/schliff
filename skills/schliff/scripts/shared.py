@@ -6,8 +6,11 @@ Single source of truth — imported by all scoring and analysis modules.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
+import stat
 import sys
 import threading
 import urllib.parse
@@ -31,6 +34,39 @@ MAX_CACHE_ENTRIES = 500
 
 # Module-level file cache to avoid redundant reads within a single invocation
 _file_cache: dict[str, str] = {}
+
+# The same, for parsed eval suites: path -> (stamp, suite, eval_suite_error reason).
+# Keyed by the eval-suite.json path, which is what `eval_suite_error` keys on too.
+#
+# The stamp is (st_mtime_ns, st_size) and it is not decoration: a path-only key
+# made a repaired suite stale — `test_a_repaired_suite_clears_its_recorded_failure`
+# went red on exactly that, a file rewritten from broken to valid still reporting
+# its old failure. Stated exactly, because a cache that lies is worse than the
+# double read it removes: this catches every rewrite that changes the size or
+# lands on a later mtime tick, which is every rewrite a doctor run can observe.
+# It would not catch a same-size rewrite inside one tick by a non-doctor caller.
+_eval_suite_cache: dict[str, tuple[tuple, Optional[dict], Optional[str]]] = {}
+
+# Why an eval suite was not loaded, keyed by its path. `load_eval_suite` degrades
+# every failure to None so one bad file cannot end a doctor run — but "absent"
+# and "present and broken" must not look the same in a report: the second earns
+# `/schliff:init`, which would then write over the file that caused it.
+#
+# The value is a path-free REASON, never the formatted exception. It is folded
+# into `skill_payload_digest`, and an OSError message carries the absolute path —
+# which gave two genuine copies of one broken skill different identities, so they
+# stopped collapsing and were billed twice. That is the defect this key exists to
+# remove. Details still reach stderr; only the reason reaches the identity.
+eval_suite_error: dict[str, str] = {}
+
+# Content identity of a suite that was read, keyed by its path — a sha256 over the
+# bytes, never the bytes themselves, so this stays 64 characters per entry.
+#
+# `skill_payload_digest` needs a way to tell two suites apart even when it cannot
+# serialise them, and the file belongs to `load_eval_suite`. Deriving it there and
+# reading it here is the alternative to the digest re-opening the path itself,
+# which is the re-derivation that produced five defects in this area already.
+eval_suite_content_id: dict[str, str] = {}
 
 # Known scoring dimensions for validation
 VALID_DIMENSIONS = {
@@ -85,6 +121,12 @@ def invalidate_cache(skill_path: str) -> None:
     """Invalidate the file cache for a given skill path."""
     key = str(Path(skill_path).resolve())
     _file_cache.pop(key, None)
+    # Four dicts are keyed on this skill's paths; invalidating two of them left the
+    # other two to outlive the file they describe. One door, all four.
+    suite_key = str(Path(skill_path).parent / "eval-suite.json")
+    _eval_suite_cache.pop(suite_key, None)
+    eval_suite_error.pop(suite_key, None)
+    eval_suite_content_id.pop(suite_key, None)
 
 
 def read_skill_safe(skill_path: str) -> str:
@@ -144,10 +186,119 @@ def extract_description(content: str) -> str:
     return ""
 
 
+def _read_bounded_with_reason(path: Path) -> tuple[Optional[str], str]:
+    """Read a file only if it is safe to: regular, and within the size limit.
+
+    One helper because the same two-line omission produced five defects in this
+    area. Both halves matter and both were learned the hard way:
+
+    * **Regular file, checked first.** ``read_text`` on a FIFO blocks forever —
+      measured, still hung after six seconds — and on a character device it reads
+      until memory runs out. ``st_size`` is 0 for both, so a size gate alone lets
+      them through. doctor walks directories that belong to other people, so a
+      plugin can put either where a skill file is expected.
+    * **Size before read, not after.** Reading first raises ``MemoryError`` on a
+      multi-gigabyte target, and ``MemoryError`` is not ``OSError`` and not
+      ``ValueError``. That was survivable while every caller sat inside
+      ``_score_single_skill``'s handler; it stopped being survivable when the
+      digest began reading these files before the scoring loop.
+
+    Returns ``None`` when the file cannot or should not be read, alongside a
+    short, path-free reason. Callers treat the ``None`` as "no content", never
+    as an error to propagate; the reason exists because collapsing "too large"
+    and "unreadable" into one word told the reader to repair a file whose only
+    problem was its size.
+
+    **The checks run on the descriptor, not on the path.** ``is_file()`` then
+    ``stat()`` then ``read_text()`` leaves two windows in which the path can be
+    swapped for a FIFO after the check and before the open — and anyone who can
+    plant the FIFO can also win that race, so under this function's own threat
+    model the hang it exists to prevent stayed reachable. ``O_NONBLOCK`` makes
+    the open itself return instead of waiting for a writer, and ``fstat`` then
+    describes the exact object that is about to be read. ``read_skill_safe``
+    resolves the same race the other way (read first, size after), which it can
+    afford because it does not need the size before the read; here the size gate
+    is the point, so the descriptor is the only honest thing to measure.
+    """
+    fd = None
+    try:
+        # getattr, not os.O_NONBLOCK: the constant is Unix-only, and on Windows the
+        # attribute lookup raises AttributeError — which `except (OSError, ValueError)`
+        # below does not catch, so every scan path would traceback on its first file.
+        # Falling back to 0 loses the FIFO-open protection on a platform that has no
+        # FIFOs; the fstat check below still rejects anything that is not a regular file.
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return None, "not a regular file"
+        if st.st_size > MAX_SKILL_SIZE:
+            return None, "too large"
+        with os.fdopen(fd, "r", encoding="utf-8", errors="replace") as handle:
+            fd = None  # fdopen owns the descriptor now; closing it twice raises.
+            return handle.read(), ""
+    except (OSError, ValueError):
+        return None, "unreadable"
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _read_bounded(path: Path) -> Optional[str]:
+    """``_read_bounded_with_reason`` for the callers that only need the text."""
+    return _read_bounded_with_reason(path)[0]
+
+
+def _payload_files(skill_path: str) -> list[Path]:
+    """The ``references/*.md`` a skill loads alongside its SKILL.md.
+
+    One enumeration, two consumers: ``estimate_token_cost`` charges for these
+    files and ``skill_payload_digest`` hashes them. They were hand-mirrored,
+    guard for guard, which is the shape that already produced several defects in
+    this area — a domain re-derived instead of asked for.
+
+    **Symlinks are rejected**, unlike ``read_skill_safe`` and ``load_eval_suite``
+    which follow them. The asymmetry is deliberate and it is a shipped security
+    fix: "symlink rejection on ``references/`` directory and files in
+    ``estimate_token_cost``". doctor walks directories that belong to other
+    people, so a plugin can put whatever it likes in ``references/``; following a
+    link there turns a word count into a filesystem oracle, and reading before
+    the size check turns a link to a huge file into an OOM. ``skill_mesh``
+    confines resolved SKILL.md paths to the scan root and ``structure``'s ref
+    linter requires refs to resolve back inside their base, for the same reason.
+
+    **The scope of the check, stated exactly:** ``is_symlink()`` tests the last
+    component, which is enough to stop a reference escaping the directory. It
+    does NOT stop a ``references/`` reached *through* a symlinked skill
+    directory — ``is_dir()`` resolves everything above. That is the caller's
+    confinement to make, and ``discover_skills`` makes it (``relative_to`` the
+    scan root), so a default run cannot reach it; ``--skill-dirs <link>`` and an
+    explicit ``score``/``bench`` path can, and there the caller named the link.
+    A ``realpath`` check here would be dead code: the base resolves with the
+    target, so it can never fail. Measured before writing that down.
+
+    I briefly reversed this to make a stow layout collapse with its plain twin,
+    on the strength of a fixture I had written myself. Measured afterwards over
+    the real installation: **0 symlinks across the 41 skills that have a
+    ``references/`` directory**. The cost of the reversal was real and the case
+    it bought was not, so the rejection stands. If a field case ever appears, the
+    fix is confinement plus a ``stat().st_size`` check before the read — not a
+    bare ``resolve()``.
+
+    Sorted for a stable digest; oversized files are dropped by whichever consumer
+    reads them.
+    """
+    refs_dir = Path(skill_path).parent / "references"
+    if not refs_dir.is_dir() or refs_dir.is_symlink():
+        return []
+    return [f for f in sorted(refs_dir.glob("*.md")) if not f.is_symlink()]
+
+
 def estimate_token_cost(skill_path: str) -> int:
     """Estimate token cost when this skill is loaded into context.
 
-    Counts words in SKILL.md + all files in references/ directory.
+    Counts words in SKILL.md plus the ``references/*.md`` that ``_payload_files``
+    enumerates — not every file in that directory. Widening it means widening
+    that helper, which moves the digest with it.
     Uses 1.3 tokens/word approximation (standard for English text with code).
     Returns estimated token count.
     """
@@ -160,35 +311,214 @@ def estimate_token_cost(skill_path: str) -> int:
     except (FileNotFoundError, ValueError):
         return 0
 
-    # Check for references/ directory alongside SKILL.md
-    refs_dir = Path(skill_path).parent / "references"
-    if refs_dir.is_dir() and not refs_dir.is_symlink():
-        for ref_file in sorted(refs_dir.glob("*.md")):
-            if ref_file.is_symlink():
-                continue
-            try:
-                ref_content = ref_file.read_text(encoding="utf-8", errors="replace")
-                if len(ref_content) <= MAX_SKILL_SIZE:
-                    total_words += len(ref_content.split())
-            except (OSError, PermissionError):
-                continue
+    for ref_file in _payload_files(skill_path):
+        ref_content = _read_bounded(ref_file)
+        if ref_content is not None:
+            total_words += len(ref_content.split())
 
     return round(total_words * 1.3)
 
 
+def skill_payload_digest(skill_path: str) -> str:
+    """Identity of an installed skill: everything a doctor row is derived from.
+
+    That is SKILL.md, its ``references/*.md``, and ``eval-suite.json`` — the file
+    list ``estimate_token_cost`` charges for, plus the one ``load_eval_suite``
+    reads. Neither half is re-derived: the references walk and the cost walk
+    share ``_payload_files``, and the suite is fetched through ``load_eval_suite``
+    itself, so no domain can drift from the one it indexes.
+
+    Scope, stated exactly: this covers what the SCORE and the COST are derived
+    from. The ``Issues`` column can still differ between two copies with the same
+    digest — ``structure``'s dangling-reference lint resolves declared paths like
+    ``scripts/run.py`` against the skill directory and its plugin/git ancestors,
+    which are outside this domain. Measured over the 20 real duplicate groups: 0
+    divergences today, and the lint does not score. A digest whose domain is smaller than the quantities it indexes is not
+    a simpler key, it is a wrong one; that was got wrong once per quantity, and
+    both mistakes are recorded with their measurements in docs/specs/2026-08-13-doctor-counts-vendored-skills.md,
+    "Amendment 2026-08-26". Not restated here.
+
+    Returns an empty string when SKILL.md cannot be read, so an unreadable skill
+    never collapses onto another.
+    """
+    path = Path(skill_path)
+    digest = hashlib.sha256()
+
+    def _absorb(label: str, text: str) -> None:
+        # Length-prefixed: without a separator, a file named `b.md` holding "X"
+        # and a file `a.md` holding "Xb.md" hash the same, so two unrelated
+        # skills would collapse and one would vanish from the report as a copy
+        # of the other.
+        blob = text.encode("utf-8")
+        digest.update(f"{label}:{len(blob)}\0".encode("utf-8"))
+        digest.update(blob)
+
+    # read_skill_safe, not read_text: it strips the BOM, so the same skill saved
+    # with and without one is one install rather than two.
+    try:
+        _absorb("SKILL.md", read_skill_safe(str(path)))
+    except (OSError, ValueError):
+        return ""
+
+    for ref_file in _payload_files(str(path)):
+        ref_content = _read_bounded(ref_file)
+        if ref_content is not None:
+            _absorb(f"references/{ref_file.name}", ref_content)
+
+    # Ask load_eval_suite itself rather than re-deriving its file discovery. The
+    # first attempt copied the symlink guard from estimate_token_cost, but
+    # load_eval_suite has no such guard — it follows the link. A stow/chezmoi
+    # layout, where eval-suite.json is symlinked, was therefore scored but not
+    # hashed, and the 4-of-7 and 7-of-7 copies collapsed again. Calling the real
+    # loader makes the domains identical by construction, and keeps them
+    # identical if its discovery ever changes.
+    suite = load_eval_suite(str(path))
+    if suite is not None:
+        try:
+            _absorb("eval-suite.json", json.dumps(suite, sort_keys=True, default=str))
+        except (RecursionError, TypeError, ValueError):
+            # A suite that parsed but will not serialise still made the row
+            # 7-of-7. Record that fact rather than silently hashing as if there
+            # were no suite at all — but record it as something derived from the
+            # file. A fixed marker here gave two skills with DIFFERENT
+            # unserialisable suites one identity, so the second vanished from the
+            # report as a copy of the first: the domain smaller than what the row
+            # reports, which is the failure the `else` branch below names and the
+            # whole reason this key exists. The id comes from `load_eval_suite`,
+            # which read the bytes; re-opening the path here would be the
+            # re-derivation this module keeps paying for.
+            marker = eval_suite_content_id.get(str(path.parent / "eval-suite.json"))
+            _absorb("eval-suite.json:unserialisable", marker or "")
+    else:
+        # "absent" and "present but broken" produce different rows — different
+        # `action`, different `eval_suite_error` — so they must not collapse onto
+        # each other. Without this the domain is again smaller than what the row
+        # reports, which is the defect this key exists to prevent.
+        suite_path = str(path.parent / "eval-suite.json")
+        failure = eval_suite_error.get(suite_path)
+        if failure:
+            # The reason alone is as coarse a key as the "<unserialisable>" literal
+            # was in the branch above, so fold in the content id where one exists.
+            #
+            # It exists only for the PARSE-stage failures: a suite that could not be
+            # read has no bytes to hash, and `_load_eval_suite_uncached` drops the id
+            # there. That is not a gap to close. Nothing the row reports derives from
+            # an unread suite's bytes — `estimate_token_cost` never charges
+            # eval-suite.json, `build_scores` gets None, and the only suite-derived
+            # field is the reason word this line already absorbs — so two such rows
+            # are identical in every quantity, which is exactly when the digest is
+            # supposed to collapse them. Making them distinct was measured and it
+            # doubles the install count and the token total for a group whose copies
+            # are byte-identical, i.e. whose read failures are correlated by
+            # construction. `test_two_copies_with_the_same_broken_suite_still_collapse`
+            # is the gate on that.
+            _absorb("eval-suite.json:error", failure)
+            _absorb("eval-suite.json:error-id", eval_suite_content_id.get(suite_path) or "")
+
+    return digest.hexdigest()
+
+
 def load_eval_suite(skill_path: str) -> Optional[dict]:
-    """Auto-discover and load eval-suite.json from skill directory."""
+    """Auto-discover and load eval-suite.json, once per path per invocation.
+
+    ``skill_payload_digest`` asks this loader for the suite (deliberately — see
+    its docstring) and ``_score_single_skill`` asks again in the scoring loop, so
+    every suite under the scan root was opened, read and parsed twice and every
+    warning about a broken one was printed twice. The cache follows the shape
+    ``_file_cache`` already uses in this module — a path key, bounded by
+    ``MAX_CACHE_ENTRIES``, cleared through ``invalidate_cache`` — rather than a
+    second, differently-invalidated one. The spelling differs from ``_file_cache``
+    on purpose-by-necessity: this key is the *unresolved* ``eval-suite.json`` path,
+    because that is what ``eval_suite_error`` keys on and the two are read together.
+    ``invalidate_cache`` uses the same spelling, so the pair cannot drift.
+
+    The ``eval_suite_error`` entry is replayed on a hit, so a cached failure
+    still reaches the report; only the duplicated stderr line is dropped.
+    """
+    suite_path = Path(skill_path).parent / "eval-suite.json"
+    key = str(suite_path)
+    try:
+        st = suite_path.stat()
+        stamp = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        stamp = ()
+    cached = _eval_suite_cache.get(key)
+    if cached is not None and cached[0] == stamp:
+        _, suite, failure = cached
+        if failure is None:
+            eval_suite_error.pop(key, None)
+        else:
+            eval_suite_error[key] = failure
+        return suite
+    suite = _load_eval_suite_uncached(skill_path)
+    if len(_eval_suite_cache) >= MAX_CACHE_ENTRIES:
+        _eval_suite_cache.pop(next(iter(_eval_suite_cache)))
+    _eval_suite_cache[key] = (stamp, suite, eval_suite_error.get(key))
+    return suite
+
+
+def _load_eval_suite_uncached(skill_path: str) -> Optional[dict]:
+    """Auto-discover and load eval-suite.json from skill directory.
+
+    Every failure degrades to ``None``. Only ``JSONDecodeError`` was caught
+    before, so a suite that is a directory, unreadable, or not UTF-8 raised
+    ``IsADirectoryError`` / ``PermissionError`` / ``UnicodeDecodeError``. That was
+    survivable while the only caller sat inside ``_score_single_skill``'s
+    ``except Exception`` — one row went to ``failed``. It stopped being
+    survivable when ``skill_payload_digest`` began calling this before the
+    scoring loop: one malformed suite anywhere under ``~/.claude`` turned the
+    whole run into a traceback. Doctor scans directories that are usually not
+    yours; it reports and never gates (ADR 0014, ADR 0019).
+    """
     skill_dir = Path(skill_path).parent
     auto_path = skill_dir / "eval-suite.json"
-    if auto_path.exists():
-        try:
-            raw = auto_path.read_text(encoding="utf-8")
-            if len(raw) > MAX_SKILL_SIZE:
-                print(f"Warning: eval-suite.json exceeds {MAX_SKILL_SIZE} bytes, skipping", file=sys.stderr)
-                return None
-            return json.loads(raw)
-        except json.JSONDecodeError as e:
-            print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
+    try:
+        if not auto_path.exists():
+            eval_suite_error.pop(str(auto_path), None)
+            eval_suite_content_id.pop(str(auto_path), None)
+            return None
+        # One reader for every file this module opens: regular-file check before
+        # the size check before the read. See `_read_bounded` for why each half
+        # is there and what it cost to learn.
+        raw, why = _read_bounded_with_reason(auto_path)
+        if raw is None:
+            # stderr carries the full diagnosis; `eval_suite_error` carries the
+            # short reason, because that one is folded into the identity and
+            # printed inside a repair action whose width is gated by
+            # test_repair_action_fits_its_column.
+            detail = f"exceeds {MAX_SKILL_SIZE:,} bytes" if why == "too large" else why
+            print(f"Warning: eval-suite.json {detail}, skipping", file=sys.stderr)
+            eval_suite_error[str(auto_path)] = why
+            eval_suite_content_id.pop(str(auto_path), None)
+            return None
+        eval_suite_content_id[str(auto_path)] = hashlib.sha256(
+            raw.encode("utf-8")).hexdigest()
+        parsed = json.loads(raw)
+        # `null` parses to None, which is indistinguishable from "no file" and
+        # routed the row to /schliff:init — the command that overwrites it. And a
+        # list or string parsed fine here while `cli._load_eval_suite_from_args`
+        # rejects the same content outright; the auto-discovery half was the
+        # permissive one. A suite that is not an object is a broken suite.
+        if not isinstance(parsed, dict):
+            print("Warning: eval-suite.json is not a JSON object, skipping", file=sys.stderr)
+            eval_suite_error[str(auto_path)] = "not a JSON object"
+            return None
+        eval_suite_error.pop(str(auto_path), None)
+        return parsed
+    except json.JSONDecodeError as e:
+        print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
+        eval_suite_error[str(auto_path)] = "malformed"
+    except RecursionError:
+        # json.loads recurses per nesting level on CPython below 3.14, and
+        # MAX_SKILL_SIZE leaves room for ~200k levels. Not an OSError and not a
+        # ValueError, so the handler below does not see it — and it only raises
+        # on the older interpreters, which means CI's newest leg stays green
+        # while the oldest tracebacks.
+        print("Warning: eval-suite.json nests too deeply to parse, skipping", file=sys.stderr)
+        eval_suite_error[str(auto_path)] = "nests too deeply to parse"
+    except (OSError, ValueError) as e:
+        print(f"Warning: could not read eval-suite.json: {e}", file=sys.stderr)
+        eval_suite_error[str(auto_path)] = "unreadable"
     return None
 
 
