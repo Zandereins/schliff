@@ -286,6 +286,33 @@ extracting into references/" beside a row whose own action says to resolve the d
 against a path picked by sort order. Carved out the same way the `/schliff:init` and
 `/schliff:auto` tallies already carve it out.
 
+## Amendment 2026-08-28 (2) — round 11
+
+**A constant is not an identity.** When a suite parsed but `json.dumps` raised, the digest absorbed
+the literal `"<unserialisable>"`. Two skills sharing a SKILL.md but holding *different*
+unserialisable suites therefore got one digest, and the second vanished from the report as a copy
+of the first — the failure the `else` branch three lines below it names in the same function. The
+marker now comes from `shared.eval_suite_content_id`, a sha256 the loader records over the bytes it
+read; the digest reads it rather than re-opening the path, which is the re-derivation this module
+has already paid for five times.
+
+The test forces `json.dumps` to raise instead of building a deeply nested fixture: below Python
+3.14 `json.loads` recurses first, so the branch is unreachable on the interpreter this suite
+usually runs on and a nesting fixture would prove nothing there.
+
+**Two findings from round 11 were deliberately NOT fixed here**, both because they are design
+choices rather than mechanical corrections, and neither has a site in the field:
+
+- *`MAX_SKILL_SIZE` is bytes in `_read_bounded` and characters in `read_skill_safe`.* A file
+  between the two thresholds is dropped from `doctor` and `mesh` with empty stderr while
+  `schliff score` still reads it. Measured over the real 159: largest SKILL.md is 80,431 B /
+  80,328 c, a factor of 12 below the limit, 0 files above 200 KB, byte-to-char ratio 1.0013. Real,
+  latent, and it moves a DoS boundary — which does not belong in a green PR inside a freeze window.
+- *`_payload_files` checks `is_symlink()` on the path, `_read_bounded` then opens that path.* Not a
+  regression: `main` had `is_symlink()` followed by `read_text()`, the same check-then-open shape.
+  Closing it means `O_NOFOLLOW`, which would also take the symlink-following that `load_eval_suite`
+  deliberately has for stow/chezmoi layouts — so it needs a per-caller flag and a decision.
+
 **Not fixed, awaiting a decision:** a grouped row lands in no quality tally — `grouped_duplicates`
 counts it, but `healthy`/`needs_work` do not, so on the real install 19 of 138 skills are absent
 from the counts the summary line reports. The suppression is right for the command

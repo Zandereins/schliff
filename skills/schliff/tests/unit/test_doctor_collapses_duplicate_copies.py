@@ -770,3 +770,41 @@ def test_grouped_rows_get_no_skill_specific_recommendation(tmp_path, monkeypatch
     assert report["duplicate_copies"], "fixture stopped producing a duplicate group"
     body = rendered.split("Skill-specific recommendations:")
     assert len(body) == 1, f"grouped row still got a recommendation:\n{body[-1][:400]}"
+
+
+def test_unserialisable_suites_do_not_share_one_identity(tmp_path, monkeypatch):
+    """A constant in the digest is not an identity.
+
+    Two skills with the same SKILL.md and DIFFERENT eval-suite.json files that
+    parse but will not serialise both absorbed the literal "<unserialisable>",
+    so their digests matched and the second vanished from the report as a copy
+    of the first — the domain smaller than what the row reports, which is the
+    failure this key exists to prevent and which the branch below it names.
+
+    `json.dumps` is forced to raise rather than reproduced through recursion
+    depth: below Python 3.14 `json.loads` recurses first and the suite never
+    reaches this branch at all, so a nesting fixture would test nothing on the
+    interpreter this suite usually runs on.
+
+    The mutation: put the fixed marker back and this goes red.
+    """
+    a = _skill(tmp_path, "cached", BODY)
+    b = _skill(tmp_path, "vendored", BODY)
+    (pathlib.Path(a["path"]).parent / "eval-suite.json").write_text(
+        '{"assertions": ["alpha"]}', encoding="utf-8")
+    (pathlib.Path(b["path"]).parent / "eval-suite.json").write_text(
+        '{"assertions": ["beta"]}', encoding="utf-8")
+    shared._eval_suite_cache.clear()
+
+    def _refuse(*args, **kwargs):
+        raise ValueError("will not serialise")
+
+    monkeypatch.setattr(shared.json, "dumps", _refuse)
+
+    digest_a = shared.skill_payload_digest(a["path"])
+    digest_b = shared.skill_payload_digest(b["path"])
+
+    assert digest_a and digest_b, "an unserialisable suite must not void the identity"
+    assert digest_a != digest_b, (
+        "two different unserialisable suites collapsed onto one identity"
+    )

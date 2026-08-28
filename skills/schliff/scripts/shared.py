@@ -59,6 +59,15 @@ _eval_suite_cache: dict[str, tuple[tuple, Optional[dict], Optional[str]]] = {}
 # remove. Details still reach stderr; only the reason reaches the identity.
 eval_suite_error: dict[str, str] = {}
 
+# Content identity of a suite that was read, keyed by its path — a sha256 over the
+# bytes, never the bytes themselves, so this stays 64 characters per entry.
+#
+# `skill_payload_digest` needs a way to tell two suites apart even when it cannot
+# serialise them, and the file belongs to `load_eval_suite`. Deriving it there and
+# reading it here is the alternative to the digest re-opening the path itself,
+# which is the re-derivation that produced five defects in this area already.
+eval_suite_content_id: dict[str, str] = {}
+
 # Known scoring dimensions for validation
 VALID_DIMENSIONS = {
     "structure", "triggers", "quality", "edges",
@@ -360,8 +369,16 @@ def skill_payload_digest(skill_path: str) -> str:
         except (RecursionError, TypeError, ValueError):
             # A suite that parsed but will not serialise still made the row
             # 7-of-7. Record that fact rather than silently hashing as if there
-            # were no suite at all.
-            _absorb("eval-suite.json", "<unserialisable>")
+            # were no suite at all — but record it as something derived from the
+            # file. A fixed marker here gave two skills with DIFFERENT
+            # unserialisable suites one identity, so the second vanished from the
+            # report as a copy of the first: the domain smaller than what the row
+            # reports, which is the failure the `else` branch below names and the
+            # whole reason this key exists. The id comes from `load_eval_suite`,
+            # which read the bytes; re-opening the path here would be the
+            # re-derivation this module keeps paying for.
+            marker = eval_suite_content_id.get(str(path.parent / "eval-suite.json"))
+            _absorb("eval-suite.json:unserialisable", marker or "")
     else:
         # "absent" and "present but broken" produce different rows — different
         # `action`, different `eval_suite_error` — so they must not collapse onto
@@ -428,6 +445,7 @@ def _load_eval_suite_uncached(skill_path: str) -> Optional[dict]:
     try:
         if not auto_path.exists():
             eval_suite_error.pop(str(auto_path), None)
+            eval_suite_content_id.pop(str(auto_path), None)
             return None
         # One reader for every file this module opens: regular-file check before
         # the size check before the read. See `_read_bounded` for why each half
@@ -441,7 +459,10 @@ def _load_eval_suite_uncached(skill_path: str) -> Optional[dict]:
             detail = f"exceeds {MAX_SKILL_SIZE:,} bytes" if why == "too large" else why
             print(f"Warning: eval-suite.json {detail}, skipping", file=sys.stderr)
             eval_suite_error[str(auto_path)] = why
+            eval_suite_content_id.pop(str(auto_path), None)
             return None
+        eval_suite_content_id[str(auto_path)] = hashlib.sha256(
+            raw.encode("utf-8")).hexdigest()
         parsed = json.loads(raw)
         # `null` parses to None, which is indistinguishable from "no file" and
         # routed the row to /schliff:init — the command that overwrites it. And a

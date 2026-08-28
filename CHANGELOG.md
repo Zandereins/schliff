@@ -62,7 +62,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   the column was two characters narrower than the string it was widened to keep whole; the
   width is now derived from the reasons the loader can actually produce and asserted by a test,
   so a new reason cannot silently re-open it. And each `eval-suite.json` is read and parsed
-  once per run instead of twice — the duplicate read also printed every warning twice.
+  once per run instead of twice — the duplicate read also printed every warning twice. And a
+  suite that parses but will not serialise no longer hashes as a fixed marker: two skills with
+  different unserialisable suites shared one identity, so the second was reported as a copy of
+  the first.
 
 - **Documented commands in tables and indented bullets now count.** `efficiency`
   credited a documented command only as a top-level bullet, so an indented
