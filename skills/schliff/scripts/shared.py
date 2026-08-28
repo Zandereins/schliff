@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 import sys
 import threading
 import urllib.parse
@@ -32,6 +34,18 @@ MAX_CACHE_ENTRIES = 500
 
 # Module-level file cache to avoid redundant reads within a single invocation
 _file_cache: dict[str, str] = {}
+
+# The same, for parsed eval suites: path -> (stamp, suite, eval_suite_error reason).
+# Keyed by the eval-suite.json path, which is what `eval_suite_error` keys on too.
+#
+# The stamp is (st_mtime_ns, st_size) and it is not decoration: a path-only key
+# made a repaired suite stale — `test_a_repaired_suite_clears_its_recorded_failure`
+# went red on exactly that, a file rewritten from broken to valid still reporting
+# its old failure. Stated exactly, because a cache that lies is worse than the
+# double read it removes: this catches every rewrite that changes the size or
+# lands on a later mtime tick, which is every rewrite a doctor run can observe.
+# It would not catch a same-size rewrite inside one tick by a non-doctor caller.
+_eval_suite_cache: dict[str, tuple[tuple, Optional[dict], Optional[str]]] = {}
 
 # Why an eval suite was not loaded, keyed by its path. `load_eval_suite` degrades
 # every failure to None so one bad file cannot end a doctor run — but "absent"
@@ -98,6 +112,7 @@ def invalidate_cache(skill_path: str) -> None:
     """Invalidate the file cache for a given skill path."""
     key = str(Path(skill_path).resolve())
     _file_cache.pop(key, None)
+    _eval_suite_cache.pop(str(Path(skill_path).parent / "eval-suite.json"), None)
 
 
 def read_skill_safe(skill_path: str) -> str:
@@ -157,7 +172,7 @@ def extract_description(content: str) -> str:
     return ""
 
 
-def _read_bounded(path: Path) -> Optional[str]:
+def _read_bounded_with_reason(path: Path) -> tuple[Optional[str], str]:
     """Read a file only if it is safe to: regular, and within the size limit.
 
     One helper because the same two-line omission produced five defects in this
@@ -174,17 +189,44 @@ def _read_bounded(path: Path) -> Optional[str]:
       ``_score_single_skill``'s handler; it stopped being survivable when the
       digest began reading these files before the scoring loop.
 
-    Returns ``None`` when the file cannot or should not be read. Callers treat
-    that as "no content", never as an error to propagate.
+    Returns ``None`` when the file cannot or should not be read, alongside a
+    short, path-free reason. Callers treat the ``None`` as "no content", never
+    as an error to propagate; the reason exists because collapsing "too large"
+    and "unreadable" into one word told the reader to repair a file whose only
+    problem was its size.
+
+    **The checks run on the descriptor, not on the path.** ``is_file()`` then
+    ``stat()`` then ``read_text()`` leaves two windows in which the path can be
+    swapped for a FIFO after the check and before the open — and anyone who can
+    plant the FIFO can also win that race, so under this function's own threat
+    model the hang it exists to prevent stayed reachable. ``O_NONBLOCK`` makes
+    the open itself return instead of waiting for a writer, and ``fstat`` then
+    describes the exact object that is about to be read. ``read_skill_safe``
+    resolves the same race the other way (read first, size after), which it can
+    afford because it does not need the size before the read; here the size gate
+    is the point, so the descriptor is the only honest thing to measure.
     """
+    fd = None
     try:
-        if not path.is_file():
-            return None
-        if path.stat().st_size > MAX_SKILL_SIZE:
-            return None
-        return path.read_text(encoding="utf-8", errors="replace")
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return None, "not a regular file"
+        if st.st_size > MAX_SKILL_SIZE:
+            return None, "too large"
+        with os.fdopen(fd, "r", encoding="utf-8", errors="replace") as handle:
+            fd = None  # fdopen owns the descriptor now; closing it twice raises.
+            return handle.read(), ""
     except (OSError, ValueError):
-        return None
+        return None, "unreadable"
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _read_bounded(path: Path) -> Optional[str]:
+    """``_read_bounded_with_reason`` for the callers that only need the text."""
+    return _read_bounded_with_reason(path)[0]
 
 
 def _payload_files(skill_path: str) -> list[Path]:
@@ -333,6 +375,42 @@ def skill_payload_digest(skill_path: str) -> str:
 
 
 def load_eval_suite(skill_path: str) -> Optional[dict]:
+    """Auto-discover and load eval-suite.json, once per path per invocation.
+
+    ``skill_payload_digest`` asks this loader for the suite (deliberately — see
+    its docstring) and ``_score_single_skill`` asks again in the scoring loop, so
+    every suite under the scan root was opened, read and parsed twice and every
+    warning about a broken one was printed twice. The cache follows the shape
+    ``_file_cache`` already uses in this module — resolved-path key, bounded by
+    ``MAX_CACHE_ENTRIES``, cleared through ``invalidate_cache`` — rather than a
+    second, differently-invalidated one.
+
+    The ``eval_suite_error`` entry is replayed on a hit, so a cached failure
+    still reaches the report; only the duplicated stderr line is dropped.
+    """
+    suite_path = Path(skill_path).parent / "eval-suite.json"
+    key = str(suite_path)
+    try:
+        st = suite_path.stat()
+        stamp = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        stamp = ()
+    cached = _eval_suite_cache.get(key)
+    if cached is not None and cached[0] == stamp:
+        _, suite, failure = cached
+        if failure is None:
+            eval_suite_error.pop(key, None)
+        else:
+            eval_suite_error[key] = failure
+        return suite
+    suite = _load_eval_suite_uncached(skill_path)
+    if len(_eval_suite_cache) >= MAX_CACHE_ENTRIES:
+        _eval_suite_cache.pop(next(iter(_eval_suite_cache)))
+    _eval_suite_cache[key] = (stamp, suite, eval_suite_error.get(key))
+    return suite
+
+
+def _load_eval_suite_uncached(skill_path: str) -> Optional[dict]:
     """Auto-discover and load eval-suite.json from skill directory.
 
     Every failure degrades to ``None``. Only ``JSONDecodeError`` was caught
@@ -354,10 +432,15 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
         # One reader for every file this module opens: regular-file check before
         # the size check before the read. See `_read_bounded` for why each half
         # is there and what it cost to learn.
-        raw = _read_bounded(auto_path)
+        raw, why = _read_bounded_with_reason(auto_path)
         if raw is None:
-            print("Warning: eval-suite.json could not be read, skipping", file=sys.stderr)
-            eval_suite_error[str(auto_path)] = "unreadable"
+            # stderr carries the full diagnosis; `eval_suite_error` carries the
+            # short reason, because that one is folded into the identity and
+            # printed inside a repair action whose width is gated by
+            # test_repair_action_fits_its_column.
+            detail = f"exceeds {MAX_SKILL_SIZE:,} bytes" if why == "too large" else why
+            print(f"Warning: eval-suite.json {detail}, skipping", file=sys.stderr)
+            eval_suite_error[str(auto_path)] = why
             return None
         parsed = json.loads(raw)
         # `null` parses to None, which is indistinguishable from "no file" and

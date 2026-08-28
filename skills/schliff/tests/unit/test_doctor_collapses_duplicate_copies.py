@@ -12,6 +12,7 @@ import pathlib
 
 import doctor
 import pytest
+import shared
 
 
 def _skill(tmp_path, name, body, refs=None):
@@ -580,3 +581,192 @@ def test_mesh_receives_every_physical_copy(tmp_path, monkeypatch):
     assert seen["n"] == 2, "mesh must see both physical copies, not the collapsed one"
     assert report["skills_found"] == 1, "the report counts one install"
     assert len(report["duplicate_copies"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# The reporting layer around the fix. Every test below is named after the
+# mutation it has to survive; each one was red before the change it guards.
+# ---------------------------------------------------------------------------
+
+
+def _eval_suite_reasons() -> set:
+    """Every reason `load_eval_suite` can put in `eval_suite_error`, from source.
+
+    Enumerated out of the module's AST rather than hand-listed here. A hand list
+    is a snapshot: it agrees with the code on the day it is written and silently
+    stops covering the case someone adds next. The two shapes that produce a
+    reason are an assignment into `eval_suite_error` and a return out of
+    `_read_bounded_with_reason`, whose value flows straight into that dict.
+    """
+    import ast
+
+    src = pathlib.Path(shared.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    reasons = set()
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) \
+                and isinstance(node.value.value, str):
+            for target in node.targets:
+                if isinstance(target, ast.Subscript) and \
+                        isinstance(target.value, ast.Name) and \
+                        target.value.id == "eval_suite_error":
+                    reasons.add(node.value.value)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_read_bounded_with_reason":
+            for inner in ast.walk(node):
+                if isinstance(inner, ast.Return) and isinstance(inner.value, ast.Tuple):
+                    tail = inner.value.elts[-1]
+                    if isinstance(tail, ast.Constant) and isinstance(tail.value, str) and tail.value:
+                        reasons.add(tail.value)
+
+    assert reasons, "found no reasons — the AST walk stopped matching the source"
+    return reasons
+
+
+def test_repair_action_fits_its_column():
+    """The cap must fit the longest action doctor can actually compose.
+
+    The mutation: lower REPAIR_ACTION_WIDTH back to 70 and this goes red naming
+    the reason that no longer fits. That is what 70 did in the field — it cut
+    "not a JSON object" to "not a JSON objec", truncating the exact payload the
+    wide cap existed to preserve.
+    """
+    prefix = "Resolve the duplicate install first; eval-suite.json: "
+    too_long = {r for r in _eval_suite_reasons()
+                if len(prefix + r) > doctor.REPAIR_ACTION_WIDTH}
+    assert not too_long, (
+        f"REPAIR_ACTION_WIDTH={doctor.REPAIR_ACTION_WIDTH} truncates: "
+        + ", ".join(f"{r!r} needs {len(prefix + r)}" for r in sorted(too_long))
+    )
+
+
+def test_a_broken_suite_reason_survives_into_the_rendered_row(tmp_path, monkeypatch):
+    """End to end: the reason reaches the reader whole, not cut mid-word."""
+    a = _skill(tmp_path, "cached", BODY)
+    b = _skill(tmp_path, "vendored", BODY)
+    for s in (a, b):
+        (pathlib.Path(s["path"]).parent / "eval-suite.json").write_text("[]", encoding="utf-8")
+    shared._eval_suite_cache.clear()
+
+    monkeypatch.setattr(doctor.skill_mesh, "discover_skills", lambda dirs: [a, b])
+    report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    rendered = doctor.format_doctor_report(report)
+
+    assert "not a JSON object" in rendered, rendered
+    assert "not a JSON objec\n" not in rendered, "reason truncated mid-word"
+
+
+def test_oversize_suite_is_not_reported_as_unreadable(tmp_path, monkeypatch):
+    """A 'repair this file' verdict must not hide that the problem is size.
+
+    The mutation: collapse the size branch of `_read_bounded_with_reason` back
+    into the generic failure and this goes red — the reader is told to fix a
+    file whose only defect is that it is too big.
+    """
+    monkeypatch.setattr(shared, "MAX_SKILL_SIZE", 200)
+    a = _skill(tmp_path, "big", BODY)
+    (pathlib.Path(a["path"]).parent / "eval-suite.json").write_text(
+        '{"cases": [' + ",".join('"x"' for _ in range(200)) + "]}", encoding="utf-8")
+    shared._eval_suite_cache.clear()
+
+    assert shared.load_eval_suite(a["path"]) is None
+    reason = shared.eval_suite_error[str(pathlib.Path(a["path"]).parent / "eval-suite.json")]
+    assert reason == "too large", f"size diagnosis lost, got {reason!r}"
+
+
+def test_the_size_check_runs_on_the_descriptor_that_gets_read(tmp_path):
+    """The TOCTOU window, made deterministic — and measured with a clock.
+
+    A plain FIFO is the WRONG fixture for this: `is_file()` already returns
+    False for one, so the previous stat-then-read shape rejected it too and a
+    FIFO test stays green against the very mutation it quotes. The defect is the
+    window between the check and the open, where the path is swapped for a FIFO
+    after it has already answered "regular file, 10 bytes". `_SwappedPath` is
+    that window with the race taken out: it answers the path-level questions the
+    old shape asked, while the object actually on disk is a FIFO.
+
+    Under the old shape `read_text` then blocks forever. A hang raises nothing,
+    so the instrument is elapsed time — an earlier test in this area passed for
+    the wrong reason by asserting on a TimeoutError the code itself caught.
+    """
+    import os as _os
+    import threading
+
+    fifo = tmp_path / "eval-suite.json"
+    _os.mkfifo(fifo)
+
+    class _SwappedPath:
+        """Answers as a small regular file; opens as the FIFO that is really there."""
+
+        def __fspath__(self):
+            return str(fifo)
+
+        def is_file(self):
+            return True
+
+        def stat(self):
+            return _os.stat_result((0o100644, 0, 0, 1, 0, 0, 10, 0, 0, 0))
+
+        def read_text(self, **kwargs):
+            with open(fifo, encoding="utf-8") as handle:
+                return handle.read()
+
+    out = {}
+
+    def _read():
+        out["result"] = shared._read_bounded_with_reason(_SwappedPath())
+
+    worker = threading.Thread(target=_read, daemon=True)
+    worker.start()
+    worker.join(timeout=5)
+
+    assert not worker.is_alive(), (
+        "the read blocked: the guard trusted the path's answers instead of the "
+        "descriptor it was about to read"
+    )
+    assert out["result"] == (None, "not a regular file"), out["result"]
+
+
+def test_each_eval_suite_is_read_once_per_run(tmp_path, monkeypatch, capsys):
+    """The digest pass and the scoring pass must not both open the same file.
+
+    The mutation: drop the cache lookup from `load_eval_suite` and this goes red
+    with two warnings for one broken file — which is what the field saw.
+    """
+    a = _skill(tmp_path, "cached", BODY)
+    b = _skill(tmp_path, "vendored", BODY)
+    for s in (a, b):
+        (pathlib.Path(s["path"]).parent / "eval-suite.json").write_text("[]", encoding="utf-8")
+    shared._eval_suite_cache.clear()
+    shared.eval_suite_error.clear()
+
+    monkeypatch.setattr(doctor.skill_mesh, "discover_skills", lambda dirs: [a, b])
+    capsys.readouterr()
+    doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    warnings = capsys.readouterr().err.count("eval-suite.json is not a JSON object")
+
+    assert warnings == 2, f"expected one warning per distinct suite, got {warnings}"
+
+
+def test_grouped_rows_get_no_skill_specific_recommendation(tmp_path, monkeypatch):
+    """A recommendation to edit a file the command did not choose on merit.
+
+    The row's own action says to resolve the duplicate install first; printing
+    "extract into references/" beside it contradicts that row and points at a
+    path picked by sort order. The mutation: drop the `also_installed_at` filter
+    and this goes red.
+    """
+    long_body = BODY + "\n".join(f"- step {i}" for i in range(400)) + "\n"
+    a = _skill(tmp_path, "cached", long_body)
+    b = _skill(tmp_path, "vendored", long_body)
+    shared._eval_suite_cache.clear()
+
+    monkeypatch.setattr(doctor.skill_mesh, "discover_skills", lambda dirs: [a, b])
+    report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    rendered = doctor.format_doctor_report(report)
+
+    assert report["duplicate_copies"], "fixture stopped producing a duplicate group"
+    body = rendered.split("Skill-specific recommendations:")
+    assert len(body) == 1, f"grouped row still got a recommendation:\n{body[-1][:400]}"

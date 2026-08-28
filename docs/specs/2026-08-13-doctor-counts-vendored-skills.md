@@ -168,8 +168,9 @@ reporting the union of issues across a group is the fix if a field case ever app
 
 **Which copy is counted, and why the row carries no command.** Not arbitrary: `discover_skills`
 sorts by path and the first wins, so `plugins/cache/…` beats `plugins/marketplaces/…` and
-`~/.claude/skills/…` every time. That is a systematic bias toward the one copy a reader should
-*not* act on — `/schliff:auto` writes `.schliff/` history beside the file, and a plugin cache is
+`~/.claude/skills/…`. That holds for those three absolute paths, i.e. for a scan pointed at
+`~/.claude` — **it is not true of the default invocation**; see "Amendment 2026-08-28". Where it
+does hold it is a systematic bias toward the one copy a reader should *not* act on — `/schliff:auto` writes `.schliff/` history beside the file, and a plugin cache is
 overwritten on the next update. Preferring another member would require a path wordlist, the
 enumeration this key exists to avoid, so instead a grouped row states the duplicate rather than
 emitting a command against one member. Every path in the group is printed; nothing is deleted
@@ -227,3 +228,65 @@ to fix the file rather than `/schliff:init`, which would write over it.
 
 **Still open, unchanged by this:** `doctor --json` reports `mesh_issue_count: 0` under
 `incremental=True` while a fresh analysis finds 49. Present on `main` before this change.
+
+## Amendment 2026-08-28 — the reporting layer, from review round 10
+
+Nine rounds went to the collapse logic; the tenth found six defects, all of them in what the
+report *says* rather than in what it counts. Recorded because five of the six are the same shape:
+a sentence that was true of the measured case and stated unconditionally.
+
+**"Usually the plugin cache" is false under the default invocation.** `_default_skill_dirs()` is
+`[~/.claude/skills, .claude/skills]`; `~/.claude/plugins` is never scanned by a default run, so
+no plugin cache is in the comparison at all. And `.` (0x2E) sorts before `/` (0x2F), so the
+relative project path wins:
+
+```
+counted: .claude/skills/dup/SKILL.md
+also at: /…/home/.claude/skills/dup/SKILL.md
+```
+
+The banner then told the reader that this counted path is "usually the plugin cache — act on the
+copy you control", i.e. to treat their own working copy as the disposable one. The claim had
+**eight homes** (banner, four code comments, two lines of `commands/schliff/doctor.md`, one spec
+sentence above) — the #209 pattern again. All are now either qualified with the invocation they
+hold for, or state only what is invariant: the counted path is an artifact of sort order.
+
+**A repair reason was truncated by the column widened to keep it.** `"Resolve the duplicate
+install first; eval-suite.json: "` is 54 characters, so a 70-wide cap cut `not a JSON object` to
+`not a JSON objec`. The width is now `REPAIR_ACTION_WIDTH`, and
+`test_repair_action_fits_its_column` derives the longest composed action from the reasons
+`load_eval_suite` can actually produce — enumerated out of the module's AST, not hand-listed — so
+a new reason fails the test instead of silently truncating. A gate, not a convention.
+
+**"Unreadable" hid the one diagnosis the reader needed.** `_read_bounded` collapsed "not a regular
+file", "too large" and `OSError` into a single `None`, so a 2 MB suite was reported as unreadable
+and the advice was to repair a file whose only defect was its size. It now returns a short,
+path-free reason (path-free because the reason is folded into the identity — the defect recorded
+in "Amendment 2026-08-26").
+
+**The size check ran on the path, not on the descriptor.** `is_file()` → `stat()` → `read_text()`
+leaves a window in which the path is swapped for a FIFO after it has answered "regular file", and
+a party that can plant the FIFO can win that race — so under this function's own stated threat
+model the hang stayed reachable. Now `O_NONBLOCK` open, then `fstat` on that descriptor.
+
+A plain FIFO is the **wrong test** for this and was written first: `is_file()` already returns
+False for one, so a FIFO fixture stays green against the very mutation it quotes. The
+discriminating fixture answers the path-level questions the old shape asked while the object on
+disk is a FIFO; under the old shape it blocks, and the instrument is a clock, not an exception.
+Verified: the mutation hangs the thread and the test fails after 5.16 s.
+
+**Every `eval-suite.json` was read and parsed twice per run** — once by `skill_payload_digest`,
+once by `_score_single_skill` — and every warning printed twice. Cached following the shape
+`_file_cache` already uses in the module, with one addition: the key carries an
+`(st_mtime_ns, st_size)` stamp. A path-only key made a repaired suite stale and
+`test_a_repaired_suite_clears_its_recorded_failure` — an existing test — caught it.
+
+**Grouped rows still drew skill-specific advice.** A duplicated 408-line skill got "Consider
+extracting into references/" beside a row whose own action says to resolve the duplicate first,
+against a path picked by sort order. Carved out the same way the `/schliff:init` and
+`/schliff:auto` tallies already carve it out.
+
+**Not fixed, awaiting a decision:** a grouped row lands in no quality tally — `grouped_duplicates`
+counts it, but `healthy`/`needs_work` do not, so on the real install 19 of 138 skills are absent
+from the counts the summary line reports. The suppression is right for the command
+recommendations; whether it is right for the counts is a separate judgement.

@@ -33,7 +33,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   action that says to repair rather than overwrite. Every file read on the discovery and scoring path — SKILL.md,
   `references/*.md` and `eval-suite.json` — is now checked for being a regular file and for its
   size *before* it is read, so a FIFO cannot hang the scan and an oversized file cannot exhaust
-  memory. (`read_skill_safe` still reads before checking size, deliberately: it resolves the
+  memory. Those two checks run on the descriptor the read is about to use (`O_NONBLOCK` open,
+  then `fstat`), not on the path: checking the path first leaves a window in which it can be
+  swapped for a FIFO afterwards, and anyone able to plant the FIFO can also win that race.
+  (`read_skill_safe` still reads before checking size, deliberately: it resolves the
   TOCTOU race the other way and its callers sit inside a handler.) `--json` gains `eval_suite_error` per row plus
   `broken_eval_suite`, `grouped_duplicates` and `skills_discovered` in the summary, and such a skill is kept out of the
   `/schliff:init` recommendation — that command would write over the file that failed to load.
@@ -46,6 +49,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   removed for you. `--json` gains `duplicate_copies` and `skills_discovered` (the physical file
   count, next to the deduplicated `skills_found`). Path-based exclusion was measured and
   rejected; see `docs/specs/2026-08-13-doctor-counts-vendored-skills.md`, "Amendment 2026-08-26".
+  The report no longer claims the counted copy is "usually the plugin cache": that holds when
+  the scan is pointed at `~/.claude`, but under the default directories `.claude/skills` sorts
+  ahead of the home path, so the counted copy is your own project one — and the advice to act
+  on "the copy you control" pointed at exactly the wrong file. The counted path is now
+  described as what it is, an artifact of sort order. A duplicated skill also no longer draws
+  skill-specific advice telling you to edit it, which contradicted its own row.
+
+- **An oversized `eval-suite.json` says so.** It reported `unreadable`, the same word as a
+  permission error, so the fix suggested was to repair a file whose only problem was its size.
+  A grouped-and-broken row also truncated its own reason mid-word (`not a JSON objec`), because
+  the column was two characters narrower than the string it was widened to keep whole; the
+  width is now derived from the reasons the loader can actually produce and asserted by a test,
+  so a new reason cannot silently re-open it. And each `eval-suite.json` is read and parsed
+  once per run instead of twice — the duplicate read also printed every warning twice.
 
 - **Documented commands in tables and indented bullets now count.** `efficiency`
   credited a documented command only as a top-level bullet, so an indented
