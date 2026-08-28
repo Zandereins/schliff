@@ -246,13 +246,18 @@ also at: /…/home/.claude/skills/dup/SKILL.md
 ```
 
 The banner then told the reader that this counted path is "usually the plugin cache — act on the
-copy you control", i.e. to treat their own working copy as the disposable one. The claim had
-**eight homes** (banner, four code comments, two lines of `commands/schliff/doctor.md`, one spec
-sentence above) — the #209 pattern again. All are now either qualified with the invocation they
-hold for, or state only what is invariant: the counted path is an artifact of sort order.
+copy you control", i.e. to treat their own working copy as the disposable one.
 
-**A repair reason was truncated by the column widened to keep it.** `"Resolve the duplicate
-install first; eval-suite.json: "` is 54 characters, so a 70-wide cap cut `not a JSON object` to
+The invariant, and the only thing any surface may state: **the counted path is whichever member
+sorted first.** That is a property of `sorted()`. Which member sort order favours depends on the
+directories being scanned, so it carries no information about which copy to act on.
+
+No claim is made here about how many places said otherwise. Three such counts were written during
+this work and all three were wrong, which is what a census of prose is worth; `grep -rn "plugin
+cache"` answers the question in a second and does not go stale.
+
+**A repair reason was truncated by the column widened to keep it.** The composed grouped-and-broken
+prefix runs well past 35 characters before the reason starts, so a 70-wide cap cut `not a JSON object` to
 `not a JSON objec`. The width is now `REPAIR_ACTION_WIDTH`, and
 `test_repair_action_fits_its_column` derives the longest composed action from the reasons
 `load_eval_suite` can actually produce — enumerated out of the module's AST, not hand-listed — so
@@ -352,3 +357,62 @@ from the quality counts, and only the counts are still undecided.
 counts it, but `healthy`/`needs_work` do not, so on the real install 19 of 138 skills are absent
 from the counts the summary line reports. The suppression is right for the command
 recommendations; whether it is right for the counts is a separate judgement.
+
+## Amendment 2026-08-28 (4) — the council round, and four items that were NOT done
+
+A four-advisor review was run against the *fix plan*, not the code. Three advisors returned REJECT.
+Four of the five planned items were wrong, and the replacement is smaller than the plan was. What
+follows is the reasoning, because the rejected items are the ones likely to be proposed again.
+
+**The digest measures a payload; the row and the advice spoke about a directory.** That mismatch,
+not the plugin-version case, is the defect. Measured: two skill directories differing in
+`scripts/run.py` collapse into one row. On the real install one group is **two live plugin
+versions** — `supabase/0.1.13` and `supabase/0.1.15`, both present in
+`~/.claude/plugins/installed_plugins.json`, one project-scoped and one user-scoped — whose
+directories differ in `CHANGELOG.md`, and sort order names the older one as the survivor.
+
+The report now states the comparison and stops: *"N skills have an identical scored payload at M
+paths — each counted once"*, followed by what was compared and the fact that the directories were
+not. The action a grouped row carries changed from `Resolve the duplicate install first` to
+`Scored once; other paths are listed above`. Deleting one sentence would not have been enough —
+the imperative lived in the Action column, the banner headline, `commands/schliff/doctor.md` and
+the CHANGELOG.
+
+**NOT DONE — refusing to collapse when the suite could not be read.** This was planned and it is a
+regression, measured: `skills_found 1→2` and the token total doubles for the group, because copies
+are byte-identical *by construction*, so their read failures are correlated, while two genuinely
+different skills failing identically is a coincidence. It also breaks
+`test_two_copies_with_the_same_broken_suite_still_collapse`, which exists to protect this. And the
+premise was wrong: nothing a row reports derives from an unread suite's bytes, so two such rows are
+identical in every quantity — which is when the digest is supposed to collapse them. Only the
+comment claiming otherwise was false; it is now correct.
+
+**NOT DONE — a gate over the prose claim.** The existing AST gate is legitimate because it
+enumerates a *machine-consumed, language-closed* set: string literals assigned into a named dict
+and returned from one named function. Sentences have no such closure, and a gate over them must
+decide whether a sentence *is* a claim. The proposed key ("concrete evidence strings") is the
+wordlist this key exists to avoid, and `ast.get_docstring` could not have seen the `#` comment or
+the Markdown lines where the claim actually lived. `grep -rn "plugin cache"` answers it in a second.
+What failed was writing the census, not the absence of a tool.
+
+**NOT DONE — widening the narrow action column to 80.** That branch carries `/schliff:auto <abs
+path>`; 80 characters of a path is neither whole nor short. The real defect was the *gate's* domain:
+it derived one prefix, so the bare grouped action — 35 characters against a 35-wide cap — sat
+outside it. The width branch now keys on whether the row's action is path-free, and the gate
+enumerates all three composed shapes from the module's own constants.
+
+**Two instruments were dead, both disarmed by an earlier round's own fix.** `ed99c12` moved reads to
+`os.open`/`os.fdopen`, and both `read_text` spies stopped observing anything; deleting the size
+guard left the references-side test green, and the suite-side one was carried by an unrelated
+assertion. Both are replaced by behavioural assertions — the recorded reason, and cost/identity
+unchanged by an oversized reference — which no change of read mechanic can disarm.
+
+**The bucket-partition test could not detect a broken partition.** All three fixtures shared one
+body, so all three collapsed into a single grouped row and disjointness was asserted over n=1 in
+the one bucket that cannot collide; double-counting a non-grouped row left the file green. The
+population now spans a grouped pair, an ungrouped row and a broken-suite row.
+
+**A degraded digest phase now says so in the artifact.** The round-12 fallback reported every copy
+and warned on stderr only, so `--json` was byte-shape identical to a clean scan with no duplicates —
+a case study generated from it would have published the uncollapsed count unmarked.
+`digest_degraded` travels in the report.

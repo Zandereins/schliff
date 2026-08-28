@@ -45,15 +45,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `plugins/cache/` and `plugins/marketplaces/` was scored and billed twice, inflating the skill
   count, the grade distribution and the headline "Total context cost". Copies are now collapsed
   by a digest over SKILL.md, `references/*.md` and `eval-suite.json` — the files a row is
-  actually derived from — and every path in a group is printed so you can delete one. Nothing is
-  removed for you. `--json` gains `duplicate_copies` and `skills_discovered` (the physical file
+  actually derived from — and every path in a group is printed. Nothing is removed for you, and
+  the report states only that comparison: the directories are not compared, so members of a group
+  may be different versions of the same plugin and may both be live installs. `--json` gains `duplicate_copies` and `skills_discovered` (the physical file
   count, next to the deduplicated `skills_found`). Path-based exclusion was measured and
   rejected; see `docs/specs/2026-08-13-doctor-counts-vendored-skills.md`, "Amendment 2026-08-26".
-  The report no longer claims the counted copy is "usually the plugin cache": that holds when
-  the scan is pointed at `~/.claude`, but under the default directories `.claude/skills` sorts
-  ahead of the home path, so the counted copy is your own project one — and the advice to act
-  on "the copy you control" pointed at exactly the wrong file. The counted path is now
-  described as what it is, an artifact of sort order. A duplicated skill also no longer draws
+  The report describes the counted path as what it is, whichever member sorted first, and draws no
+  conclusion from that: it had advised acting on "the copy you control", which under the default
+  directories is the reader's own project copy. A duplicated skill also no longer draws
   skill-specific advice telling you to edit it, which contradicted its own row.
 
 - **An oversized `eval-suite.json` says so.** It reported `unreadable`, the same word as a
@@ -69,7 +68,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   reason string. A duplicated skill whose suite is also broken now keeps the "do NOT run
   `/schliff:init` on these" warning, which fell through the counters that gate it. The bounded
   reader no longer references `os.O_NONBLOCK` directly, a Unix-only constant whose absence on
-  Windows raised an `AttributeError` past every guard on every scan path.
+  Windows raised an `AttributeError` past every guard on every scan path. The size guard is now
+  asserted through behaviour rather than by spying on `pathlib.Path.read_text`, which stopped
+  observing anything when the reader moved to `os.open` — deleting the guard had left its own test
+  green. And a run whose duplicate detection failed reports `digest_degraded`, so an uncollapsed
+  count can no longer be mistaken for a scan that found no duplicates.
 
 - **Documented commands in tables and indented bullets now count.** `efficiency`
   credited a documented command only as a top-level bullet, so an indented

@@ -121,7 +121,12 @@ def invalidate_cache(skill_path: str) -> None:
     """Invalidate the file cache for a given skill path."""
     key = str(Path(skill_path).resolve())
     _file_cache.pop(key, None)
-    _eval_suite_cache.pop(str(Path(skill_path).parent / "eval-suite.json"), None)
+    # Four dicts are keyed on this skill's paths; invalidating two of them left the
+    # other two to outlive the file they describe. One door, all four.
+    suite_key = str(Path(skill_path).parent / "eval-suite.json")
+    _eval_suite_cache.pop(suite_key, None)
+    eval_suite_error.pop(suite_key, None)
+    eval_suite_content_id.pop(suite_key, None)
 
 
 def read_skill_safe(skill_path: str) -> str:
@@ -393,10 +398,20 @@ def skill_payload_digest(skill_path: str) -> str:
         failure = eval_suite_error.get(suite_path)
         if failure:
             # The reason alone is as coarse a key as the "<unserialisable>" literal
-            # was in the branch above: two suites that are both `malformed` for
-            # different reasons, or simply different broken bytes, share one string
-            # and collapse onto each other. The content id is already recorded for
-            # these paths — it is set before `json.loads` runs — so fold it in too.
+            # was in the branch above, so fold in the content id where one exists.
+            #
+            # It exists only for the PARSE-stage failures: a suite that could not be
+            # read has no bytes to hash, and `_load_eval_suite_uncached` drops the id
+            # there. That is not a gap to close. Nothing the row reports derives from
+            # an unread suite's bytes — `estimate_token_cost` never charges
+            # eval-suite.json, `build_scores` gets None, and the only suite-derived
+            # field is the reason word this line already absorbs — so two such rows
+            # are identical in every quantity, which is exactly when the digest is
+            # supposed to collapse them. Making them distinct was measured and it
+            # doubles the install count and the token total for a group whose copies
+            # are byte-identical, i.e. whose read failures are correlated by
+            # construction. `test_two_copies_with_the_same_broken_suite_still_collapse`
+            # is the gate on that.
             _absorb("eval-suite.json:error", failure)
             _absorb("eval-suite.json:error-id", eval_suite_content_id.get(suite_path) or "")
 

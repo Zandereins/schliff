@@ -36,6 +36,14 @@ _INSTRUCTION_FILENAMES = {"claude.md", ".cursorrules", "agents.md"}
 # was picked by eye and silently cut "not a JSON object" to "not a JSON objec".
 REPAIR_ACTION_WIDTH = 80
 
+# The two path-free action shapes. Named, not inlined, because the width gate has
+# to enumerate exactly the strings that reach the wide column — the previous gate
+# derived only the repair prefix and so did not cover the grouped action, which
+# was 35 characters against a 35-wide cap with zero margin.
+BROKEN_ACTION_PREFIX = "Fix eval-suite.json first: "
+GROUPED_ACTION = "Scored once; other paths are listed above"
+GROUPED_ACTION_PREFIX = "Scored once; eval-suite.json: "
+
 
 def discover_instruction_files(root_dir: str) -> list[dict]:
     """Discover all project instruction files in a directory tree.
@@ -126,7 +134,7 @@ def _score_single_skill(skill_path: str) -> dict:
     suite_error = shared.eval_suite_error.get(str(Path(skill_path).parent / "eval-suite.json"))
 
     if suite_error:
-        action = f"Fix eval-suite.json first: {suite_error}"
+        action = f"{BROKEN_ACTION_PREFIX}{suite_error}"
     elif not has_eval:
         action = f"/schliff:init {skill_path}"
     elif score < 50:
@@ -171,13 +179,16 @@ def _collapse_duplicate_copies(skills: list[dict]) -> tuple[list[dict], list[dic
 
     Nothing is deleted; every path in a group is reported and the caller decides
     (ADR 0019). The counted copy is the first in discovery order, which sorts by
-    path — so for the dominant real case ``plugins/cache/…`` wins over
-    ``plugins/marketplaces/…`` and over ``~/.claude/skills/…``. That is not
-    arbitrary, it is a systematic bias toward the one copy the reader should NOT
-    act on: a plugin cache is overwritten on the next update. The copies are
-    identical in everything measured, so preferring another member would need a
-    path wordlist — the enumeration this whole key exists to avoid. Instead the
-    row for a group carries no runnable ``action``.
+    path. Sort order is not merit, and which member it favours depends on the
+    directories being scanned, so no member may be named by a runnable command:
+    the row for a group carries no ``action`` that acts on a path. Preferring a
+    member on any other basis would need a path wordlist — the enumeration this
+    key exists to avoid.
+
+    What the group asserts is bounded by what the digest reads. Two members can
+    differ in anything outside SKILL.md, ``references/*.md`` and
+    ``eval-suite.json`` — including their version, and including whether both are
+    live installs. The report states the comparison and never concludes from it.
 
     Skills whose digest could not be computed are all kept: an empty digest is
     not an identity, so they must not collapse together.
@@ -238,6 +249,8 @@ def run_doctor(
             "duplicate_copies": [],
             "broken_eval_suite": 0,
             "grouped_duplicates": 0,
+            "grouped_broken_eval_suite": 0,
+            "digest_degraded": False,
             "mesh_health": 100,
             "mesh_issue_count": 0,
             "results": [],
@@ -255,12 +268,14 @@ def run_doctor(
     # did not, which made the premise false exactly where the run is hardest to
     # recover. Falling back to no collapsing reports every copy — an over-count,
     # which this module has repeatedly recorded as the survivable direction.
+    digest_degraded = False
     try:
         unique_skills, duplicate_copies = _collapse_duplicate_copies(skills)
     except Exception as exc:  # noqa: BLE001 — one bad file must not end the run
         print(f"Warning: duplicate detection failed ({type(exc).__name__}), "
               f"reporting every copy separately", file=sys.stderr)
         unique_skills, duplicate_copies = skills, []
+        digest_degraded = True
     # path -> the other install locations, so a row carries its own signal. A
     # --json consumer acting on `action` would otherwise have to join against
     # duplicate_copies to learn that the path it was handed is whichever member
@@ -302,15 +317,14 @@ def run_doctor(
         if path in copies_by_path:
             result["also_installed_at"] = copies_by_path[path]
             # `path` is one member of a group, picked by sort order rather than
-            # by merit. Under `--skill-dirs ~/.claude` that is systematically the
-            # plugin cache; under the default dirs, where `.claude/skills` sorts
-            # ahead of the home path, it is the reader's own project copy. Either
-            # way emitting `/schliff:auto <that path>` would name a copy this
-            # command did not choose on merit.
+            # by merit, so no runnable command may name it. The action states
+            # what was measured — one score and one cost — and never what the
+            # reader should do to the filesystem: the digest covers SKILL.md,
+            # `references/*.md` and `eval-suite.json`, so two members can differ
+            # in everything else, including their version.
             reason = result.get("eval_suite_error")
             result["action"] = (
-                f"Resolve the duplicate install first; eval-suite.json: {reason}"
-                if reason else "Resolve the duplicate install first"
+                f"{GROUPED_ACTION_PREFIX}{reason}" if reason else GROUPED_ACTION
             )
         results.append(result)
 
@@ -376,7 +390,7 @@ def run_doctor(
     if grouped:
         # Excluded from every other bucket on purpose, so without this line these
         # rows appear in no tally at all — 20 of 138 on a real installation.
-        summary_parts.append(f"{grouped} duplicate install")
+        summary_parts.append(f"{grouped} counted once")
     if failed:
         summary_parts.append(f"{failed} failed to score")
     if mesh_issues:
@@ -422,6 +436,11 @@ def run_doctor(
         "no_eval_suite": no_eval,
         "broken_eval_suite": broken_eval,
         "grouped_duplicates": grouped,
+        # A consumer that publishes `skills_found` has to be able to see that the
+        # collapse did not run: without this the fallback's output is byte-shape
+        # identical to a clean scan that found no duplicates, so a case study
+        # generated from --json would publish the pre-fix count with no marker.
+        "digest_degraded": digest_degraded,
         "grouped_broken_eval_suite": grouped_broken,
         "total_tokens": total_tokens,
         # Physical files on disk, before collapsing copies. `skills_found` is the
@@ -466,20 +485,31 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
         lines.append(f"  Total context cost: ~{total_tokens:,} tokens")
         lines.append("")
 
-    # Same bytes installed twice — counted once, both paths named so the reader
-    # can delete one. Capped like the drift block below.
+    # One scored payload found at several paths — counted once. The block states
+    # what was compared and stops there. It said "installed more than once …
+    # extra copies … so you can delete one", and that is a verdict about the
+    # filesystem this key never measured: on the real install one group is two
+    # ACTIVE plugin versions (0.1.13 and 0.1.15 of the same plugin, both present
+    # in `~/.claude/plugins/installed_plugins.json`, one project-scoped and one
+    # user-scoped) whose directories differ outside the digest domain, and sort
+    # order names the older one as the survivor. Capped like the drift block below.
     duplicate_copies = report.get("duplicate_copies", [])
     if duplicate_copies:
         extra = sum(len(d["also_installed_at"]) for d in duplicate_copies)
         n = len(duplicate_copies)
         lines.append(
-            f"  {n} {'skill is' if n == 1 else 'skills are'} installed more than "
-            f"once ({extra} extra {'copy' if extra == 1 else 'copies'}, counted once):"
+            f"  {n} {'skill has' if n == 1 else 'skills have'} an identical scored "
+            f"payload at {extra + n} paths — each counted once "
+            f"({extra} {'path' if extra == 1 else 'paths'} collapsed):"
         )
         lines.append(
-            "    The counted path is whichever sorted first — an artifact of "
-            "sort order, not a recommendation. Check every path listed "
-            "before acting on any."
+            "    Compared: SKILL.md, references/*.md, eval-suite.json — the files "
+            "the score and the cost come from. The directories themselves were "
+            "NOT compared and may differ, including in version."
+        )
+        lines.append(
+            "    The counted path is whichever sorted first, an artifact of sort "
+            "order rather than a recommendation."
         )
         lines.append(
             "    Mesh findings below are counted per file, not per install, so "
@@ -516,13 +546,19 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
         # The reason is the whole payload of a repair action, so keep it whole
         # rather than truncating to "Fix eval-suite.json first (unreadab".
         # 70 was still too narrow for the composed grouped-and-broken form
-        # ("Resolve the duplicate install first; eval-suite.json: " is 54
-        # characters before the reason even starts), so it truncated the exact
-        # word it was widened to preserve: "not a JSON objec". The width is not
+        # (the composed grouped-and-broken prefix runs well past 35 characters
+        # before the reason even starts), so it truncated the exact word it was
+        # widened to preserve: "not a JSON objec". The width is not
         # a guess — test_repair_action_fits_its_column derives the longest
         # composed action from the reasons load_eval_suite can actually produce
         # and fails if it stops fitting, so a new reason cannot re-open this.
-        action = r["action"][:REPAIR_ACTION_WIDTH] if r.get("eval_suite_error") else r["action"][:35]
+        # Path-free actions get the wide column; the narrow one exists for actions
+        # that embed an absolute path (`/schliff:auto <path>`), where widening to
+        # 80 would produce an 80-character clip of a path — neither whole nor
+        # short. Grouped and repair actions are path-free by construction, which
+        # is why the flag is the row's own shape and not a list of prefixes.
+        path_free = r.get("eval_suite_error") or r.get("also_installed_at")
+        action = r["action"][:REPAIR_ACTION_WIDTH] if path_free else r["action"][:35]
 
         lines.append(f"  {name:<25s} {score:>5.0f} {grade:s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
 
@@ -615,8 +651,8 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
     #
     # Grouped rows are carved out for the same reason the /schliff:init and
     # /schliff:auto tallies carve them out, and the same reason doctor.md step 5
-    # does: the row's own `action` says to resolve the duplicate install first,
-    # and its path was picked by sort order rather than by merit. Printing
+    # does: the row's own `action` states that the payload was scored once, and
+    # its path was picked by sort order rather than by merit. Printing
     # "extract into references/" beside that is an instruction to edit a file
     # this command did not choose — and it contradicts the row three lines up.
     skills_with_recs = [

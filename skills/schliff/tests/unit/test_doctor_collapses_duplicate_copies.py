@@ -233,14 +233,13 @@ def test_a_broken_suite_row_does_not_send_you_to_overwrite_it(tmp_path):
 
 
 def test_a_grouped_row_carries_no_runnable_action(tmp_path):
-    """The counted path is sort order, not merit — and usually the plugin cache.
+    """The counted path is sort order, not merit.
 
-    ``discover_skills`` sorts by path and the first wins, so
-    ``plugins/cache/…`` beats ``plugins/marketplaces/…`` and ``~/.claude/skills/…``
-    every time. Emitting ``/schliff:auto <that path>`` writes ``.schliff/``
-    history into a directory the next plugin update deletes. Preferring another
-    member would need a path wordlist — the enumeration this key avoids — so the
-    row says what to do instead.
+    ``discover_skills`` sorts by path and the first wins. Which member that
+    favours depends on the directories scanned, so naming it in a runnable
+    command — ``/schliff:auto <that path>`` — would act on a copy this command
+    did not choose. Preferring another member would need a path wordlist, the
+    enumeration this key avoids, so the row states the measurement instead.
     """
     _skill(tmp_path, "cache-copy", BODY)
     _skill(tmp_path, "user-copy", BODY)
@@ -356,43 +355,37 @@ def test_an_unreadable_suite_is_not_counted_as_missing(tmp_path):
     assert "Run /schliff:init on" not in rendered
 
 
-def test_an_oversized_eval_suite_is_never_read(tmp_path, monkeypatch):
+def test_an_oversized_eval_suite_is_not_read_into_memory(tmp_path):
     """Size before read — the OOM-safe loading the changelog promised.
 
-    ``read_text`` on a multi-gigabyte target raises ``MemoryError``, which is
-    neither ``OSError`` nor ``ValueError`` nor ``RecursionError``. The digest
-    calls this before the scoring loop and outside any handler, so one such file
-    ended the whole run. ``cli._load_eval_suite_from_args`` already checked
-    ``stat().st_size`` first; the shared loader never did.
+    This test replaces a spy on ``pathlib.Path.read_text``. The spy was dead:
+    the reader moved to ``os.open``/``os.fdopen``, so it observed nothing and
+    its ``assert reads == []`` was vacuously true — the mutation it named left
+    it green, and only a second, unrelated assertion in the same test carried
+    it. An instrument that a change of read mechanic can silently disarm is not
+    an instrument. Assert the observable outcome instead: the reason recorded,
+    which no read mechanic can fake.
 
-    Remove the ``stat().st_size`` guard and this goes red — the file gets read.
+    Remove the size branch from ``_read_bounded_with_reason`` and this goes red.
     """
     import shared
 
     skill = _skill(tmp_path, "s", BODY)
     suite = tmp_path / "s" / "eval-suite.json"
     suite.write_text("{" + " " * (shared.MAX_SKILL_SIZE + 1000) + "}", encoding="utf-8")
+    shared._eval_suite_cache.clear()
 
-    reads = []
-    real_read = pathlib.Path.read_text
-
-    def _spy(self, *a, **kw):
-        if self.name == "eval-suite.json":
-            reads.append(str(self))
-        return real_read(self, *a, **kw)
-
-    monkeypatch.setattr(pathlib.Path, "read_text", _spy)
     assert shared.load_eval_suite(skill["path"]) is None
-    assert reads == [], "an oversized suite must not be read into memory at all"
+    assert shared.eval_suite_error[str(suite)] == "too large"
 
 
 def test_a_grouped_row_is_not_counted_as_missing_an_eval_suite(tmp_path):
     """The footer must not contradict the row, for duplicates either.
 
-    A grouped row's action says to resolve the duplicate and its path is the
-    plugin cache. Counting it as "missing an eval suite" put it in "Run
-    /schliff:init on N skills" — writing into a directory the next plugin update
-    deletes. Field-measured before the fix: all 20 groups landed in that count.
+    A grouped row's action states that the payload was scored once, and its path
+    was picked by sort order. Counting it as "missing an eval suite" put it in
+    "Run /schliff:init on N skills" — a command against a path this tool did not
+    choose. Field-measured before the fix: all 20 groups landed in that count.
     """
     _skill(tmp_path, "cached", BODY)
     _skill(tmp_path, "vendored", BODY)
@@ -448,30 +441,24 @@ def test_a_fifo_where_a_file_is_expected_does_not_hang(tmp_path):
     assert shared.skill_payload_digest(skill["path"])
 
 
-def test_an_oversized_reference_is_never_read(tmp_path, monkeypatch):
-    """Size before read on the references side too.
+def test_an_oversized_reference_is_not_charged_or_hashed(tmp_path):
+    """The same guard, on the references side, asserted through behaviour.
 
-    The loader got this guard first; the reference walk kept reading before
-    checking, under a handler that catches neither ``MemoryError``. Since the
-    digest runs before the scoring loop, one huge file ended the whole run
-    instead of marking a row failed.
+    The previous version spied on ``pathlib.Path.read_text`` and had ZERO
+    discriminating power after the reader moved to ``os.open``: deleting the
+    size branch entirely left it green, so the guard was unwatched on this path.
+    Cost and identity are what the guard protects, so assert those: an oversized
+    reference must change neither.
     """
     import shared
 
-    skill = _skill(tmp_path, "s", BODY, refs={"big.md": "x" * (shared.MAX_SKILL_SIZE + 1000)})
+    plain = _skill(tmp_path, "plain", BODY)
+    fat = _skill(tmp_path, "fat", BODY, refs={"big.md": "x" * (shared.MAX_SKILL_SIZE + 1000)})
 
-    reads = []
-    real_read = pathlib.Path.read_text
-
-    def _spy(self, *a, **kw):
-        if self.name == "big.md":
-            reads.append(str(self))
-        return real_read(self, *a, **kw)
-
-    monkeypatch.setattr(pathlib.Path, "read_text", _spy)
-    shared.skill_payload_digest(skill["path"])
-    shared.estimate_token_cost(skill["path"])
-    assert reads == [], "an oversized reference must not be read into memory"
+    assert shared.estimate_token_cost(fat["path"]) == shared.estimate_token_cost(plain["path"]), \
+        "an oversized reference was charged — the size guard did not run"
+    assert shared.skill_payload_digest(fat["path"]) == shared.skill_payload_digest(plain["path"]), \
+        "an oversized reference reached the identity — the size guard did not run"
 
 
 @pytest.mark.parametrize("content", ["null", "[1, 2, 3]", '"hello"'])
@@ -496,10 +483,21 @@ def test_a_suite_that_is_not_an_object_is_a_broken_suite(tmp_path, content):
 
 
 def test_every_scanned_row_lands_in_exactly_one_bucket(tmp_path):
-    """Grouped rows were in no tally at all — 20 of 138 on the real install."""
+    """Grouped rows were in no tally at all — 20 of 138 on the real install.
+
+    The fixture matters more than the assertion here. All three skills used to
+    share ``BODY``, so all three collapsed into ONE grouped row and the
+    disjointness was checked over n=1 in the single bucket that cannot collide:
+    double-counting a NON-grouped row left the whole file green. The population
+    now spans a grouped pair, an ungrouped row, and a broken-suite row, so every
+    branch of the classification is represented.
+    """
     _skill(tmp_path, "cached", BODY)
     _skill(tmp_path, "vendored", BODY)
-    _skill(tmp_path, "solo", BODY)
+    _skill(tmp_path, "solo", BODY + "\n## Different\n\nOther bytes entirely.\n")
+    broken = _skill(tmp_path, "broken", BODY + "\n## Third\n\nDifferent again.\n")
+    (pathlib.Path(broken["path"]).parent / "eval-suite.json").write_text("[]", encoding="utf-8")
+    shared._eval_suite_cache.clear()
 
     r = doctor.run_doctor(skill_dirs=[str(tmp_path)])
     buckets = (
@@ -511,7 +509,11 @@ def test_every_scanned_row_lands_in_exactly_one_bucket(tmp_path):
     assert r["skills_discovered"] - r["skills_found"] == sum(
         len(g["also_installed_at"]) for g in r["duplicate_copies"]
     )
-    assert f"{r['grouped_duplicates']} duplicate install" in doctor.format_doctor_report(r)
+    assert f"{r['grouped_duplicates']} counted once" in doctor.format_doctor_report(r)
+    # The population must actually exercise more than the grouped bucket, or the
+    # disjointness above is asserted over a single row and proves nothing.
+    assert r["grouped_duplicates"] >= 1 and r["broken_eval_suite"] >= 1
+    assert r["healthy"] + r["needs_work"] + r["no_eval_suite"] >= 1
 
 
 def test_cost_and_digest_read_the_same_files(tmp_path, monkeypatch):
@@ -634,12 +636,20 @@ def test_repair_action_fits_its_column():
     "not a JSON object" to "not a JSON objec", truncating the exact payload the
     wide cap existed to preserve.
     """
-    prefix = "Resolve the duplicate install first; eval-suite.json: "
-    too_long = {r for r in _eval_suite_reasons()
-                if len(prefix + r) > doctor.REPAIR_ACTION_WIDTH}
+    reasons = _eval_suite_reasons()
+    # Every path-free action doctor can compose, taken from the module's own
+    # constants. The previous version hard-coded ONE prefix, so the bare grouped
+    # action — 35 characters against the 35-wide branch, zero margin — sat
+    # outside the gate that exists for exactly this failure.
+    composed = (
+        [doctor.GROUPED_ACTION]
+        + [doctor.GROUPED_ACTION_PREFIX + r for r in reasons]
+        + [doctor.BROKEN_ACTION_PREFIX + r for r in reasons]
+    )
+    too_long = [a for a in composed if len(a) > doctor.REPAIR_ACTION_WIDTH]
     assert not too_long, (
         f"REPAIR_ACTION_WIDTH={doctor.REPAIR_ACTION_WIDTH} truncates: "
-        + ", ".join(f"{r!r} needs {len(prefix + r)}" for r in sorted(too_long))
+        + ", ".join(f"{a!r} needs {len(a)}" for a in sorted(too_long))
     )
 
 
@@ -910,3 +920,34 @@ def test_a_grouped_and_broken_row_keeps_the_init_warning(tmp_path, monkeypatch):
     disjoint = (report["broken_eval_suite"] + report["no_eval_suite"]
                 + report["healthy"] + report["needs_work"] + report["grouped_duplicates"])
     assert disjoint == len(report["results"]), "buckets stopped partitioning the rows"
+
+
+def test_a_degraded_digest_phase_says_so_in_the_artifact(tmp_path, monkeypatch):
+    """A silent fallback publishes the pre-fix number.
+
+    When the collapse fails the run continues and reports every copy — the
+    survivable direction. But the warning went to stderr only, so the `--json`
+    output was byte-shape identical to a clean scan that genuinely found no
+    duplicates. A case study generated from that output would publish the
+    uncollapsed count with nothing marking it.
+
+    The mutation: drop `digest_degraded` from the report and this goes red.
+    """
+    a = _skill(tmp_path, "cached", BODY)
+    b = _skill(tmp_path, "vendored", BODY)
+    monkeypatch.setattr(doctor.skill_mesh, "discover_skills", lambda dirs: [a, b])
+
+    clean = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    assert clean["digest_degraded"] is False
+    assert clean["skills_found"] == 1
+
+    monkeypatch.setattr(
+        doctor, "_collapse_duplicate_copies",
+        lambda skills: (_ for _ in ()).throw(MemoryError("digest phase")))
+    degraded = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+
+    assert degraded["skills_found"] == 2, "the fallback must report every copy"
+    assert degraded["digest_degraded"] is True, (
+        "an uncollapsed count that calls itself clean is the pre-fix number, "
+        "published without a marker"
+    )
