@@ -28,6 +28,13 @@ from shared import EXCLUDED_DIRS, estimate_token_cost, skill_payload_digest
 # Filenames to match (lowercase) for instruction file discovery
 _INSTRUCTION_FILENAMES = {"claude.md", ".cursorrules", "agents.md"}
 
+# Width of the Action column for a row that carries a repair reason. Wide
+# enough for the longest action doctor can compose, which is the grouped-and-
+# broken form plus the longest reason `load_eval_suite` records. Asserted by
+# test_repair_action_fits_its_column rather than trusted: the previous value
+# was picked by eye and silently cut "not a JSON object" to "not a JSON objec".
+REPAIR_ACTION_WIDTH = 80
+
 
 def discover_instruction_files(root_dir: str) -> list[dict]:
     """Discover all project instruction files in a directory tree.
@@ -242,7 +249,7 @@ def run_doctor(
     # path -> the other install locations, so a row carries its own signal. A
     # --json consumer acting on `action` would otherwise have to join against
     # duplicate_copies to learn that the path it was handed is whichever member
-    # sorted first, usually the plugin cache.
+    # sorted first, which is not necessarily the copy worth acting on.
     copies_by_path = {d["counted"]: d["also_installed_at"] for d in duplicate_copies}
 
     results = []
@@ -274,14 +281,16 @@ def run_doctor(
             **score_result,
         }
         # Present only when this row stands for more than one install. `path` and
-        # therefore `action` name whichever member sorted first — usually the
-        # plugin cache, which the next update overwrites.
+        # therefore `action` name whichever member sorted first, which is picked
+        # by sort order and not by merit.
         if path in copies_by_path:
             result["also_installed_at"] = copies_by_path[path]
             # `path` is one member of a group, picked by sort order rather than
-            # by merit, and it is usually the plugin cache. Emitting
-            # `/schliff:auto <that path>` would write .schliff/ history into a
-            # directory the next plugin update deletes.
+            # by merit. Under `--skill-dirs ~/.claude` that is systematically the
+            # plugin cache; under the default dirs, where `.claude/skills` sorts
+            # ahead of the home path, it is the reader's own project copy. Either
+            # way emitting `/schliff:auto <that path>` would name a copy this
+            # command did not choose on merit.
             reason = result.get("eval_suite_error")
             result["action"] = (
                 f"Resolve the duplicate install first; eval-suite.json: {reason}"
@@ -291,7 +300,7 @@ def run_doctor(
 
         if path in copies_by_path:
             # A grouped row's own action says to resolve the duplicate, and its
-            # path is the plugin cache. Counting it as "missing an eval suite"
+            # path was picked by sort order. Counting it as "missing an eval suite"
             # would put it in the /schliff:init recommendation below — writing
             # into a directory the next plugin update deletes, and contradicting
             # the row three lines above. Same carve-out doctor.md step 5 makes.
@@ -440,8 +449,9 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
             f"once ({extra} extra {'copy' if extra == 1 else 'copies'}, counted once):"
         )
         lines.append(
-            "    The counted path is whichever sorted first, which is usually the "
-            "plugin cache — act on the copy you control."
+            "    The counted path is whichever sorted first — an artifact of "
+            "sort order, not a recommendation. Check every path listed "
+            "before acting on any."
         )
         lines.append(
             "    Mesh findings below are counted per file, not per install, so "
@@ -477,9 +487,14 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
         issues = r["issue_count"]
         # The reason is the whole payload of a repair action, so keep it whole
         # rather than truncating to "Fix eval-suite.json first (unreadab".
-        # A repair action carries its reason, which is the payload; cap it
-        # wide rather than at 35 so a grouped-and-broken row does not run away.
-        action = r["action"][:70] if r.get("eval_suite_error") else r["action"][:35]
+        # 70 was still too narrow for the composed grouped-and-broken form
+        # ("Resolve the duplicate install first; eval-suite.json: " is 54
+        # characters before the reason even starts), so it truncated the exact
+        # word it was widened to preserve: "not a JSON objec". The width is not
+        # a guess — test_repair_action_fits_its_column derives the longest
+        # composed action from the reasons load_eval_suite can actually produce
+        # and fails if it stops fitting, so a new reason cannot re-open this.
+        action = r["action"][:REPAIR_ACTION_WIDTH] if r.get("eval_suite_error") else r["action"][:35]
 
         lines.append(f"  {name:<25s} {score:>5.0f} {grade:s} {dims:>6s} {tokens:>7d} {issues:>7d}  {action}")
 
@@ -563,8 +578,18 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
             lines.append(f"    {step}. Run /schliff:auto on {needs_work} low-scoring skills")
         lines.append("")
 
-    # Skill-specific recommendations
-    skills_with_recs = [r for r in results if r.get("recommendations")]
+    # Skill-specific recommendations.
+    #
+    # Grouped rows are carved out for the same reason the /schliff:init and
+    # /schliff:auto tallies carve them out, and the same reason doctor.md step 5
+    # does: the row's own `action` says to resolve the duplicate install first,
+    # and its path was picked by sort order rather than by merit. Printing
+    # "extract into references/" beside that is an instruction to edit a file
+    # this command did not choose — and it contradicts the row three lines up.
+    skills_with_recs = [
+        r for r in results
+        if r.get("recommendations") and not r.get("also_installed_at")
+    ]
     if skills_with_recs:
         lines.append("  Skill-specific recommendations:")
         for r in skills_with_recs:

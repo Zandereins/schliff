@@ -41,8 +41,8 @@ Run a comprehensive health check on all installed skills.
 
    ```
    N skills are installed more than once (M extra copies, counted once).
-   The counted path is whichever sorted first, usually the plugin cache — name
-   every path in the group so the reader can act on the copy they control.
+   The counted path is whichever sorted first — an artifact of sort order, not
+   a recommendation. Name every path in the group so the reader can check them.
    ```
 
    Do not explain the whole `skills_discovered` − `skills_found` gap as
@@ -54,8 +54,8 @@ Run a comprehensive health check on all installed skills.
 4. A row with `eval_suite_error` has a suite that is present but unreadable —
    report the reason and do not suggest `/schliff:init`, which would write over
    that file. A row with `also_installed_at` names whichever member sorted
-   first — usually the plugin cache; use its `action` verbatim rather than
-   composing a command from `path`.
+   first, which is picked by sort order and not by merit; use its `action`
+   verbatim rather than composing a command from `path`.
 
 5. For skills with grade D or F, suggest specific next steps — **except** on rows
    carrying `eval_suite_error` or `also_installed_at`, whose own `action` already
