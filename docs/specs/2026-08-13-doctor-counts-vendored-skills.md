@@ -313,6 +313,41 @@ choices rather than mechanical corrections, and neither has a site in the field:
   Closing it means `O_NOFOLLOW`, which would also take the symlink-following that `load_eval_suite`
   deliberately has for stow/chezmoi layouts — so it needs a per-caller flag and a decision.
 
+## Amendment 2026-08-28 (3) — round 12, and the sweep that was not one
+
+Four findings, and the instructive part is that **two of them were introduced by the round-11
+fix itself**. The finding count stopped falling (7 → 3 → 4) not because the review was grinding
+but because new defects were being added at roughly the rate old ones were removed.
+
+**`os.O_NONBLOCK` is Unix-only.** The descriptor-based reader shipped in round 10 referenced it
+directly. On Windows the attribute lookup raises `AttributeError` — neither `OSError` nor
+`ValueError`, so the reader's own guard does not catch it — and the reader now sits on *every*
+scan path, so the first file of any run would traceback. `getattr(os, "O_NONBLOCK", 0)`. The
+project treats Windows as in scope elsewhere (`verify.py:155` has an explicit fallback with a
+comment saying so) and `pyproject.toml` declares no OS classifier.
+
+**The `<unserialisable>` fix was applied to one branch of two.** Three lines below it, the
+`else` branch absorbed only the coarse reason string, so two suites both `malformed` for
+different reasons shared a digest and were reported as copies of each other. `eval_suite_content_id`
+was already populated on those paths — it is recorded before `json.loads` runs — so the fix was
+available and simply not carried across. This is the defect class this document has now recorded
+three times: *fix every site of a class, not the one the finding named.*
+
+**The digest phase ran outside every handler.** `_collapse_duplicate_copies` is called before the
+scoring loop, and `skill_payload_digest` reaches `read_skill_safe`, which reads before it checks
+size and can raise `MemoryError`. `_payload_files` justifies leaving `read_skill_safe` outside the
+bounded reader on the grounds that "its callers sit inside a handler" — false for this caller,
+exactly where a failure ends the whole run. Wrapped; the fallback reports every copy, the
+over-count direction this module has repeatedly recorded as the survivable one.
+
+**A grouped-and-broken row fell through every bucket** and took the report's strongest line with
+it. `grouped` is tested before `eval_suite_error`, so such a row incremented neither counter, and
+the whole "Recommended next steps" block is gated on those counts — so `do NOT run /schliff:init
+on these, it writes over them` was absent from the rendered report. Tracked as
+`grouped_broken_eval_suite`, beside the disjoint buckets rather than inside them, so the partition
+still holds exactly. Note this is *not* the open question below: the safety warning is separable
+from the quality counts, and only the counts are still undecided.
+
 **Not fixed, awaiting a decision:** a grouped row lands in no quality tally — `grouped_duplicates`
 counts it, but `healthy`/`needs_work` do not, so on the real install 19 of 138 skills are absent
 from the counts the summary line reports. The suppression is right for the command

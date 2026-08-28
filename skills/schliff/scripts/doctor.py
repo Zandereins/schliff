@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
 import score_skill as scorer
@@ -245,7 +246,21 @@ def run_doctor(
             "summary": "No skills found. Check skill directories.",
         }
 
-    unique_skills, duplicate_copies = _collapse_duplicate_copies(skills)
+    # The digest phase is the only walk that runs OUTSIDE `_score_single_skill`'s
+    # handler, and `skill_payload_digest` reaches `read_skill_safe`, which reads
+    # before it checks size and can therefore raise `MemoryError` — not an
+    # `OSError`, not a `ValueError`, so that function's own guard does not see it.
+    # `_payload_files` justifies leaving `read_skill_safe` outside the bounded
+    # reader on the grounds that "its callers sit inside a handler"; this caller
+    # did not, which made the premise false exactly where the run is hardest to
+    # recover. Falling back to no collapsing reports every copy — an over-count,
+    # which this module has repeatedly recorded as the survivable direction.
+    try:
+        unique_skills, duplicate_copies = _collapse_duplicate_copies(skills)
+    except Exception as exc:  # noqa: BLE001 — one bad file must not end the run
+        print(f"Warning: duplicate detection failed ({type(exc).__name__}), "
+              f"reporting every copy separately", file=sys.stderr)
+        unique_skills, duplicate_copies = skills, []
     # path -> the other install locations, so a row carries its own signal. A
     # --json consumer acting on `action` would otherwise have to join against
     # duplicate_copies to learn that the path it was handed is whichever member
@@ -258,6 +273,7 @@ def run_doctor(
     no_eval = 0
     broken_eval = 0
     grouped = 0
+    grouped_broken = 0
     failed = 0
 
     for skill in unique_skills:
@@ -304,7 +320,18 @@ def run_doctor(
             # would put it in the /schliff:init recommendation below — writing
             # into a directory the next plugin update deletes, and contradicting
             # the row three lines above. Same carve-out doctor.md step 5 makes.
+            #
+            # The buckets stay disjoint, so `grouped_broken` is tracked beside them
+            # rather than inside them: a grouped row whose suite is ALSO broken was
+            # otherwise counted nowhere, and the "Recommended next steps" block is
+            # gated on those counts — so the whole block vanished, taking the
+            # "do NOT run /schliff:init on these, it writes over them" line with it.
+            # That line is the strongest warning the report has, and it applies to
+            # a grouped row exactly as much as to a lone one. It names no path, so
+            # printing it cannot point the reader at a copy picked by sort order.
             grouped += 1
+            if score_result.get("eval_suite_error"):
+                grouped_broken += 1
         elif score_result.get("eval_suite_error"):
             # Present but unreadable. Counting it as "missing" would put it in
             # the /schliff:init recommendation below, which writes eval-suite.json
@@ -395,6 +422,7 @@ def run_doctor(
         "no_eval_suite": no_eval,
         "broken_eval_suite": broken_eval,
         "grouped_duplicates": grouped,
+        "grouped_broken_eval_suite": grouped_broken,
         "total_tokens": total_tokens,
         # Physical files on disk, before collapsing copies. `skills_found` is the
         # deduplicated count; without this the difference is only recoverable by
@@ -561,16 +589,21 @@ def format_doctor_report(report: dict, verbose: bool = False) -> str:
     broken_eval = report.get("broken_eval_suite", 0)
     needs_work = report.get("needs_work", 0)
 
-    if no_eval > 0 or needs_work > 0 or broken_eval > 0:
+    # The repair warning counts grouped-and-broken rows too. They are deliberately
+    # absent from the disjoint buckets, and gating the block on those alone deleted
+    # the only line telling the reader not to run /schliff:init over a file that
+    # failed to load.
+    broken_total = broken_eval + report.get("grouped_broken_eval_suite", 0)
+    if no_eval > 0 or needs_work > 0 or broken_total > 0:
         lines.append("  Recommended next steps:")
         step = 0
         if no_eval > 0:
             step += 1
             lines.append(f"    {step}. Run /schliff:init on {no_eval} skills missing eval suites")
-        if broken_eval > 0:
+        if broken_total > 0:
             step += 1
             lines.append(
-                f"    {step}. Repair {broken_eval} unreadable eval-suite.json — "
+                f"    {step}. Repair {broken_total} unreadable eval-suite.json — "
                 f"do NOT run /schliff:init on these, it writes over them"
             )
         if needs_work > 0:

@@ -12,6 +12,7 @@ import pathlib
 
 import doctor
 import pytest
+
 import shared
 
 
@@ -808,3 +809,104 @@ def test_unserialisable_suites_do_not_share_one_identity(tmp_path, monkeypatch):
     assert digest_a != digest_b, (
         "two different unserialisable suites collapsed onto one identity"
     )
+
+
+def test_the_bounded_reader_does_not_need_a_unix_only_constant():
+    """`os.O_NONBLOCK` is Unix-only; on Windows the lookup raises AttributeError.
+
+    That is neither an OSError nor a ValueError, so the reader's own guard would
+    not catch it — and the reader is now on every scan path, so the first file
+    of any `doctor`, `mesh` or `score` run would traceback. The mutation: use
+    `os.O_NONBLOCK` directly and this goes red on a platform without it.
+    """
+    import ast
+    import os as _os
+
+    src = pathlib.Path(shared.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    bare = [
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.Attribute) and n.attr == "O_NONBLOCK"
+        and isinstance(n.value, ast.Name) and n.value.id == "os"
+    ]
+    assert not bare, (
+        "os.O_NONBLOCK referenced directly; use getattr(os, 'O_NONBLOCK', 0) so the "
+        "module imports and runs where the constant does not exist"
+    )
+
+    # And the guard still buys what it is there for where the constant does exist.
+    if hasattr(_os, "O_NONBLOCK"):
+        assert _os.O_RDONLY | getattr(_os, "O_NONBLOCK", 0) != _os.O_RDONLY
+
+
+def test_two_differently_broken_suites_are_two_identities(tmp_path):
+    """The reason string is as coarse a key as the literal it replaced.
+
+    Round 11 fixed this for the unserialisable branch and left its sibling three
+    lines below untouched: two suites that are both `malformed` for different
+    reasons shared one digest and were reported as copies of each other, with a
+    banner telling the reader to "check every path" for two files that differ.
+
+    The mutation: drop the content-id absorb from the error branch, red again.
+    """
+    a = _skill(tmp_path, "cached", BODY)
+    b = _skill(tmp_path, "vendored", BODY)
+    (pathlib.Path(a["path"]).parent / "eval-suite.json").write_text(
+        "{{{{ broken", encoding="utf-8")
+    (pathlib.Path(b["path"]).parent / "eval-suite.json").write_text(
+        "[[[[ also broken but different bytes", encoding="utf-8")
+    shared._eval_suite_cache.clear()
+
+    assert shared.skill_payload_digest(a["path"]) != shared.skill_payload_digest(b["path"])
+
+
+def test_a_failing_digest_phase_does_not_end_the_run(tmp_path, monkeypatch):
+    """The one walk that ran outside a handler.
+
+    `skill_payload_digest` reaches `read_skill_safe`, which reads before it
+    checks size and can raise MemoryError — not an OSError, not a ValueError, so
+    its own guard does not see it. The premise `_payload_files` states, that
+    "its callers sit inside a handler", was false for this caller.
+
+    The mutation: unwrap the collapse call and this goes red with a traceback
+    instead of a report.
+    """
+    a = _skill(tmp_path, "cached", BODY)
+    b = _skill(tmp_path, "vendored", BODY)
+    monkeypatch.setattr(doctor.skill_mesh, "discover_skills", lambda dirs: [a, b])
+    monkeypatch.setattr(
+        doctor, "_collapse_duplicate_copies",
+        lambda skills: (_ for _ in ()).throw(MemoryError("digest phase")))
+
+    report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+
+    assert report["skills_found"] == 2, "fallback must report every copy, not none"
+    assert report["duplicate_copies"] == []
+
+
+def test_a_grouped_and_broken_row_keeps_the_init_warning(tmp_path, monkeypatch):
+    """The strongest warning in the report must not fall through the buckets.
+
+    `grouped` is checked before `eval_suite_error`, so a duplicated skill with a
+    broken suite incremented neither counter — and the whole "Recommended next
+    steps" block is gated on those, so it vanished, taking
+    "do NOT run /schliff:init on these, it writes over them" with it.
+
+    The mutation: drop `grouped_broken` and this goes red.
+    """
+    a = _skill(tmp_path, "cached", BODY)
+    b = _skill(tmp_path, "vendored", BODY)
+    for s in (a, b):
+        (pathlib.Path(s["path"]).parent / "eval-suite.json").write_text("[]", encoding="utf-8")
+    shared._eval_suite_cache.clear()
+    monkeypatch.setattr(doctor.skill_mesh, "discover_skills", lambda dirs: [a, b])
+
+    report = doctor.run_doctor(skill_dirs=[str(tmp_path)])
+    rendered = doctor.format_doctor_report(report)
+
+    assert report["grouped_broken_eval_suite"] == 1
+    assert "do NOT run /schliff:init" in rendered
+    # The disjoint buckets must still partition the rows exactly.
+    disjoint = (report["broken_eval_suite"] + report["no_eval_suite"]
+                + report["healthy"] + report["needs_work"] + report["grouped_duplicates"])
+    assert disjoint == len(report["results"]), "buckets stopped partitioning the rows"

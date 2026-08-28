@@ -65,7 +65,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   once per run instead of twice — the duplicate read also printed every warning twice. And a
   suite that parses but will not serialise no longer hashes as a fixed marker: two skills with
   different unserialisable suites shared one identity, so the second was reported as a copy of
-  the first.
+  the first — and the same held for two suites broken in different ways, which shared the coarse
+  reason string. A duplicated skill whose suite is also broken now keeps the "do NOT run
+  `/schliff:init` on these" warning, which fell through the counters that gate it. The bounded
+  reader no longer references `os.O_NONBLOCK` directly, a Unix-only constant whose absence on
+  Windows raised an `AttributeError` past every guard on every scan path.
 
 - **Documented commands in tables and indented bullets now count.** `efficiency`
   credited a documented command only as a top-level bullet, so an indented

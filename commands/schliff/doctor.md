@@ -36,8 +36,10 @@ Run a comprehensive health check on all installed skills.
 
 3. If `duplicate_copies` is non-empty, report it **above** the table — the CLI
    renderer prints it there, and the two surfaces should not disagree on shape.
-   The same skill installed twice (typically a plugin present in both
-   `plugins/cache/` and `plugins/marketplaces/`) is counted once:
+   The same skill installed twice is counted once. That pairing is usually
+   `plugins/cache/` and `plugins/marketplaces/` when the scan is pointed at
+   `~/.claude`; a default run never scans `~/.claude/plugins` at all, so there it
+   is a home copy and a project-local one:
 
    ```
    N skills are installed more than once (M extra copies, counted once).

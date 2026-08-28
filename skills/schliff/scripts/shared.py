@@ -217,7 +217,12 @@ def _read_bounded_with_reason(path: Path) -> tuple[Optional[str], str]:
     """
     fd = None
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+        # getattr, not os.O_NONBLOCK: the constant is Unix-only, and on Windows the
+        # attribute lookup raises AttributeError — which `except (OSError, ValueError)`
+        # below does not catch, so every scan path would traceback on its first file.
+        # Falling back to 0 loses the FIFO-open protection on a platform that has no
+        # FIFOs; the fstat check below still rejects anything that is not a regular file.
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode):
             return None, "not a regular file"
@@ -384,9 +389,16 @@ def skill_payload_digest(skill_path: str) -> str:
         # `action`, different `eval_suite_error` — so they must not collapse onto
         # each other. Without this the domain is again smaller than what the row
         # reports, which is the defect this key exists to prevent.
-        failure = eval_suite_error.get(str(path.parent / "eval-suite.json"))
+        suite_path = str(path.parent / "eval-suite.json")
+        failure = eval_suite_error.get(suite_path)
         if failure:
+            # The reason alone is as coarse a key as the "<unserialisable>" literal
+            # was in the branch above: two suites that are both `malformed` for
+            # different reasons, or simply different broken bytes, share one string
+            # and collapse onto each other. The content id is already recorded for
+            # these paths — it is set before `json.loads` runs — so fold it in too.
             _absorb("eval-suite.json:error", failure)
+            _absorb("eval-suite.json:error-id", eval_suite_content_id.get(suite_path) or "")
 
     return digest.hexdigest()
 
@@ -398,9 +410,12 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
     its docstring) and ``_score_single_skill`` asks again in the scoring loop, so
     every suite under the scan root was opened, read and parsed twice and every
     warning about a broken one was printed twice. The cache follows the shape
-    ``_file_cache`` already uses in this module — resolved-path key, bounded by
+    ``_file_cache`` already uses in this module — a path key, bounded by
     ``MAX_CACHE_ENTRIES``, cleared through ``invalidate_cache`` — rather than a
-    second, differently-invalidated one.
+    second, differently-invalidated one. The spelling differs from ``_file_cache``
+    on purpose-by-necessity: this key is the *unresolved* ``eval-suite.json`` path,
+    because that is what ``eval_suite_error`` keys on and the two are read together.
+    ``invalidate_cache`` uses the same spelling, so the pair cannot drift.
 
     The ``eval_suite_error`` entry is replayed on a hit, so a cached failure
     still reaches the report; only the duplicated stderr line is dropped.
