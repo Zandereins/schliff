@@ -48,8 +48,15 @@ class TestBenchmarkFiles:
 # ---------------------------------------------------------------------------
 
 class TestBenchmarkMetadata:
-    def test_six_benchmarks_defined(self):
-        assert len(bench_run.BENCHMARKS) == 6
+    def test_every_benchmark_is_declared_once(self):
+        # Was `== 6` against seven benchmarks, so this file has been red for as
+        # long as the seventh vector has existed — and it contradicted the floor
+        # in test_composite_unified.py, which is the one CI actually collects.
+        # An equality against a count breaks whenever a vector is ADDED; the
+        # floor that guards against removal lives in run.py, once.
+        assert len(bench_run.BENCHMARKS) >= bench_run.MIN_VECTORS
+        files = [b["file"] for b in bench_run.BENCHMARKS]
+        assert len(files) == len(set(files)), f"duplicate declarations: {files}"
 
     def test_each_has_required_keys(self):
         required = {"file", "target_dimension", "gaming_vector", "detection"}
@@ -89,10 +96,10 @@ class TestScoreSkill:
 # ---------------------------------------------------------------------------
 
 class TestRunBenchmarks:
-    def test_returns_list(self):
+    def test_returns_one_result_per_declaration(self):
         results = bench_run.run_benchmarks()
         assert isinstance(results, list)
-        assert len(results) == 6
+        assert len(results) == len(bench_run.BENCHMARKS)
 
     def test_each_result_has_caught_field(self):
         results = bench_run.run_benchmarks()

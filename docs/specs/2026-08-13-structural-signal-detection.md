@@ -388,7 +388,9 @@ whose `.md` file survives fails too. That comparison alone cannot see a vector d
 sides at once — the two sets shrink together — so a floor on the vector count sits beside it.
 The floor is a literal, deliberately: an equality against a count is the `== 6`-against-seven drift,
 whereas a floor does not break when a vector is added, and lowering it is the deliberate act that
-retiring a vector should require.
+retiring a vector should require. It lives in `run.py` as `MIN_VECTORS`, with exactly one home —
+in the gate itself and not only in a test, because the guidance above tells contributors to check a
+new vector with `run.py --json`, and that invocation has to be the one that refuses.
 
 Still open, and NOT what blocks a new vector: `test_benchmark.py` is red (two assertions expect 6
 benchmarks where `BENCHMARKS` holds 7) and `pyproject.toml`'s `testpaths` excludes the directory, so

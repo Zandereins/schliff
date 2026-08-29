@@ -38,10 +38,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   travels in the output rather than short-circuiting it, so a consumer can still see why the run
   failed.
 
-  `caught` is lenient — a dimension that was never scored reads as caught, because the `-1`
-  no-eval-suite sentinel is below the penalty threshold — so gating on it can produce a false green
-  but never a false red. That is the safe direction, and it is why this does not wait for the
-  separate fix that makes `caught` honest.
+  A shrinking corpus fails too: `incomplete` only sees a declaration whose file went missing, so
+  retiring a vector on both sides at once — the ordinary edit — left the run reporting a smaller
+  headline and exiting 0. `run.py` now carries a floor on the declared vector count, which is where
+  it has to be, because the contributor guidance says to score a new vector with `run.py --json`
+  before committing.
+
+  What gating on `caught` can and cannot do, stated exactly: it cannot mask a detector that stops
+  firing, but it **can** fire on a scorer improvement. `bloated-preamble.md` is caught purely by the
+  score threshold — its declared filler mechanism emits no issue at all — so raising `efficiency`
+  above 80 reddens every required context while separation is untouched. That red is not false, a
+  declared detection really did stop penalising, but it fires on an improvement and is a real cost.
+  An earlier version of this entry claimed it could never happen; it can, and the vector that
+  carries it is named in the follow-up issue.
 
 - **A broken `eval-suite.json` no longer ends the run.** `schliff score`, `bench`, `eval`, `auto`
   and `doctor` all raised on a suite that is a directory, unreadable, not UTF-8, or nested deeply

@@ -87,6 +87,18 @@ BENCHMARKS = [
 
 CLEAN_CONTROL = "clean-reference.md"
 
+# Floor on the corpus. `incomplete` below only sees a declaration whose file went
+# missing; delete the entry AND the file together — the ordinary "retire a vector"
+# edit — and the corpus shrinks with no signal. Measured: BENCHMARKS = [] prints
+# "0/0 gaming attempts detected" and exits 0.
+#
+# It lives here and not only in the test suite because the spec tells contributors
+# to score a new vector with `run.py --json` before committing, and that check has
+# to be the one that refuses. A floor, not an equality: `== 6` against seven
+# benchmarks is the drift this file has already paid for once. Lowering it is the
+# deliberate act retiring a vector should require.
+MIN_VECTORS = 7
+
 
 def score_skill(skill_path: str) -> dict:
     """Score a single skill across all dimensions."""
@@ -222,6 +234,7 @@ def main():
     incomplete = [r["file"] for r in results if "error" in r]
     if clean_composite is None:
         incomplete.append(CLEAN_CONTROL)
+    shrunk = len(BENCHMARKS) < MIN_VECTORS
 
     # The other half of "a vector stopped being measured": it is still measured,
     # and it is no longer caught. Verified reachable — forcing one benchmark's
@@ -229,10 +242,20 @@ def main():
     # same headline drop a rename produces. A detector regression is the likelier
     # cause of the two, so leaving it out would have closed the smaller half.
     #
-    # `caught` is lenient today (an unmeasured dimension scoring the -1 sentinel
-    # reads as caught, see the follow-up issue), so gating on it can produce a
-    # false GREEN but never a false RED — which is the safe direction to be wrong
-    # in, and why this does not wait for that fix.
+    # What gating on `caught` can and cannot do, stated precisely, because the
+    # first version of this comment claimed "never a false red" and that is wrong.
+    #
+    # It cannot mask a regression: a detector that stops firing turns this red.
+    # It CAN fire on a scorer IMPROVEMENT. `bloated-preamble.md` is caught purely
+    # by the `target_score < 80` threshold — its declared filler mechanism emits
+    # no issue at all (efficiency 63, empty issue list) — so raising efficiency
+    # above 80 reddens every required context while separation is untouched
+    # (composite 26.4 against a clean control of 31.9). Measured. The other
+    # threshold-caught vectors are shielded by an issue keyword; this one is not.
+    #
+    # That red is not false — a declared detection really did stop penalising —
+    # but it fires on an improvement, so it is a real cost and it is named in the
+    # follow-up issue rather than hidden behind a claim that it cannot happen.
     uncaught = [r["file"] for r in results if "error" not in r and not r.get("caught")]
 
     violations = []
@@ -245,6 +268,7 @@ def main():
         output = [{k: v for k, v in r.items() if k != "target_details"} for r in results]
         print(json.dumps({"clean_composite": clean_composite,
                           "incomplete": incomplete, "uncaught": uncaught,
+                          "declared_vectors": len(BENCHMARKS), "shrunk": shrunk,
                           "violations": violations, "results": output}, indent=2))
     else:
         print(format_markdown(results))
@@ -254,6 +278,10 @@ def main():
             for f in incomplete:
                 print(f"  {f}")
             print("Every separation result above is unproven until they are restored.")
+        if shrunk:
+            print(f"CORPUS SHRANK — {len(BENCHMARKS)} vectors declared, "
+                  f"floor is {MIN_VECTORS}. If a vector was retired on purpose, "
+                  f"lower MIN_VECTORS in the same commit and say why.")
         if uncaught:
             print("VECTORS NO LONGER CAUGHT — the detector for these stopped firing:")
             for f in uncaught:
@@ -263,7 +291,7 @@ def main():
             for f, c in violations:
                 print(f"  {f}: {c}")
 
-    sys.exit(1 if violations or incomplete or uncaught else 0)
+    sys.exit(1 if violations or incomplete or uncaught or shrunk else 0)
 
 
 if __name__ == "__main__":

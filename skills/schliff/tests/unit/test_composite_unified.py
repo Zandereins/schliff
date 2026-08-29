@@ -10,6 +10,8 @@ Pins three invariants permanently:
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -184,6 +186,37 @@ def test_clean_body_not_stuffing_penalized(tmp_path):
         f"legitimate domain skill scored too low: {result['score']}"
 
 
+@pytest.fixture
+def bench_module(monkeypatch, request):
+    """The anti-gaming runner, imported without leaving it behind.
+
+    Two leaks, and only one of them monkeypatch handles. `syspath_prepend` does
+    revert the path entry, which matters because while it is live
+    `benchmarks/anti-gaming/skills/` sits ahead of the repo root as a `skills`
+    namespace package. The other is `sys.modules["run"]`, squatting about the
+    most generic top-level name there is for the rest of the process.
+
+    `monkeypatch.delitem(..., raising=False)` does NOT clean that up. Read the
+    source: when the key is absent it either raises or does nothing, and records
+    no undo entry either way — so an earlier version of this file carried a
+    comment asserting a pytest behaviour pytest does not have. An explicit
+    finalizer is the honest form.
+    """
+    repo = Path(__file__).resolve().parents[4]
+    monkeypatch.syspath_prepend(str(repo / "benchmarks" / "anti-gaming"))
+    preexisting = sys.modules.get("run")
+    import run as bench
+
+    def _restore():
+        if preexisting is None:
+            sys.modules.pop("run", None)
+        else:
+            sys.modules["run"] = preexisting
+
+    request.addfinalizer(_restore)
+    return bench
+
+
 def test_anti_gaming_benchmark_gate():
     import subprocess
     repo = Path(__file__).resolve().parents[4]  # unit→tests→schliff→skills→repo root
@@ -195,7 +228,7 @@ def test_anti_gaming_benchmark_gate():
     assert proc.returncode == 0, f"anti-gaming gate failed:\n{proc.stdout}"
 
 
-def test_the_anti_gaming_gate_fails_on_an_incomplete_corpus(monkeypatch, capsys):
+def test_the_anti_gaming_gate_fails_on_an_incomplete_corpus(bench_module, monkeypatch, capsys):
     """"No vector gamed" and "no vector measured" must not both be exit 0.
 
     The gate above asserts only ``returncode == 0``. Measured on f202bc1, before
@@ -206,19 +239,7 @@ def test_the_anti_gaming_gate_fails_on_an_incomplete_corpus(monkeypatch, capsys)
 
     This is the unit half; the subprocess test above covers the real corpus.
     """
-    import pytest
-
-    repo = Path(__file__).resolve().parents[4]
-    # Two leaks, not one. `syspath_prepend` reverts the path entry — which matters
-    # because while it is live, `benchmarks/anti-gaming/skills/` sits ahead of the
-    # repo root as a `skills` namespace package. The `delitem` reverts the OTHER
-    # half: `sys.modules["run"]` outlives monkeypatch on its own, under about the
-    # most generic top-level name there is, and stays bound to the benchmark
-    # runner for the rest of the process. Recording the key as absent BEFORE the
-    # import is what makes undo remove it.
-    monkeypatch.syspath_prepend(str(repo / "benchmarks" / "anti-gaming"))
-    monkeypatch.delitem(sys.modules, "run", raising=False)
-    import run as bench
+    bench = bench_module
 
     monkeypatch.setattr(sys, "argv", ["run.py"])
     monkeypatch.setattr(
@@ -234,7 +255,7 @@ def test_the_anti_gaming_gate_fails_on_an_incomplete_corpus(monkeypatch, capsys)
     assert "renamed-away.md" in out, "the report must name what it did not measure"
 
 
-def test_the_benchmark_corpus_and_its_declarations_agree(monkeypatch):
+def test_the_benchmark_corpus_and_its_declarations_agree(bench_module):
     """A vector can also stop being measured by losing its declaration.
 
     `incomplete` catches a file that vanished while its BENCHMARKS entry stayed.
@@ -247,10 +268,8 @@ def test_the_benchmark_corpus_and_its_declarations_agree(monkeypatch):
     seven benchmarks is the drift this file must not repeat. Both directions
     fail — a skill file with no entry, and an entry with no file.
     """
+    bench = bench_module
     repo = Path(__file__).resolve().parents[4]
-    monkeypatch.syspath_prepend(str(repo / "benchmarks" / "anti-gaming"))
-    monkeypatch.delitem(sys.modules, "run", raising=False)
-    import run as bench
 
     on_disk = {p.name for p in (repo / "benchmarks" / "anti-gaming" / "skills").glob("*.md")}
     declared = {b["file"] for b in bench.BENCHMARKS} | {bench.CLEAN_CONTROL}
@@ -261,18 +280,12 @@ def test_the_benchmark_corpus_and_its_declarations_agree(monkeypatch):
     )
 
     # Set equality compares two things that move together, so it cannot see a
-    # vector being deleted on BOTH sides at once — measured: `git rm no-scope.md`
-    # plus its dict entry gives 6/6, empty `incomplete`, exit 0, and this very
-    # assertion still passes. A floor is the only thing that catches a corpus
-    # shrinking, and unlike the `== 6`-against-seven equality that this file
-    # exists to not repeat, a floor does not break when a vector is ADDED.
-    #
-    # Lowering this number is the deliberate act. If a vector is genuinely
-    # retired, lower it in the same commit and say why there.
-    assert len(bench.BENCHMARKS) >= 7, (
-        f"the corpus shrank to {len(bench.BENCHMARKS)} vectors; if that was "
-        f"deliberate, lower this floor in the same commit and say why"
-    )
+    # vector deleted on BOTH sides at once — measured: removing a file plus its
+    # dict entry gives 6/6, empty `incomplete`, exit 0, and this very assertion
+    # still passes. `run.py` carries the floor for that, and the number lives
+    # there alone; asserting it again here would be a second home for it. What
+    # this checks is that the floor is actually WIRED to the exit code.
+    assert len(bench.BENCHMARKS) >= bench.MIN_VECTORS
 
 
 def test_evolve_score_file_matches_cli(tmp_path):
@@ -298,7 +311,7 @@ def test_default_run_reports_seven_of_seven():
     assert r["measured_dimensions"] == 7 and r["total_dimensions"] == 7
 
 
-def test_the_anti_gaming_gate_fails_when_a_vector_is_no_longer_caught(monkeypatch, capsys):
+def test_the_anti_gaming_gate_fails_when_a_vector_is_no_longer_caught(bench_module, monkeypatch, capsys):
     """A detector regression is the likelier half, and it shipped untested.
 
     The gate exits 1 on `uncaught`, and nothing asserted it: removing that term
@@ -309,12 +322,7 @@ def test_the_anti_gaming_gate_fails_when_a_vector_is_no_longer_caught(monkeypatc
     The vector is still measured here — no `error` key — so `incomplete` cannot
     carry this; only `caught` can.
     """
-    import pytest
-
-    repo = Path(__file__).resolve().parents[4]
-    monkeypatch.syspath_prepend(str(repo / "benchmarks" / "anti-gaming"))
-    monkeypatch.delitem(sys.modules, "run", raising=False)
-    import run as bench
+    bench = bench_module
 
     monkeypatch.setattr(sys, "argv", ["run.py"])
     monkeypatch.setattr(bench, "run_benchmarks", lambda: [{
@@ -330,3 +338,24 @@ def test_the_anti_gaming_gate_fails_when_a_vector_is_no_longer_caught(monkeypatc
     out = capsys.readouterr().out
     assert "VECTORS NO LONGER CAUGHT" in out, out[-400:]
     assert "detector-regressed.md" in out, "the report must name the vector that stopped firing"
+
+
+def test_the_anti_gaming_gate_fails_when_the_corpus_shrinks(bench_module, monkeypatch, capsys):
+    """Retiring a vector on both sides is the edit `incomplete` cannot see.
+
+    `incomplete` needs a declaration whose file went missing. Delete the entry
+    and the file together — the ordinary way to retire a vector — and the run
+    reports a smaller headline and exits 0: measured, `BENCHMARKS = []` printed
+    "0/0 gaming attempts detected" and exited 0.
+
+    Asserted through the exit code rather than by repeating the floor's value,
+    which lives in `run.py` and should have exactly one home.
+    """
+    monkeypatch.setattr(sys, "argv", ["run.py"])
+    monkeypatch.setattr(bench_module, "BENCHMARKS", bench_module.BENCHMARKS[:-1])
+
+    with pytest.raises(SystemExit) as exc:
+        bench_module.main()
+
+    assert exc.value.code == 1, "a corpus below the floor must not pass"
+    assert "CORPUS SHRANK" in capsys.readouterr().out
