@@ -359,3 +359,27 @@ def test_the_anti_gaming_gate_fails_when_the_corpus_shrinks(bench_module, monkey
 
     assert exc.value.code == 1, "a corpus below the floor must not pass"
     assert "CORPUS SHRANK" in capsys.readouterr().out
+
+
+def test_a_duplicated_declaration_does_not_refill_the_floor(bench_module, monkeypatch, capsys):
+    """The floor counts vectors, not entries.
+
+    Counting entries let a duplicated dict restore the number: one vector removed
+    plus one copy-pasted entry gave seven declared against six real, the headline
+    read "7/7 gaming attempts detected", and the gate exited 0 — measured. The
+    likelier version needs no removal at all, only a copy-paste when adding a
+    vector with the `file` key left unchanged.
+
+    The mutation: count `len(BENCHMARKS)` instead of the distinct files, and this
+    goes green again.
+    """
+    shortened = [b for b in bench_module.BENCHMARKS[:-1]]
+    monkeypatch.setattr(bench_module, "BENCHMARKS", shortened + [dict(shortened[0])])
+    monkeypatch.setattr(sys, "argv", ["run.py"])
+
+    with pytest.raises(SystemExit) as exc:
+        bench_module.main()
+
+    assert exc.value.code == 1, "a duplicate declaration must not stand in for a vector"
+    out = capsys.readouterr().out
+    assert "CORPUS SHRANK" in out and "distinct vectors" in out, out[-300:]

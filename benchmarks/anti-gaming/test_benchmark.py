@@ -96,10 +96,11 @@ class TestScoreSkill:
 # ---------------------------------------------------------------------------
 
 class TestRunBenchmarks:
-    def test_returns_one_result_per_declaration(self):
-        results = bench_run.run_benchmarks()
-        assert isinstance(results, list)
-        assert len(results) == len(bench_run.BENCHMARKS)
+    # `len(results) == len(BENCHMARKS)` used to live here. It was a tautology:
+    # `run_benchmarks` appends exactly one result per entry on both its paths, so
+    # no input can violate it — it asserted Python, not this code. Dropped rather
+    # than reworded; duplicate declarations are caught by
+    # `test_every_benchmark_is_declared_once`, which can actually fail.
 
     def test_each_result_has_caught_field(self):
         results = bench_run.run_benchmarks()

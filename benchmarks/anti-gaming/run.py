@@ -234,7 +234,13 @@ def main():
     incomplete = [r["file"] for r in results if "error" in r]
     if clean_composite is None:
         incomplete.append(CLEAN_CONTROL)
-    shrunk = len(BENCHMARKS) < MIN_VECTORS
+    # Distinct FILES, not entries. Counting entries let a duplicated dict restore
+    # the number: one vector removed plus one copy-pasted entry gave 7 declared,
+    # 6 real, "7/7 gaming attempts detected", exit 0 — measured. The likelier
+    # version needs no deletion at all: copy a dict when adding a vector, forget
+    # to change `file`, and the run publishes 8/8 over seven real vectors.
+    vectors = {b["file"] for b in BENCHMARKS}
+    shrunk = len(vectors) < MIN_VECTORS
 
     # The other half of "a vector stopped being measured": it is still measured,
     # and it is no longer caught. Verified reachable — forcing one benchmark's
@@ -245,7 +251,16 @@ def main():
     # What gating on `caught` can and cannot do, stated precisely, because the
     # first version of this comment claimed "never a false red" and that is wrong.
     #
-    # It cannot mask a regression: a detector that stops firing turns this red.
+    # It cannot mask a regression on six of the seven vectors: a detector that
+    # stops firing turns those red. NOT on `keyword-stuffing.md`, whose target
+    # dimension `triggers` is eval-suite-gated and returns the -1 sentinel with
+    # no suite — so `target_score < 80` is satisfied by UNMEASURED rather than by
+    # penalised, and `caught` is permanently True. Measured: replacing that file
+    # with the clean control verbatim, so that it games nothing at all, still
+    # reports caught. Its declared TF-IDF detection is never exercised. Fixing it
+    # means retargeting the vector at a dimension measurable without a suite,
+    # which turns the gate red until it is done, so it is in the follow-up issue
+    # and named here rather than covered by a claim of full coverage.
     # It CAN fire on a scorer IMPROVEMENT. `bloated-preamble.md` is caught purely
     # by the `target_score < 80` threshold — its declared filler mechanism emits
     # no issue at all (efficiency 63, empty issue list) — so raising efficiency
@@ -268,7 +283,8 @@ def main():
         output = [{k: v for k, v in r.items() if k != "target_details"} for r in results]
         print(json.dumps({"clean_composite": clean_composite,
                           "incomplete": incomplete, "uncaught": uncaught,
-                          "declared_vectors": len(BENCHMARKS), "shrunk": shrunk,
+                          "declared_vectors": len(vectors),
+                          "declarations": len(BENCHMARKS), "shrunk": shrunk,
                           "violations": violations, "results": output}, indent=2))
     else:
         print(format_markdown(results))
@@ -279,7 +295,8 @@ def main():
                 print(f"  {f}")
             print("Every separation result above is unproven until they are restored.")
         if shrunk:
-            print(f"CORPUS SHRANK — {len(BENCHMARKS)} vectors declared, "
+            print(f"CORPUS SHRANK — {len(vectors)} distinct vectors "
+                  f"({len(BENCHMARKS)} declarations), "
                   f"floor is {MIN_VECTORS}. If a vector was retired on purpose, "
                   f"lower MIN_VECTORS in the same commit and say why.")
         if uncaught:

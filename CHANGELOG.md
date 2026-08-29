@@ -44,8 +44,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   it has to be, because the contributor guidance says to score a new vector with `run.py --json`
   before committing.
 
+  The floor counts distinct vector files, not declarations: counting declarations let a duplicated
+  entry stand in for a removed vector, and a copy-pasted entry with an unchanged `file` key would
+  have published one more detection than there are vectors.
+
   What gating on `caught` can and cannot do, stated exactly: it cannot mask a detector that stops
-  firing, but it **can** fire on a scorer improvement. `bloated-preamble.md` is caught purely by the
+  firing **on six of the seven vectors** — not on `keyword-stuffing.md`, whose target dimension is
+  eval-suite-gated and returns the no-suite sentinel, so it reads as caught no matter what the file
+  contains (verified by replacing it with the clean control). And it **can** fire on a scorer
+  improvement. `bloated-preamble.md` is caught purely by the
   score threshold — its declared filler mechanism emits no issue at all — so raising `efficiency`
   above 80 reddens every required context while separation is untouched. That red is not false, a
   declared detection really did stop penalising, but it fires on an improvement and is a real cost.
