@@ -30,10 +30,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `benchmarks/anti-gaming/skills/` left `run.py` at exit 0 while its headline dropped from 7/7 to
   6/7, so the vector stopped being tested and the CI job — which asserts only `returncode == 0` —
   stayed green. Since the gate is enforced in five of the six required status checks, that made
-  every earlier green run unprovable in retrospect. `main()` now lists the unmeasured files, says
-  the separation results are unproven until they are restored, and exits 1; `--json` gains
-  `incomplete`. The corpus state travels in the output rather than short-circuiting it, so a
-  consumer can still see why the run failed.
+  every earlier green run unprovable in retrospect. The same headline drop is reachable a second
+  way, and the likelier one: a vector that is still measured but is **no longer caught**, i.e. a
+  detector regression. `main()` now names both — the files that produced no measurement, and the
+  vectors whose detector stopped firing — states that the separation results are unproven until
+  they are restored, and exits 1; `--json` gains `incomplete` and `uncaught`. The corpus state
+  travels in the output rather than short-circuiting it, so a consumer can still see why the run
+  failed.
+
+  `caught` is lenient — a dimension that was never scored reads as caught, because the `-1`
+  no-eval-suite sentinel is below the penalty threshold — so gating on it can produce a false green
+  but never a false red. That is the safe direction, and it is why this does not wait for the
+  separate fix that makes `caught` honest.
 
 - **A broken `eval-suite.json` no longer ends the run.** `schliff score`, `bench`, `eval`, `auto`
   and `doctor` all raised on a suite that is a directory, unreadable, not UTF-8, or nested deeply

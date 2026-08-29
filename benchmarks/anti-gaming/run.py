@@ -223,6 +223,18 @@ def main():
     if clean_composite is None:
         incomplete.append(CLEAN_CONTROL)
 
+    # The other half of "a vector stopped being measured": it is still measured,
+    # and it is no longer caught. Verified reachable — forcing one benchmark's
+    # `caught` to False printed "6/7 gaming attempts detected" and exited 0, the
+    # same headline drop a rename produces. A detector regression is the likelier
+    # cause of the two, so leaving it out would have closed the smaller half.
+    #
+    # `caught` is lenient today (an unmeasured dimension scoring the -1 sentinel
+    # reads as caught, see the follow-up issue), so gating on it can produce a
+    # false GREEN but never a false RED — which is the safe direction to be wrong
+    # in, and why this does not wait for that fix.
+    uncaught = [r["file"] for r in results if "error" not in r and not r.get("caught")]
+
     violations = []
     if clean_composite is not None:
         for r in results:
@@ -232,7 +244,7 @@ def main():
     if use_json:
         output = [{k: v for k, v in r.items() if k != "target_details"} for r in results]
         print(json.dumps({"clean_composite": clean_composite,
-                          "incomplete": incomplete,
+                          "incomplete": incomplete, "uncaught": uncaught,
                           "violations": violations, "results": output}, indent=2))
     else:
         print(format_markdown(results))
@@ -242,12 +254,16 @@ def main():
             for f in incomplete:
                 print(f"  {f}")
             print("Every separation result above is unproven until they are restored.")
+        if uncaught:
+            print("VECTORS NO LONGER CAUGHT — the detector for these stopped firing:")
+            for f in uncaught:
+                print(f"  {f}")
         if violations:
             print("SEPARATION FAILURES (gamed >= clean):")
             for f, c in violations:
                 print(f"  {f}: {c}")
 
-    sys.exit(1 if violations or incomplete else 0)
+    sys.exit(1 if violations or incomplete or uncaught else 0)
 
 
 if __name__ == "__main__":

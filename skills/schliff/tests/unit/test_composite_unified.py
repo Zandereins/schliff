@@ -189,7 +189,10 @@ def test_anti_gaming_benchmark_gate():
     repo = Path(__file__).resolve().parents[4]  # unit→tests→schliff→skills→repo root
     proc = subprocess.run(["/usr/bin/python3", "benchmarks/anti-gaming/run.py"],
                           cwd=str(repo), capture_output=True, text=True)
-    assert proc.returncode == 0, f"anti-gaming separation failed:\n{proc.stdout}"
+    # Neutral wording: the gate now exits 1 for three distinct reasons (separation
+    # broken, corpus incomplete, a vector no longer caught) and stdout says which.
+    # Naming one of them here put the wrong why in the CI headline for the others.
+    assert proc.returncode == 0, f"anti-gaming gate failed:\n{proc.stdout}"
 
 
 def test_the_anti_gaming_gate_fails_on_an_incomplete_corpus(monkeypatch, capsys):
@@ -206,9 +209,10 @@ def test_the_anti_gaming_gate_fails_on_an_incomplete_corpus(monkeypatch, capsys)
     import pytest
 
     repo = Path(__file__).resolve().parents[4]
-    bench_dir = str(repo / "benchmarks" / "anti-gaming")
-    if bench_dir not in sys.path:
-        sys.path.insert(0, bench_dir)
+    # syspath_prepend, not sys.path.insert: the module is named `run`, about as
+    # generic as a top-level name gets, and a bare insert leaves that directory
+    # ahead of scripts/ for every later test in the process.
+    monkeypatch.syspath_prepend(str(repo / "benchmarks" / "anti-gaming"))
     import run as bench
 
     monkeypatch.setattr(sys, "argv", ["run.py"])
@@ -223,6 +227,32 @@ def test_the_anti_gaming_gate_fails_on_an_incomplete_corpus(monkeypatch, capsys)
     out = capsys.readouterr().out
     assert "CORPUS INCOMPLETE" in out, out[-400:]
     assert "renamed-away.md" in out, "the report must name what it did not measure"
+
+
+def test_the_benchmark_corpus_and_its_declarations_agree(monkeypatch):
+    """A vector can also stop being measured by losing its declaration.
+
+    `incomplete` catches a file that vanished while its BENCHMARKS entry stayed.
+    Drop the entry as well — an ordinary edit — and the headline reads 6/6 with
+    an empty `incomplete` and exit 0: verified. The only assertion pinning the
+    count lives in benchmarks/anti-gaming/test_benchmark.py, which is red and
+    which `testpaths` excludes from every run, so no enforced check saw it.
+
+    Pinned against the directory rather than a literal count: `== 6` against
+    seven benchmarks is the drift this file must not repeat. Both directions
+    fail — a skill file with no entry, and an entry with no file.
+    """
+    repo = Path(__file__).resolve().parents[4]
+    monkeypatch.syspath_prepend(str(repo / "benchmarks" / "anti-gaming"))
+    import run as bench
+
+    on_disk = {p.name for p in (repo / "benchmarks" / "anti-gaming" / "skills").glob("*.md")}
+    declared = {b["file"] for b in bench.BENCHMARKS} | {bench.CLEAN_CONTROL}
+
+    assert on_disk == declared, (
+        f"undeclared skill files: {sorted(on_disk - declared)}; "
+        f"declared but absent: {sorted(declared - on_disk)}"
+    )
 
 
 def test_evolve_score_file_matches_cli(tmp_path):
