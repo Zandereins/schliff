@@ -383,3 +383,30 @@ def test_a_duplicated_declaration_does_not_refill_the_floor(bench_module, monkey
     assert exc.value.code == 1, "a duplicate declaration must not stand in for a vector"
     out = capsys.readouterr().out
     assert "CORPUS SHRANK" in out and "distinct vectors" in out, out[-300:]
+
+
+def test_a_duplicate_declaration_fails_even_without_a_removal(bench_module, monkeypatch, capsys):
+    """The additive case — a copy-paste while ADDING a vector.
+
+    The first version of the duplicate guard only fired when the copy also
+    dropped the corpus below the floor, i.e. the removal case the test above
+    exercises. Appending a duplicate without removing anything left eight
+    declarations over seven vectors at exit 0, with the headline reading "8/8":
+    measured, and it is the case the code comment claimed to cover.
+
+    This assertion lives here and not in `benchmarks/anti-gaming/test_benchmark.py`,
+    which holds the other duplicate check: `testpaths` excludes that directory and
+    CI runs `pytest tests/unit/`, so nothing collects it. A guard enforced nowhere
+    is a guard that exists only in the repository.
+    """
+    monkeypatch.setattr(bench_module, "BENCHMARKS",
+                        bench_module.BENCHMARKS + [dict(bench_module.BENCHMARKS[0])])
+    monkeypatch.setattr(sys, "argv", ["run.py"])
+
+    with pytest.raises(SystemExit) as exc:
+        bench_module.main()
+
+    assert exc.value.code == 1, "a duplicated declaration must redden the gate on its own"
+    out = capsys.readouterr().out
+    assert "DECLARED MORE THAN ONCE" in out, out[-300:]
+    assert "inflated by duplicate declarations" in out, "the headline must not overstate coverage"

@@ -168,7 +168,15 @@ def format_markdown(results: list[dict]) -> str:
 
     caught = sum(1 for r in results if r.get("caught"))
     total = len(results)
+    distinct = len({r["file"] for r in results})
     lines.append(f"**{caught}/{total} gaming attempts detected and penalized.**")
+    if distinct != total:
+        # One row per declaration, so a file declared twice is counted twice. Say
+        # so next to the number rather than under it; the gate reddens on this,
+        # but the headline is what a reader quotes.
+        lines.append("")
+        lines.append(f"**Only {distinct} distinct vectors — the count above is inflated "
+                     f"by duplicate declarations.**")
     lines.append("")
 
     lines.append("| Skill | Target Dim | Gaming Vector | Score | Caught |")
@@ -241,6 +249,14 @@ def main():
     # to change `file`, and the run publishes 8/8 over seven real vectors.
     vectors = {b["file"] for b in BENCHMARKS}
     shrunk = len(vectors) < MIN_VECTORS
+    # A duplicate is its own failure and must not depend on the floor. The
+    # previous version only caught it when the copy ALSO dropped the corpus below
+    # MIN_VECTORS — the removal case. Appending a duplicate without removing
+    # anything, which is what a copy-paste while ADDING a vector produces, left
+    # eight declarations over seven vectors at exit 0 with a headline reading
+    # "8/8". Measured, and it is the case the comment here previously claimed to
+    # cover while the code did not.
+    duplicated = sorted(f for f in vectors if sum(b["file"] == f for b in BENCHMARKS) > 1)
 
     # The other half of "a vector stopped being measured": it is still measured,
     # and it is no longer caught. Verified reachable — forcing one benchmark's
@@ -285,6 +301,7 @@ def main():
                           "incomplete": incomplete, "uncaught": uncaught,
                           "declared_vectors": len(vectors),
                           "declarations": len(BENCHMARKS), "shrunk": shrunk,
+                          "duplicated": duplicated,
                           "violations": violations, "results": output}, indent=2))
     else:
         print(format_markdown(results))
@@ -299,6 +316,10 @@ def main():
                   f"({len(BENCHMARKS)} declarations), "
                   f"floor is {MIN_VECTORS}. If a vector was retired on purpose, "
                   f"lower MIN_VECTORS in the same commit and say why.")
+        if duplicated:
+            print("DECLARED MORE THAN ONCE — the headline counts these twice:")
+            for f in duplicated:
+                print(f"  {f}")
         if uncaught:
             print("VECTORS NO LONGER CAUGHT — the detector for these stopped firing:")
             for f in uncaught:
@@ -308,7 +329,7 @@ def main():
             for f, c in violations:
                 print(f"  {f}: {c}")
 
-    sys.exit(1 if violations or incomplete or uncaught or shrunk else 0)
+    sys.exit(1 if violations or incomplete or uncaught or shrunk or duplicated else 0)
 
 
 if __name__ == "__main__":

@@ -372,7 +372,8 @@ under `playground/.venv/lib/python3.12/site-packages/`; in a user's repo that wo
 ~~`benchmarks/anti-gaming/` runs in no CI job~~ — **CORRECTED 2026-08-28, and the correction is the
 lesson.** The grep this claim rested on is accurate: `grep -rn 'anti-gaming\|benchmarks'
 .github/workflows/ Makefile` returns nothing. The conclusion drawn from it was not.
-`skills/schliff/tests/unit/test_composite_unified.py:187` runs `run.py` as a subprocess and asserts
+`test_anti_gaming_benchmark_gate` in `skills/schliff/tests/unit/test_composite_unified.py` runs
+`run.py` as a subprocess and asserts
 `returncode == 0`, and `test.yml` invokes `pytest tests/unit/` with an explicit path, which
 overrides `testpaths`. The gate has therefore been **enforced in five of the six required contexts**
 (`test 3.10`–`3.13`, `test-macos`) the whole time. A true observation with a false conclusion, which

@@ -44,9 +44,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   it has to be, because the contributor guidance says to score a new vector with `run.py --json`
   before committing.
 
-  The floor counts distinct vector files, not declarations: counting declarations let a duplicated
-  entry stand in for a removed vector, and a copy-pasted entry with an unchanged `file` key would
-  have published one more detection than there are vectors.
+  A duplicated declaration fails on its own, independently of the floor. Counting declarations let a
+  duplicated entry stand in for a removed vector; tying the check to the floor then still missed the
+  additive case, where a copy-pasted entry with an unchanged `file` key published one more detection
+  than there are vectors at exit 0. The report also says when the headline is inflated, because that
+  number is what a reader quotes.
 
   What gating on `caught` can and cannot do, stated exactly: it cannot mask a detector that stops
   firing **on six of the seven vectors** — not on `keyword-stuffing.md`, whose target dimension is
