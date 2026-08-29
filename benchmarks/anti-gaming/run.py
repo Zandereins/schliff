@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Anti-gaming benchmark — demonstrates Schliff's gaming detection.
 
-Scores 6 synthetic SKILL.md files designed to exploit specific dimensions.
+Scores the synthetic SKILL.md files under skills/, one per gaming vector.
 Each skill targets a different gaming vector. The benchmark verifies that
 Schliff's anti-gaming checks catch and penalize each attempt.
 

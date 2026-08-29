@@ -383,8 +383,12 @@ gamed" from "no vector measured". Renaming one skill file left it at exit 0 whil
 dropped from 7/7 to 6/7 — and so did a vector that is still measured but no longer caught, which is
 the likelier cause of the two. `main()` now reports `incomplete` and `uncaught` and exits 1, so a
 vector that stops being measured OR stops being detected reddens CI instead of vanishing. The
-corpus is additionally pinned against the directory it lives in (not against a count literal, which
-is the `== 6`-against-seven drift), so deleting a `BENCHMARKS` entry fails too.
+corpus is additionally pinned against the directory it lives in, so deleting a `BENCHMARKS` entry
+whose `.md` file survives fails too. That comparison alone cannot see a vector deleted on **both**
+sides at once — the two sets shrink together — so a floor on the vector count sits beside it.
+The floor is a literal, deliberately: an equality against a count is the `== 6`-against-seven drift,
+whereas a floor does not break when a vector is added, and lowering it is the deliberate act that
+retiring a vector should require.
 
 Still open, and NOT what blocks a new vector: `test_benchmark.py` is red (two assertions expect 6
 benchmarks where `BENCHMARKS` holds 7) and `pyproject.toml`'s `testpaths` excludes the directory, so

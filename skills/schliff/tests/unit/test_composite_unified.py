@@ -209,10 +209,15 @@ def test_the_anti_gaming_gate_fails_on_an_incomplete_corpus(monkeypatch, capsys)
     import pytest
 
     repo = Path(__file__).resolve().parents[4]
-    # syspath_prepend, not sys.path.insert: the module is named `run`, about as
-    # generic as a top-level name gets, and a bare insert leaves that directory
-    # ahead of scripts/ for every later test in the process.
+    # Two leaks, not one. `syspath_prepend` reverts the path entry — which matters
+    # because while it is live, `benchmarks/anti-gaming/skills/` sits ahead of the
+    # repo root as a `skills` namespace package. The `delitem` reverts the OTHER
+    # half: `sys.modules["run"]` outlives monkeypatch on its own, under about the
+    # most generic top-level name there is, and stays bound to the benchmark
+    # runner for the rest of the process. Recording the key as absent BEFORE the
+    # import is what makes undo remove it.
     monkeypatch.syspath_prepend(str(repo / "benchmarks" / "anti-gaming"))
+    monkeypatch.delitem(sys.modules, "run", raising=False)
     import run as bench
 
     monkeypatch.setattr(sys, "argv", ["run.py"])
@@ -244,6 +249,7 @@ def test_the_benchmark_corpus_and_its_declarations_agree(monkeypatch):
     """
     repo = Path(__file__).resolve().parents[4]
     monkeypatch.syspath_prepend(str(repo / "benchmarks" / "anti-gaming"))
+    monkeypatch.delitem(sys.modules, "run", raising=False)
     import run as bench
 
     on_disk = {p.name for p in (repo / "benchmarks" / "anti-gaming" / "skills").glob("*.md")}
@@ -252,6 +258,20 @@ def test_the_benchmark_corpus_and_its_declarations_agree(monkeypatch):
     assert on_disk == declared, (
         f"undeclared skill files: {sorted(on_disk - declared)}; "
         f"declared but absent: {sorted(declared - on_disk)}"
+    )
+
+    # Set equality compares two things that move together, so it cannot see a
+    # vector being deleted on BOTH sides at once — measured: `git rm no-scope.md`
+    # plus its dict entry gives 6/6, empty `incomplete`, exit 0, and this very
+    # assertion still passes. A floor is the only thing that catches a corpus
+    # shrinking, and unlike the `== 6`-against-seven equality that this file
+    # exists to not repeat, a floor does not break when a vector is ADDED.
+    #
+    # Lowering this number is the deliberate act. If a vector is genuinely
+    # retired, lower it in the same commit and say why there.
+    assert len(bench.BENCHMARKS) >= 7, (
+        f"the corpus shrank to {len(bench.BENCHMARKS)} vectors; if that was "
+        f"deliberate, lower this floor in the same commit and say why"
     )
 
 
@@ -276,3 +296,37 @@ def test_default_run_reports_seven_of_seven():
             ["structure", "triggers", "quality", "edges", "efficiency", "composability", "clarity"]}
     r = compute_composite(full)
     assert r["measured_dimensions"] == 7 and r["total_dimensions"] == 7
+
+
+def test_the_anti_gaming_gate_fails_when_a_vector_is_no_longer_caught(monkeypatch, capsys):
+    """A detector regression is the likelier half, and it shipped untested.
+
+    The gate exits 1 on `uncaught`, and nothing asserted it: removing that term
+    from the exit expression left all fourteen tests in this file green, so a
+    revert would have shipped. The behaviour was checked by hand in a shell and
+    never written down, which is the same thing as not checking it.
+
+    The vector is still measured here — no `error` key — so `incomplete` cannot
+    carry this; only `caught` can.
+    """
+    import pytest
+
+    repo = Path(__file__).resolve().parents[4]
+    monkeypatch.syspath_prepend(str(repo / "benchmarks" / "anti-gaming"))
+    monkeypatch.delitem(sys.modules, "run", raising=False)
+    import run as bench
+
+    monkeypatch.setattr(sys, "argv", ["run.py"])
+    monkeypatch.setattr(bench, "run_benchmarks", lambda: [{
+        "file": "detector-regressed.md", "target_dimension": "efficiency",
+        "gaming_vector": "x", "detection": "y", "target_score": 91,
+        "target_issues": [], "composite": 1.0, "all_scores": {}, "caught": False,
+    }])
+
+    with pytest.raises(SystemExit) as exc:
+        bench.main()
+
+    assert exc.value.code == 1, "a vector that stopped being detected must not pass"
+    out = capsys.readouterr().out
+    assert "VECTORS NO LONGER CAUGHT" in out, out[-400:]
+    assert "detector-regressed.md" in out, "the report must name the vector that stopped firing"
