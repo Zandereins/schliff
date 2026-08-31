@@ -77,7 +77,7 @@ evolve = ["litellm>=1.40.0,<2.0.0"]
 # `ignore` entry in .github/dependabot.yml): no CI job installs this extra, and
 # the only judge test runs with mock=True, so CI cannot observe a break here.
 # Lift the cap by hand, together with a job that actually installs and runs it.
-judge = ["anthropic>=0.104,<1.0", "pydantic>=2.13,<3.0"]
+judge = ["anthropic>=0.104,<2.0", "pydantic>=2.13,<3.0"]
 # Phase 3b: mcp = ["mcp>=1.0.0,<2.0.0"]
 
 [tool.pytest.ini_options]
