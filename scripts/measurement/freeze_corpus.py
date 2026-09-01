@@ -9,9 +9,18 @@ published on 2026-09-14 cannot be reproduced by anyone, including its author.
 
 Two domains, kept apart on purpose:
 
-* **Which files count** belongs to `skill_mesh.discover_skills`. It is called
-  here rather than re-derived, so the freeze covers exactly the set the tool
-  measures — including its exclusions.
+* **Which files count** belongs to the modules that own them, called here rather
+  than re-derived: `skill_mesh.discover_skills` for which skills exist, and
+  `shared._payload_files` plus the loader's `eval-suite.json` path for which
+  files each skill's numbers are computed from.
+
+  Getting that second half wrong is what the first version of this file did. It
+  hashed SKILL.md alone, while `estimate_token_cost` and `skill_payload_digest`
+  also read `references/*.md` and `eval-suite.json`. Measured: rewriting one
+  reference moved a skill from 26 to 3,925 tokens and changed its payload digest
+  while `verify` reported `0 drifted` and exited 0. A freeze whose domain is
+  smaller than the quantity it indexes is not a freeze — the same defect this
+  repository fixed in `skill_payload_digest` itself.
 * **What the bytes were** belongs to this file. It hashes the raw bytes with a
   full sha256, NOT `discover_skills`' own `content_hash`, which is truncated to
   16 characters and computed over content that schliff has already decoded and
@@ -37,28 +46,79 @@ if str(_SCRIPTS) not in sys.path:
 
 import skill_mesh  # noqa: E402  (path set above)
 
+import shared  # noqa: E402  (path set above)
+
 CORPUS_ROOT = Path.home() / ".claude"
 
 
+def _payload_of(skill_md: Path) -> list[Path]:
+    """Every file the published numbers for this skill are computed from.
+
+    SKILL.md, its `references/*.md` as `_payload_files` enumerates them, and
+    `eval-suite.json` when present — the same three the cost and the identity
+    read. Asked for, not re-derived: a hand-mirrored copy of this list is what
+    produced several defects in `shared` itself.
+    """
+    files = [skill_md, *shared._payload_files(str(skill_md))]
+    suite = skill_md.parent / "eval-suite.json"
+    if suite.exists():
+        files.append(suite)
+    return files
+
+
 def _entries() -> list[dict]:
-    """One record per discovered SKILL.md: path relative to the corpus root, sha256, size."""
+    """One record per file the measurement reads: relative path, sha256, size."""
+    skills = skill_mesh.discover_skills([str(CORPUS_ROOT)])
+    # discover_skills stops at MAX_SCAN_FILES and sorts AFTER truncating, so a
+    # capped scan yields a set that depends on traversal order. Silently freezing
+    # such a set would make `verify` report churn on an unchanged corpus.
+    if len(skills) >= skill_mesh.MAX_SCAN_FILES:
+        raise SystemExit(
+            f"discovery hit its {skill_mesh.MAX_SCAN_FILES}-file cap; the frozen set "
+            f"would be whatever the filesystem happened to return first"
+        )
+
+    seen: set[Path] = set()
     out = []
-    for skill in skill_mesh.discover_skills([str(CORPUS_ROOT)]):
-        path = Path(skill["path"])
-        raw = path.read_bytes()
-        out.append({
-            # Relative, so the manifest is checkable on another machine and does
-            # not publish a home directory layout.
-            "path": str(path.relative_to(CORPUS_ROOT)),
-            "sha256": hashlib.sha256(raw).hexdigest(),
-            "bytes": len(raw),
-        })
+    for skill in skills:
+        for path in _payload_of(Path(skill["path"])):
+            if path in seen:
+                continue
+            seen.add(path)
+            try:
+                raw = path.read_bytes()
+            except OSError as exc:
+                # A file that vanished mid-run is exactly the corpus change this
+                # tool exists to report. Say so; do not traceback over it.
+                print(f"skipped (unreadable): {path} — {type(exc).__name__}")
+                continue
+            out.append({
+                # Relative, so the manifest is checkable on another machine and
+                # does not publish a home directory layout.
+                "path": str(path.relative_to(CORPUS_ROOT)),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "bytes": len(raw),
+            })
     out.sort(key=lambda e: e["path"])
     return out
 
 
 def write(target: Path) -> int:
     entries = _entries()
+    if not entries:
+        raise SystemExit(
+            f"refusing to write an empty manifest: no skills found under {CORPUS_ROOT}"
+        )
+    if target.exists():
+        previous = sum(1 for line in target.read_text(encoding="utf-8").splitlines() if line.strip())
+        if len(entries) < previous:
+            # `discover_skills` skips a missing directory silently, so a run under
+            # a different HOME would otherwise truncate the reproducibility
+            # artifact and exit 0.
+            raise SystemExit(
+                f"refusing to shrink {target} from {previous} to {len(entries)} entries; "
+                f"delete it deliberately if the corpus really got smaller"
+            )
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", encoding="utf-8") as fh:
         for e in entries:

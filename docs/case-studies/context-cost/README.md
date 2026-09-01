@@ -20,8 +20,14 @@ updates rewrite on their own schedule. Measured:
 | 2026-09-01 | 161, then **159** once `backups/` was excluded |
 
 A number published on 2026-09-14 against a corpus that has moved three times cannot be reproduced
-by anyone, including its author. `corpus-2026-09-01.jsonl` is the freeze: one line per discovered
-file, path relative to `~/.claude`, full sha256 of the raw bytes, size.
+by anyone, including its author. `corpus-2026-09-01.jsonl` is the freeze: one line per file the
+measurement reads, path relative to `~/.claude`, full sha256 of the raw bytes, size.
+
+**Every file, not only the SKILL.md.** `estimate_token_cost` and `skill_payload_digest` also read
+`references/*.md` and `eval-suite.json`, so freezing SKILL.md alone would bound the wrong set:
+measured, rewriting one reference moved a skill from 26 to 3,925 tokens and changed its payload
+digest while `verify` reported `0 drifted` and exited 0. The 159 skills carry **409 files** between
+them — 61% of what determines the published number sits outside the SKILL.md set.
 
 ```bash
 python3 scripts/measurement/freeze_corpus.py verify docs/case-studies/context-cost/corpus-2026-09-01.jsonl
@@ -40,17 +46,20 @@ twice in the week this was written. A freeze must not depend on the tool it free
 ## What the corpus actually contains
 
 The freeze made this auditable for the first time, and it is not what "159 skills in `~/.claude`"
-suggests:
+suggests. As discovered on 2026-09-01, **before** `backups/` was excluded:
 
-| count | location | what it is |
-|---|---|---|
-| 111 | `plugins/cache/` | plugin payloads, the install location |
-| 46 | `plugins/marketplaces/` | the same plugins, second copy |
-| 2 | `backups/` | **schliff's own backups, from 2026-06-11** |
-| 2 | `skills/` | hand-installed: `hydra` and `schliff` |
+| count | location | what it is | in the frozen corpus |
+|---|---|---|---|
+| 111 | `plugins/cache/` | plugin payloads, the install location | yes |
+| 46 | `plugins/marketplaces/` | the same plugins, second copy | yes |
+| 2 | `backups/` | **schliff's own backups, from 2026-06-11** | **no — excluded** |
+| 2 | `skills/` | hand-installed: `hydra` and `schliff` | yes |
+
+The committed manifest therefore holds those **159 SKILL.md** and no `backups/` rows, at **409
+lines in total** once each skill's references and eval suite are counted.
 
 **Two hand-installed skills.** Everything else is plugin material, most of it present twice — which
-is what `doctor`'s payload deduplication collapses from 161 files to 138 installations.
+is what `doctor`'s payload deduplication collapses to 136 installations.
 
 ### The backups are counted as installations
 

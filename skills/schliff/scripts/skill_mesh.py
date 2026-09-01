@@ -29,6 +29,12 @@ import shared
 from nlp import tokenize_meaningful
 from shared import EXCLUDED_DIRS, extract_description
 
+# Bound on a single discovery walk. Module-level rather than local to
+# `discover_skills`, because a caller that has to know whether the cap was hit —
+# a truncated scan sorts AFTER truncating, so its contents follow filesystem
+# order — cannot read a local. One home for the number.
+MAX_SCAN_FILES = 1000
+
 # --- Skill Discovery ---
 
 def discover_skills(skill_dirs: list[str]) -> list[dict]:
@@ -39,7 +45,6 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
     skills = []
     seen_paths = set()
 
-    MAX_SCAN_FILES = 1000
     file_count = 0
     scan_limit_reached = False
 

@@ -58,6 +58,7 @@ def test_only_the_real_skill_is_discovered(tree):
 @pytest.mark.parametrize("vendored", [
     ".venv/lib/python3.12/site-packages/skills/vendored/SKILL.md",
     "node_modules/some-pkg/skills/vendored/SKILL.md",
+    "backups/schliff/skills.bak.20260611075414/SKILL.md",
     ".vercel/python/cache/uv/archive-v0/AbC123/skills/vendored/SKILL.md",
     "lib/python3.12/site-packages/skills/vendored/SKILL.md",
 ])
@@ -73,7 +74,7 @@ def test_a_real_skill_named_like_a_cache_dir_still_counts(tmp_path):
     assert str(tmp_path / "skills" / "cache-warmer" / "SKILL.md") in found
 
 
-@pytest.mark.parametrize("ancestor", ["build", "dist", "venv", ".cache", "node_modules"])
+@pytest.mark.parametrize("ancestor", ["build", "dist", "venv", ".cache", "node_modules", "backups"])
 def test_excluded_segment_above_the_scan_root_is_not_the_users_problem(tmp_path, ancestor):
     """Filtering must apply BELOW the scan root, not to the path that leads to it.
 
@@ -96,7 +97,7 @@ def test_excluded_segment_above_the_scan_root_is_not_the_users_problem(tmp_path,
     )
 
 
-@pytest.mark.parametrize("skill_name", ["build", "dist", "venv", ".cache", "node_modules"])
+@pytest.mark.parametrize("skill_name", ["build", "dist", "venv", ".cache", "node_modules", "backups"])
 def test_a_skill_may_be_named_like_an_excluded_directory(tmp_path, skill_name):
     """The skill's OWN directory name is not a vendoring signal.
 
