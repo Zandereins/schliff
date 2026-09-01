@@ -68,8 +68,9 @@ suggests. As discovered on 2026-09-01, **before** `backups/` was excluded:
 | 2 | `backups/` | **schliff's own backups, from 2026-06-11** | **no — excluded** |
 | 2 | `skills/` | hand-installed: `hydra` and `schliff` | yes |
 
-The committed manifest therefore holds those **159 SKILL.md** and no `backups/` rows, at **409
-lines in total** once each skill's references and eval suite are counted.
+The committed manifest therefore holds those **159 SKILL.md** and no `backups/` rows. Its full
+line count and composition are stated once, in the section above — repeating it here is how this
+sentence came to claim 409 after the manifest had grown to 431.
 
 **Two hand-installed skills.** Everything else is plugin material, most of it present twice — which
 is what `doctor`'s payload deduplication collapses to 136 installations.

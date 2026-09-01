@@ -55,6 +55,13 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
 
     Returns list of skill dicts with: path, name, description, content_hash, tokens.
     """
+    global _last_scan_truncated
+    # Cleared here and not only in the status wrapper: `doctor` calls this
+    # directly, so one truncated scan otherwise left the flag stuck True for the
+    # rest of the process and every later reader saw a truncation that did not
+    # happen. The walk that sets it owns clearing it.
+    _last_scan_truncated = False
+
     skills = []
     seen_paths = set()
 
@@ -104,7 +111,6 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
             if file_count > MAX_SCAN_FILES:
                 print(f"Warning: scan limit reached ({MAX_SCAN_FILES} files), stopping discovery", file=sys.stderr)
                 scan_limit_reached = True
-                global _last_scan_truncated
                 _last_scan_truncated = True
                 break
             try:
@@ -167,8 +173,6 @@ def discover_skills_with_status(skill_dirs: list[str]) -> tuple[list[dict], bool
     and it rejects a complete scan of exactly ``MAX_SCAN_FILES`` files, since the
     break is ``>`` and not ``>=``.
     """
-    global _last_scan_truncated
-    _last_scan_truncated = False
     skills = discover_skills(skill_dirs)
     return skills, _last_scan_truncated
 

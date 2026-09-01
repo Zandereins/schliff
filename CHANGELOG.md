@@ -35,6 +35,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `.claude.json.backup.*` files live there too, so nothing under it is a loadable skill. The scan
   now reports 136 installations and 420,583 tokens on that corpus.
 
+  `EXCLUDED_DIRS` is shared by three walks, so this also prunes `backups/` from the instruction-file
+  discovery behind `schliff sync` and `doctor`'s project section: a `backups/AGENTS.md` in **your own
+  repository** no longer appears in drift analysis. That is intended — a backup of an AGENTS.md is
+  not the project's AGENTS.md — and it is pinned by a test, but it is a behaviour change beyond
+  `~/.claude` and beyond skills.
+
 - **The anti-gaming gate reports an incomplete corpus instead of passing quietly.** It could not
   distinguish "no vector gamed" from "no vector measured": renaming a single skill file under
   `benchmarks/anti-gaming/skills/` left `run.py` at exit 0 while its headline dropped from 7/7 to

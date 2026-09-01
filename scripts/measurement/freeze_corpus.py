@@ -63,6 +63,16 @@ def _payload_of(skill_md: Path) -> list[Path]:
     produced several defects in `shared` itself.
     """
     files = [skill_md, *shared._payload_files(str(skill_md))]
+    # `_payload_files` rejects symlinked references — a shipped security decision
+    # for the cost path. `manifest.invoke_cost_chars` follows them and charges the
+    # target, so one of the three published numbers reads a file that enumeration
+    # deliberately omits. Measured: rewriting a symlink target moved `invoke` from
+    # 10,010 to 100,010 with `verify` reporting 0 drifted. The freeze is a superset
+    # of every reader by design, so it takes them; it does not follow the link,
+    # it hashes the link's target bytes exactly as the charge does.
+    refs = skill_md.parent / "references"
+    if refs.is_dir() and not refs.is_symlink():
+        files.extend(f for f in sorted(refs.glob("*.md")) if f.is_symlink())
     suite = shared.eval_suite_path(str(skill_md))
     if suite.exists():
         files.append(suite)
@@ -112,10 +122,15 @@ def _manifest_inputs() -> list[Path]:
     cannot be frozen by a manifest keyed on that root, and is named rather than
     dropped silently.
     """
-    out = [CORPUS_ROOT / "settings.json"]
+    settings = CORPUS_ROOT / "settings.json"
+    out = [settings] if settings.exists() else []
     outside = []
     for artifact in manifest_mod.build_manifest(CORPUS_ROOT).loaded:
-        path = Path(str(artifact.path).replace("~", str(Path.home()), 1))
+        # expanduser, not a replace: `manifest._tilde` only abbreviates a LEADING
+        # home prefix and returns anything else untouched, so an unanchored
+        # first-occurrence replace rewrote a `~` sitting anywhere in an absolute
+        # path — and the guard below then tested a path that does not exist.
+        path = Path(str(artifact.path)).expanduser()
         try:
             path.relative_to(CORPUS_ROOT)
         except ValueError:
@@ -146,6 +161,7 @@ def _entries() -> list[dict]:
         )
 
     seen: set[Path] = set()
+    unfreezable: list[str] = []
     out = []
     sources = [_payload_of(Path(skill["path"])) for skill in skills]
     sources.append(_manifest_inputs())
@@ -156,10 +172,14 @@ def _entries() -> list[dict]:
             seen.add(path)
             raw = _read_bounded_bytes(path)
             if raw is None:
-                # Vanished mid-run, not a regular file, or past the size limit —
-                # the first is exactly the corpus change this tool exists to
-                # report. Say so; do not traceback and do not hang.
-                print(f"skipped (unreadable or oversized): {path}")
+                # NOT a skip. `manifest` still charges an oversized SKILL.md —
+                # `parse_frontmatter` head-reads 64 KB and `invoke_cost_chars`
+                # uses `st_size` with no cap — so dropping it leaves a file the
+                # headline reads outside the freeze, which is the one thing this
+                # artifact must never do. Measured before this guard: a 1.2 MB
+                # SKILL.md was dropped, `write` reported "froze 1 files" and
+                # `verify` reported "0 drifted" with exit 0 while the number moved.
+                unfreezable.append(str(path))
                 continue
             out.append({
                 # Relative, so the manifest is checkable on another machine and
@@ -168,6 +188,12 @@ def _entries() -> list[dict]:
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "bytes": len(raw),
             })
+    if unfreezable:
+        raise SystemExit(
+            "these files are read by a published number and cannot be frozen "
+            "(not a regular file, past the size limit, or unreadable):\n  "
+            + "\n  ".join(sorted(unfreezable))
+        )
     out.sort(key=lambda e: e["path"])
     return out
 
