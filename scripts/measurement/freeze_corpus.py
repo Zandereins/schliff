@@ -79,6 +79,20 @@ def _payload_of(skill_md: Path) -> list[Path]:
     return files
 
 
+# Exit codes carry the verdict, so no caller has to pattern-match this file's
+# prose. `run_measurement` used to classify drift by prefix-matching stdout, and
+# adding two labels here silently turned every resolution flip into "the freeze
+# check itself failed" — the opposite verdict. 0 clean, 1 drift, 2 the check
+# could not run.
+EXIT_CLEAN, EXIT_DRIFT, EXIT_BROKEN = 0, 1, 2
+
+
+def _fail(message: str) -> None:
+    """Refuse with EXIT_BROKEN — a failed check is not a drift verdict."""
+    print(message, file=sys.stderr)
+    sys.exit(EXIT_BROKEN)
+
+
 def _read_bounded_bytes(path: Path) -> bytes | None:
     """The raw bytes, with `_read_bounded_with_reason`'s discipline.
 
@@ -125,6 +139,14 @@ def _manifest_inputs() -> list[Path]:
     settings = CORPUS_ROOT / "settings.json"
     out = [settings] if settings.exists() else []
     outside = []
+    # Which of several coexisting version directories is active is decided by
+    # `_resolve_plugin_dir` on directory MTIME, and mtime is not content. Three
+    # plugins here have two directories sharing one mtime, so the winner falls to
+    # `iterdir()` order. Red proof, flipping nothing but an mtime: the resolved
+    # supabase description went 790 -> 498 characters, which moves `resident`
+    # directly — while every frozen path stayed present and unchanged, because
+    # BOTH versions are in the freeze. Recording which paths were resolved is the
+    # only thing that makes that flip visible.
     for artifact in manifest_mod.build_manifest(CORPUS_ROOT).loaded:
         # expanduser, not a replace: `manifest._tilde` only abbreviates a LEADING
         # home prefix and returns anything else untouched, so an unanchored
@@ -155,16 +177,15 @@ def _entries() -> list[dict]:
         # A truncated walk sorts AFTER truncating, so its contents follow
         # filesystem traversal order; freezing that would make `verify` report
         # churn on an unchanged corpus.
-        raise SystemExit(
-            f"discovery stopped at its {skill_mesh.MAX_SCAN_FILES}-file cap; the frozen "
-            f"set would be whatever the filesystem happened to return first"
-        )
+        _fail(f"discovery stopped at its {skill_mesh.MAX_SCAN_FILES}-file cap; the frozen "
+              f"set would be whatever the filesystem happened to return first")
 
     seen: set[Path] = set()
     unfreezable: list[str] = []
     out = []
+    resolved = set(_manifest_inputs())
     sources = [_payload_of(Path(skill["path"])) for skill in skills]
-    sources.append(_manifest_inputs())
+    sources.append(sorted(resolved))
     for group in sources:
         for path in group:
             if path in seen:
@@ -181,19 +202,20 @@ def _entries() -> list[dict]:
                 # `verify` reported "0 drifted" with exit 0 while the number moved.
                 unfreezable.append(str(path))
                 continue
-            out.append({
+            entry = {
                 # Relative, so the manifest is checkable on another machine and
                 # does not publish a home directory layout.
                 "path": str(path.relative_to(CORPUS_ROOT)),
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "bytes": len(raw),
-            })
+            }
+            if path in resolved:
+                entry["resolved"] = True
+            out.append(entry)
     if unfreezable:
-        raise SystemExit(
-            "these files are read by a published number and cannot be frozen "
-            "(not a regular file, past the size limit, or unreadable):\n  "
-            + "\n  ".join(sorted(unfreezable))
-        )
+        _fail("these files are read by a published number and cannot be frozen "
+              "(not a regular file, past the size limit, or unreadable):\n  "
+              + "\n  ".join(sorted(unfreezable)))
     out.sort(key=lambda e: e["path"])
     return out
 
@@ -201,25 +223,33 @@ def _entries() -> list[dict]:
 def write(target: Path) -> int:
     entries = _entries()
     if not entries:
-        raise SystemExit(
-            f"refusing to write an empty manifest: no skills found under {CORPUS_ROOT}"
-        )
+        _fail(f"refusing to write an empty manifest: no skills found under {CORPUS_ROOT}")
     # Compare against the newest existing freeze in the directory, not against
     # `target`: the manifests are date-stamped, so a re-freeze writes a NEW path
     # and a guard keyed on `target.exists()` never fires for the workflow this
     # repository actually prescribes — which is every re-freeze.
-    siblings = sorted(target.parent.glob("corpus-*.jsonl")) if target.parent.exists() else []
-    baseline = max(siblings, key=lambda p: p.name, default=None)
+    # The target itself counts as a baseline too. Keying only on the date-stamped
+    # siblings narrowed the guard: a re-freeze to the same path under any other
+    # name was unprotected, which is the case the original `target.exists()`
+    # check covered before it was replaced.
+    candidates = list(target.parent.glob("corpus-*.jsonl")) if target.parent.exists() else []
+    if target.exists() and target not in candidates:
+        candidates.append(target)
+    # Largest by ENTRY COUNT, not by name. Appending the target to a list ranked
+    # by filename left it unprotected whenever its name sorted below `corpus-…`:
+    # measured, a 50-entry freeze was overwritten with 3 entries at exit 0, which
+    # is the failure this guard exists for.
+    counts = {p: sum(1 for line in p.read_text(encoding="utf-8").splitlines() if line.strip())
+              for p in candidates}
+    baseline = max(counts, key=counts.get, default=None)
     if baseline is not None:
-        previous = sum(1 for line in baseline.read_text(encoding="utf-8").splitlines() if line.strip())
+        previous = counts[baseline]
         if len(entries) < previous:
             # `discover_skills` skips a missing directory silently, so a run under
             # a different HOME would otherwise truncate the reproducibility
             # artifact and exit 0.
-            raise SystemExit(
-                f"refusing to write {len(entries)} entries when {baseline.name} holds "
-                f"{previous}; delete that file deliberately if the corpus really got smaller"
-            )
+            _fail(f"refusing to write {len(entries)} entries when {baseline.name} holds "
+                  f"{previous}; delete that file deliberately if the corpus really got smaller")
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", encoding="utf-8") as fh:
         for e in entries:
@@ -230,29 +260,48 @@ def write(target: Path) -> int:
 
 def verify(target: Path) -> int:
     if not target.exists():
-        print(f"no frozen manifest at {target}")
-        return 1
+        _fail(f"no frozen manifest at {target}")
     frozen = {}
-    with target.open(encoding="utf-8") as fh:
-        for line in fh:
-            if line.strip():
-                e = json.loads(line)
-                frozen[e["path"]] = e["sha256"]
-    current = {e["path"]: e["sha256"] for e in _entries()}
+    frozen_resolved = set()
+    # Caught, because exit 1 now MEANS drift: an uncaught parse error would exit 1
+    # through the interpreter and be read as a drift verdict — the very
+    # misclassification the exit-code contract was introduced to remove.
+    try:
+        with target.open(encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    e = json.loads(line)
+                    frozen[e["path"]] = e["sha256"]
+                    if e.get("resolved"):
+                        frozen_resolved.add(e["path"])
+    except (json.JSONDecodeError, KeyError, OSError) as exc:
+        _fail(f"{target} is not a usable freeze manifest: {type(exc).__name__}: {exc}")
+    entries = _entries()
+    current = {e["path"]: e["sha256"] for e in entries}
+    current_resolved = {e["path"] for e in entries if e.get("resolved")}
 
     added = sorted(set(current) - set(frozen))
     removed = sorted(set(frozen) - set(current))
     changed = sorted(p for p in set(frozen) & set(current) if frozen[p] != current[p])
+    # A version flip changes nothing in the file set — both versions are frozen —
+    # so the resolved set is compared on its own.
+    # Only paths that are still PRESENT: a removed file is already reported as
+    # removed, and counting it again under "no longer resolved" made one missing
+    # file read as two drifted problems under two labels.
+    still_present = set(frozen) & set(current)
+    unresolved = sorted((frozen_resolved - current_resolved) & still_present)
+    newly = sorted((current_resolved - frozen_resolved) & still_present)
 
-    for label, paths in (("added", added), ("removed", removed), ("changed", changed)):
+    for label, paths in (("added", added), ("removed", removed), ("changed", changed),
+                         ("no longer resolved", unresolved), ("newly resolved", newly)):
         for p in paths:
             print(f"{label}: {p}")
 
-    drift = len(added) + len(removed) + len(changed)
+    drift = len(added) + len(removed) + len(changed) + len(unresolved) + len(newly)
     print(f"{len(frozen)} frozen, {len(current)} present, {drift} drifted")
     # Non-zero on drift: a measurement taken against a corpus that no longer
     # matches its freeze is not reproducible, and that has to be loud.
-    return 1 if drift else 0
+    return EXIT_DRIFT if drift else EXIT_CLEAN
 
 
 def main() -> int:
