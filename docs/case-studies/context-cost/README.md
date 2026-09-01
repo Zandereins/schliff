@@ -1,7 +1,12 @@
 # Context-cost measurement — frozen corpus and the number that gets published
 
-Status: **corpus frozen 2026-09-01.** Measurement is scheduled for 2026-09-04, the case study for
-2026-09-14. Two decisions below are still open and both belong to the repository owner.
+Status: **corpus frozen 2026-09-01, both decisions settled the same day.** Measurement is scheduled
+for 2026-09-04, the case study for 2026-09-14.
+
+- **`backups/` is excluded from discovery.** The frozen corpus is **159 files → 136 installations,
+  420,583 tokens**.
+- **The headline is `resident`: 7,975 tokens across 106 artifacts.** `invoke` and the on-disk figure
+  are named alongside it, never alone.
 
 ## Why this exists
 
@@ -12,7 +17,7 @@ updates rewrite on their own schedule. Measured:
 |---|---|
 | 2026-08-29 | 159 |
 | 2026-08-31 | 161 — a plugin update ran at 08:37 that morning |
-| 2026-09-01 | 161 |
+| 2026-09-01 | 161, then **159** once `backups/` was excluded |
 
 A number published on 2026-09-14 against a corpus that has moved three times cannot be reproduced
 by anyone, including its author. `corpus-2026-09-01.jsonl` is the freeze: one line per discovered
@@ -66,9 +71,16 @@ it, correctly: the payload digest also covers `references/*.md` and `eval-suite.
 backup directory does not carry. So the digest is right and the discovery is wrong — a backup
 directory is not an install location.
 
-**Open decision 1:** exclude `backups` from discovery, or publish 138 with the contamination named.
-Excluding it moves the headline to **136 installations and 420,583 tokens** — measured by running
-`run_doctor` with `backups` added to `EXCLUDED_DIRS`, not by subtracting.
+**Decided 2026-09-01: excluded.** `backups` is in `shared.EXCLUDED_DIRS`, guarded by
+`test_a_backup_is_not_an_installed_skill`. The corpus is **136 installations and 420,583 tokens** —
+measured by running `run_doctor` with the exclusion, not by subtracting.
+
+This completes a fix the project already made and then bypassed. `install.sh` used to write
+`~/.claude/skills/schliff.bak.<ts>`, inside the skill scan path, duplicating the whole `/schliff:*`
+namespace; on 2026-06-11 it moved to `~/.claude/backups/` for exactly that reason
+(`docs/specs/2026-06-11-agentic-integration.md`). That protected Claude Code's scan path but not a
+scan pointed at `~/.claude` itself. `~/.claude/backups/` is a Claude Code convention directory — its
+own `.claude.json.backup.*` files live there too — so nothing under it is a loadable skill.
 
 That run also reports **159 files discovered**, which is the number the plan names as the scope.
 The match is a coincidence and must not be read as confirmation: the plan's 159 was measured on
@@ -90,10 +102,16 @@ The plan commits to "context cost, explicitly not the grades". It does not say w
 Two orders of magnitude apart, and two different stories: *"your setup costs 8k tokens before you
 type"* against *"438k tokens of skill material on disk"*.
 
-**Open decision 2**, and it has to be made before the measurement, not while writing the case study
-— deciding afterwards means deciding by which number reads better, which is the rationalisation
-pre-registration exists to prevent.
+**Decided 2026-09-01, before the measurement and not while writing the case study — `resident`.**
 
-Recommendation, if delegated: **`resident` as the headline** — those are the unavoidable costs and
-the most surprising claim — with `invoke` and the on-disk figure named in the same paragraph, so no
-one can quote the most convenient one in isolation.
+Those 7,975 tokens are the only unavoidable ones: 106 artifacts contributing roughly 75 tokens each
+(name plus description) to every context window, before anything is invoked. That is "context cost"
+in the literal sense the plan commits to.
+
+`invoke` is a ceiling nobody reaches — it assumes every skill is invoked. The on-disk figure is not
+a context cost at all; it is the size of the material, and calling it one would be the most
+attackable claim in the study.
+
+**All three appear in the same paragraph** of the case study, so none can be quoted in isolation.
+The decision is recorded here rather than settled during writing, because deciding afterwards means
+deciding by which number reads better — the rationalisation pre-registration exists to prevent.

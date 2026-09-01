@@ -123,3 +123,30 @@ def test_excluded_segment_below_the_scan_root_is_still_excluded(tmp_path):
 
     found = {s["path"] for s in discover_skills([str(root)])}
     assert found == {str(root / "real" / "SKILL.md")}
+
+
+def test_a_backup_is_not_an_installed_skill(tmp_path):
+    """`~/.claude/backups/` holds backups, and a backup is not a loadable skill.
+
+    This completes a fix from 2026-06-11. `install.sh` used to write its backup
+    to ``~/.claude/skills/schliff.bak.<ts>`` — inside the skill scan path, which
+    duplicated the whole ``/schliff:*`` namespace — and was moved to
+    ``~/.claude/backups/`` for that reason
+    (docs/specs/2026-06-11-agentic-integration.md). That protected Claude Code's
+    scan path but not a scan pointed at ``~/.claude`` itself: measured
+    2026-09-01, ``doctor ~/.claude`` reported THREE rows named ``schliff``, two
+    of them June backups of its own SKILL.md, contributing 18,014 of 438,597
+    tokens and two of 138 counted installations.
+
+    The mutation: drop ``backups`` from ``EXCLUDED_DIRS`` and this goes red.
+    """
+    _write(tmp_path, "skills/real/SKILL.md")
+    _write(tmp_path, "backups/schliff/skills.bak.20260611075414/SKILL.md")
+    _write(tmp_path, "backups/schliff-skill-backups/schliff.bak.20260611071745/SKILL.md")
+
+    found = {s["path"] for s in discover_skills([str(tmp_path)])}
+
+    assert found == {str(tmp_path / "skills" / "real" / "SKILL.md")}, (
+        f"backups discovered as skills: "
+        f"{sorted(p.replace(str(tmp_path), '') for p in found)}"
+    )

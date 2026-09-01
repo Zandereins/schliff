@@ -25,6 +25,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **`backups/` is no longer discovered as installed skills.** `install.sh` used to write its backup
+  to `~/.claude/skills/schliff.bak.<ts>`, inside the skill scan path, which duplicated the whole
+  `/schliff:*` namespace; it moved to `~/.claude/backups/` on 2026-06-11 for that reason. That
+  protected Claude Code's scan path but not a scan pointed at `~/.claude` itself — measured
+  2026-09-01, `schliff doctor ~/.claude` reported **three** rows named `schliff`, two of them June
+  backups of its own SKILL.md, contributing 18,014 of 438,597 tokens and two of 138 counted
+  installations. `~/.claude/backups/` is a Claude Code convention directory; its own
+  `.claude.json.backup.*` files live there too, so nothing under it is a loadable skill. The scan
+  now reports 136 installations and 420,583 tokens on that corpus.
+
 - **The anti-gaming gate reports an incomplete corpus instead of passing quietly.** It could not
   distinguish "no vector gamed" from "no vector measured": renaming a single skill file under
   `benchmarks/anti-gaming/skills/` left `run.py` at exit 0 while its headline dropped from 7/7 to

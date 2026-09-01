@@ -88,6 +88,22 @@ EXCLUDED_DIRS = frozenset({
     ".git", "node_modules", ".venv", "venv", "__pycache__",
     ".tox", "dist", "build", ".eggs",
     "site-packages", ".cache", ".vercel",
+    # `backups` completes a fix this project already made and then bypassed.
+    # `install.sh` used to write `~/.claude/skills/schliff.bak.<ts>`, inside the
+    # skill scan path, which duplicated the whole `/schliff:*` namespace; on
+    # 2026-06-11 it moved to `~/.claude/backups/` for exactly that reason
+    # (docs/specs/2026-06-11-agentic-integration.md). That protected Claude
+    # Code's scan path but not a scan pointed at `~/.claude` itself: measured
+    # 2026-09-01, `doctor ~/.claude` reported THREE rows named `schliff`, two of
+    # them June backups of its own SKILL.md, contributing 18,014 of 438,597
+    # tokens and two of 138 installations. `~/.claude/backups/` is a Claude Code
+    # convention directory — its own `.claude.json.backup.*` live there too — so
+    # nothing under it is a loadable skill.
+    #
+    # As coarse as `build` and `dist` already are: a directory component named
+    # `backups` anywhere under a scan root is pruned. That is the granularity
+    # this set has always had, not a new kind of rule.
+    "backups",
 })
 
 # --- Regex for description extraction ---
