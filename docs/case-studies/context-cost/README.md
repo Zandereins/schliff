@@ -50,8 +50,10 @@ That is the whole measurement: it verifies the freeze, takes the three figures f
 own them, and writes `measurement-<date>.json` beside the manifest it was taken against. **On drift
 it names every changed file, writes nothing, and exits 1** — re-freezing is a decision, not
 something a script should make quietly. `freeze_corpus.py verify` alone does the check without
-taking the measurement. If it reports drift, the choice is to re-freeze and say so, or to measure against the
-frozen set — not to publish a number whose corpus is unknown. Whichever is chosen, record which.
+taking the measurement. On drift it refuses, so the choice is made deliberately and outside it: re-freeze and say so in the
+case study, or restore the corpus to the frozen state and re-run. What the command will not do is
+produce a number whose corpus is unknown. Add `--rehearsal` to try the run without writing a file
+that looks like the pre-registered one.
 
 The file list comes from `skill_mesh.discover_skills`, which owns the question of which files count.
 The hashes do not: they are full sha256 over raw bytes, not that module's `content_hash`, which is

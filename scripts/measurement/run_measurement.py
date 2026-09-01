@@ -17,6 +17,7 @@ stops at the first that fails:
 
 Usage:
     python3 scripts/measurement/run_measurement.py <frozen-manifest.jsonl>
+    python3 scripts/measurement/run_measurement.py <frozen-manifest.jsonl> --rehearsal
 """
 
 from __future__ import annotations
@@ -49,9 +50,14 @@ def _verify(manifest: Path, when: str) -> bool:
     if proc.stdout.strip():
         # Labelled: the run verifies twice, and two identical lines with no
         # indication of which is which is not an operator-readable transcript.
-        print(f"[freeze {when}] {proc.stdout.rstrip()}")
+        for line in proc.stdout.rstrip().splitlines():
+            print(f"[freeze {when}] {line}")
     if proc.stderr.strip():
         print(proc.stderr.rstrip(), file=sys.stderr)
+    # stdout is block-buffered whenever it is redirected, so without this the
+    # verdict below lands before the evidence above it — and "see the error
+    # above" pointed downward in a tee'd log. Verified both ways.
+    sys.stdout.flush()
     if proc.returncode == 0:
         return True
 
@@ -94,10 +100,18 @@ def _cli(*args: str) -> dict:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
+    args = sys.argv[1:]
+    # A rehearsal writes a differently-named file and marks itself in the record.
+    # The previous guard only refused a same-day collision, so a rehearsal today
+    # and the pre-registered run on another date produced two files that are
+    # indistinguishable by name or content — which is the failure its own comment
+    # described, still open.
+    rehearsal = "--rehearsal" in args
+    args = [a for a in args if a != "--rehearsal"]
+    if len(args) != 1:
         print(__doc__.strip().split("Usage:")[-1].strip())
         return 2
-    manifest = Path(sys.argv[1]).resolve()
+    manifest = Path(args[0]).resolve()
 
     if not _verify(manifest, "before"):
         return 1
@@ -111,6 +125,21 @@ def main() -> int:
     # is about three seconds. Small, and the whole point of this artifact is that
     # a number is never published against an unverified corpus.
     if not _verify(manifest, "after"):
+        return 1
+
+    if doc["failed"]:
+        # `skills_found` is len(results) - failed and `total_tokens` sums only
+        # rows without an error, so one skill that raises during scoring
+        # publishes a smaller installation count and a smaller token total, with
+        # `digest_degraded: false` — byte-shape identical to a clean run. doctor
+        # carries the fact in `summary` and prints nothing to stderr, so nothing
+        # else would have surfaced it.
+        print(
+            f"\nMEASUREMENT NOT TAKEN — {doc['failed']} skill(s) failed to score, so both the "
+            f"installation count and the token total are short by an unknown amount.\n"
+            f"doctor says: {doc.get('summary', '(no summary)')}",
+            file=sys.stderr,
+        )
         return 1
 
     if doc["digest_degraded"]:
@@ -128,18 +157,30 @@ def main() -> int:
 
     record = {
         "measured_on": date.today().isoformat(),
+        "rehearsal": rehearsal,
         "frozen_corpus": manifest.name,
         "headline": {"resident_tokens": man["resident_tokens"], "artifacts": man["loaded_count"]},
+        # Recorded, not summarised: `resident` sums every loaded artifact, and
+        # manifest's findings are the only place a consumer learns that one of
+        # them is unreachable. Verified on this corpus that `nested` and
+        # `disabled` artifacts are NOT in `loaded`, so they do not inflate the
+        # headline — but `duplicate-name` and `no-skill-md` are exactly the
+        # signals a published figure should carry with it.
+        "manifest_findings": [{"kind": f["kind"], "subject": f["subject"]}
+                              for f in man.get("findings", [])],
         "context": {
             "invoke_tokens": man["invoke_tokens"],
             "on_disk_tokens": doc["total_tokens"],
             "installations": doc["skills_found"],
             "files_discovered": doc["skills_discovered"],
             "duplicate_groups": len(doc["duplicate_copies"]),
+            "broken_eval_suites": doc["broken_eval_suite"],
             "digest_degraded": doc["digest_degraded"],
+            "failed_to_score": doc["failed"],
         },
     }
-    out = manifest.parent / f"measurement-{record['measured_on']}.json"
+    prefix = "rehearsal" if rehearsal else "measurement"
+    out = manifest.parent / f"{prefix}-{record['measured_on']}.json"
     if out.exists():
         # The name carries only a date, so a rehearsal and the pre-registered run
         # collide. One already did: a dry run wrote `measurement-2026-09-01.json`
