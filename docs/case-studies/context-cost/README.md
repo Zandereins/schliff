@@ -43,12 +43,15 @@ The manifest holds **431 files**: 159 SKILL.md, 246 references, 4 eval suites, 2
 `settings.json`. Every artifact `manifest` reports is in it.
 
 ```bash
-python3 scripts/measurement/freeze_corpus.py verify docs/case-studies/context-cost/corpus-2026-09-01.jsonl
+python3 scripts/measurement/run_measurement.py docs/case-studies/context-cost/corpus-2026-09-01.jsonl
 ```
 
-Exits non-zero and names every added, removed or changed file. **Run this immediately before the
-measurement.** If it reports drift, the choice is to re-freeze and say so, or to measure against the
-frozen set — not to publish a number whose corpus is unknown.
+That is the whole measurement: it verifies the freeze, takes the three figures from the tools that
+own them, and writes `measurement-<date>.json` beside the manifest it was taken against. **On drift
+it names every changed file, writes nothing, and exits 1** — re-freezing is a decision, not
+something a script should make quietly. `freeze_corpus.py verify` alone does the check without
+taking the measurement. If it reports drift, the choice is to re-freeze and say so, or to measure against the
+frozen set — not to publish a number whose corpus is unknown. Whichever is chosen, record which.
 
 The file list comes from `skill_mesh.discover_skills`, which owns the question of which files count.
 The hashes do not: they are full sha256 over raw bytes, not that module's `content_hash`, which is
