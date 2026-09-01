@@ -32,6 +32,23 @@ _REPO = Path(__file__).resolve().parents[2]
 _SCHLIFF = _REPO / "skills" / "schliff"
 
 
+def _engine() -> dict:
+    """Which build of schliff produced these numbers.
+
+    `schliff version` cannot answer here — `_cli` appends `--json` and that
+    subcommand rejects it — so the commit is read from git, which is the thing
+    that actually identifies the reader.
+    """
+    proc = subprocess.run(["git", "rev-parse", "HEAD"], cwd=_REPO,
+                          capture_output=True, text=True)
+    dirty = subprocess.run(["git", "status", "--porcelain"], cwd=_REPO,
+                           capture_output=True, text=True)
+    return {
+        "commit": proc.stdout.strip() if proc.returncode == 0 else "unknown",
+        "working_tree_clean": dirty.returncode == 0 and not dirty.stdout.strip(),
+    }
+
+
 def _verify(manifest: Path, when: str) -> bool:
     """Run the freeze check and report honestly which kind of failure it was.
 
@@ -65,10 +82,12 @@ def _verify(manifest: Path, when: str) -> bool:
     if drifted:
         print(
             f"\nMEASUREMENT NOT TAKEN — the corpus no longer matches its freeze ({when} measuring).\n"
-            "Decide, and record which you chose:\n"
+            "The choice is made outside this command, and recorded either way:\n"
             "  * re-freeze and say so in the case study, or\n"
-            "  * measure against the frozen set.\n"
-            "Publishing a number whose corpus is unknown is the one option that is not open.",
+            "  * restore the corpus to the frozen state and re-run.\n"
+            "Measuring against the frozen bytes while the disk differs is not something\n"
+            "this command can do, and publishing a number whose corpus is unknown is not\n"
+            "an option at all.",
             file=sys.stderr,
         )
     else:
@@ -158,6 +177,12 @@ def main() -> int:
     record = {
         "measured_on": date.today().isoformat(),
         "rehearsal": rehearsal,
+        # The corpus is named; the engine that read it has to be too. `resident`
+        # and `invoke` come from `manifest.py` in THIS checkout, and the readers
+        # in this area changed twice in the week this was written — two records
+        # against the same frozen corpus at different commits are otherwise
+        # byte-indistinguishable in provenance and silently non-comparable.
+        "measured_by": _engine(),
         "frozen_corpus": manifest.name,
         "headline": {"resident_tokens": man["resident_tokens"], "artifacts": man["loaded_count"]},
         # Recorded, not summarised: `resident` sums every loaded artifact, and
@@ -166,7 +191,8 @@ def main() -> int:
         # `disabled` artifacts are NOT in `loaded`, so they do not inflate the
         # headline — but `duplicate-name` and `no-skill-md` are exactly the
         # signals a published figure should carry with it.
-        "manifest_findings": [{"kind": f["kind"], "subject": f["subject"]}
+        "manifest_findings": [{"kind": f["kind"], "subject": f["subject"],
+                               "detail": f.get("detail", "")}
                               for f in man.get("findings", [])],
         "context": {
             "invoke_tokens": man["invoke_tokens"],
@@ -174,7 +200,11 @@ def main() -> int:
             "installations": doc["skills_found"],
             "files_discovered": doc["skills_discovered"],
             "duplicate_groups": len(doc["duplicate_copies"]),
+            # Both counters: `broken_eval_suite` deliberately excludes grouped
+            # duplicate rows, which is why `grouped_broken_eval_suite` exists —
+            # reading only the first reintroduces the undercount that key closed.
             "broken_eval_suites": doc["broken_eval_suite"],
+            "broken_eval_suites_in_groups": doc.get("grouped_broken_eval_suite", 0),
             "digest_degraded": doc["digest_degraded"],
             "failed_to_score": doc["failed"],
         },

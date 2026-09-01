@@ -125,6 +125,14 @@ def _manifest_inputs() -> list[Path]:
     settings = CORPUS_ROOT / "settings.json"
     out = [settings] if settings.exists() else []
     outside = []
+    # Which of several coexisting version directories is active is decided by
+    # `_resolve_plugin_dir` on directory MTIME, and mtime is not content. Three
+    # plugins here have two directories sharing one mtime, so the winner falls to
+    # `iterdir()` order. Red proof, flipping nothing but an mtime: the resolved
+    # supabase description went 790 -> 498 characters, which moves `resident`
+    # directly — while every frozen path stayed present and unchanged, because
+    # BOTH versions are in the freeze. Recording which paths were resolved is the
+    # only thing that makes that flip visible.
     for artifact in manifest_mod.build_manifest(CORPUS_ROOT).loaded:
         # expanduser, not a replace: `manifest._tilde` only abbreviates a LEADING
         # home prefix and returns anything else untouched, so an unanchored
@@ -163,8 +171,9 @@ def _entries() -> list[dict]:
     seen: set[Path] = set()
     unfreezable: list[str] = []
     out = []
+    resolved = set(_manifest_inputs())
     sources = [_payload_of(Path(skill["path"])) for skill in skills]
-    sources.append(_manifest_inputs())
+    sources.append(sorted(resolved))
     for group in sources:
         for path in group:
             if path in seen:
@@ -181,13 +190,16 @@ def _entries() -> list[dict]:
                 # `verify` reported "0 drifted" with exit 0 while the number moved.
                 unfreezable.append(str(path))
                 continue
-            out.append({
+            entry = {
                 # Relative, so the manifest is checkable on another machine and
                 # does not publish a home directory layout.
                 "path": str(path.relative_to(CORPUS_ROOT)),
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "bytes": len(raw),
-            })
+            }
+            if path in resolved:
+                entry["resolved"] = True
+            out.append(entry)
     if unfreezable:
         raise SystemExit(
             "these files are read by a published number and cannot be frozen "
@@ -208,7 +220,13 @@ def write(target: Path) -> int:
     # `target`: the manifests are date-stamped, so a re-freeze writes a NEW path
     # and a guard keyed on `target.exists()` never fires for the workflow this
     # repository actually prescribes — which is every re-freeze.
+    # The target itself counts as a baseline too. Keying only on the date-stamped
+    # siblings narrowed the guard: a re-freeze to the same path under any other
+    # name was unprotected, which is the case the original `target.exists()`
+    # check covered before it was replaced.
     siblings = sorted(target.parent.glob("corpus-*.jsonl")) if target.parent.exists() else []
+    if target.exists() and target not in siblings:
+        siblings.append(target)
     baseline = max(siblings, key=lambda p: p.name, default=None)
     if baseline is not None:
         previous = sum(1 for line in baseline.read_text(encoding="utf-8").splitlines() if line.strip())
@@ -233,22 +251,32 @@ def verify(target: Path) -> int:
         print(f"no frozen manifest at {target}")
         return 1
     frozen = {}
+    frozen_resolved = set()
     with target.open(encoding="utf-8") as fh:
         for line in fh:
             if line.strip():
                 e = json.loads(line)
                 frozen[e["path"]] = e["sha256"]
-    current = {e["path"]: e["sha256"] for e in _entries()}
+                if e.get("resolved"):
+                    frozen_resolved.add(e["path"])
+    entries = _entries()
+    current = {e["path"]: e["sha256"] for e in entries}
+    current_resolved = {e["path"] for e in entries if e.get("resolved")}
 
     added = sorted(set(current) - set(frozen))
     removed = sorted(set(frozen) - set(current))
     changed = sorted(p for p in set(frozen) & set(current) if frozen[p] != current[p])
+    # A version flip changes nothing in the file set — both versions are frozen —
+    # so the resolved set is compared on its own.
+    unresolved = sorted(frozen_resolved - current_resolved)
+    newly = sorted(current_resolved - frozen_resolved)
 
-    for label, paths in (("added", added), ("removed", removed), ("changed", changed)):
+    for label, paths in (("added", added), ("removed", removed), ("changed", changed),
+                         ("no longer resolved", unresolved), ("newly resolved", newly)):
         for p in paths:
             print(f"{label}: {p}")
 
-    drift = len(added) + len(removed) + len(changed)
+    drift = len(added) + len(removed) + len(changed) + len(unresolved) + len(newly)
     print(f"{len(frozen)} frozen, {len(current)} present, {drift} drifted")
     # Non-zero on drift: a measurement taken against a corpus that no longer
     # matches its freeze is not reproducible, and that has to be loud.
