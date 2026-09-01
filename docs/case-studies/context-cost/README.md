@@ -23,11 +23,24 @@ A number published on 2026-09-14 against a corpus that has moved three times can
 by anyone, including its author. `corpus-2026-09-01.jsonl` is the freeze: one line per file the
 measurement reads, path relative to `~/.claude`, full sha256 of the raw bytes, size.
 
-**Every file, not only the SKILL.md.** `estimate_token_cost` and `skill_payload_digest` also read
-`references/*.md` and `eval-suite.json`, so freezing SKILL.md alone would bound the wrong set:
-measured, rewriting one reference moved a skill from 26 to 3,925 tokens and changed its payload
-digest while `verify` reported `0 drifted` and exited 0. The 159 skills carry **409 files** between
-them — 61% of what determines the published number sits outside the SKILL.md set.
+**Every file any published number reads**, which is more than the SKILL.md and different per number:
+
+| number | computed from |
+|---|---|
+| `resident` (the headline) | the `description:` frontmatter of each loaded artifact — SKILL.md **and** `commands/**/*.md`, gated by `settings.json` → `enabledPlugins` |
+| `invoke` | the bodies of those same artifacts |
+| on-disk | SKILL.md + `references/*.md` |
+| installation count | the payload digest: SKILL.md + `references/*.md` + `eval-suite.json` |
+
+Neither `references/*.md` nor `eval-suite.json` contributes a single token to `resident`; the suite
+contributes none to any token figure at all and feeds only the deduplication that produces the
+installation count. Two earlier versions of this freeze got that wrong in opposite directions —
+first it covered SKILL.md alone (measured: rewriting one reference moved a skill from 26 to 3,925
+tokens with `verify` reporting `0 drifted`), then it covered what `doctor` reads and left the
+headline's own inputs out (measured: 21 of 106 artifacts and 830 of 7,975 resident tokens unfrozen).
+
+The manifest holds **431 files**: 159 SKILL.md, 246 references, 4 eval suites, 21 commands, and
+`settings.json`. Every artifact `manifest` reports is in it.
 
 ```bash
 python3 scripts/measurement/freeze_corpus.py verify docs/case-studies/context-cost/corpus-2026-09-01.jsonl

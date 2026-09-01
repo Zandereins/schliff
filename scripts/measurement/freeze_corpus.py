@@ -37,6 +37,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 
@@ -44,6 +46,7 @@ _SCRIPTS = Path(__file__).resolve().parents[2] / "skills" / "schliff" / "scripts
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
+import manifest as manifest_mod  # noqa: E402  (path set above)
 import skill_mesh  # noqa: E402  (path set above)
 
 import shared  # noqa: E402  (path set above)
@@ -66,8 +69,66 @@ def _payload_of(skill_md: Path) -> list[Path]:
     return files
 
 
+def _read_bounded_bytes(path: Path) -> bytes | None:
+    """The raw bytes, with `_read_bounded_with_reason`'s discipline.
+
+    Deliberately the same shape and not a call: that function decodes with
+    `errors="replace"`, and a hash over replaced text is not a byte fingerprint.
+    What is borrowed is the discipline, which this script needs for the same
+    reason `shared` does — it reads `references/*.md` under third-party plugin
+    caches, files discovery never pre-screened. A plain `read_bytes` there hangs
+    forever on a FIFO (measured in `shared`: still blocked after six seconds) and
+    raises `MemoryError` on a multi-gigabyte target, which is not an `OSError`
+    and so escapes the handler below.
+    """
+    fd = None
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > shared.MAX_SKILL_SIZE:
+            return None
+        with os.fdopen(fd, "rb") as handle:
+            fd = None
+            return handle.read()
+    except (OSError, ValueError):
+        return None
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _manifest_inputs() -> list[Path]:
+    """Every file the `manifest` figures are computed from.
+
+    The headline this measurement publishes is `manifest`'s `resident`, and
+    `build_manifest` reads more than the skills do: `commands/**/*.md` for every
+    enabled plugin, plus `settings.json`, whose `enabledPlugins` gates the whole
+    artifact set. Freezing only what `doctor` reads covered the number this study
+    demotes and left the chosen one open — measured, 21 of 106 artifacts and 830
+    of 7,975 resident tokens sat outside the freeze.
+
+    Asked for, not re-derived: `build_manifest` is called and its artifact paths
+    taken. Anything it reports outside the corpus root (a project's `.claude/`)
+    cannot be frozen by a manifest keyed on that root, and is named rather than
+    dropped silently.
+    """
+    out = [CORPUS_ROOT / "settings.json"]
+    outside = []
+    for artifact in manifest_mod.build_manifest(CORPUS_ROOT).loaded:
+        path = Path(str(artifact.path).replace("~", str(Path.home()), 1))
+        try:
+            path.relative_to(CORPUS_ROOT)
+        except ValueError:
+            outside.append(str(path))
+            continue
+        out.append(path)
+    for path in sorted(set(outside)):
+        print(f"outside the corpus root, not frozen: {path}")
+    return out
+
+
 def _entries() -> list[dict]:
-    """One record per file the measurement reads: relative path, sha256, size."""
+    """One record per file ANY published number reads: relative path, sha256, size."""
     # Ask the walk whether it truncated. Comparing `len(skills)` to the cap was
     # wrong in both directions: the cap counts candidates surviving EXCLUDED_DIRS
     # while this list only keeps those that also pass symlink confinement,
@@ -86,17 +147,19 @@ def _entries() -> list[dict]:
 
     seen: set[Path] = set()
     out = []
-    for skill in skills:
-        for path in _payload_of(Path(skill["path"])):
+    sources = [_payload_of(Path(skill["path"])) for skill in skills]
+    sources.append(_manifest_inputs())
+    for group in sources:
+        for path in group:
             if path in seen:
                 continue
             seen.add(path)
-            try:
-                raw = path.read_bytes()
-            except OSError as exc:
-                # A file that vanished mid-run is exactly the corpus change this
-                # tool exists to report. Say so; do not traceback over it.
-                print(f"skipped (unreadable): {path} — {type(exc).__name__}")
+            raw = _read_bounded_bytes(path)
+            if raw is None:
+                # Vanished mid-run, not a regular file, or past the size limit —
+                # the first is exactly the corpus change this tool exists to
+                # report. Say so; do not traceback and do not hang.
+                print(f"skipped (unreadable or oversized): {path}")
                 continue
             out.append({
                 # Relative, so the manifest is checkable on another machine and
@@ -115,15 +178,21 @@ def write(target: Path) -> int:
         raise SystemExit(
             f"refusing to write an empty manifest: no skills found under {CORPUS_ROOT}"
         )
-    if target.exists():
-        previous = sum(1 for line in target.read_text(encoding="utf-8").splitlines() if line.strip())
+    # Compare against the newest existing freeze in the directory, not against
+    # `target`: the manifests are date-stamped, so a re-freeze writes a NEW path
+    # and a guard keyed on `target.exists()` never fires for the workflow this
+    # repository actually prescribes — which is every re-freeze.
+    siblings = sorted(target.parent.glob("corpus-*.jsonl")) if target.parent.exists() else []
+    baseline = max(siblings, key=lambda p: p.name, default=None)
+    if baseline is not None:
+        previous = sum(1 for line in baseline.read_text(encoding="utf-8").splitlines() if line.strip())
         if len(entries) < previous:
             # `discover_skills` skips a missing directory silently, so a run under
             # a different HOME would otherwise truncate the reproducibility
             # artifact and exit 0.
             raise SystemExit(
-                f"refusing to shrink {target} from {previous} to {len(entries)} entries; "
-                f"delete it deliberately if the corpus really got smaller"
+                f"refusing to write {len(entries)} entries when {baseline.name} holds "
+                f"{previous}; delete that file deliberately if the corpus really got smaller"
             )
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", encoding="utf-8") as fh:

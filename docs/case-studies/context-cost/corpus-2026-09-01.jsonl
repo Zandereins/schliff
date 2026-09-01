@@ -1,3 +1,17 @@
+{"bytes": 7376, "path": "commands/schliff/analyze.md", "sha256": "5ebf6136b697770d8bb8257ab3b5ec26b092e69bc12792e6571ac29552b483b9"}
+{"bytes": 2213, "path": "commands/schliff/auto.md", "sha256": "7af8bc0de4954ec59f6c794aa2bf9d9e349795b6a9cfb39a0f67e22c4ed5ad75"}
+{"bytes": 3407, "path": "commands/schliff/bench.md", "sha256": "1a036e79bab6cd2bd986d950deb38eccd93301ed44dfbb00a2d9d30cb93b2f4f"}
+{"bytes": 1479, "path": "commands/schliff/doctor.md", "sha256": "b0f69bf61ac6310d787d9f91229496924022568166ce656417be572d28fcec2d"}
+{"bytes": 8684, "path": "commands/schliff/eval.md", "sha256": "f016609a73a31093fec596a8b95a5241749a4c9e9debbef96356f3a21b3479bd"}
+{"bytes": 4473, "path": "commands/schliff/init.md", "sha256": "316a132ff4923be9a3f242ba75d766d1752a341cfc859e83e9068476b9e4991c"}
+{"bytes": 1950, "path": "commands/schliff/log-failure.md", "sha256": "1aa9e9c7e132bbe072c9fb2dad2bb4669d16b1f21e85df35e945b4c8b6ece7f6"}
+{"bytes": 1172, "path": "commands/schliff/mesh.md", "sha256": "3c3e03f14a2f278afffa48628291f49ef35623c2867249c43f81e5bcfd859d07"}
+{"bytes": 4576, "path": "commands/schliff/report.md", "sha256": "0e2653edc78b14c98ee27c2c966a08e91f2e37231e73e112754048a33f63faa5"}
+{"bytes": 2603, "path": "commands/schliff/triage.md", "sha256": "10f833b7c28786874ec12c79d4aa97feb9e877f5bfb0640b29c1ec99a932510e"}
+{"bytes": 1742, "path": "commands/schliff/update.md", "sha256": "badad321ac4438196a9d399c0225c1522061d175f0ef1f29297bfdcc0682f3b1"}
+{"bytes": 10501, "path": "plugins/cache/claude-hud/claude-hud/0.0.11/commands/configure.md", "sha256": "310626684ce5ac22f910c0a762d1d73521df837d8ff781f4b33378befd14f3f8"}
+{"bytes": 16264, "path": "plugins/cache/claude-hud/claude-hud/0.0.11/commands/setup.md", "sha256": "e61061f8c7e0668a1f3a435e502fbdf13d42ad038dfef55ef433553812abdd0a"}
+{"bytes": 1357, "path": "plugins/cache/claude-plugins-official/claude-md-management/1.0.0/commands/revise-claude-md.md", "sha256": "d59ffd7ef2b793bdfda0efbeed6bb948cb9a455d1fe6cccb54fe4585788c68e9"}
 {"bytes": 6028, "path": "plugins/cache/claude-plugins-official/claude-md-management/1.0.0/skills/claude-md-improver/SKILL.md", "sha256": "b06c7420be08ca1c7f6d75f7f4709fdb787624a2d363e2f8052216d8c780f85b"}
 {"bytes": 2617, "path": "plugins/cache/claude-plugins-official/claude-md-management/1.0.0/skills/claude-md-improver/references/quality-criteria.md", "sha256": "383def16b05dca948297dd1acb33f007cb1b1b2c368454d424c5634348a8bab1"}
 {"bytes": 3687, "path": "plugins/cache/claude-plugins-official/claude-md-management/1.0.0/skills/claude-md-improver/references/templates.md", "sha256": "de0aa3ac30120a0c77f9cd82738a75ed8326864f98feb89356a253f2deaf3ab0"}
@@ -112,6 +126,10 @@
 {"bytes": 1721, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/.claude/skills/plugin-audit/references/log-format.md", "sha256": "0b81e3342b64dea6d8bbad30dcffb9a12a53aea6a085d85294ec9c3fdc1d9e77"}
 {"bytes": 2120, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/.claude/skills/release/SKILL.md", "sha256": "f0ba3b1f281455ac11cf239def54f2ab9cce65ac1cb6c4512d622bc337294025"}
 {"bytes": 4977, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/.claude/skills/vercel-plugin-eval/SKILL.md", "sha256": "5c701868cc662025d01e38700c1e1d13d1cdd4f60c4f7405615f651d759571ab"}
+{"bytes": 5807, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/commands/bootstrap.md", "sha256": "e26a1f7aa23a17b5af6db7d30f8470a537d72449907ae7dca9765b9d836c015a"}
+{"bytes": 7785, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/commands/deploy.md", "sha256": "236ad738d9c57b044fc00744a86e3de21c34ae85a77ee3bce68dfe07de42798f"}
+{"bytes": 8975, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/commands/env.md", "sha256": "cb1a0174593e1e1531974a19a352a3817fe673c524ee8a1871ed2feeb310b9ef"}
+{"bytes": 11279, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/commands/status.md", "sha256": "975d6a9ea4b8c702171c701129c1ae054d4cd8c6b607a3667450a7dcd922bb83"}
 {"bytes": 23772, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/skills/ai-gateway/SKILL.md", "sha256": "7bfdfaa64d0636a3a972b3c93fd6c707b94a3c48e99f81808c5df79a609747d2"}
 {"bytes": 19820, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/skills/ai-sdk/SKILL.md", "sha256": "255c0f4bd83a3a6092b31b887e7f42026eed1aee14bf9d8cf63083d0058bd116"}
 {"bytes": 2191, "path": "plugins/cache/claude-plugins-official/vercel/0.45.1/skills/ai-sdk/references/ai-gateway.md", "sha256": "f3c716c7f9ddad655044f19823ce5c2792985fba5589a0e99e8e3b1139fec90c"}
@@ -261,6 +279,8 @@
 {"bytes": 17906, "path": "plugins/cache/obsidian-skills/obsidian/1.0.0/skills/obsidian-bases/SKILL.md", "sha256": "2b01f105aba1b97ad4c85d3ab3107e1b740b79ac6fc9130ba950e6075f9324c4"}
 {"bytes": 2941, "path": "plugins/cache/obsidian-skills/obsidian/1.0.0/skills/obsidian-cli/SKILL.md", "sha256": "5412b1e8471cbf6c79dd6aa6b884ffbc8e07350e6ab90819c32f67e5f3c2d8a3"}
 {"bytes": 10813, "path": "plugins/cache/obsidian-skills/obsidian/1.0.0/skills/obsidian-markdown/SKILL.md", "sha256": "50fd2c27aafaa4f4328b3debd74f7d7a0d689ce9d63e8ebfd6b5ae4305ca746e"}
+{"bytes": 3286, "path": "plugins/cache/openai-codex/codex/1.0.1/commands/rescue.md", "sha256": "aa97872b78bcd7ccf4fd2f7a24f33d9d9dfd6ebd3c78e65112c897248b25c52c"}
+{"bytes": 1118, "path": "plugins/cache/openai-codex/codex/1.0.1/commands/setup.md", "sha256": "e2d2c2671d7ea86691687030d6f8f6f3f054445cec06207d874732a2c6e0d2fa"}
 {"bytes": 3097, "path": "plugins/cache/openai-codex/codex/1.0.1/skills/codex-cli-runtime/SKILL.md", "sha256": "cce11c3bd6d7b5ec6277b3527e65ff38c5bd16084b436bf2870fabb30414359c"}
 {"bytes": 1731, "path": "plugins/cache/openai-codex/codex/1.0.1/skills/codex-result-handling/SKILL.md", "sha256": "99fcbbebaeac1e1504b8adfba513bd5964e171414f6709034f3f980a1f2385a8"}
 {"bytes": 3644, "path": "plugins/cache/openai-codex/codex/1.0.1/skills/gpt-5-4-prompting/SKILL.md", "sha256": "48222490b629e0e5cf7372253b864cc03b7780ce7afeaab4129f3dd2efdbf5d9"}
@@ -284,6 +304,7 @@
 {"bytes": 8593, "path": "plugins/cache/personal-skills/zaneins/0.19.4/skills/verify-fix/SKILL.md", "sha256": "b33296387f8f3a943f50b272ab1564bf3efea459a8530b5d3782e6ea4dfcdca0"}
 {"bytes": 7385, "path": "plugins/cache/personal-skills/zaneins/0.19.4/skills/wizard/SKILL.md", "sha256": "e7fb358aaa4148ab537ead4ba949dc010ab154e7016ecf1a0dba7927c39303c8"}
 {"bytes": 12212, "path": "plugins/cache/personal-skills/zaneins/0.19.4/skills/writing-shape/SKILL.md", "sha256": "4f68dde2cade616df7dab64e8deb638d4a5d23d7d9958c03b78028d4efb16dae"}
+{"bytes": 1423, "path": "plugins/cache/superpowers-marketplace/episodic-memory/1.0.15/commands/search-conversations.md", "sha256": "5d28d466406da54c628f7747f5667b7d9d4a52305270f5422864d9fce09ce136"}
 {"bytes": 2538, "path": "plugins/cache/superpowers-marketplace/episodic-memory/1.0.15/skills/remembering-conversations/SKILL.md", "sha256": "84a2ffa55206e037450bc323e03b121f3742950c95f5838f9b9dec8e5c6d5978"}
 {"bytes": 3639, "path": "plugins/cache/vault-sync/vault-sync/9904d91688b1/skills/jarvis/SKILL.md", "sha256": "7d5dcff74674762fb6404263208f4e121972ca807f0ae59c52244e654cc77c6f"}
 {"bytes": 1220, "path": "plugins/cache/vault-sync/vault-sync/9904d91688b1/skills/vault-artefacts/SKILL.md", "sha256": "7f84ad5f39bfac69567022bfa3d2df9293b96da06b2997f89d4198805cb72902"}
@@ -394,6 +415,7 @@
 {"bytes": 1490, "path": "plugins/marketplaces/openai-codex/plugins/codex/skills/gpt-5-4-prompting/references/codex-prompt-antipatterns.md", "sha256": "ebf38d5d60244b0b80a35734d76a4c452abf96e9f1e4a4b8be78aa13a1ab2ab9"}
 {"bytes": 4175, "path": "plugins/marketplaces/openai-codex/plugins/codex/skills/gpt-5-4-prompting/references/codex-prompt-recipes.md", "sha256": "fcc000e51cb967731c1b667fe27d024b0c51158a0d5d692792b23e6b46172331"}
 {"bytes": 4160, "path": "plugins/marketplaces/openai-codex/plugins/codex/skills/gpt-5-4-prompting/references/prompt-blocks.md", "sha256": "9df47d9ac08c28c6ae302febc2b788cf6105ca18998a9649d7c8ccd816a047e9"}
+{"bytes": 9164, "path": "settings.json", "sha256": "e9ce0e2b5bf7e08a24150760e8034a8fb53a929f75b7307262538d099983f7fb"}
 {"bytes": 80431, "path": "skills/hydra/SKILL.md", "sha256": "bcb3bd2438769b1d0432480727df3068ce0cdab78cc41ad3d07ff17096fd9d11"}
 {"bytes": 5568, "path": "skills/hydra/eval-suite.json", "sha256": "b9498a6b5400144bd7cceb671c2fb893be4f986735a3ce71821304a805475348"}
 {"bytes": 27646, "path": "skills/hydra/references/advisors.md", "sha256": "133e4187055e606979948ff665cc1c201640257c01248ebbb2916e438d40b727"}

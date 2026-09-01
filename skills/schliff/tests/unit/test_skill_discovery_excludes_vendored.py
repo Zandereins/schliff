@@ -180,7 +180,15 @@ def test_the_eval_suite_path_has_one_home():
     from pathlib import Path as _P
 
     scripts = _P(__file__).resolve().parents[2] / "scripts"
-    construction = re.compile(r'/\s*"eval-suite\.json"')
+    # Path CONSTRUCTION, in either quoting style and through os.path.join.
+    # Keyed on the double-quoted form alone, this gate passed on the very
+    # mutation its docstring named — single quotes slipped straight through.
+    #
+    # Scope, stated rather than claimed: an f-string or a name assembled from
+    # parts would still evade this. The pattern covers the shapes that exist in
+    # this codebase; the point is that it now fails when someone writes the
+    # obvious thing, not that it cannot be evaded.
+    construction = re.compile(r"""(?:/\s*|,\s*)["']eval-suite\.json["']""")
     sites = []
     for name in ("shared.py", "doctor.py"):
         source = scripts / name
@@ -193,3 +201,40 @@ def test_the_eval_suite_path_has_one_home():
         f"shared.py and doctor.py, not one: {sites}"
     )
     assert sites[0].startswith("shared.py"), f"its one home should be shared.py, found {sites[0]}"
+
+
+@pytest.mark.parametrize("walker", ["doctor", "sync"])
+def test_backups_is_pruned_by_the_instruction_walks_too(tmp_path, walker):
+    """`EXCLUDED_DIRS` has three consumers, and `backups` reaches all of them.
+
+    `discover_skills` is only one. `doctor.discover_instruction_files` and
+    `sync.discover_all_instruction_files` prune the same set from an `os.walk`
+    over an arbitrary user repository, so `myrepo/backups/AGENTS.md` now drops
+    out of drift analysis and out of doctor's instruction-file list as well.
+
+    That is intended — a backup of an AGENTS.md is not the project's AGENTS.md —
+    but it is blast radius beyond the `~/.claude` case the change was argued
+    from, and `backups` is likelier to be a live user directory than
+    `node_modules`. Pinned so the behaviour is a decision and not a side effect.
+    """
+    (tmp_path / "AGENTS.md").write_text("# Real\n\nSetup: `make dev`\n", encoding="utf-8")
+    backup = tmp_path / "backups" / "2026-06-11"
+    backup.mkdir(parents=True)
+    (backup / "AGENTS.md").write_text("# Backup\n\nSetup: `make dev`\n", encoding="utf-8")
+
+    if walker == "doctor":
+        import doctor
+        found = {f["path"] for f in doctor.discover_instruction_files(str(tmp_path))}
+    else:
+        import sync
+        found = {f["path"] for f in sync.discover_all_instruction_files(str(tmp_path))}
+
+    # Relative to tmp_path, because pytest names the temp directory after the
+    # test — so an absolute-path check for "backups" matches the fixture itself
+    # and fails on a correct implementation. It did.
+    relative = {str(Path(p).relative_to(tmp_path)) for p in found}
+
+    assert not any(r.startswith("backups/") for r in relative), (
+        f"a backup copy reached the {walker} instruction walk: {sorted(relative)}"
+    )
+    assert "AGENTS.md" in relative, f"the real AGENTS.md must still be found: {sorted(relative)}"
