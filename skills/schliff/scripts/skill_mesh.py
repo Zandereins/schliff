@@ -29,17 +29,42 @@ import shared
 from nlp import tokenize_meaningful
 from shared import EXCLUDED_DIRS, extract_description
 
+# Bound on a single discovery walk. Module-level rather than local to
+# `discover_skills`, because a caller that has to know whether the cap was hit —
+# a truncated scan sorts AFTER truncating, so its contents follow filesystem
+# order — cannot read a local. One home for the number.
+MAX_SCAN_FILES = 1000
+
+# Set by `discover_skills` when a walk stops at the cap; read through
+# `discover_skills_with_status`, which resets it first. Module state rather than
+# a changed return type, because every existing caller wants the list alone.
+_last_scan_truncated = False
+
 # --- Skill Discovery ---
 
 def discover_skills(skill_dirs: list[str]) -> list[dict]:
     """Find all SKILL.md files in given directories.
 
+    ``discover_skills_with_status`` returns the same list plus whether the walk
+    hit ``MAX_SCAN_FILES``. Callers that must not act on a truncated set — a
+    corpus freeze, say — need that fact and cannot infer it from the list: the
+    cap counts CANDIDATES surviving ``EXCLUDED_DIRS``, while this list only grows
+    for those that also pass symlink confinement, realpath dedup and the bounded
+    read, so a short list is not evidence of truncation and a full one is not
+    evidence against it.
+
     Returns list of skill dicts with: path, name, description, content_hash, tokens.
     """
+    global _last_scan_truncated
+    # Cleared here and not only in the status wrapper: `doctor` calls this
+    # directly, so one truncated scan otherwise left the flag stuck True for the
+    # rest of the process and every later reader saw a truncation that did not
+    # happen. The walk that sets it owns clearing it.
+    _last_scan_truncated = False
+
     skills = []
     seen_paths = set()
 
-    MAX_SCAN_FILES = 1000
     file_count = 0
     scan_limit_reached = False
 
@@ -86,6 +111,7 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
             if file_count > MAX_SCAN_FILES:
                 print(f"Warning: scan limit reached ({MAX_SCAN_FILES} files), stopping discovery", file=sys.stderr)
                 scan_limit_reached = True
+                _last_scan_truncated = True
                 break
             try:
                 # Use os.path.realpath() explicitly to resolve all symlinks
@@ -135,6 +161,20 @@ def discover_skills(skill_dirs: list[str]) -> list[dict]:
     # (rglob traversal order is filesystem-dependent and not stable).
     skills.sort(key=lambda s: s["path"])
     return skills
+
+
+def discover_skills_with_status(skill_dirs: list[str]) -> tuple[list[dict], bool]:
+    """``discover_skills``, plus whether the walk stopped at ``MAX_SCAN_FILES``.
+
+    One walk, two callers with different needs. The truncation flag lives here
+    because the walk owns it; a caller comparing ``len(result)`` against the cap
+    is comparing a filtered count to an unfiltered bound, which is wrong in both
+    directions — it misses a truncated scan whose candidates were mostly dropped,
+    and it rejects a complete scan of exactly ``MAX_SCAN_FILES`` files, since the
+    break is ``>`` and not ``>=``.
+    """
+    skills = discover_skills(skill_dirs)
+    return skills, _last_scan_truncated
 
 
 # --- TF-IDF Cosine Similarity ---

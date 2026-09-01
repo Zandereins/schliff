@@ -131,7 +131,7 @@ def _score_single_skill(skill_path: str) -> dict:
     # `shared.eval_suite_error`, not a bound alias: a later per-run reset in
     # shared would leave an import-time binding reading a dead dict, and every
     # row would silently report no suite error.
-    suite_error = shared.eval_suite_error.get(str(Path(skill_path).parent / "eval-suite.json"))
+    suite_error = shared.eval_suite_error.get(str(shared.eval_suite_path(skill_path)))
 
     if suite_error:
         action = f"{BROKEN_ACTION_PREFIX}{suite_error}"
