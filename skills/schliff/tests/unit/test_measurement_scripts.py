@@ -57,30 +57,36 @@ def test_a_changed_reference_is_drift(corpus, tmp_path):
     assert fc.verify(manifest) == 1, "a reference the token cost reads must count as drift"
 
 
-def test_write_refuses_an_empty_or_shrinking_corpus(corpus, tmp_path):
+def test_write_refuses_an_empty_or_shrinking_corpus(corpus, tmp_path, capsys):
     """`discover_skills` skips a missing directory, so a wrong HOME truncated the artifact."""
     root, fc = corpus
     manifest = tmp_path / "m.jsonl"
     fc.write(manifest)
 
     fc.CORPUS_ROOT = tmp_path / "nowhere"
-    with pytest.raises(SystemExit, match="empty manifest"):
+    with pytest.raises(SystemExit) as empty:
         fc.write(tmp_path / "other.jsonl")
+    assert empty.value.code == fc.EXIT_BROKEN
+    assert "empty manifest" in capsys.readouterr().err
 
     fc.CORPUS_ROOT = root
     (root / "skills" / "demo" / "references" / "notes.md").unlink()
-    with pytest.raises(SystemExit, match="refusing to write"):
+    with pytest.raises(SystemExit) as shrink:
         fc.write(manifest)
+    assert shrink.value.code == fc.EXIT_BROKEN
+    assert "refusing to write" in capsys.readouterr().err
 
 
-def test_write_refuses_a_file_it_cannot_freeze(corpus, tmp_path, monkeypatch):
+def test_write_refuses_a_file_it_cannot_freeze(corpus, tmp_path, monkeypatch, capsys):
     """An unfreezable file is read by a published number; dropping it was silent."""
     root, fc = corpus
     monkeypatch.setattr(fc.shared, "MAX_SKILL_SIZE", 200)
     (root / "skills" / "demo" / "references" / "notes.md").write_text("x" * 500)
 
-    with pytest.raises(SystemExit, match="cannot be frozen"):
+    with pytest.raises(SystemExit) as exc:
         fc.write(tmp_path / "m.jsonl")
+    assert exc.value.code == fc.EXIT_BROKEN, "a check that could not run is not drift"
+    assert "cannot be frozen" in capsys.readouterr().err
 
 
 def test_a_resolution_flip_is_drift_even_when_no_file_changed(corpus, tmp_path):
@@ -146,7 +152,15 @@ def test_evidence_precedes_the_verdict_in_a_redirected_log(tmp_path):
     assert text.index("drifted") < text.index("MEASUREMENT NOT TAKEN"), (
         f"the verdict preceded the evidence it rests on:\n{text}"
     )
-    assert all(line.startswith("[freeze ") for line in text.splitlines()
-               if line.strip() and "drifted" in line or line.startswith("added:")), (
-        "every freeze line needs its label, not only the first"
-    )
+    # Assert on the BARE labels: if any line still starts with `added:` or
+    # `drifted` without its prefix, the labelling stopped after the first line.
+    # The previous version read `line.strip() and "drifted" in line or
+    # line.startswith("added:")`, which parses as `(A and B) or C` — and since
+    # every line is already prefixed, C never selected anything, so dropping the
+    # per-line labelling would have kept this green.
+    unlabelled = [line for line in text.splitlines()
+                  if (line.startswith(("added:", "removed:", "changed:",
+                                       "no longer resolved:", "newly resolved:"))
+                      or (line.rstrip().endswith("drifted")
+                          and not line.startswith("[freeze ")))]
+    assert not unlabelled, f"freeze output missing its label: {unlabelled}"

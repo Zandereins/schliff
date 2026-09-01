@@ -28,6 +28,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import freeze_corpus  # noqa: E402  (path set above)
+
 _REPO = Path(__file__).resolve().parents[2]
 _SCHLIFF = _REPO / "skills" / "schliff"
 
@@ -78,8 +81,12 @@ def _verify(manifest: Path, when: str) -> bool:
     if proc.returncode == 0:
         return True
 
-    drifted = any(line.startswith(("added:", "removed:", "changed:")) for line in proc.stdout.splitlines())
-    if drifted:
+    # The verdict comes from the exit code, not from pattern-matching another
+    # process's prose. Prefix-matching stdout broke the moment `freeze_corpus`
+    # gained two labels: a resolution flip emits only those, so every version
+    # change was announced as "the freeze check itself failed" — the opposite of
+    # the truth, on the one date it matters.
+    if proc.returncode == freeze_corpus.EXIT_DRIFT:
         print(
             f"\nMEASUREMENT NOT TAKEN — the corpus no longer matches its freeze ({when} measuring).\n"
             "The choice is made outside this command, and recorded either way:\n"
