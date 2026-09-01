@@ -60,7 +60,7 @@ def _payload_of(skill_md: Path) -> list[Path]:
     produced several defects in `shared` itself.
     """
     files = [skill_md, *shared._payload_files(str(skill_md))]
-    suite = skill_md.parent / "eval-suite.json"
+    suite = shared.eval_suite_path(str(skill_md))
     if suite.exists():
         files.append(suite)
     return files
@@ -68,14 +68,20 @@ def _payload_of(skill_md: Path) -> list[Path]:
 
 def _entries() -> list[dict]:
     """One record per file the measurement reads: relative path, sha256, size."""
-    skills = skill_mesh.discover_skills([str(CORPUS_ROOT)])
-    # discover_skills stops at MAX_SCAN_FILES and sorts AFTER truncating, so a
-    # capped scan yields a set that depends on traversal order. Silently freezing
-    # such a set would make `verify` report churn on an unchanged corpus.
-    if len(skills) >= skill_mesh.MAX_SCAN_FILES:
+    # Ask the walk whether it truncated. Comparing `len(skills)` to the cap was
+    # wrong in both directions: the cap counts candidates surviving EXCLUDED_DIRS
+    # while this list only keeps those that also pass symlink confinement,
+    # realpath dedup and the bounded read — so a capped scan whose candidates were
+    # mostly dropped returns a short list and looks fine, and a complete scan of
+    # exactly MAX_SCAN_FILES files was rejected, since the break is `>` not `>=`.
+    skills, truncated = skill_mesh.discover_skills_with_status([str(CORPUS_ROOT)])
+    if truncated:
+        # A truncated walk sorts AFTER truncating, so its contents follow
+        # filesystem traversal order; freezing that would make `verify` report
+        # churn on an unchanged corpus.
         raise SystemExit(
-            f"discovery hit its {skill_mesh.MAX_SCAN_FILES}-file cap; the frozen set "
-            f"would be whatever the filesystem happened to return first"
+            f"discovery stopped at its {skill_mesh.MAX_SCAN_FILES}-file cap; the frozen "
+            f"set would be whatever the filesystem happened to return first"
         )
 
     seen: set[Path] = set()

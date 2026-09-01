@@ -63,7 +63,8 @@ is what `doctor`'s payload deduplication collapses to 136 installations.
 
 ### The backups are counted as installations
 
-`doctor ~/.claude` reports **three** rows named `schliff`:
+**As measured on 2026-09-01, before the fix in this change**, `doctor ~/.claude` reported **three**
+rows named `schliff`:
 
 ```
 9001 tokens  backups/schliff-skill-backups/schliff.bak.20260611071745/SKILL.md
@@ -71,13 +72,13 @@ is what `doctor`'s payload deduplication collapses to 136 installations.
 9591 tokens  skills/schliff/SKILL.md
 ```
 
-The two June backups contribute **18,014 of the 438,597 tokens (4.1%)** and two of the 138
-installations. `shared.EXCLUDED_DIRS` covers `node_modules`, `.venv`, `site-packages` and similar,
-but not `backups`.
+The two June backups contributed **18,014 of the then-438,597 tokens (4.1%)** and two of the then-138
+installations. `shared.EXCLUDED_DIRS` covered `node_modules`, `.venv`, `site-packages` and similar,
+but not `backups`. It does now, and the scan reports one row named `schliff`.
 
-One of them is byte-identical to the live `skills/schliff/SKILL.md` and still does not collapse with
+One of them is byte-identical to the live `skills/schliff/SKILL.md` and still did not collapse with
 it, correctly: the payload digest also covers `references/*.md` and `eval-suite.json`, which the
-backup directory does not carry. So the digest is right and the discovery is wrong — a backup
+backup directory does not carry. So the digest was right and the discovery was wrong — a backup
 directory is not an install location.
 
 **Decided 2026-09-01: excluded.** `backups` is in `shared.EXCLUDED_DIRS`, guarded by
@@ -106,10 +107,10 @@ The plan commits to "context cost, explicitly not the grades". It does not say w
 |---|---|---|
 | `manifest` resident | **7,975 tokens** across 106 artifacts | what sits in every context before you do anything |
 | `manifest` invoke | **364,126 tokens** | what it costs if everything is invoked |
-| `doctor ~/.claude` | **438,597 tokens** across 138 installations | everything on disk, payload-deduplicated |
+| `doctor ~/.claude` | **420,583 tokens** across 136 installations | everything on disk, payload-deduplicated |
 
 Two orders of magnitude apart, and two different stories: *"your setup costs 8k tokens before you
-type"* against *"438k tokens of skill material on disk"*.
+type"* against *"421k tokens of skill material on disk"*.
 
 **Decided 2026-09-01, before the measurement and not while writing the case study — `resident`.**
 

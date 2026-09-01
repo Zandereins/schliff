@@ -151,3 +151,45 @@ def test_a_backup_is_not_an_installed_skill(tmp_path):
         f"backups discovered as skills: "
         f"{sorted(p.replace(str(tmp_path), '') for p in found)}"
     )
+
+
+def test_the_eval_suite_path_has_one_home():
+    """A consolidation without a gate is a convention, not a fix.
+
+    The `<skill dir>/eval-suite.json` expression had six independent derivations
+    across `shared` and `doctor` — the loader, its cache wrapper, the
+    invalidator, two branches of `skill_payload_digest`, and doctor's row
+    builder — all keying the same module dicts on a string each of them rebuilt.
+    That is the #209 shape: the defect is not the expression, it is the number of
+    homes. A caller outside the module needed it as a seventh, which surfaced it.
+
+    Keyed on the construction, not on wording: rebuild the path in either of
+    these two modules instead of calling `shared.eval_suite_path` and this goes
+    red.
+
+    **Scope, stated exactly.** This covers `shared.py` and `doctor.py`, the two
+    modules consolidated here. It is NOT a repository-wide uniqueness claim:
+    when this gate was first written repo-wide it immediately found five more
+    derivations — in `achievements.py`, `dashboard.py`, `init-skill.py`,
+    `score-skill.py` and `text_gradient.py` — which is precisely why a
+    consolidation needs a gate rather than an assertion that it is complete.
+    Those five are a separate, mechanical change; widening this list is what
+    closes them.
+    """
+    import re
+    from pathlib import Path as _P
+
+    scripts = _P(__file__).resolve().parents[2] / "scripts"
+    construction = re.compile(r'/\s*"eval-suite\.json"')
+    sites = []
+    for name in ("shared.py", "doctor.py"):
+        source = scripts / name
+        for n, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
+            if construction.search(line):
+                sites.append(f"{name}:{n}")
+
+    assert len(sites) == 1, (
+        f"the eval-suite path is derived in {len(sites)} places across "
+        f"shared.py and doctor.py, not one: {sites}"
+    )
+    assert sites[0].startswith("shared.py"), f"its one home should be shared.py, found {sites[0]}"

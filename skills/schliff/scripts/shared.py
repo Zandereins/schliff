@@ -139,7 +139,7 @@ def invalidate_cache(skill_path: str) -> None:
     _file_cache.pop(key, None)
     # Four dicts are keyed on this skill's paths; invalidating two of them left the
     # other two to outlive the file they describe. One door, all four.
-    suite_key = str(Path(skill_path).parent / "eval-suite.json")
+    suite_key = str(eval_suite_path(skill_path))
     _eval_suite_cache.pop(suite_key, None)
     eval_suite_error.pop(suite_key, None)
     eval_suite_content_id.pop(suite_key, None)
@@ -403,14 +403,14 @@ def skill_payload_digest(skill_path: str) -> str:
             # whole reason this key exists. The id comes from `load_eval_suite`,
             # which read the bytes; re-opening the path here would be the
             # re-derivation this module keeps paying for.
-            marker = eval_suite_content_id.get(str(path.parent / "eval-suite.json"))
+            marker = eval_suite_content_id.get(str(eval_suite_path(str(path))))
             _absorb("eval-suite.json:unserialisable", marker or "")
     else:
         # "absent" and "present but broken" produce different rows — different
         # `action`, different `eval_suite_error` — so they must not collapse onto
         # each other. Without this the domain is again smaller than what the row
         # reports, which is the defect this key exists to prevent.
-        suite_path = str(path.parent / "eval-suite.json")
+        suite_path = str(eval_suite_path(str(path)))
         failure = eval_suite_error.get(suite_path)
         if failure:
             # The reason alone is as coarse a key as the "<unserialisable>" literal
@@ -434,6 +434,19 @@ def skill_payload_digest(skill_path: str) -> str:
     return digest.hexdigest()
 
 
+def eval_suite_path(skill_path: str) -> Path:
+    """Where a skill's ``eval-suite.json`` lives.
+
+    Six places derived this independently — the loader, its cache wrapper, the
+    invalidator, two branches of ``skill_payload_digest`` and doctor's row
+    builder — all keying the same dicts on a string they each rebuilt. That is
+    the shape #209 named: the defect is not the expression, it is that it had six
+    homes. A caller outside this module (the corpus freeze) needed it as a
+    seventh, which is what surfaced it.
+    """
+    return Path(skill_path).parent / "eval-suite.json"
+
+
 def load_eval_suite(skill_path: str) -> Optional[dict]:
     """Auto-discover and load eval-suite.json, once per path per invocation.
 
@@ -451,7 +464,7 @@ def load_eval_suite(skill_path: str) -> Optional[dict]:
     The ``eval_suite_error`` entry is replayed on a hit, so a cached failure
     still reaches the report; only the duplicated stderr line is dropped.
     """
-    suite_path = Path(skill_path).parent / "eval-suite.json"
+    suite_path = eval_suite_path(skill_path)
     key = str(suite_path)
     try:
         st = suite_path.stat()
@@ -486,8 +499,7 @@ def _load_eval_suite_uncached(skill_path: str) -> Optional[dict]:
     whole run into a traceback. Doctor scans directories that are usually not
     yours; it reports and never gates (ADR 0014, ADR 0019).
     """
-    skill_dir = Path(skill_path).parent
-    auto_path = skill_dir / "eval-suite.json"
+    auto_path = eval_suite_path(skill_path)
     try:
         if not auto_path.exists():
             eval_suite_error.pop(str(auto_path), None)
