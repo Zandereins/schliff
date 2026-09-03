@@ -19,13 +19,15 @@ updates rewrite on their own schedule. Measured:
 | 2026-08-29 | 159 |
 | 2026-08-31 | 161 — a plugin update ran at 08:37 that morning |
 | 2026-09-01 | 161, then **159** once `backups/` was excluded |
-| 2026-09-03 | **212** — the `vercel` plugin moved from 0.45.1 to 0.48.0, and the 0.45.1 cache stayed on disk |
+| 2026-09-03 | **212** — the user-scoped `vercel` install moved from 0.45.1 to 0.48.0; a project-scoped 0.45.1 install remains |
 
-A number published on 2026-09-14 against a corpus that has moved four times cannot be reproduced
-by anyone, including its author. `corpus-2026-09-04.jsonl` is the freeze: one line per file the
+Two of those rows are plugin updates nobody in this repository triggered (08-31 and 09-03); a number
+published on 2026-09-14 against a corpus that moves on its own schedule cannot be reproduced by
+anyone, including its author. `corpus-2026-09-03.jsonl` is the freeze: one line per file the
 measurement reads, path relative to `~/.claude`, full sha256 of the raw bytes, size.
 `corpus-2026-09-01.jsonl` is the first freeze, superseded on 2026-09-03 and kept so the drift
-between the two is auditable.
+between the two is auditable. Manifests are named by the day they were frozen, not the day they are
+measured against.
 
 **Every file any published number reads**, which is more than the SKILL.md and different per number:
 
@@ -48,7 +50,7 @@ The manifest holds **580 files**: 212 SKILL.md, 342 references, 4 eval suites, 2
 SKILL.md, 246 references, 4 eval suites, 21 commands, `settings.json`.)
 
 ```bash
-python3 scripts/measurement/run_measurement.py docs/case-studies/context-cost/corpus-2026-09-04.jsonl
+python3 scripts/measurement/run_measurement.py docs/case-studies/context-cost/corpus-2026-09-03.jsonl
 ```
 
 That is the whole measurement: it verifies the freeze, takes the three figures from the tools that
@@ -84,7 +86,8 @@ stated once, in the section above — repeating it here is how this sentence cam
 the manifest had grown to 431.
 
 **Two hand-installed skills.** Everything else is plugin material, most of it present twice — which
-is what `doctor`'s payload deduplication collapses to 136 installations.
+is what `doctor`'s payload deduplication collapsed to 136 installations on the first freeze and
+150 on the second.
 
 ### The backups are counted as installations
 
@@ -162,8 +165,8 @@ On 2026-09-03, one day before the pre-registered run, `freeze_corpus.py verify` 
   153 added · 4 removed · 3 changed · 32 no longer resolved · 2 newly resolved
 ```
 
-The cause is a plugin update: `vercel` moved from 0.45.1 to 0.48.0, and `frontend-design` and
-`skill-creator` switched to a new marketplace revision. `settings.json` and the `claude-security`
+The cause is a plugin update: the user-scoped `vercel` install moved from 0.45.1 to 0.48.0, and
+`frontend-design` and `skill-creator` switched to a new marketplace revision. `settings.json` and the `claude-security`
 and `frontend-design` marketplace copies changed as well. The version detection built for exactly
 this case fired on its first real occasion, and `run_measurement.py` refused and wrote nothing.
 
@@ -172,20 +175,30 @@ The corpus is a living system that plugin updates rewrite on their own schedule;
 have meant editing Claude Code's own plugin pointers to make a number reproducible, which is the
 wrong direction. The first manifest stays in the repository so the drift is auditable.
 
-Effect on all three figures, measured with `--rehearsal` against the new manifest on 2026-09-03:
+Effect on all three figures, measured with `--rehearsal` against the new manifest on 2026-09-03
+(the record is `rehearsal-2026-09-03.json`, committed beside the manifests):
 
-| figure | 2026-09-01 freeze | 2026-09-04 freeze |
+| figure | 2026-09-01 freeze | 2026-09-03 freeze |
 |---|---|---|
 | `resident` (the headline) | 7,975 tokens across 106 artifacts | **8,212 tokens across 109 artifacts** |
 | `invoke` | 364,126 tokens | 372,812 tokens |
 | on disk | 420,583 tokens across 136 installations | 461,824 tokens across 150 installations |
 | SKILL.md discovered | 159 | 212 |
 
-The on-disk figure grew more than the headline because the 0.45.1 cache directory is still on disk
-and still discovered: 48 of its SKILL.md files sit in the new manifest as `resolved: false`. They
-count as installed material for `doctor` and contribute nothing to `resident`, which is gated by
-what `settings.json` enables. The headline moved by three artifacts and 237 tokens, which are the
-skills 0.48.0 added.
+The on-disk figure grew more than the headline, and not because of a leftover: 0.45.1 is not a
+stale cache but a second live install. `installed_plugins.json` lists `vercel` twice — 0.45.1
+project-scoped for another repository, 0.48.0 user-scoped — so both versions are installed material
+and `doctor` counts one installation per payload across them. 38 of the 48 0.45.1 rows carry their
+byte-identical 0.48.0 twin in `also_installed_at` and were already counted on 2026-09-01; the growth
+is the 13 payloads under 0.48.0 that have no twin — three new skills and ten whose payload changed —
+at 39,273 of the 41,241 added tokens. Deleting the 0.45.1 directory would break the other project's
+install and would not return the figure to 420,583: the 0.48.0 rows would be counted instead.
+
+In the manifest the 0.45.1 rows are the 48 SKILL.md without a `resolved` key — non-resolution is
+encoded by absence, the key is only ever written as `true`. They contribute nothing to `resident`,
+which is gated by what `settings.json` enables. The headline moved by three artifacts and a net 237
+tokens: 0.48.0 adds three skills and rewrites the `description:` of four carried-over ones, so the
+237 is not the sum of the three new descriptions.
 
 The headline decision above was taken on the 2026-09-01 values and is not reopened by the
 re-freeze: the ranking of the three figures, and the two orders of magnitude between the first and
