@@ -5,9 +5,9 @@ after the corpus drifted** (see [The corpus drifted before the measurement](#the
 Measurement is scheduled for 2026-09-04, the case study for 2026-09-14.
 
 - **`backups/` is excluded from discovery.** The frozen corpus is **212 files → 150 installations,
-  461,824 tokens** (on the first freeze: 159 → 136, 420,583).
-- **The headline is `resident`: 8,212 tokens across 109 artifacts** (first freeze: 7,975 across
-  106). `invoke` and the on-disk figure are named alongside it, never alone.
+  461,824 tokens**.
+- **The headline is `resident`: 8,212 tokens across 109 artifacts.** `invoke` and the on-disk figure
+  are named alongside it, never alone. Both figures on the first freeze are in the drift section.
 
 ## Why this exists
 
@@ -110,8 +110,8 @@ backup directory does not carry. So the digest was right and the discovery was w
 directory is not an install location.
 
 **Decided 2026-09-01: excluded.** `backups` is in `shared.EXCLUDED_DIRS`, guarded by
-`test_a_backup_is_not_an_installed_skill`. The corpus is **136 installations and 420,583 tokens** —
-measured by running `run_doctor` with the exclusion, not by subtracting.
+`test_a_backup_is_not_an_installed_skill`. On the first freeze the corpus was **136 installations and
+420,583 tokens** — measured by running `run_doctor` with the exclusion, not by subtracting.
 
 This completes a fix the project already made and then bypassed. `install.sh` used to write
 `~/.claude/skills/schliff.bak.<ts>`, inside the skill scan path, duplicating the whole `/schliff:*`
@@ -120,7 +120,8 @@ namespace; on 2026-06-11 it moved to `~/.claude/backups/` for exactly that reaso
 scan pointed at `~/.claude` itself. `~/.claude/backups/` is a Claude Code convention directory — its
 own `.claude.json.backup.*` files live there too — so nothing under it is a loadable skill.
 
-That run also reports **159 files discovered**, which is the number the plan names as the scope.
+That run also reported **159 files discovered**, which is the number the plan names as the scope
+(212 on the second freeze, so the plan's scope figure is dated too).
 The match is a coincidence and must not be read as confirmation: the plan's 159 was measured on
 2026-08-29, when the corpus held those same two backups and not yet the two files a plugin update
 added on 08-31. Two different sets, same size. This is a path exclusion,
@@ -162,8 +163,13 @@ On 2026-09-03, one day before the pre-registered run, `freeze_corpus.py verify` 
 
 ```
 431 frozen, 580 present, 194 drifted
-  153 added · 4 removed · 3 changed · 32 no longer resolved · 2 newly resolved
 ```
+
+By label, counted by hand from the 194 lines `verify` prints (it prints one line per file and no
+per-label totals): 153 added, 4 removed, 3 changed, 32 no longer resolved, 2 newly resolved. The
+4 removed are `vercel/0.45.1/commands/*.md`, all still on disk: commands are frozen only for the
+resolved version, because no published number reads the commands of an unresolved one, so a version
+flip shows as removed/added for commands and as unresolved/resolved for SKILL.md.
 
 The cause is a plugin update: the user-scoped `vercel` install moved from 0.45.1 to 0.48.0, and
 `frontend-design` and `skill-creator` switched to a new marketplace revision. `settings.json` and the `claude-security`
@@ -190,15 +196,27 @@ stale cache but a second live install. `installed_plugins.json` lists `vercel` t
 project-scoped for another repository, 0.48.0 user-scoped — so both versions are installed material
 and `doctor` counts one installation per payload across them. 38 of the 48 0.45.1 rows carry their
 byte-identical 0.48.0 twin in `also_installed_at` and were already counted on 2026-09-01; the growth
-is the 13 payloads under 0.48.0 that have no twin — three new skills and ten whose payload changed —
-at 39,273 of the 41,241 added tokens. Deleting the 0.45.1 directory would break the other project's
+is 14 new payload groups: the 13 under 0.48.0 that have no twin — three new skills and ten whose
+payload changed — at 39,273 tokens, and a second `frontend-design` payload at 1,971, because the new
+marketplace revision rewrote its SKILL.md while the older cache revisions keep the old one; the
+`claude-security` copy was replaced in place at −3. Together, 41,241. Deleting the 0.45.1 directory would break the other project's
 install and would not return the figure to 420,583: the 0.48.0 rows would be counted instead.
 
-In the manifest the 0.45.1 rows are the 48 SKILL.md without a `resolved` key — non-resolution is
-encoded by absence, the key is only ever written as `true`. They contribute nothing to `resident`,
+In the manifest all 48 0.45.1 SKILL.md rows lack a `resolved` key, as do 76 others (orphaned
+revisions, `upstream/` nests, marketplace copies) — non-resolution is encoded by absence, the key is
+only ever written as `true`. They contribute nothing to `resident`,
 which is gated by what `settings.json` enables. The headline moved by three artifacts and a net 237
 tokens: 0.48.0 adds three skills and rewrites the `description:` of four carried-over ones, so the
 237 is not the sum of the three new descriptions.
+
+**Known defect, found in review on 2026-09-03 and not yet fixed:** the "2 newly resolved" rows are
+`frontend-design/ed404106fcd8` and `skill-creator/ed404106fcd8`, and `installed_plugins.json` does
+not install them — it installs `0120fb83da5d`. `manifest.py` resolves a plugin's version directory
+by newest mtime, and Claude Code writes `.orphaned_at` into the old directory a few milliseconds
+after creating the new one, so the orphan wins on every update. The two revisions carry an identical
+`description:`, so `resident` is unaffected today; `invoke` is understated by roughly 278 tokens.
+The fix belongs in the reader, not in this freeze, and is a decision for the owner before or after
+the run.
 
 The headline decision above was taken on the 2026-09-01 values and is not reopened by the
 re-freeze: the ranking of the three figures, and the two orders of magnitude between the first and
