@@ -11,6 +11,7 @@ heuristic over another process's stdout, so renaming a label in
 itself failed" — the opposite verdict, with no test to notice.
 """
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -164,3 +165,6 @@ def test_evidence_precedes_the_verdict_in_a_redirected_log(tmp_path):
                       or (line.rstrip().endswith("drifted")
                           and not line.startswith("[freeze ")))]
     assert not unlabelled, f"freeze output missing its label: {unlabelled}"
+    # The per-label totals travel with the verdict, so a drift report can be
+    # quoted rather than counted by hand from the path lines.
+    assert re.search(r"\d+ added · \d+ removed · \d+ changed · \d+ no longer resolved · \d+ newly resolved", text), text

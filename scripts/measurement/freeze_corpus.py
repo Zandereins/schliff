@@ -299,6 +299,11 @@ def verify(target: Path) -> int:
 
     drift = len(added) + len(removed) + len(changed) + len(unresolved) + len(newly)
     print(f"{len(frozen)} frozen, {len(current)} present, {drift} drifted")
+    if drift:
+        # Per-label totals, so a drift report can be quoted instead of counted
+        # by hand from the path lines above.
+        print(f"  {len(added)} added · {len(removed)} removed · {len(changed)} changed · "
+              f"{len(unresolved)} no longer resolved · {len(newly)} newly resolved")
     # Non-zero on drift: a measurement taken against a corpus that no longer
     # matches its freeze is not reproducible, and that has to be loud.
     return EXIT_DRIFT if drift else EXIT_CLEAN

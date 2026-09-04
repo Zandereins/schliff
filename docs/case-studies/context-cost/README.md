@@ -1,13 +1,16 @@
 # Context-cost measurement — frozen corpus and the number that gets published
 
-Status: **corpus frozen 2026-09-01, both decisions settled the same day; re-frozen 2026-09-03
-after the corpus drifted** (see [The corpus drifted before the measurement](#the-corpus-drifted-before-the-measurement)).
-Measurement is scheduled for 2026-09-04, the case study for 2026-09-14.
+Status: **measured 2026-09-04.** The number of record is `measurement-2026-09-04.json`, taken
+against `corpus-2026-09-03.jsonl` with the freeze verified before and after (`580 frozen, 580
+present, 0 drifted`). Corpus frozen 2026-09-01, both decisions settled the same day, re-frozen
+2026-09-03 after the corpus drifted (see
+[The corpus drifted before the measurement](#the-corpus-drifted-before-the-measurement)). The case
+study follows on 2026-09-14.
 
 - **`backups/` is excluded from discovery.** The frozen corpus is **212 files → 150 installations,
   461,824 tokens**.
 - **The headline is `resident`: 8,212 tokens across 109 artifacts.** `invoke` and the on-disk figure
-  are named alongside it, never alone. Both figures on the first freeze are in the drift section.
+  are named alongside it, never alone. The first-freeze values of all three are in the table below.
 
 ## Why this exists
 
@@ -46,15 +49,20 @@ tokens with `verify` reporting `0 drifted`), then it covered what `doctor` reads
 headline's own inputs out (measured: 21 of 106 artifacts and 830 of 7,975 resident tokens unfrozen).
 
 The manifest holds **580 files**: 212 SKILL.md, 342 references, 4 eval suites, 21 commands, and
-`settings.json`. Every artifact `manifest` reports is in it. (The first freeze held 431: 159
-SKILL.md, 246 references, 4 eval suites, 21 commands, `settings.json`.)
+`settings.json`. Every artifact `manifest` reports is in it; the first freeze's composition is
+the first manifest itself.
 
 ```bash
 python3 scripts/measurement/run_measurement.py docs/case-studies/context-cost/corpus-2026-09-03.jsonl
 ```
 
 That is the whole measurement: it verifies the freeze, takes the three figures from the tools that
-own them, and writes `measurement-<date>.json` beside the manifest it was taken against. **On drift
+own them, and writes `measurement-<date>.json` beside the manifest it was taken against. It has
+run: the record exists, and the command now refuses rather than overwrite it — a second run is a
+deliberate act, not a retry. The record's `measured_by.commit` names the PR-branch commit the
+reader ran from; its readers (`manifest.py`, `doctor.py`, `shared.py`) are byte-identical to `main`
+at `3ccf758`, and after the squash merge of #228 the reader is `main` at that merge. The branch SHA
+stays reachable through the un-deleted branch, but the `main` SHA is the one to cite. **On drift
 it names every changed file, writes nothing, and exits 1** — re-freezing is a decision, not
 something a script should make quietly. `freeze_corpus.py verify` runs the same check on its own,
 without taking a measurement. The choice after a refusal is made deliberately and outside the command: re-freeze and say so in the
@@ -80,8 +88,8 @@ suggests. As discovered on 2026-09-01, **before** `backups/` was excluded:
 | 2 | `backups/` | **schliff's own backups, from 2026-06-11** | **no — excluded** |
 | 2 | `skills/` | hand-installed: `hydra` and `schliff` | yes |
 
-The first manifest therefore held those **159 SKILL.md** and no `backups/` rows; the current one
-holds 212, for the reason given in the drift section. The full line count and composition are
+The first manifest therefore held those SKILL.md and no `backups/` rows; the current one holds
+more, for the reason given in the drift section. The full line count and composition are
 stated once, in the section above — repeating it here is how this sentence came to claim 409 after
 the manifest had grown to 431.
 
@@ -132,15 +140,16 @@ so it is an entry in an existing mechanism rather than a new enumeration.
 
 The plan commits to "context cost, explicitly not the grades". It does not say which of these:
 
-| source | number (first freeze, 2026-09-01) | the question it answers |
-|---|---|---|
-| `manifest` resident | **7,975 tokens** across 106 artifacts | what sits in every context before you do anything |
-| `manifest` invoke | **364,126 tokens** | what it costs if everything is invoked |
-| `doctor ~/.claude` | **420,583 tokens** across 136 installations | everything on disk, payload-deduplicated |
+| source | 2026-09-01 freeze | 2026-09-03 freeze, measured 09-04 | the question it answers |
+|---|---|---|---|
+| `manifest` resident | 7,975 tokens across 106 artifacts | **8,212 tokens across 109 artifacts** | what sits in every context before you do anything |
+| `manifest` invoke | 364,126 tokens | 372,812 tokens | what it costs if everything is invoked |
+| `doctor ~/.claude` | 420,583 tokens across 136 installations | 461,824 tokens across 150 installations | everything on disk, payload-deduplicated |
+| SKILL.md discovered | 159 | 212 | the scan's input count, not a cost |
 
 Two orders of magnitude apart, and two different stories: *"your setup costs 8k tokens before you
-type"* against *"421k tokens of skill material on disk"*. The re-freeze moved every figure (the
-values are in the drift section below) and none of the gaps between them.
+type"* against *"462k tokens of skill material on disk"*. The re-freeze moved every figure and none
+of the gaps between them. This table is the only place both columns are stated.
 
 **Decided 2026-09-01, before the measurement and not while writing the case study — `resident`.**
 
@@ -163,11 +172,11 @@ On 2026-09-03, one day before the pre-registered run, `freeze_corpus.py verify` 
 
 ```
 431 frozen, 580 present, 194 drifted
+  153 added · 4 removed · 3 changed · 32 no longer resolved · 2 newly resolved
 ```
 
-By label, counted by hand from the 194 lines `verify` prints (it prints one line per file and no
-per-label totals): 153 added, 4 removed, 3 changed, 32 no longer resolved, 2 newly resolved. The
-4 removed are `vercel/0.45.1/commands/*.md`, all still on disk: commands are frozen only for the
+(The per-label line is printed by `verify` since this change; before it, the totals had to be
+counted from the 194 path lines.) The 4 removed are `vercel/0.45.1/commands/*.md`, all still on disk: commands are frozen only for the
 resolved version, because no published number reads the commands of an unresolved one, so a version
 flip shows as removed/added for commands and as unresolved/resolved for SKILL.md.
 
@@ -181,15 +190,10 @@ The corpus is a living system that plugin updates rewrite on their own schedule;
 have meant editing Claude Code's own plugin pointers to make a number reproducible, which is the
 wrong direction. The first manifest stays in the repository so the drift is auditable.
 
-Effect on all three figures, measured with `--rehearsal` against the new manifest on 2026-09-03
-(the record is `rehearsal-2026-09-03.json`, committed beside the manifests):
-
-| figure | 2026-09-01 freeze | 2026-09-03 freeze |
-|---|---|---|
-| `resident` (the headline) | 7,975 tokens across 106 artifacts | **8,212 tokens across 109 artifacts** |
-| `invoke` | 364,126 tokens | 372,812 tokens |
-| on disk | 420,583 tokens across 136 installations | 461,824 tokens across 150 installations |
-| SKILL.md discovered | 159 | 212 |
+The effect on all three figures is in the table under
+[Which number is the headline](#which-number-is-the-headline). `rehearsal-2026-09-03.json` is the
+rehearsal against the new manifest, `measurement-2026-09-04.json` the pre-registered run; they
+agree on every figure and differ only in date, commit and the `rehearsal` flag.
 
 The on-disk figure grew more than the headline, and not because of a leftover: 0.45.1 is not a
 stale cache but a second live install. `installed_plugins.json` lists `vercel` twice — 0.45.1
@@ -211,14 +215,19 @@ tokens: 0.48.0 adds three skills and rewrites the `description:` of four carried
 
 **Known defect, found in review on 2026-09-03 and not yet fixed:** the "2 newly resolved" rows are
 `frontend-design/ed404106fcd8` and `skill-creator/ed404106fcd8`, and `installed_plugins.json` does
-not install them — it installs `0120fb83da5d`. `manifest.py` resolves a plugin's version directory
+not install them — it installs `0120fb83da5d`. The first freeze had the same defect: it marked
+`0620a687ddd5` as resolved, a directory Claude Code had orphaned on 08-31, so those two drift rows
+are an orphan-to-orphan flip, not the marketplace switch. `manifest.py` resolves a plugin's version directory
 by newest mtime, and Claude Code writes `.orphaned_at` into the old directory a few milliseconds
 after creating the new one, so the orphan wins on every update. The two revisions carry an identical
 `description:`, so `resident` is unaffected today; `invoke` is understated by 282 tokens (the
 `frontend-design` SKILL.md grew by 1,130 characters; the two `skill-creator` revisions are
-byte-identical).
-The fix belongs in the reader, not in this freeze, and is a decision for the owner before or after
-the run.
+byte-identical). `measurement-2026-09-04.json` carries no field naming this: its `invoke_tokens`
+372,812 was taken with that reader, and a fixed reader will report 373,094 on an untouched corpus
+while `verify` reports two rows no longer resolved and two newly resolved. The fix belongs in the
+reader, not in this freeze; it was deliberately not made before the run, because a reader change on
+measurement day would have made the rehearsal and the run incomparable. It is a separate change
+after this one, with a new rehearsal beside it.
 
 The headline decision above was taken on the 2026-09-01 values and is not reopened by the
 re-freeze: the ranking of the three figures, and the two orders of magnitude between the first and
