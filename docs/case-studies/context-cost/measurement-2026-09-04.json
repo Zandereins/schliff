@@ -1,0 +1,136 @@
+{
+  "context": {
+    "broken_eval_suites": 0,
+    "broken_eval_suites_in_groups": 0,
+    "digest_degraded": false,
+    "duplicate_groups": 58,
+    "failed_to_score": 0,
+    "files_discovered": 212,
+    "installations": 150,
+    "invoke_tokens": 372812,
+    "on_disk_tokens": 461824
+  },
+  "frozen_corpus": "corpus-2026-09-03.jsonl",
+  "headline": {
+    "artifacts": 109,
+    "resident_tokens": 8212
+  },
+  "manifest_findings": [
+    {
+      "detail": "frontmatter disable-model-invocation: true",
+      "kind": "disabled",
+      "subject": "codex:adversarial-review"
+    },
+    {
+      "detail": "frontmatter disable-model-invocation: true",
+      "kind": "disabled",
+      "subject": "codex:cancel"
+    },
+    {
+      "detail": "frontmatter disable-model-invocation: true",
+      "kind": "disabled",
+      "subject": "codex:result"
+    },
+    {
+      "detail": "frontmatter disable-model-invocation: true",
+      "kind": "disabled",
+      "subject": "codex:review"
+    },
+    {
+      "detail": "frontmatter disable-model-invocation: true",
+      "kind": "disabled",
+      "subject": "codex:status"
+    },
+    {
+      "detail": "frontmatter disable-model-invocation: true",
+      "kind": "disabled",
+      "subject": "zaneins:edit-article"
+    },
+    {
+      "detail": "frontmatter disable-model-invocation: true",
+      "kind": "disabled",
+      "subject": "zaneins:git-guardrails"
+    },
+    {
+      "detail": "frontmatter disable-model-invocation: true",
+      "kind": "disabled",
+      "subject": "zaneins:grill-with-docs"
+    },
+    {
+      "detail": "frontmatter disable-model-invocation: true",
+      "kind": "disabled",
+      "subject": "zaneins:verify-fix"
+    },
+    {
+      "detail": "claimed 2x (skill 8022 B + command 5807 B)",
+      "kind": "duplicate-name",
+      "subject": "vercel:bootstrap"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/ai-sdk/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/chat-sdk/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/eve/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/next-cache-components/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/next-forge/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/next-upgrade/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/nextjs/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/react-best-practices/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/vercel-cli/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/vercel-sandbox/upstream/SKILL.md"
+    },
+    {
+      "detail": "nested below a skill directory \u2014 it never registers",
+      "kind": "nested",
+      "subject": "~/.claude/plugins/cache/claude-plugins-official/vercel/0.48.0/skills/workflow/upstream/SKILL.md"
+    },
+    {
+      "detail": "enabled in settings.json but not present on disk",
+      "kind": "no-skill-md",
+      "subject": "playwright@claude-plugins-official"
+    }
+  ],
+  "measured_by": {
+    "commit": "400c5ea7ad6c33f0d0bb2d62f5da94ee55100d05",
+    "working_tree_clean": true
+  },
+  "measured_on": "2026-09-04",
+  "rehearsal": false
+}
