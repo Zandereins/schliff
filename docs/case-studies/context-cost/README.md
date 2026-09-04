@@ -19,7 +19,7 @@ updates rewrite on their own schedule. Measured:
 | 2026-08-29 | 159 |
 | 2026-08-31 | 161 — a plugin update ran at 08:37 that morning |
 | 2026-09-01 | 161, then **159** once `backups/` was excluded |
-| 2026-09-03 | **212** — the user-scoped `vercel` install moved from 0.45.1 to 0.48.0; a project-scoped 0.45.1 install remains |
+| 2026-09-03 | **212** — 51 SKILL.md under `vercel/0.48.0` (the user-scoped install moved from 0.45.1; a project-scoped 0.45.1 install remains) plus one new revision each of `frontend-design` and `skill-creator` |
 
 Two of those rows are plugin updates nobody in this repository triggered (08-31 and 09-03); a number
 published on 2026-09-14 against a corpus that moves on its own schedule cannot be reproduced by
@@ -214,7 +214,9 @@ tokens: 0.48.0 adds three skills and rewrites the `description:` of four carried
 not install them — it installs `0120fb83da5d`. `manifest.py` resolves a plugin's version directory
 by newest mtime, and Claude Code writes `.orphaned_at` into the old directory a few milliseconds
 after creating the new one, so the orphan wins on every update. The two revisions carry an identical
-`description:`, so `resident` is unaffected today; `invoke` is understated by roughly 278 tokens.
+`description:`, so `resident` is unaffected today; `invoke` is understated by 282 tokens (the
+`frontend-design` SKILL.md grew by 1,130 characters; the two `skill-creator` revisions are
+byte-identical).
 The fix belongs in the reader, not in this freeze, and is a decision for the owner before or after
 the run.
 
