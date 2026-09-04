@@ -61,6 +61,8 @@ def test_a_changed_reference_is_drift(corpus, tmp_path, capsys):
     # and survives a C-locale stdout.
     out = capsys.readouterr().out
     assert "  0 added, 0 removed, 1 changed, 0 no longer resolved, 0 newly resolved\n" in out, out
+    assert fc.DRIFT_LABELS == ("added", "removed", "changed", "no longer resolved", "newly resolved")
+    assert "changed: " in out, "the per-path lines carry the same labels as the totals"
     assert out.isascii(), out
     # Unequal counters, so a swapped pair of labels cannot hide behind zeros.
     (root / "skills" / "demo" / "references" / "more.md").write_text("# more\n")
@@ -71,24 +73,36 @@ def test_a_changed_reference_is_drift(corpus, tmp_path, capsys):
 def test_write_refuses_an_empty_or_shrinking_corpus(corpus, tmp_path, capsys):
     """`discover_skills` skips a missing directory, so a wrong HOME truncated the artifact."""
     root, fc = corpus
-    manifest = tmp_path / "m.jsonl"
+    # Date-stamped names, as in the repository: the baseline is the siblings.
+    manifest = tmp_path / "corpus-2026-01-01.jsonl"
     fc.write(manifest)
 
     fc.CORPUS_ROOT = tmp_path / "nowhere"
     with pytest.raises(SystemExit) as empty:
-        fc.write(tmp_path / "other.jsonl")
+        fc.write(tmp_path / "corpus-2026-01-02.jsonl")
     assert empty.value.code == fc.EXIT_BROKEN
     assert "empty manifest" in capsys.readouterr().err
 
     fc.CORPUS_ROOT = root
     (root / "skills" / "demo" / "references" / "notes.md").unlink()
     with pytest.raises(SystemExit) as shrink:
-        fc.write(manifest)
+        fc.write(tmp_path / "corpus-2026-01-03.jsonl")
     assert shrink.value.code == fc.EXIT_BROKEN
     assert "refusing to write" in capsys.readouterr().err
-    # The escape is the flag, not deleting the earlier manifest.
-    fc.write(manifest, allow_shrink=True)
-    assert fc.verify(manifest) == 0
+
+
+def test_write_refuses_to_overwrite_a_manifest(corpus, tmp_path, capsys):
+    """A manifest is named by measurement records; a re-freeze is a new dated file."""
+    root, fc = corpus
+    manifest = tmp_path / "m.jsonl"
+    fc.write(manifest)
+    before = manifest.read_bytes()
+    (root / "skills" / "demo" / "references" / "more.md").write_text("# more\n")
+    with pytest.raises(SystemExit) as exc:
+        fc.write(manifest)
+    assert exc.value.code == fc.EXIT_BROKEN
+    assert "already exists" in capsys.readouterr().err
+    assert manifest.read_bytes() == before, "the refusal must leave the file untouched"
 
 
 def test_write_refuses_a_file_it_cannot_freeze(corpus, tmp_path, monkeypatch, capsys):

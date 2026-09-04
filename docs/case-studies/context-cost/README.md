@@ -1,16 +1,15 @@
 # Context-cost measurement — frozen corpus and the number that gets published
 
 Status: **measured 2026-09-04.** The number of record is `measurement-2026-09-04.json`, taken
-against `corpus-2026-09-03.jsonl` with the freeze verified before and after (`580 frozen, 580
-present, 0 drifted`). Corpus frozen 2026-09-01, both decisions settled the same day, re-frozen
-2026-09-03 after the corpus drifted (see
-[The corpus drifted before the measurement](#the-corpus-drifted-before-the-measurement)). The case
-study follows on 2026-09-14.
+against `corpus-2026-09-03.jsonl` with the freeze verified before and after, `0 drifted`. Corpus
+frozen 2026-09-01, both decisions settled the same day, re-frozen 2026-09-03 after the corpus
+drifted (see [The corpus drifted before the measurement](#the-corpus-drifted-before-the-measurement)).
+The case study follows on 2026-09-14.
 
-- **`backups/` is excluded from discovery.** The frozen corpus is **212 files → 150 installations,
-  461,824 tokens**.
-- **The headline is `resident`: 8,212 tokens across 109 artifacts.** `invoke` and the on-disk figure
-  are named alongside it, never alone. The first-freeze values of all three are in the table below.
+- **`backups/` is excluded from discovery.**
+- **The headline is `resident`.** `invoke` and the on-disk figure are named alongside it, never
+  alone. All figures, on both freezes, are in the table under
+  [Which number is the headline](#which-number-is-the-headline).
 
 ## Why this exists
 
@@ -63,7 +62,8 @@ writes a second dated record beside it, and nothing but this document marks 09-0
 pre-registered one. The record's `measured_by.commit` names the PR-branch commit the
 reader ran from; its readers (`manifest.py`, `doctor.py`, `shared.py`) are byte-identical to `main`
 at `3ccf758`, and after the squash merge of #228 the reader is `main` at that merge. The branch SHA
-stays reachable through the un-deleted branch, but the `main` SHA is the one to cite. **On drift
+stays reachable on the remote as `refs/pull/228/head` (not fetched by a default clone), but the
+`main` SHA is the one to cite. **On drift
 it names every changed file, writes nothing, and exits 1** — re-freezing is a decision, not
 something a script should make quietly. `freeze_corpus.py verify` runs the same check on its own,
 without taking a measurement. The choice after a refusal is made deliberately and outside the command: re-freeze and say so in the
@@ -156,7 +156,7 @@ Every other figure in this document that names a freeze points back at this tabl
 **Decided 2026-09-01, before the measurement and not while writing the case study — `resident`.**
 
 Those 7,975 tokens (first freeze; 8,212 on the measured one) are the only unavoidable ones: 106
-artifacts contributing roughly 75 tokens each
+artifacts (109 on the measured one) contributing roughly 75 tokens each
 (name plus description) to every context window, before anything is invoked. That is "context cost"
 in the literal sense the plan commits to.
 
@@ -223,7 +223,7 @@ are an orphan-to-orphan flip, not the marketplace switch. `manifest.py` resolves
 by newest mtime, and Claude Code writes `.orphaned_at` into the old directory a few milliseconds
 after creating the new one, so the orphan wins on every update. The two revisions carry an identical
 `description:`, so `resident` is unaffected today; `invoke` is understated by 282 tokens (the
-`frontend-design` SKILL.md grew by 1,130 characters; the two `skill-creator` revisions are
+`frontend-design` SKILL.md grew by 1,130 bytes, which is what the reader charges, at 4 per token; the two `skill-creator` revisions are
 byte-identical). `measurement-2026-09-04.json` carries no field naming this: its `invoke_tokens`
 372,812 was taken with that reader, and a fixed reader will report 373,094 on an untouched corpus
 while `verify` reports two rows no longer resolved and two newly resolved. The fix belongs in the
@@ -232,5 +232,4 @@ measurement day would have made the rehearsal and the run incomparable. It is a 
 after this one, with a new rehearsal beside it.
 
 The headline decision above was taken on the 2026-09-01 values and is not reopened by the
-re-freeze: the ranking of the three figures, and the two orders of magnitude between the first and
-the last, are unchanged.
+re-freeze, for the reason given under that table.
