@@ -47,15 +47,25 @@ def corpus(tmp_path, monkeypatch):
     return root, fc
 
 
-def test_a_changed_reference_is_drift(corpus, tmp_path):
+def test_a_changed_reference_is_drift(corpus, tmp_path, capsys):
     """The defect that started this: freezing SKILL.md alone missed the references."""
     root, fc = corpus
     manifest = tmp_path / "m.jsonl"
     fc.write(manifest)
     assert fc.verify(manifest) == 0
+    assert "added," not in capsys.readouterr().out, "no drift, no per-label totals"
 
     (root / "skills" / "demo" / "references" / "notes.md").write_text("# notes\n\nlonger\n")
     assert fc.verify(manifest) == 1, "a reference the token cost reads must count as drift"
+    # The per-label totals are exact and ASCII, so a drift report can be quoted
+    # and survives a C-locale stdout.
+    out = capsys.readouterr().out
+    assert "  0 added, 0 removed, 1 changed, 0 no longer resolved, 0 newly resolved\n" in out, out
+    assert out.isascii(), out
+    # Unequal counters, so a swapped pair of labels cannot hide behind zeros.
+    (root / "skills" / "demo" / "references" / "more.md").write_text("# more\n")
+    assert fc.verify(manifest) == 1
+    assert "  1 added, 0 removed, 1 changed, 0 no longer resolved, 0 newly resolved\n" in capsys.readouterr().out
 
 
 def test_write_refuses_an_empty_or_shrinking_corpus(corpus, tmp_path, capsys):
@@ -76,6 +86,9 @@ def test_write_refuses_an_empty_or_shrinking_corpus(corpus, tmp_path, capsys):
         fc.write(manifest)
     assert shrink.value.code == fc.EXIT_BROKEN
     assert "refusing to write" in capsys.readouterr().err
+    # The escape is the flag, not deleting the earlier manifest.
+    fc.write(manifest, allow_shrink=True)
+    assert fc.verify(manifest) == 0
 
 
 def test_write_refuses_a_file_it_cannot_freeze(corpus, tmp_path, monkeypatch, capsys):
@@ -162,9 +175,14 @@ def test_evidence_precedes_the_verdict_in_a_redirected_log(tmp_path):
     unlabelled = [line for line in text.splitlines()
                   if (line.startswith(("added:", "removed:", "changed:",
                                        "no longer resolved:", "newly resolved:"))
+                      or re.match(r"\s*\d+ added, ", line)
                       or (line.rstrip().endswith("drifted")
                           and not line.startswith("[freeze ")))]
     assert not unlabelled, f"freeze output missing its label: {unlabelled}"
-    # The per-label totals travel with the verdict, so a drift report can be
-    # quoted rather than counted by hand from the path lines.
-    assert re.search(r"\d+ added · \d+ removed · \d+ changed · \d+ no longer resolved · \d+ newly resolved", text), text
+    # The per-label totals travel with the verdict, under the same prefix, and
+    # add up to the drift count on the summary line.
+    summary = re.search(r"\[freeze before\] (\d+) frozen, \d+ present, (\d+) drifted", text)
+    totals = re.search(r"\[freeze before\]\s+(\d+) added, (\d+) removed, (\d+) changed, "
+                       r"(\d+) no longer resolved, (\d+) newly resolved", text)
+    assert summary and totals, text
+    assert sum(map(int, totals.groups())) == int(summary.group(2)), text

@@ -33,7 +33,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   backups of its own SKILL.md, contributing 18,014 of 438,597 tokens and two of 138 counted
   installations. `~/.claude/backups/` is a Claude Code convention directory; its own
   `.claude.json.backup.*` files live there too, so nothing under it is a loadable skill. The scan
-  now reports 136 installations and 420,583 tokens on that corpus.
+  reported 136 installations and 420,583 tokens on that corpus on 2026-09-01; the measured
+  figures of record are in `docs/case-studies/context-cost/measurement-2026-09-04.json`.
 
   `EXCLUDED_DIRS` is shared by three walks, so this also prunes `backups/` from the instruction-file
   discovery behind `schliff sync` and `doctor`'s project section: a `backups/AGENTS.md` in **your own

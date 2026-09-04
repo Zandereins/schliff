@@ -58,8 +58,9 @@ python3 scripts/measurement/run_measurement.py docs/case-studies/context-cost/co
 
 That is the whole measurement: it verifies the freeze, takes the three figures from the tools that
 own them, and writes `measurement-<date>.json` beside the manifest it was taken against. It has
-run: the record exists, and the command now refuses rather than overwrite it — a second run is a
-deliberate act, not a retry. The record's `measured_by.commit` names the PR-branch commit the
+run: the record exists. A same-day rerun refuses rather than overwrite it; a run on a later day
+writes a second dated record beside it, and nothing but this document marks 09-04 as the
+pre-registered one. The record's `measured_by.commit` names the PR-branch commit the
 reader ran from; its readers (`manifest.py`, `doctor.py`, `shared.py`) are byte-identical to `main`
 at `3ccf758`, and after the squash merge of #228 the reader is `main` at that merge. The branch SHA
 stays reachable through the un-deleted branch, but the `main` SHA is the one to cite. **On drift
@@ -148,12 +149,14 @@ The plan commits to "context cost, explicitly not the grades". It does not say w
 | SKILL.md discovered | 159 | 212 | the scan's input count, not a cost |
 
 Two orders of magnitude apart, and two different stories: *"your setup costs 8k tokens before you
-type"* against *"462k tokens of skill material on disk"*. The re-freeze moved every figure and none
-of the gaps between them. This table is the only place both columns are stated.
+type"* against *"462k tokens of skill material on disk"*. The re-freeze moved every figure; the
+ranking of the three and the two orders of magnitude between the first and the last are unchanged.
+Every other figure in this document that names a freeze points back at this table.
 
 **Decided 2026-09-01, before the measurement and not while writing the case study — `resident`.**
 
-Those 7,975 tokens are the only unavoidable ones: 106 artifacts contributing roughly 75 tokens each
+Those 7,975 tokens (first freeze; 8,212 on the measured one) are the only unavoidable ones: 106
+artifacts contributing roughly 75 tokens each
 (name plus description) to every context window, before anything is invoked. That is "context cost"
 in the literal sense the plan commits to.
 
@@ -172,11 +175,10 @@ On 2026-09-03, one day before the pre-registered run, `freeze_corpus.py verify` 
 
 ```
 431 frozen, 580 present, 194 drifted
-  153 added · 4 removed · 3 changed · 32 no longer resolved · 2 newly resolved
 ```
 
-(The per-label line is printed by `verify` since this change; before it, the totals had to be
-counted from the 194 path lines.) The 4 removed are `vercel/0.45.1/commands/*.md`, all still on disk: commands are frozen only for the
+By label: 153 added, 4 removed, 3 changed, 32 no longer resolved, 2 newly resolved — counted from
+the 194 path lines on 09-03; `verify` prints that line itself since #228. The 4 removed are `vercel/0.45.1/commands/*.md`, all still on disk: commands are frozen only for the
 resolved version, because no published number reads the commands of an unresolved one, so a version
 flip shows as removed/added for commands and as unresolved/resolved for SKILL.md.
 
@@ -213,7 +215,7 @@ which is gated by what `settings.json` enables. The headline moved by three arti
 tokens: 0.48.0 adds three skills and rewrites the `description:` of four carried-over ones, so the
 237 is not the sum of the three new descriptions.
 
-**Known defect, found in review on 2026-09-03 and not yet fixed:** the "2 newly resolved" rows are
+**Known defect, found in review on 2026-09-03, tracked as #229, not yet fixed:** the "2 newly resolved" rows are
 `frontend-design/ed404106fcd8` and `skill-creator/ed404106fcd8`, and `installed_plugins.json` does
 not install them — it installs `0120fb83da5d`. The first freeze had the same defect: it marked
 `0620a687ddd5` as resolved, a directory Claude Code had orphaned on 08-31, so those two drift rows

@@ -29,7 +29,7 @@ Two domains, kept apart on purpose:
   in the week this was written. A freeze must not depend on the tool it freezes.
 
 Usage:
-    python3 scripts/measurement/freeze_corpus.py write  docs/.../corpus.jsonl
+    python3 scripts/measurement/freeze_corpus.py write  docs/.../corpus.jsonl [--allow-shrink]
     python3 scripts/measurement/freeze_corpus.py verify docs/.../corpus.jsonl
 """
 
@@ -220,7 +220,7 @@ def _entries() -> list[dict]:
     return out
 
 
-def write(target: Path) -> int:
+def write(target: Path, allow_shrink: bool = False) -> int:
     entries = _entries()
     if not entries:
         _fail(f"refusing to write an empty manifest: no skills found under {CORPUS_ROOT}")
@@ -244,12 +244,13 @@ def write(target: Path) -> int:
     baseline = max(counts, key=counts.get, default=None)
     if baseline is not None:
         previous = counts[baseline]
-        if len(entries) < previous:
+        if len(entries) < previous and not allow_shrink:
             # `discover_skills` skips a missing directory silently, so a run under
             # a different HOME would otherwise truncate the reproducibility
-            # artifact and exit 0.
+            # artifact and exit 0. The escape is a flag, not deleting the older
+            # manifest: that file is the audit trail of an earlier measurement.
             _fail(f"refusing to write {len(entries)} entries when {baseline.name} holds "
-                  f"{previous}; delete that file deliberately if the corpus really got smaller")
+                  f"{previous}; pass --allow-shrink if the corpus really got smaller")
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", encoding="utf-8") as fh:
         for e in entries:
@@ -302,18 +303,24 @@ def verify(target: Path) -> int:
     if drift:
         # Per-label totals, so a drift report can be quoted instead of counted
         # by hand from the path lines above.
-        print(f"  {len(added)} added · {len(removed)} removed · {len(changed)} changed · "
-              f"{len(unresolved)} no longer resolved · {len(newly)} newly resolved")
+        # ASCII on purpose: under a C locale a non-ASCII separator raised
+        # UnicodeEncodeError and the interpreter's exit 1 read as EXIT_DRIFT.
+        print(f"  {len(added)} added, {len(removed)} removed, {len(changed)} changed, "
+              f"{len(unresolved)} no longer resolved, {len(newly)} newly resolved")
     # Non-zero on drift: a measurement taken against a corpus that no longer
     # matches its freeze is not reproducible, and that has to be loud.
     return EXIT_DRIFT if drift else EXIT_CLEAN
 
 
 def main() -> int:
-    if len(sys.argv) != 3 or sys.argv[1] not in ("write", "verify"):
+    allow_shrink = "--allow-shrink" in sys.argv[1:]
+    args = [a for a in sys.argv[1:] if a != "--allow-shrink"]
+    if len(args) != 2 or args[0] not in ("write", "verify") or (allow_shrink and args[0] != "write"):
         print(__doc__.strip().split("Usage:")[-1].strip())
         return 2
-    return (write if sys.argv[1] == "write" else verify)(Path(sys.argv[2]))
+    if args[0] == "write":
+        return write(Path(args[1]), allow_shrink=allow_shrink)
+    return verify(Path(args[1]))
 
 
 if __name__ == "__main__":
