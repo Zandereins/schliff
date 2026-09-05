@@ -34,6 +34,7 @@ See docs/specs/2026-07-30-redos-audit-fixes.md (D6).
 """
 import importlib
 import re
+import sys
 import time
 
 import pytest
@@ -223,22 +224,35 @@ _CALIBRATOR = re.compile(r"zzz-this-literal-is-not-present")
 _CALIBRATOR_CACHE: dict = {}
 
 
-def _timed_scans(rx, text: str, target_seconds: float = _MIN_ABS_SECONDS) -> float:
-    """Seconds per scan, averaged over enough scans to clear the timing floor.
+def _timed_scans(rx, text: str, target_seconds: float = _MIN_ABS_SECONDS,
+                 windows: int = 3) -> float:
+    """Seconds per scan: the fastest of `windows` windows, each long enough to
+    clear the timing floor.
 
     A single `re.search` of the calibrator costs ~0.8 microseconds — three orders
     of magnitude under `_MIN_ABS_SECONDS`, the floor this file applies to every
     other measurement because below it noise dominates. Timing it the same way as
     the pattern under test meant dividing by a number that was mostly jitter.
+
+    Minimum of several windows, for the same reason `_best_of` takes a minimum:
+    a stall only ever adds time. The first version took ONE window and returned
+    as soon as it cleared the floor — which a stall does by itself, so a 30 ms
+    hiccup at the end of a 64-scan window became the divisor for every pattern
+    (measured on CI: calibrator 7.29 and 0.19 on a linear scan; see
+    `test_the_calibrator_survives_one_stalled_window`). The window size `n` is
+    accepted only once the FASTEST window clears the floor, so a stall cannot
+    make an undersized window look long enough either.
     """
     n = 64
     while True:
-        start = time.perf_counter()
-        for _ in range(n):
-            rx.search(text)
-        elapsed = time.perf_counter() - start
-        if elapsed >= target_seconds or n >= 1_000_000:
-            return elapsed / n
+        best = float("inf")
+        for _ in range(windows):
+            start = time.perf_counter()
+            for _ in range(n):
+                rx.search(text)
+            best = min(best, time.perf_counter() - start)
+        if best >= target_seconds or n >= 1_000_000:
+            return best / n
         n *= 8
 
 
@@ -354,4 +368,68 @@ def test_pattern_scales_linearly(path, rx):
           "content from a public HTTP endpoint and from third-party CI. Bound the "
           "quantifier, and calibrate the bound against the real corpus rather than "
           "guessing it — see docs/specs/2026-07-30-redos-audit-fixes.md"
+    )
+
+
+def test_the_calibrator_survives_one_stalled_window(monkeypatch):
+    """One scheduler stall must not become the divisor for 224 patterns.
+
+    Measured on CI (test-macos, 2026-08-25 to 2026-09-05): the calibrator ratio
+    came in at 7.29 and, back-computed from a 0.93x raw doubling reported as
+    4.96x calibrated, at 0.19 — on a literal scan that is linear by
+    construction. Its value is cached per input pair, so a single stalled
+    timing window distorts every pattern measured against that pair, and the
+    defect-class self-test then reads 1.1-1.46 against a 1.5 threshold.
+
+    The stall is injected into the clock, not the runner: perf_counter jumps by
+    30 ms exactly once, during the first window of the large scan.
+    """
+    real = time.perf_counter
+    state = {"calls": 0, "stalled": False}
+    make = _FILLERS["sudo"]
+    small, large = make(_N), make(_N * 2)
+
+    def stalled_clock():
+        now = real()
+        # The large scan is the second measurement. Its first window reads the
+        # clock twice, start and end; the stall lands on the end reading. Every
+        # later reading is counted too: each window costs two.
+        if state["large_started"]:
+            state["calls"] += 1
+            if state["calls"] == 2 and not state["stalled"]:
+                state["stalled"] = True
+                return now + 0.030
+        return now
+
+    state["large_started"] = False
+    monkeypatch.setattr(time, "perf_counter", stalled_clock)
+    # A fresh cache, restored on teardown: the parametrized cases share the real
+    # one, and a value measured under a patched clock must not leak into it.
+    monkeypatch.setattr(sys.modules[__name__], "_CALIBRATOR_CACHE", {})
+    # Instrument the boundary between the two scans without changing the code
+    # under test: the cache key is computed first, then small, then large.
+    orig_timed = _timed_scans
+
+    def timed_marking(rx, text, *a, **kw):
+        if text is large:
+            state["large_started"] = True
+        return orig_timed(rx, text, *a, **kw)
+
+    monkeypatch.setattr(sys.modules[__name__], "_timed_scans", timed_marking)
+    ratio = _calibrator_ratio(small, large, reps=2)
+    # The band below is met by an unstalled calibrator too, so first prove the
+    # stall reached the code under test — a refactor that reads another clock or
+    # calls `_timed_scans` through an alias would otherwise pass this vacuously.
+    assert state["large_started"] and state["stalled"], "the stall was never injected"
+    # The stalled window cleared the floor on its own. Accepting it would have
+    # ended the large scan at n=64 after one round of three windows, i.e. six
+    # clock readings; requiring the FASTEST window to clear the floor forces at
+    # least a second round at a larger n.
+    assert state["calls"] >= 12, (
+        f"the large scan stopped after {state['calls']} clock readings: an undersized "
+        "window was accepted because one stalled window cleared the floor"
+    )
+    assert ratio is not None and 1.0 < ratio < 3.0, (
+        f"one 30 ms stall moved the calibrator to {ratio:.2f}; a linear scan on "
+        "doubled input is ~2.0, and this value would be cached for every pattern"
     )

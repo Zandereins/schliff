@@ -272,6 +272,20 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   during development. Verified red-capable (4.20×, 4.02× confirmed) and green four times
   over under four busy cores.
 
+  *Amendment 2026-08-21 (#210):* the ratio is calibrated — divided by the ratio of a
+  known-linear literal scan on the same input — and the threshold is 1.5 on that scale.
+
+  *Amendment 2026-09-05:* the calibrator itself flaked. It took one timing window per
+  input size and returned as soon as the window cleared the floor, which a scheduler
+  stall does by itself; measured on the macOS runner, a linear scan calibrated at 7.29
+  and, back-computed from a 0.93x raw doubling reported as 4.96x, at 0.19, and because the value is cached per input pair one stall distorted every
+  pattern (seven red attempts in eleven days, all `test-macos`, all traceable to the
+  divisor). The calibrator now takes the fastest of three windows and accepts a window
+  size only once the fastest window clears the floor. Pinned by a test that injects a
+  30 ms clock stall into one window: 628 before, ~2.0 after. Not reproducible on a
+  laptop under eightfold load (spread 1.66–2.02), so the field verification is repeated
+  CI runs, not a local loop.
+
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
 (measured on `main`); the refinement "…with no
