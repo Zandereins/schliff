@@ -392,10 +392,11 @@ def test_the_calibrator_survives_one_stalled_window(monkeypatch):
     def stalled_clock():
         now = real()
         # The large scan is the second measurement. Its first window reads the
-        # clock twice, start and end; the stall lands on the end reading.
-        if state["large_started"] and not state["stalled"]:
+        # clock twice, start and end; the stall lands on the end reading. Every
+        # later reading is counted too: each window costs two.
+        if state["large_started"]:
             state["calls"] += 1
-            if state["calls"] == 2:
+            if state["calls"] == 2 and not state["stalled"]:
                 state["stalled"] = True
                 return now + 0.030
         return now
@@ -420,6 +421,14 @@ def test_the_calibrator_survives_one_stalled_window(monkeypatch):
     # stall reached the code under test — a refactor that reads another clock or
     # calls `_timed_scans` through an alias would otherwise pass this vacuously.
     assert state["large_started"] and state["stalled"], "the stall was never injected"
+    # The stalled window cleared the floor on its own. Accepting it would have
+    # ended the large scan at n=64 after one round of three windows, i.e. six
+    # clock readings; requiring the FASTEST window to clear the floor forces at
+    # least a second round at a larger n.
+    assert state["calls"] >= 12, (
+        f"the large scan stopped after {state['calls']} clock readings: an undersized "
+        "window was accepted because one stalled window cleared the floor"
+    )
     assert ratio is not None and 1.0 < ratio < 3.0, (
         f"one 30 ms stall moved the calibrator to {ratio:.2f}; a linear scan on "
         "doubled input is ~2.0, and this value would be cached for every pattern"

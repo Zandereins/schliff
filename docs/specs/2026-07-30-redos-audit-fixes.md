@@ -278,7 +278,7 @@ rule with an allowlist; that design was prototyped and rejected on measurement â
   *Amendment 2026-09-05:* the calibrator itself flaked. It took one timing window per
   input size and returned as soon as the window cleared the floor, which a scheduler
   stall does by itself; measured on the macOS runner, a linear scan calibrated at 7.29
-  and at 0.19, and because the value is cached per input pair one stall distorted every
+  and, back-computed from a 0.93x raw doubling reported as 4.96x, at 0.19, and because the value is cached per input pair one stall distorted every
   pattern (seven red attempts in eleven days, all `test-macos`, all traceable to the
   divisor). The calibrator now takes the fastest of three windows and accepts a window
   size only once the fastest window clears the floor. Pinned by a test that injects a
