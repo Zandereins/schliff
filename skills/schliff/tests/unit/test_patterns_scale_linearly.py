@@ -402,7 +402,9 @@ def test_the_calibrator_survives_one_stalled_window(monkeypatch):
 
     state["large_started"] = False
     monkeypatch.setattr(time, "perf_counter", stalled_clock)
-    _CALIBRATOR_CACHE.clear()
+    # A fresh cache, restored on teardown: the parametrized cases share the real
+    # one, and a value measured under a patched clock must not leak into it.
+    monkeypatch.setattr(sys.modules[__name__], "_CALIBRATOR_CACHE", {})
     # Instrument the boundary between the two scans without changing the code
     # under test: the cache key is computed first, then small, then large.
     orig_timed = _timed_scans
@@ -414,6 +416,10 @@ def test_the_calibrator_survives_one_stalled_window(monkeypatch):
 
     monkeypatch.setattr(sys.modules[__name__], "_timed_scans", timed_marking)
     ratio = _calibrator_ratio(small, large, reps=2)
+    # The band below is met by an unstalled calibrator too, so first prove the
+    # stall reached the code under test — a refactor that reads another clock or
+    # calls `_timed_scans` through an alias would otherwise pass this vacuously.
+    assert state["large_started"] and state["stalled"], "the stall was never injected"
     assert ratio is not None and 1.0 < ratio < 3.0, (
         f"one 30 ms stall moved the calibrator to {ratio:.2f}; a linear scan on "
         "doubled input is ~2.0, and this value would be cached for every pattern"
