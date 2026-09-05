@@ -20,6 +20,8 @@ import pytest
 
 _REPO = Path(__file__).resolve().parents[4]
 _MEASUREMENT = _REPO / "scripts" / "measurement"
+sys.path.insert(0, str(_MEASUREMENT))
+from freeze_corpus import DRIFT_LABELS  # noqa: E402  (the labels the log tests parse)
 
 SKILL = """---
 name: demo
@@ -61,7 +63,6 @@ def test_a_changed_reference_is_drift(corpus, tmp_path, capsys):
     # and survives a C-locale stdout.
     out = capsys.readouterr().out
     assert "  0 added, 0 removed, 1 changed, 0 no longer resolved, 0 newly resolved\n" in out, out
-    assert fc.DRIFT_LABELS == ("added", "removed", "changed", "no longer resolved", "newly resolved")
     assert "changed: " in out, "the per-path lines carry the same labels as the totals"
     assert out.isascii(), out
     # Unequal counters, so a swapped pair of labels cannot hide behind zeros.
@@ -91,6 +92,21 @@ def test_write_refuses_an_empty_or_shrinking_corpus(corpus, tmp_path, capsys):
     assert "refusing to write" in capsys.readouterr().err
 
 
+def test_the_shrink_baseline_is_the_fullest_sibling_not_the_newest(corpus, tmp_path, capsys):
+    """A newer but smaller sibling must not lower the bar a wrong-HOME run is measured against."""
+    root, fc = corpus
+    full = tmp_path / "corpus-2026-01-01.jsonl"
+    fc.write(full)
+    rows = full.read_text().splitlines()
+    assert len(rows) == 2
+    (tmp_path / "corpus-2026-01-02.jsonl").write_text(rows[0] + "\n")
+    (root / "skills" / "demo" / "references" / "notes.md").unlink()
+    with pytest.raises(SystemExit) as exc:
+        fc.write(tmp_path / "corpus-2026-01-03.jsonl")
+    assert exc.value.code == fc.EXIT_BROKEN
+    assert "corpus-2026-01-01.jsonl holds 2" in capsys.readouterr().err
+
+
 def test_write_refuses_to_overwrite_a_manifest(corpus, tmp_path, capsys):
     """A manifest is named by measurement records; a re-freeze is a new dated file."""
     root, fc = corpus
@@ -117,7 +133,7 @@ def test_write_refuses_a_file_it_cannot_freeze(corpus, tmp_path, monkeypatch, ca
     assert "cannot be frozen" in capsys.readouterr().err
 
 
-def test_a_resolution_flip_is_drift_even_when_no_file_changed(corpus, tmp_path):
+def test_a_resolution_flip_is_drift_even_when_no_file_changed(corpus, tmp_path, capsys):
     """Which plugin version is active is decided by mtime, which is not content.
 
     Both versions sit in the freeze, so every path stays present and unchanged
@@ -135,6 +151,11 @@ def test_a_resolution_flip_is_drift_even_when_no_file_changed(corpus, tmp_path):
     manifest.write_text("\n".join(json.dumps(e, sort_keys=True) for e in entries) + "\n")
 
     assert fc.verify(manifest) == 1, "a change in which paths resolve must count as drift"
+    # The flip is reported under its own label, so the resolution pair cannot
+    # be swapped unnoticed: every path stays, so added/removed/changed are 0.
+    out = capsys.readouterr().out
+    assert "newly resolved: " in out and "no longer resolved: " not in out, out
+    assert "  0 added, 0 removed, 0 changed, 0 no longer resolved, 1 newly resolved\n" in out, out
 
 
 def _run(*args: str) -> subprocess.CompletedProcess:
@@ -187,8 +208,7 @@ def test_evidence_precedes_the_verdict_in_a_redirected_log(tmp_path):
     # every line is already prefixed, C never selected anything, so dropping the
     # per-line labelling would have kept this green.
     unlabelled = [line for line in text.splitlines()
-                  if (line.startswith(("added:", "removed:", "changed:",
-                                       "no longer resolved:", "newly resolved:"))
+                  if (line.startswith(tuple(f"{label}:" for label in DRIFT_LABELS))
                       or re.match(r"\s*\d+ added, ", line)
                       or (line.rstrip().endswith("drifted")
                           and not line.startswith("[freeze ")))]
@@ -196,7 +216,7 @@ def test_evidence_precedes_the_verdict_in_a_redirected_log(tmp_path):
     # The per-label totals travel with the verdict, under the same prefix, and
     # add up to the drift count on the summary line.
     summary = re.search(r"\[freeze before\] (\d+) frozen, \d+ present, (\d+) drifted", text)
-    totals = re.search(r"\[freeze before\]\s+(\d+) added, (\d+) removed, (\d+) changed, "
-                       r"(\d+) no longer resolved, (\d+) newly resolved", text)
+    totals = re.search(r"\[freeze before\]\s+" + ", ".join(rf"(\d+) {re.escape(label)}"
+                                                           for label in DRIFT_LABELS) + r"$", text, re.M)
     assert summary and totals, text
     assert sum(map(int, totals.groups())) == int(summary.group(2)), text

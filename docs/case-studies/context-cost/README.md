@@ -61,9 +61,9 @@ run: the record exists. A same-day rerun refuses rather than overwrite it; a run
 writes a second dated record beside it, and nothing but this document marks 09-04 as the
 pre-registered one. The record's `measured_by.commit` names the PR-branch commit the
 reader ran from; its readers (`manifest.py`, `doctor.py`, `shared.py`) are byte-identical to `main`
-at `3ccf758`, and after the squash merge of #228 the reader is `main` at that merge. The branch SHA
-stays reachable on the remote as `refs/pull/228/head` (not fetched by a default clone), but the
-`main` SHA is the one to cite. **On drift
+at `3ccf758`. `freeze_corpus.py` changed after the record in output and refusals only (per-label
+totals, no overwrite); the drift set it computes did not. The branch SHA stays reachable on the
+remote as `refs/pull/228/head`, which a default clone does not fetch. **On drift
 it names every changed file, writes nothing, and exits 1** — re-freezing is a decision, not
 something a script should make quietly. `freeze_corpus.py verify` runs the same check on its own,
 without taking a measurement. The choice after a refusal is made deliberately and outside the command: re-freeze and say so in the
@@ -95,8 +95,8 @@ stated once, in the section above — repeating it here is how this sentence cam
 the manifest had grown to 431.
 
 **Two hand-installed skills.** Everything else is plugin material, most of it present twice — which
-is what `doctor`'s payload deduplication collapsed to 136 installations on the first freeze and
-150 on the second.
+is what `doctor`'s payload deduplication collapses to the installation count in the table under
+[Which number is the headline](#which-number-is-the-headline).
 
 ### The backups are counted as installations
 
@@ -130,7 +130,7 @@ scan pointed at `~/.claude` itself. `~/.claude/backups/` is a Claude Code conven
 own `.claude.json.backup.*` files live there too — so nothing under it is a loadable skill.
 
 That run also reported **159 files discovered**, which is the number the plan names as the scope
-(212 on the second freeze, so the plan's scope figure is dated too).
+(the plan's scope figure is dated too; the current count is in that table).
 The match is a coincidence and must not be read as confirmation: the plan's 159 was measured on
 2026-08-29, when the corpus held those same two backups and not yet the two files a plugin update
 added on 08-31. Two different sets, same size. This is a path exclusion,
@@ -155,8 +155,7 @@ Every other figure in this document that names a freeze points back at this tabl
 
 **Decided 2026-09-01, before the measurement and not while writing the case study — `resident`.**
 
-Those 7,975 tokens (first freeze; 8,212 on the measured one) are the only unavoidable ones: 106
-artifacts (109 on the measured one) contributing roughly 75 tokens each
+Those resident tokens are the only unavoidable ones: each artifact contributes roughly 75 tokens
 (name plus description) to every context window, before anything is invoked. That is "context cost"
 in the literal sense the plan commits to.
 

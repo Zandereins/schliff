@@ -231,14 +231,12 @@ def write(target: Path) -> int:
     entries = _entries()
     if not entries:
         _fail(f"refusing to write an empty manifest: no skills found under {CORPUS_ROOT}")
-    # Compare against the existing freezes in the directory: the manifests are
-    # date-stamped, so a re-freeze writes a NEW path (the target may not exist,
-    # see above) and the baseline has to come from its siblings.
+    # The target cannot exist (refused above), so the baseline is the
+    # date-stamped siblings. Largest by ENTRY COUNT, not newest by name: a
+    # wrong-HOME run has to be refused against the fullest freeze whatever date
+    # it carries. Measured before this rule existed: a 50-entry freeze was
+    # replaced with 3 entries at exit 0.
     candidates = list(target.parent.glob("corpus-*.jsonl")) if target.parent.exists() else []
-    # Largest by ENTRY COUNT, not by name. Appending the target to a list ranked
-    # by filename left it unprotected whenever its name sorted below `corpus-…`:
-    # measured, a 50-entry freeze was overwritten with 3 entries at exit 0, which
-    # is the failure this guard exists for.
     counts = {p: sum(1 for line in p.read_text(encoding="utf-8").splitlines() if line.strip())
               for p in candidates}
     baseline = max(counts, key=counts.get, default=None)
@@ -249,7 +247,7 @@ def write(target: Path) -> int:
             # a different HOME would otherwise truncate the reproducibility
             # artifact and exit 0.
             _fail(f"refusing to write {len(entries)} entries when {baseline.name} holds "
-                  f"{previous}; delete that file deliberately if the corpus really got smaller")
+                  f"{previous}; a corpus that really got smaller is issue #230")
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", encoding="utf-8") as fh:
         for e in entries:
