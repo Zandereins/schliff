@@ -60,19 +60,19 @@ own them, and writes `measurement-<date>.json` beside the manifest it was taken 
 run: the record exists. A same-day rerun refuses rather than overwrite it; a run on a later day
 writes a second dated record beside it, and nothing but this document marks 09-04 as the
 pre-registered one. The record's `measured_by.commit` names the PR-branch commit the
-reader ran from; its readers (`manifest.py`, `doctor.py`, `shared.py`) are byte-identical to `main`
-at `3ccf758`. `freeze_corpus.py` changed after the record in output and refusals only (per-label
-totals, no overwrite); the drift set it computes did not. `400c5ea` is an ancestor of
-`refs/pull/228/head`, not its tip and not on `main`: fetch that ref and check out the SHA. **On drift
+reader ran from; its readers (`manifest.py`, `doctor.py`, `shared.py`) and both measurement scripts
+are byte-identical to `main` at `3ccf758` — this change adds data and prose, no code. `400c5ea` is
+an ancestor of `refs/pull/228/head`, not its tip and not on `main`: fetch that ref and check out
+the SHA. **On drift
 it names every changed file, writes nothing, and exits 1** — re-freezing is a decision, not
 something a script should make quietly. `freeze_corpus.py verify` runs the same check on its own,
 without taking a measurement. The choice after a refusal is made deliberately and outside the command: re-freeze and say so in the
 case study, or restore the corpus to the frozen state and re-run. What it will not do is produce a
 number whose corpus is unknown. Add `--rehearsal` to try the run without writing a file that looks
-like the pre-registered one. `freeze_corpus.py write` has two refusals of its own: an existing
-target (a re-freeze is a new dated file) and a corpus smaller than the fullest manifest beside it,
-the guard against a run under the wrong `HOME`. The second one has no escape that keeps every
-manifest; that contradiction is #230.
+like the pre-registered one. `freeze_corpus.py write` refuses an empty corpus and a corpus smaller
+than the fullest manifest beside it, the guard against a run under the wrong `HOME`; its only
+escape is deleting that manifest, which contradicts keeping every manifest a record names. That
+contradiction, and the fact that `write` overwrites an existing manifest in place, are #230.
 
 The file list comes from `skill_mesh.discover_skills`, which owns the question of which files count.
 The hashes do not: they are full sha256 over raw bytes, not that module's `content_hash`, which is
@@ -180,7 +180,7 @@ On 2026-09-03, one day before the pre-registered run, `freeze_corpus.py verify` 
 ```
 
 By label: 153 added, 4 removed, 3 changed, 32 no longer resolved, 2 newly resolved — counted from
-the 194 path lines on 09-03; `verify` prints that line itself since #228. The 4 removed are `vercel/0.45.1/commands/*.md`, all still on disk: commands are frozen only for the
+the 194 path lines on 09-03 (`verify` prints no per-label totals, #230). The 4 removed are `vercel/0.45.1/commands/*.md`, all still on disk: commands are frozen only for the
 resolved version, because no published number reads the commands of an unresolved one. A flip
 between two frozen revisions shows as unresolved/resolved for SKILL.md (the `frontend-design` and
 `skill-creator` switch: 2 and 2); a flip to a revision the first freeze never held shows as

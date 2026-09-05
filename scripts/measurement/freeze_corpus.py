@@ -85,8 +85,6 @@ def _payload_of(skill_md: Path) -> list[Path]:
 # check itself failed" — the opposite verdict. 0 clean, 1 drift, 2 the check
 # could not run.
 EXIT_CLEAN, EXIT_DRIFT, EXIT_BROKEN = 0, 1, 2
-# One spelling for the per-path lines, the totals line, and the tests.
-DRIFT_LABELS = ("added", "removed", "changed", "no longer resolved", "newly resolved")
 
 
 def _fail(message: str) -> None:
@@ -223,21 +221,24 @@ def _entries() -> list[dict]:
 
 
 def write(target: Path) -> int:
-    if target.exists():
-        # A manifest is the audit trail of the measurements that name it; a
-        # re-freeze writes a new dated path. Stricter than run_measurement.py's
-        # record guard, which allows a deliberate delete-and-rerun: a manifest
-        # is named by records, a record names only itself.
-        _fail(f"{target} already exists; a re-freeze writes a new dated manifest")
     entries = _entries()
     if not entries:
         _fail(f"refusing to write an empty manifest: no skills found under {CORPUS_ROOT}")
-    # The target cannot exist (refused above), so the baseline is the
-    # date-stamped siblings. Largest by ENTRY COUNT, not newest by name: a
-    # wrong-HOME run has to be refused against the fullest freeze whatever date
-    # it carries. Measured before this rule existed: a 50-entry freeze was
-    # replaced with 3 entries at exit 0.
+    # Compare against the newest existing freeze in the directory, not against
+    # `target`: the manifests are date-stamped, so a re-freeze writes a NEW path
+    # and a guard keyed on `target.exists()` never fires for the workflow this
+    # repository actually prescribes — which is every re-freeze.
+    # The target itself counts as a baseline too. Keying only on the date-stamped
+    # siblings narrowed the guard: a re-freeze to the same path under any other
+    # name was unprotected, which is the case the original `target.exists()`
+    # check covered before it was replaced.
     candidates = list(target.parent.glob("corpus-*.jsonl")) if target.parent.exists() else []
+    if target.exists() and target not in candidates:
+        candidates.append(target)
+    # Largest by ENTRY COUNT, not by name. Appending the target to a list ranked
+    # by filename left it unprotected whenever its name sorted below `corpus-…`:
+    # measured, a 50-entry freeze was overwritten with 3 entries at exit 0, which
+    # is the failure this guard exists for.
     counts = {p: sum(1 for line in p.read_text(encoding="utf-8").splitlines() if line.strip())
               for p in candidates}
     baseline = max(counts, key=counts.get, default=None)
@@ -248,18 +249,11 @@ def write(target: Path) -> int:
             # a different HOME would otherwise truncate the reproducibility
             # artifact and exit 0.
             _fail(f"refusing to write {len(entries)} entries when {baseline.name} holds "
-                  f"{previous}; a corpus that really got smaller is issue #230")
+                  f"{previous}; delete that file deliberately if the corpus really got smaller")
     target.parent.mkdir(parents=True, exist_ok=True)
-    # Written beside the target and renamed into place, so an interrupted write
-    # never leaves a truncated manifest for the refusal above to protect.
-    partial = target.with_name(target.name + ".partial")
-    try:
-        with partial.open("w", encoding="utf-8") as fh:
-            for e in entries:
-                fh.write(json.dumps(e, sort_keys=True) + "\n")
-        os.replace(partial, target)
-    finally:
-        partial.unlink(missing_ok=True)
+    with target.open("w", encoding="utf-8") as fh:
+        for e in entries:
+            fh.write(json.dumps(e, sort_keys=True) + "\n")
     print(f"froze {len(entries)} files -> {target}")
     return 0
 
@@ -298,19 +292,13 @@ def verify(target: Path) -> int:
     unresolved = sorted((frozen_resolved - current_resolved) & still_present)
     newly = sorted((current_resolved - frozen_resolved) & still_present)
 
-    groups = tuple(zip(DRIFT_LABELS, (added, removed, changed, unresolved, newly)))
-    for label, paths in groups:
+    for label, paths in (("added", added), ("removed", removed), ("changed", changed),
+                         ("no longer resolved", unresolved), ("newly resolved", newly)):
         for p in paths:
             print(f"{label}: {p}")
 
-    drift = sum(len(paths) for _, paths in groups)
+    drift = len(added) + len(removed) + len(changed) + len(unresolved) + len(newly)
     print(f"{len(frozen)} frozen, {len(current)} present, {drift} drifted")
-    if drift:
-        # Per-label totals, so a drift report can be quoted instead of counted
-        # by hand from the path lines above. ASCII on purpose: under a C locale
-        # a non-ASCII separator raised UnicodeEncodeError and the interpreter's
-        # exit 1 read as EXIT_DRIFT.
-        print("  " + ", ".join(f"{len(paths)} {label}" for label, paths in groups))
     # Non-zero on drift: a measurement taken against a corpus that no longer
     # matches its freeze is not reproducible, and that has to be loud.
     return EXIT_DRIFT if drift else EXIT_CLEAN
