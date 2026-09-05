@@ -59,11 +59,9 @@ That is the whole measurement: it verifies the freeze, takes the three figures f
 own them, and writes `measurement-<date>.json` beside the manifest it was taken against. It has
 run: the record exists. A same-day rerun refuses rather than overwrite it; a run on a later day
 writes a second dated record beside it, and nothing but this document marks 09-04 as the
-pre-registered one. The record's `measured_by.commit` names the PR-branch commit the
-reader ran from; its readers (`manifest.py`, `doctor.py`, `shared.py`) and both measurement scripts
-are byte-identical to `main` at `3ccf758` — this change adds data and prose, no code. `400c5ea` is
-an ancestor of `refs/pull/228/head`, not its tip and not on `main`: fetch that ref and check out
-the SHA. **On drift
+pre-registered one. The record's `measured_by.commit` names the branch commit the reader ran
+from, reachable as an ancestor of `refs/pull/228/head`; its readers and both measurement scripts
+are byte-identical to `main` at `3ccf758`. **On drift
 it names every changed file, writes nothing, and exits 1** — re-freezing is a decision, not
 something a script should make quietly. `freeze_corpus.py verify` runs the same check on its own,
 without taking a measurement. The choice after a refusal is made deliberately and outside the command: re-freeze and say so in the
@@ -103,7 +101,7 @@ is what `doctor`'s payload deduplication collapses to the installation count in 
 
 ### The backups are counted as installations
 
-**As measured on 2026-09-01, before the fix in this change**, `doctor ~/.claude` reported **three**
+**As measured on 2026-09-01, before the exclusion (#224)**, `doctor ~/.claude` reported **three**
 rows named `schliff`:
 
 ```
@@ -133,7 +131,8 @@ scan pointed at `~/.claude` itself. `~/.claude/backups/` is a Claude Code conven
 own `.claude.json.backup.*` files live there too — so nothing under it is a loadable skill.
 
 That run also reported **159 files discovered**, which is the number the plan names as the scope
-(the plan's scope figure is dated too; the current count is in that table).
+(the plan's scope figure is dated too; the current count is in the table under
+[Which number is the headline](#which-number-is-the-headline)).
 The match is a coincidence and must not be read as confirmation: the plan's 159 was measured on
 2026-08-29, when the corpus held those same two backups and not yet the two files a plugin update
 added on 08-31. Two different sets, same size. This is a path exclusion,
@@ -180,10 +179,11 @@ On 2026-09-03, one day before the pre-registered run, `freeze_corpus.py verify` 
 ```
 
 By label: 153 added, 4 removed, 3 changed, 32 no longer resolved, 2 newly resolved — counted from
-the 194 path lines on 09-03 (`verify` prints no per-label totals, #230). The 4 removed are `vercel/0.45.1/commands/*.md`, all still on disk: commands are frozen only for the
+the 194 path lines on 09-03; `verify` prints no per-label totals. The 4 removed are `vercel/0.45.1/commands/*.md`, all still on disk: commands are frozen only for the
 resolved version, because no published number reads the commands of an unresolved one. A flip
-between two frozen revisions shows as unresolved/resolved for SKILL.md (the `frontend-design` and
-`skill-creator` switch: 2 and 2); a flip to a revision the first freeze never held shows as
+between two frozen revisions shows as unresolved/resolved for SKILL.md (`frontend-design` and
+`skill-creator`, `0620a687ddd5` to `ed404106fcd8`: 2 and 2 — both orphaned revisions, see #229
+below); a flip to a revision the first freeze never held shows as
 no longer resolved plus added (`vercel`: 30 of the 32, and its 33 resolved 0.48.0 SKILL.md sit
 under the 153 added). Commands show as removed/added in both cases.
 
@@ -220,21 +220,13 @@ which is gated by what `settings.json` enables. The headline moved by three arti
 tokens: 0.48.0 adds three skills and rewrites the `description:` of four carried-over ones, so the
 237 is not the sum of the three new descriptions.
 
-**Known defect, found in review on 2026-09-03, tracked as #229, not yet fixed:** the "2 newly resolved" rows are
-`frontend-design/ed404106fcd8` and `skill-creator/ed404106fcd8`, and `installed_plugins.json` does
-not install them — it installs `0120fb83da5d`. The first freeze had the same defect: it marked
-`0620a687ddd5` as resolved, a directory Claude Code had orphaned on 08-31, so those two drift rows
-are an orphan-to-orphan flip, not the marketplace switch. `manifest.py` resolves a plugin's version directory
-by newest mtime, and Claude Code writes `.orphaned_at` into the old directory a few milliseconds
-after creating the new one, so the orphan wins on every update. The two revisions carry an identical
-`description:`, so `resident` is unaffected today; `invoke` is understated by 282 tokens (the
-`frontend-design` SKILL.md grew by 1,130 bytes, which is what the reader charges, at 4 per token; the two `skill-creator` revisions are
-byte-identical). `measurement-2026-09-04.json` carries no field naming this: its `invoke_tokens`
-372,812 was taken with that reader, and a fixed reader will report 373,094 on an untouched corpus
-while `verify` reports two rows no longer resolved and two newly resolved. The fix belongs in the
-reader, not in this freeze; it was deliberately not made before the run, because a reader change on
-measurement day would have made the rehearsal and the run incomparable. It is a separate change
-after this one, with a new rehearsal beside it.
+**Known defect, #229:** the record was taken with a reader that resolves an orphaned plugin
+revision (`ed404106fcd8` instead of the installed `0120fb83da5d`, for `frontend-design` and
+`skill-creator`; the first freeze had the same defect with `0620a687ddd5`). `resident` is
+unaffected, the descriptions being identical; `invoke_tokens` is understated by 282, and a fixed
+reader reports 373,094 on an untouched corpus, with `verify` showing the two rows flip. The fix was
+deliberately not made before the run, so that rehearsal and run stay comparable; it needs a new
+rehearsal beside it.
 
 The headline decision above was taken on the 2026-09-01 values and is not reopened by the
 re-freeze, for the reason given under that table.
