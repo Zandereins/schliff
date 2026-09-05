@@ -225,8 +225,9 @@ def _entries() -> list[dict]:
 def write(target: Path) -> int:
     if target.exists():
         # A manifest is the audit trail of the measurements that name it; a
-        # re-freeze writes a new dated path. Same rule as run_measurement.py
-        # for its own record.
+        # re-freeze writes a new dated path. Stricter than run_measurement.py's
+        # record guard, which allows a deliberate delete-and-rerun: a manifest
+        # is named by records, a record names only itself.
         _fail(f"{target} already exists; a re-freeze writes a new dated manifest")
     entries = _entries()
     if not entries:
@@ -249,9 +250,16 @@ def write(target: Path) -> int:
             _fail(f"refusing to write {len(entries)} entries when {baseline.name} holds "
                   f"{previous}; a corpus that really got smaller is issue #230")
     target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("w", encoding="utf-8") as fh:
-        for e in entries:
-            fh.write(json.dumps(e, sort_keys=True) + "\n")
+    # Written beside the target and renamed into place, so an interrupted write
+    # never leaves a truncated manifest for the refusal above to protect.
+    partial = target.with_name(target.name + ".partial")
+    try:
+        with partial.open("w", encoding="utf-8") as fh:
+            for e in entries:
+                fh.write(json.dumps(e, sort_keys=True) + "\n")
+        os.replace(partial, target)
+    finally:
+        partial.unlink(missing_ok=True)
     print(f"froze {len(entries)} files -> {target}")
     return 0
 

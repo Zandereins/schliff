@@ -92,6 +92,29 @@ def test_write_refuses_an_empty_or_shrinking_corpus(corpus, tmp_path, capsys):
     assert "refusing to write" in capsys.readouterr().err
 
 
+def test_an_interrupted_write_leaves_no_manifest(corpus, tmp_path, monkeypatch):
+    """A truncated dated manifest would be protected by the overwrite refusal forever."""
+    root, fc = corpus
+    target = tmp_path / "corpus-2026-01-01.jsonl"
+    real_dumps = fc.json.dumps
+    calls = []
+
+    def dumps_then_die(obj, **kw):
+        calls.append(obj)
+        if len(calls) == 2:
+            raise KeyboardInterrupt
+        return real_dumps(obj, **kw)
+
+    monkeypatch.setattr(fc.json, "dumps", dumps_then_die)
+    with pytest.raises(KeyboardInterrupt):
+        fc.write(target)
+    assert not target.exists(), "a partial manifest must not survive the interruption"
+    assert list(tmp_path.glob("corpus-*")) == [], "no leftover temporary file either"
+    monkeypatch.setattr(fc.json, "dumps", real_dumps)
+    fc.write(target)
+    assert fc.verify(target) == 0
+
+
 def test_the_shrink_baseline_is_the_fullest_sibling_not_the_newest(corpus, tmp_path, capsys):
     """A newer but smaller sibling must not lower the bar a wrong-HOME run is measured against."""
     root, fc = corpus
