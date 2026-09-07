@@ -275,16 +275,24 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   *Amendment 2026-08-21 (#210):* the ratio is calibrated — divided by the ratio of a
   known-linear literal scan on the same input — and the threshold is 1.5 on that scale.
 
-  *Amendment 2026-09-05:* the calibrator itself flaked. It took one timing window per
-  input size and returned as soon as the window cleared the floor, which a scheduler
-  stall does by itself; measured on the macOS runner, a linear scan calibrated at 7.29
-  and, back-computed from a 0.93x raw doubling reported as 4.96x, at 0.19, and because the value is cached per input pair one stall distorted every
-  pattern (seven red attempts in eleven days, all `test-macos`, all traceable to the
-  divisor). The calibrator now takes the fastest of three windows and accepts a window
-  size only once the fastest window clears the floor. Pinned by a test that injects a
-  30 ms clock stall into one window: 628 before, ~2.0 after. Not reproducible on a
-  laptop under eightfold load (spread 1.66–2.02), so the field verification is repeated
-  CI runs, not a local loop.
+  *Amendment 2026-09-05/07 (#231):* the calibrator itself flaked. Counted from the
+  attempts API for 2026-08-25 to 09-05: 88 attempts of the Tests workflow, 13 red on this
+  file — ten on `test-macos`, three on ubuntu (one of them on `main`) — i.e. roughly 15 %
+  per attempt. The calibrator took one timing window per input size and returned as soon
+  as the window cleared the floor, which a scheduler stall does by itself; and its value is
+  cached per input pair, so one stall distorted every pattern. Two attempts printed the
+  divisor (7.29, and 0.19 back-computed from a 0.93x raw doubling reported as 4.96x); the
+  other eleven printed only the calibrated number and are consistent with a divisor of
+  2.7–3.5, which is why every failure string now carries the raw ratio and the calibrator.
+  The calibrator now measures small and large in interleaved windows, takes the fastest
+  window per size, accepts a window size only once the fastest small window clears the
+  floor, and re-measures up to three times when the result leaves the 0.5–5.0 band.
+  Pinned by two tests: an injected 30 ms clock stall (628 before, ~1.9 after; red again
+  under "any window clears the floor") and a structural check of the interleaving. Not
+  reproducible on a laptop (60 samples under eightfold load: 1.66–2.02), and green CI
+  reruns are weak evidence at this rate — p < 0.05 needs about 18 consecutive greens — so
+  the mechanism proof is the deterministic test and the field check is the CI record over
+  the following weeks, read with attempts expanded.
 
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
