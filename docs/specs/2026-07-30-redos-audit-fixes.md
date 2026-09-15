@@ -265,12 +265,71 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   1151, 50, 19). Every assertion mutation-tested: un-bounding a pattern, tightening a
   bound below its measured maximum, and truncating the backtick span each turn it red.
 - `test_patterns_scale_linearly.py` — empirical, 224 compiled patterns across 30 modules
-  × 25 filler alphabets at doubling lengths, ratio < 3.0. Two-stage: a flagged filler is
+  × 25 filler alphabets at doubling lengths, ratio < 3.0 *(raw scale as first built;
+  calibrated to 1.5 since #210, see the amendment below)*. Two-stage: a flagged filler is
   re-measured with more repetitions **and at a second doubling**, and only fails if both
-  doublings are super-linear. The healthy margin is 1.3–2.4× against a 3.0× threshold,
+  doublings are super-linear. The healthy margin was 1.3–2.4× against the raw 3.0× threshold,
   which is too thin to rest on one sample — a single sample under load did flake once
   during development. Verified red-capable (4.20×, 4.02× confirmed) and green four times
   over under four busy cores.
+
+  *Amendment 2026-08-21 (#210):* the ratio is calibrated — divided by the ratio of a
+  known-linear literal scan on the same input — and the threshold is 1.5 on that scale.
+
+  *Amendment 2026-09-05/07 (#231):* the calibrator itself flaked. Counted from the
+  attempts API for 2026-08-25 to 09-05: 88 attempts of the Tests workflow, 13 red on this
+  file — ten on `test-macos`, three on ubuntu (one of them on `main`) — i.e. roughly 15 %
+  per attempt. The calibrator took one timing window per input size and returned as soon
+  as the window cleared the floor, which a scheduler stall does by itself; and its value is
+  cached per input pair, so one stall distorted every pattern. Two attempts printed the
+  divisor (7.29, and 0.19 back-computed from a 0.93x raw doubling reported as 4.96x); the
+  other eleven printed only the calibrated number and are consistent with a divisor of
+  2.7–3.5, which is why every failure string now carries the raw ratio and the calibrator.
+  The calibrator now measures small and large in interleaved windows, takes the fastest
+  window per size, accepts a window size only once the fastest small window clears the
+  floor, and sizes the next window from the previous round instead of growing eightfold.
+  Two variants were tried in review and removed: a retry-until-in-band loop (no test
+  pinned it, and it never fired for the eleven reds it was written for, whose divisors of
+  2.7–3.5 lie inside the band) and failing the calling case when the divisor leaves the
+  0.5–5.0 band (under sustained load it turns one bad divisor into a red on every pattern
+  of that input pair). The divisor is cached as measured; the plausibility test asserts
+  the band for one of the fifty-two input pairs, and the remaining gap — a bad divisor
+  on another pair has no red of its own — is #233's measurement redesign, not a guard.
+  Which test went red, read from the attempt logs on 2026-09-15: eleven of the thirteen
+  were `test_the_gate_still_fires_on_the_real_defect_class`, one reading per pattern at
+  1.11–1.47 with no divisor printed; two printed the divisor. Two of the eleven had
+  several patterns under the threshold at once, which points at the shared divisor; the
+  single-pattern reds cannot be attributed from the logs. **That test keeps its single
+  reading.** The gate itself flags a pattern only when three readings in a row clear 1.5,
+  so one reading under it is a necessary condition for the gate to be blind, and the test
+  reporting it is the test doing its job; a re-measuring variant that passed if any
+  reading cleared was tried in review and reverted, because it is green on exactly the
+  runner profiles where the gate lets a defect through. What this PR fixes is the divisor
+  path; whether the single-pattern reds were the divisor or the pattern side under load
+  is the question the CI record now answers, because every red prints the divisor: a
+  divisor near 2 beside a calibrated value under 1.5 is the gate's margin (27 % under the
+  idle defective minimum, see `_MAX_RATIO`), not the calibrator, and belongs to a
+  threshold decision (#234). The calibrator mechanism is pinned by one test on a fully
+  virtual clock — a probe pattern advances it, so the verdict is exact on every runner —
+  with a stall inside the first small and the last large window of every round, run at
+  two floors that divide the work: floor 100 (doubling floor decides the round size) is
+  the one red under "accept once the LARGE window clears the floor", floor 400 (estimate
+  decides) the one red under a wrong estimate; both are red under "take the last window",
+  "take the slowest window", "take the mean", "any small window clears the floor" and
+  "no accept rule", and green under a refactor that shares one clock reading between
+  adjacent windows. The exact `seen` sequence also pins the interleaving. **What the
+  mechanism does not cover, measured 2026-09-15 in review round 10 and confirmed:** under
+  sustained contention (sixteen busy processes) the divisor still spreads 1.6–4.5 inside
+  the band, and the defect-class reading goes under 1.5 in about one reading in twelve
+  with the raw ratio intact (5.3 raw, divisor 4.5). Min-of-three removes discrete stalls;
+  it cannot remove contention that outlasts a round, because the divisor is measured apart
+  from the pattern (#233). An earlier claim here that the flake was "not reproducible on a
+  laptop" rested on the divisor alone (1.66–2.02 over 60 samples under eightfold load) and
+  is withdrawn. Green CI reruns are weak evidence at this rate: p < 0.05 needs 19
+  consecutive greens (0.85^18 = 0.054, 0.85^19 = 0.046). So the mechanism proof is the
+  deterministic test, and the field check is the CI record over the following weeks, read
+  with attempts expanded and the printed divisor deciding which of the two causes each red
+  belongs to.
 
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
