@@ -365,11 +365,18 @@ only when no submission PR was opened before the reading date.
 | Field | Value |
 | --- | --- |
 | Reading date | 2026-09-10 |
-| Snapshot line `collected_at` | *to be recorded* |
-| `views.uniques` at reading | *to be recorded* |
+| Snapshot line `collected_at` | `2026-09-10T20:25:00Z` |
+| `views.uniques` at reading | **32** |
 | Baseline `views.uniques` | 32 |
-| Delta vs. baseline | *to be recorded* |
-| Confounded by a submission before the reading date? | *to be recorded (yes + D0, or no)* |
+| Delta vs. baseline | **0** |
+| Confounded by a submission before the reading date? | no — no submission PR exists (D0 not opened) |
+| `referrers` on the snapshot line (per E-3) | `github.com` 16 uniques, Google 2, `fpaul.dev` 1 |
+| Recorded on | 2026-09-15, five days late — see the amendment of that date |
+
+**Result, read against the interpretation below: ≤ 32.** The shipped intervention changed nothing
+measurable. The reading was taken on 2026-09-15 from the data that was already on
+`experiment/traffic-data`; the qualifying line is the one the rule names, and the late entry
+changes neither the line nor the number.
 
 **Interpretation, pre-registered so it is not chosen afterwards:**
 
@@ -832,3 +839,28 @@ author's own interest in the outcome, which is what makes it admissible at all. 
 *Unchanged by all of the above:* D0 stays 2026-09-18. Gate 1 stays "≥1 of N merges within D0+21".
 Gate 2's threshold stays 96 uniques and its qualitative branch is untouched. Observation R still
 reads 2026-09-10 against baseline 32. The abandonment deadline stays 2026-09-30.
+
+### 2026-09-15 — Observation R recorded, five days after its reading date
+
+*What was recorded:* the table in [Observation R](#observation-r--the-readme-only-arm). The
+qualifying snapshot is `collected_at 2026-09-10T20:25:00Z` — the daily collector fired on the
+reading date, so the line is dated 2026-09-10 as Step 1 of #198 requires. `views.uniques` is
+**32** against a baseline of 32: delta 0, the **≤ 32** branch. No submission PR existed at the
+reading date, so the reading is a clean README-only one.
+
+*Why the entry is late:* the number existed on 2026-09-10 and was read in conversation on
+2026-09-15, but the table stayed empty until this commit. The reading rule is a function of the
+committed data alone, so a late entry cannot change the number — but it is the same failure
+mode the 2026-08-20 S2 amendment describes, and it is named rather than backdated.
+
+*Secondary quantity, computed as pre-registered on 2026-08-25 and reported as NON-CONFIRMATORY:*
+per-day union of `views.views[]` across all 29 snapshots, no day missing in either window.
+Pre (2026-07-28 … 2026-08-10): 42 unique-days over 14 days = **3.00/day**, as stated in advance.
+Post (2026-08-11 … 2026-09-09): 104 unique-days over 30 days = **3.47/day**. Under the hard
+limits above this moves no threshold, softens no verdict and is not the headline; it is
+reported because it was pre-registered, and it says the daily sum drifted slightly upward while
+the confirmatory scalar did not move at all.
+
+*Unchanged:* every threshold and date. Step 2 of #198 (release 8.12.0, 2026-09-14) did not
+happen on its date; that is an operational miss recorded in #198, not an amendment to this
+document.
