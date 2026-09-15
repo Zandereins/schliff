@@ -280,11 +280,15 @@ def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_S
         # ~10 % of this file's wall time before and after. The 1.25 margin is
         # for the fastest window of the next round landing a little under the
         # estimate. A clock too coarse to time a 64-scan window returns 0 and
-        # would divide by it; that case grows n the old way.
+        # would divide by it; that case grows n the old way. A clock that
+        # returns a near-zero reading instead would size the next round into
+        # the billions before the cap above is consulted, so the estimate is
+        # clamped to the cap here.
         if best_small > 0:
-            n = max(n * 2, math.ceil(n * target_seconds / best_small * 1.25))
+            estimate = math.ceil(n * target_seconds / best_small * 1.25)
         else:
-            n *= 8
+            estimate = n * 8
+        n = min(1_000_000, max(n * 2, estimate))
 
 
 def _calibrator_ratio(small: str, large: str):
@@ -439,7 +443,7 @@ def test_the_calibrator_survives_stalled_windows(monkeypatch):
     runner: a probe "pattern" advances it by 1.0 per scan of the small text and
     2.0 per scan of the large one — a linear scan, divisor exactly 2.0 — and
     adds a 50-unit stall inside the first small window and inside the last
-    large window of EVERY round of three pairs. Every round, because the round
+    large window of EVERY round of `windows` pairs. Every round, because the round
     the calibrator accepts is the one whose windows become the divisor. Two
     positions, because a stalled small window is what tempts "any window
     clears the floor", and a stalled last large window is what "take the last
@@ -451,6 +455,8 @@ def test_the_calibrator_survives_stalled_windows(monkeypatch):
     next round is sized to 128 and accepted on its fastest small window. The
     assertions pin exactly that scan count and the exact per-scan pair.
     """
+    windows = 3
+    period = 2 * windows  # windows per round: one small and one large per pair
     clock = {"now": 0.0, "stalls": 0, "window": 0, "last": None}
     monkeypatch.setattr(time, "perf_counter", lambda: clock["now"])
     small, large = "a" * 10, "a" * 20
@@ -464,15 +470,17 @@ def test_the_calibrator_survives_stalled_windows(monkeypatch):
                 if clock["last"] is not None:
                     clock["window"] += 1
                 clock["last"] = len(text)
-                if clock["window"] % 6 in (0, 5):
+                if clock["window"] % period in (0, period - 1):
                     clock["now"] += 50.0
                     clock["stalls"] += 1
             seen.append(len(text))
             clock["now"] += len(text) / 10
 
-    per_small, per_large = _paired_scans(Probe(), small, large, target_seconds=100.0, windows=3)
+    per_small, per_large = _paired_scans(
+        Probe(), small, large, target_seconds=100.0, windows=windows
+    )
     assert clock["stalls"] >= 4, f"only {clock['stalls']} stalls were injected"
-    assert len(seen) == 6 * 64 + 6 * 128, (
+    assert len(seen) == period * 64 + period * 128, (
         f"{len(seen)} scans: one round of 64 and one of 128 is what accepting on "
         "the FASTEST SMALL window produces; fewer means a stalled or undersized "
         "window was accepted, more means the accept rule is gone"

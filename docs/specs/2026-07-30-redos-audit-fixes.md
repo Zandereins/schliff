@@ -295,12 +295,14 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   of that input pair). The divisor is cached as measured; the plausibility test asserts
   the band for one of the fifty-two input pairs, and the remaining gap — a bad divisor
   on another pair has no red of its own — is #233's measurement redesign, not a guard.
-  Pinned by two tests on a fully virtual clock — a probe pattern advances it, so the
-  verdict is exact on every runner: a stall inside the first small and the last large
-  window of every round (red under "take the last window", "take the slowest window",
-  "take the mean", "any small window clears the floor", "accept once the LARGE window
-  clears the floor" and "no accept rule"; green under a refactor that shares one clock
-  reading between adjacent windows) and a structural check of the interleaving. Not
+  Pinned by two tests. One runs on a fully virtual clock — a probe pattern advances it,
+  so the verdict is exact on every runner — with a stall inside the first small and the
+  last large window of every round (red under "take the last window", "take the slowest
+  window", "take the mean", "any small window clears the floor", "accept once the LARGE
+  window clears the floor" and "no accept rule"; green under a refactor that shares one
+  clock reading between adjacent windows). The other is a structural check of the
+  interleaving on the real clock, which reaches one round only because its floor is
+  zero. Not
   reproducible on a laptop (60 samples under eightfold load: 1.66–2.02), and green CI
   reruns are weak evidence at this rate — p < 0.05 needs 19 consecutive greens
   (0.85^18 = 0.054, 0.85^19 = 0.046) — so the mechanism proof is the deterministic test
