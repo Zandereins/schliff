@@ -64,3 +64,15 @@ a security gate and a CI surface.
 
 **Three separate releases.** Three lockstep version bumps and three badge cache-busts for two
 internal changes nobody can observe from outside.
+
+## Amendment 2026-09-15 — what "moves the composite" means
+
+Release 8.12.0 raises the composite of non-SKILL formats (a bare AGENTS.md 17.4 → 35.0)
+because `dashboard.py` and `auto-improve.py` stopped counting an unlisted dimension as
+zero, and lowers no file's score relative to 8.11.1 (measured across 171 field files, see
+the CHANGELOG notes). Read literally, the decision above would make that a major. The rule
+is restated as it was meant: **a change that lowers any file's score, or moves a pinned
+`--min-score` verdict from pass to fail, is a major; a correction that only raises scores
+ships as a minor with the movement disclosed in the CHANGELOG.** The reason is the same as
+in *Why*: a major signals a migration, and there is none to make when nothing that passed
+starts failing.

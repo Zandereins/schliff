@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [8.12.0] - 2026-09-15
+
 ### Added
 
 - **`operational_coverage` now produces fixes.** On an AGENTS.md the heaviest dimension —
@@ -218,6 +220,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   points; 0 of 159 installed skills, and 0 against 8.11.1, which never
   credited the phrase.) If you gate CI with `verify --min-score`, nothing you pass today
   starts failing.
+- **Version number, against ADR 0017.** The ADR says a change that moves the composite
+  would be a major. This release moves it — upward only, and only for the non-SKILL
+  formats whose heaviest dimension had been counted as zero (see the first note above);
+  no file's score falls relative to 8.11.1, as the previous note measures. It ships as a
+  minor on that reading — *a change that lowers a score is a major* — which ADR 0017 now
+  states in an amendment rather than leaving the rule to be broken quietly.
 - A denominator cap that would have stopped `efficiency` from penalising long files was
   implemented and reverted before release: it decoupled the score from length, which let
   padding dilute a keyword-stuffing penalty and keep the gain. The underlying limit stays
@@ -1646,7 +1654,8 @@ measured, reported wrongly. Three of them were found by verifying the fourth.
 
 - Initial release — 6-dimension scoring, eval runner, progress tracking
 
-[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.11.1...HEAD
+[Unreleased]: https://github.com/Zandereins/schliff/compare/v8.12.0...HEAD
+[8.12.0]: https://github.com/Zandereins/schliff/compare/v8.11.1...v8.12.0
 [8.11.1]: https://github.com/Zandereins/schliff/compare/v8.11.0...v8.11.1
 [8.11.0]: https://github.com/Zandereins/schliff/compare/v8.10.1...v8.11.0
 [8.10.1]: https://github.com/Zandereins/schliff/compare/v8.10.0...v8.10.1
