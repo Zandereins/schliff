@@ -35,7 +35,6 @@ See docs/specs/2026-07-30-redos-audit-fixes.md (D6).
 import importlib
 import math
 import re
-import sys
 import time
 
 import pytest
@@ -220,22 +219,21 @@ def _best_of(rx, text, reps=2):
 _CALIBRATOR = re.compile(r"zzz-this-literal-is-not-present")
 
 # The calibrator's own ratio depends only on the two input strings, not on the
-# pattern under test, so measuring it per pattern multiplied the suite's runtime
-# by ~4 for no extra information. Keyed on lengths and first bytes: the fillers
-# are generated, so that identifies the pair without holding megabytes.
+# pattern under test. Measured at this revision, 47-49 calls per file run reach
+# it for 11-12 distinct pairs at ~44 ms each, so the cache saves about 2 s on a
+# 5 s file — and costs the session-wide blast radius #233 describes. Keyed on
+# lengths and first bytes: the fillers are generated, so that identifies the
+# pair without holding megabytes.
 _CALIBRATOR_CACHE: dict = {}
 
 # A linear scan on doubled input measures ~2.0 (idle 1.8-1.9; 1.3-3.0 under
 # sixteen busy processes). Outside this band the divisor would distort every
 # pattern; the plausibility test asserts it for the one pair it measures.
 _CALIBRATOR_BAND = (0.5, 5.0)
-# Window pairs per round of `_paired_scans`. Named because the stall test
-# derives its clock-reading arithmetic from it.
-_CALIBRATOR_WINDOWS = 3
 
 
 def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_SECONDS,
-                  windows: int = _CALIBRATOR_WINDOWS) -> tuple:
+                  windows: int = 3) -> tuple:
     """Seconds per scan for `small` and `large`, measured in interleaved windows.
 
     A single `re.search` of the calibrator costs ~0.8 microseconds — three orders
@@ -257,10 +255,9 @@ def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_S
     per side, so the windows are not paired: what interleaving buys is that a
     burst shorter than a round leaves each side one clean window with equal
     probability, where the sequential order left one side none. It is not a
-    defence against contention that covers most of a round — measured with a
-    virtual clock, a burst over five of the six windows gives the same
-    out-of-band divisor in either order. That residual is the field's 7.29
-    class, and it is what the plausibility band is for.
+    defence against contention that covers most of a round: a burst that leaves
+    a side no clean window moves the divisor in either order. That residual is
+    the field's 7.29 class, and it is what the plausibility band is for.
     """
     n = 64
     while True:
@@ -426,7 +423,7 @@ def test_pattern_scales_linearly(path, rx):
     )
 
 
-def test_the_calibrator_survives_one_stalled_window(monkeypatch):
+def test_the_calibrator_survives_stalled_windows(monkeypatch):
     """One scheduler stall must not become the divisor for 224 patterns.
 
     Measured on CI between 2026-08-25 and 2026-09-05: 13 red attempts of this
@@ -438,60 +435,51 @@ def test_the_calibrator_survives_one_stalled_window(monkeypatch):
     cached per input pair, so a single stalled timing window distorted every
     pattern measured against that pair.
 
-    The stall is injected into the clock, not the runner: in EVERY round of
-    three window pairs, perf_counter jumps by 30 ms on the end reading of the
-    first small window and again on the end reading of the last large window.
-    Every round, because the round the calibrator finally accepts is the one
-    whose windows become the divisor; a stall placed only in the first round
-    lands in a round the accept rule rejects anyway, and then taking the LAST
-    window, or the maximum, instead of the fastest stays green. Two positions,
-    because a stalled small window is what tempts "any window clears the floor"
-    and a stalled last large window is what "take the last window" would read.
+    The clock is fully virtual, so the verdict is exact and the same on every
+    runner: a probe "pattern" advances it by 1.0 per scan of the small text and
+    2.0 per scan of the large one — a linear scan, divisor exactly 2.0 — and
+    adds a 50-unit stall inside the first small window and inside the last
+    large window of EVERY round of three pairs. Every round, because the round
+    the calibrator accepts is the one whose windows become the divisor. Two
+    positions, because a stalled small window is what tempts "any window
+    clears the floor", and a stalled last large window is what "take the last
+    window" would read; a stall on both sides is what a mean or a maximum
+    would average in, and only the fastest window per side ignores it.
+
+    With the floor at 100: an unstalled 64-scan small window measures 64 and
+    is rejected, the stalled one measures 114 and must not be accepted; the
+    next round is sized to 128 and accepted on its fastest small window. The
+    assertions pin exactly that scan count and the exact per-scan pair.
     """
-    real = time.perf_counter
-    state = {"calls": 0, "stalls": 0, "armed": False}
-    make = _FILLERS["sudo"]
-    small, large = make(_N), make(_N * 2)
+    clock = {"now": 0.0, "stalls": 0, "window": 0, "last": None}
+    monkeypatch.setattr(time, "perf_counter", lambda: clock["now"])
+    small, large = "a" * 10, "a" * 20
+    seen: list = []
 
-    # Windows alternate small, large; each reads the clock twice, so one round
-    # of `_CALIBRATOR_WINDOWS` pairs is four readings per pair. Reading 2 ends
-    # the first small window, the round's last reading ends its last large one.
-    per_round = 4 * _CALIBRATOR_WINDOWS
+    class Probe:
+        def search(self, text):
+            # A window boundary is a change of text; windows are counted from
+            # that, not from clock readings, so the layout of readings is free.
+            if len(text) != clock["last"]:
+                if clock["last"] is not None:
+                    clock["window"] += 1
+                clock["last"] = len(text)
+                if clock["window"] % 6 in (0, 5):
+                    clock["now"] += 50.0
+                    clock["stalls"] += 1
+            seen.append(len(text))
+            clock["now"] += len(text) / 10
 
-    def stalled_clock():
-        now = real()
-        # Every reading is counted: the accept rule below is pinned by the count.
-        if state["armed"]:
-            state["calls"] += 1
-            if state["calls"] % per_round in (2, 0):
-                state["stalls"] += 1
-                return now + 0.030
-        return now
-
-    monkeypatch.setattr(time, "perf_counter", stalled_clock)
-    # A fresh cache, restored on teardown: the parametrized cases share the real
-    # one, and a value measured under a patched clock must not leak into it.
-    monkeypatch.setattr(sys.modules[__name__], "_CALIBRATOR_CACHE", {})
-    state["armed"] = True
-    ratio = _calibrator_ratio(small, large)
-    state["armed"] = False
-    # The band below is met by an unstalled calibrator too, so first prove the
-    # stall reached the code under test — a refactor that reads another clock
-    # would otherwise pass this vacuously.
-    assert state["stalls"] >= 2, f"only {state['stalls']} stalls were injected"
-    # The stalled small window cleared the floor on its own. Accepting it would
-    # have ended the scan at n=64 after one round; requiring the FASTEST small
-    # window to clear the floor forces at least a second round at a larger n.
-    assert state["calls"] >= 2 * per_round, (
-        f"the scan stopped after {state['calls']} clock readings: an undersized "
-        "window was accepted because one stalled window cleared the floor"
+    per_small, per_large = _paired_scans(Probe(), small, large, target_seconds=100.0, windows=3)
+    assert clock["stalls"] >= 4, f"only {clock['stalls']} stalls were injected"
+    assert len(seen) == 6 * 64 + 6 * 128, (
+        f"{len(seen)} scans: one round of 64 and one of 128 is what accepting on "
+        "the FASTEST SMALL window produces; fewer means a stalled or undersized "
+        "window was accepted, more means the accept rule is gone"
     )
-    assert ratio is not None, "the stalled calibrator could not be timed at all"
-    lo, hi = _CALIBRATOR_BAND
-    assert lo < ratio < hi, (
-        f"a 30 ms stall per window pair moved the calibrator to {ratio:.2f}; a "
-        "linear scan on doubled input is ~2.0, and this value would be cached "
-        "for every pattern"
+    assert (per_small, per_large) == (1.0, 2.0), (
+        f"the stalled windows reached the divisor: {per_small} -> {per_large} "
+        "per scan, where only the fastest window per side gives 1.0 -> 2.0"
     )
 
 

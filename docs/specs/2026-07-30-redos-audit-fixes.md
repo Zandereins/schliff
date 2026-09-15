@@ -265,9 +265,10 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   1151, 50, 19). Every assertion mutation-tested: un-bounding a pattern, tightening a
   bound below its measured maximum, and truncating the backtick span each turn it red.
 - `test_patterns_scale_linearly.py` — empirical, 224 compiled patterns across 30 modules
-  × 25 filler alphabets at doubling lengths, ratio < 3.0. Two-stage: a flagged filler is
+  × 25 filler alphabets at doubling lengths, ratio < 3.0 *(raw scale as first built;
+  calibrated to 1.5 since #210, see the amendment below)*. Two-stage: a flagged filler is
   re-measured with more repetitions **and at a second doubling**, and only fails if both
-  doublings are super-linear. The healthy margin is 1.3–2.4× against a 3.0× threshold,
+  doublings are super-linear. The healthy margin was 1.3–2.4× against the raw 3.0× threshold,
   which is too thin to rest on one sample — a single sample under load did flake once
   during development. Verified red-capable (4.20×, 4.02× confirmed) and green four times
   over under four busy cores.
@@ -294,16 +295,17 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   of that input pair). The divisor is cached as measured; the plausibility test asserts
   the band for one of the fifty-two input pairs, and the remaining gap — a bad divisor
   on another pair has no red of its own — is #233's measurement redesign, not a guard.
-  Pinned by two tests: an
-  injected 30 ms clock stall in every round, on the first small and the last large window
-  (red under "take the last window", "take the slowest window" and "any small window
-  clears the floor"; not red under "accept once the LARGE window clears the floor", which
-  accepts one round early with an in-band divisor) and a structural check of the
-  interleaving. Not
+  Pinned by two tests on a fully virtual clock — a probe pattern advances it, so the
+  verdict is exact on every runner: a stall inside the first small and the last large
+  window of every round (red under "take the last window", "take the slowest window",
+  "take the mean", "any small window clears the floor", "accept once the LARGE window
+  clears the floor" and "no accept rule"; green under a refactor that shares one clock
+  reading between adjacent windows) and a structural check of the interleaving. Not
   reproducible on a laptop (60 samples under eightfold load: 1.66–2.02), and green CI
-  reruns are weak evidence at this rate — p < 0.05 needs 19 consecutive greens (0.85^18 = 0.054, 0.85^19 = 0.046) — so
-  the mechanism proof is the deterministic test and the field check is the CI record over
-  the following weeks, read with attempts expanded.
+  reruns are weak evidence at this rate — p < 0.05 needs 19 consecutive greens
+  (0.85^18 = 0.054, 0.85^19 = 0.046) — so the mechanism proof is the deterministic test
+  and the field check is the CI record over the following weeks, read with attempts
+  expanded.
 
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
