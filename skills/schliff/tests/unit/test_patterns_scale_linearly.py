@@ -13,9 +13,13 @@ separate reliably on a loaded runner.
 
 The ratio is therefore CALIBRATED: divided by the ratio of a known-linear scan of
 the same input, measured in the same process, so runner speed divides out. On that
-scale healthy patterns measure ~1.05 (max 1.08) and the defect class 2.4-2.8, and
-the threshold is 1.5x — see `_MAX_RATIO`. An absolute floor still applies, so a
-loaded CI runner cannot flake it while the 4.0x class is still caught with margin.
+scale healthy patterns measure ~1.05 (max 1.08) and the defect class 2.05-2.28 idle,
+and the threshold is 1.5x — see `_MAX_RATIO`. An absolute floor still applies. A
+loaded runner CAN still flake it: the divisor is measured apart from the pattern, so
+sustained contention does not divide out (13 of 88 CI attempts in 2026-08/09; under
+sixteen busy processes the divisor spreads 1.6-4.5 and the defect class reads under
+1.5 in about one reading in twelve) — see the spec's 2026-09-05/07 amendment, #233
+and #234.
 
 Known limit, stated rather than glossed: this gate reaches exactly as far as its filler
 alphabet. That is not hypothetical — `manifest._FM` was quadratic on a frontmatter-shaped
@@ -229,9 +233,10 @@ _CALIBRATOR = re.compile(r"zzz-this-literal-is-not-present")
 # pair without holding megabytes.
 _CALIBRATOR_CACHE: dict = {}
 
-# A linear scan on doubled input measures ~2.0 (idle 1.8-1.9; 1.3-3.0 under
-# sixteen busy processes). Outside this band the divisor would distort every
-# pattern; the plausibility test asserts it for the one pair it measures.
+# A linear scan on doubled input measures ~2.0 (idle 1.8-1.9; 1.6-4.5 under
+# sixteen busy processes, measured 2026-09-15). The band contains the loaded
+# range on purpose, so it only catches a divisor that is broken rather than
+# noisy; the plausibility test asserts it for the one pair it measures.
 _CALIBRATOR_BAND = (0.5, 5.0)
 # Scans per window past which a window is accepted whether or not it cleared the
 # floor — the only exit on a clock that never advances. Used by the accept
@@ -266,8 +271,10 @@ def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_S
     likelier to land in one — sizing the large side to the floor on its own is
     a companion of #233. Interleaving is not a defence against contention that
     covers most of a round: a burst that leaves a side no clean window moves
-    the divisor in either order, and that residual is what the plausibility
-    band is for.
+    the divisor in either order. The plausibility band does not catch that
+    residual — it was set wide enough to contain the loaded range, and every
+    divisor implicated in the field reds lies inside it — which is why the
+    residual is #233's, not this function's.
     """
     n = 64
     while True:
@@ -308,9 +315,11 @@ def _calibrator_ratio(small: str, large: str):
         # Cached as measured, plausible or not. The plausibility test reads
         # the `word` pair at (_N, 2*_N) — one of the fifty-two pairs this suite
         # keys — and only that one is asserted; an implausible divisor on any
-        # other pair distorts the cases that hit it without a red of its own
-        # (too high passes them silently, too low fails them with the divisor
-        # printed). A version that failed the calling case instead was tried
+        # other pair distorts the cases that hit it without a red of its own:
+        # for the parametrized cases in either direction, since stage 2's
+        # second doubling keys a fresh pair and decides alone; for the
+        # defect-class test a too-high divisor is the red, a too-low one
+        # passes. A version that failed the calling case instead was tried
         # in review and rejected: under sustained load it turned one bad
         # divisor into a red on every pattern of that pair. The measurement
         # design that would remove the gap — calibrate in the same loop as the
