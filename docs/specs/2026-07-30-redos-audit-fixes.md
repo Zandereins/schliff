@@ -286,9 +286,16 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   2.7–3.5, which is why every failure string now carries the raw ratio and the calibrator.
   The calibrator now measures small and large in interleaved windows, takes the fastest
   window per size, accepts a window size only once the fastest small window clears the
-  floor, and re-measures up to three times when the result leaves the 0.5–5.0 band.
-  Pinned by two tests: an injected 30 ms clock stall (628 before, ~1.9 after; red again
-  under "any window clears the floor") and a structural check of the interleaving. Not
+  floor, sizes the next window from the previous round instead of growing eightfold, and
+  fails the calling case loudly — with both per-scan times — when the divisor leaves the
+  0.5–5.0 band, instead of caching it. A retry-until-in-band loop was in the first draft
+  and was removed in review: no test pinned it, and it never fired for the eleven reds it
+  was written for, whose divisors of 2.7–3.5 lie inside the band. Pinned by two tests: an
+  injected 30 ms clock stall in every round, on the first small and the last large window
+  (red under "take the last window", "take the slowest window" and "any small window
+  clears the floor"; not red under "accept once the LARGE window clears the floor", which
+  accepts one round early with an in-band divisor) and a structural check of the
+  interleaving. Not
   reproducible on a laptop (60 samples under eightfold load: 1.66–2.02), and green CI
   reruns are weak evidence at this rate — p < 0.05 needs about 18 consecutive greens — so
   the mechanism proof is the deterministic test and the field check is the CI record over

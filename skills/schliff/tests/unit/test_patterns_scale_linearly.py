@@ -33,6 +33,7 @@ heuristic being right. Its deterministic companion is `test_patterns_are_bounded
 See docs/specs/2026-07-30-redos-audit-fixes.md (D6).
 """
 import importlib
+import math
 import re
 import sys
 import time
@@ -224,11 +225,10 @@ _CALIBRATOR = re.compile(r"zzz-this-literal-is-not-present")
 # are generated, so that identifies the pair without holding megabytes.
 _CALIBRATOR_CACHE: dict = {}
 
-# A linear scan on doubled input measures ~2.0 (idle 1.8-1.9). Outside this band
-# the divisor would distort every pattern, so a measurement outside it is taken
-# again (bounded, see `_calibrator_ratio`) and the plausibility test asserts it.
+# A linear scan on doubled input measures ~2.0 (idle 1.8-1.9; 1.3-3.0 under
+# sixteen busy processes). Outside this band the divisor would distort every
+# pattern, so `_calibrator_ratio` refuses to hand it out — see there.
 _CALIBRATOR_BAND = (0.5, 5.0)
-_CALIBRATOR_RETRIES = 3
 
 
 def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_SECONDS,
@@ -269,21 +269,31 @@ def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_S
                     best_large = min(best_large, elapsed)
         if best_small >= target_seconds or n >= 1_000_000:
             return best_small / n, best_large / n
-        n *= 8
+        # Size the next round from this one instead of growing blindly: `n *= 8`
+        # overshot the floor about sixfold (24 ms windows against a 4 ms floor)
+        # and made the calibrator half of this file's runtime. The 1.25 margin
+        # is for the fastest window of the next round landing a little under
+        # the estimate; the doubling floor keeps a coarse clock from stalling.
+        n = max(n * 2, math.ceil(n * target_seconds / best_small * 1.25))
 
 
 def _calibrator_ratio(small: str, large: str, reps: int):
     key = (len(small), len(large), small[:8], large[:8])
     if key not in _CALIBRATOR_CACHE:
-        ratio = None
-        for _ in range(_CALIBRATOR_RETRIES):
-            c_small, c_large = _paired_scans(_CALIBRATOR, small, large)
-            ratio = c_large / c_small if c_small > 0 and c_large > 0 else None
-            if ratio is not None and _CALIBRATOR_BAND[0] < ratio < _CALIBRATOR_BAND[1]:
-                break
-        # Cached even when still implausible after the retries: a None here
-        # would pass every case vacuously, and the plausibility test reads the
-        # same value and fails loudly instead.
+        c_small, c_large = _paired_scans(_CALIBRATOR, small, large)
+        ratio = c_large / c_small if c_small > 0 and c_large > 0 else None
+        lo, hi = _CALIBRATOR_BAND
+        # Not cached and not returned: a None divisor would pass the calling
+        # case vacuously, and an implausible one — 6.5 turns a linear 2.0 into
+        # 0.31 — would pass it silently. The plausibility test below covers one
+        # of the fifty-two input pairs; this makes the other fifty-one fail in
+        # the case that hit them, with the numbers, instead of dividing.
+        if ratio is None or not lo < ratio < hi:
+            pytest.fail(
+                f"calibrator ratio {ratio} is implausible for a linear scan "
+                f"({c_small * 1e6:.2f}us -> {c_large * 1e6:.2f}us per scan); the "
+                "division would distort this pattern's result"
+            )
         _CALIBRATOR_CACHE[key] = ratio
     return _CALIBRATOR_CACHE[key]
 
@@ -304,7 +314,7 @@ def _ratio(rx, make, n, reps):
 
     Returns (calibrated, t_small, t_large, calibrator): every failure message
     prints the last three too, because a red that shows only the calibrated
-    number cannot be attributed to the pattern or to the divisor — ten of the
+    number cannot be attributed to the pattern or to the divisor — eleven of the
     thirteen red CI attempts this gate produced in 08/09-2026 were of that kind.
     """
     small, large = make(n), make(n * 2)
@@ -383,12 +393,15 @@ def test_pattern_scales_linearly(path, rx):
             continue
         # Stage 2: confirm at two consecutive doublings before failing.
         r1, s1, l1, c1 = _ratio(rx, make, _N, reps=5)
-        r2, _, l2, c2 = _ratio(rx, make, _N * 2, reps=5)
+        r2, s2, l2, c2 = _ratio(rx, make, _N * 2, reps=5)
         if r1 is None or r1 < _MAX_RATIO or r2 is None or r2 < _MAX_RATIO:
             continue
+        # The second doubling's raw ratio is l2/s2 — its own fresh small timing,
+        # not l1 — so that calibrated == raw / calibrator holds for what is printed.
         offenders.append(
-            f"{filler_name}: {s1 * 1000:.1f}ms -> {l1 * 1000:.1f}ms -> {l2 * 1000:.1f}ms "
-            f"(calibrated {r1:.2f}x, {r2:.2f}x per doubling; raw {l1 / s1:.2f}x, {l2 / l1:.2f}x; "
+            f"{filler_name}: {s1 * 1000:.1f}ms -> {l1 * 1000:.1f}ms, "
+            f"{s2 * 1000:.1f}ms -> {l2 * 1000:.1f}ms "
+            f"(calibrated {r1:.2f}x, {r2:.2f}x per doubling; raw {l1 / s1:.2f}x, {l2 / s2:.2f}x; "
             f"calibrator {c1:.2f}, {c2:.2f})"
         )
     assert not offenders, (
@@ -413,24 +426,31 @@ def test_the_calibrator_survives_one_stalled_window(monkeypatch):
     cached per input pair, so a single stalled timing window distorted every
     pattern measured against that pair.
 
-    The stall is injected into the clock, not the runner: perf_counter jumps by
-    30 ms exactly once, on the end reading of the first large window. Under the
-    single-window code that window was accepted as the measurement.
+    The stall is injected into the clock, not the runner: in EVERY round of
+    three window pairs, perf_counter jumps by 30 ms on the end reading of the
+    first small window and again on the end reading of the last large window.
+    Every round, because the round the calibrator finally accepts is the one
+    whose windows become the divisor; a stall placed only in the first round
+    lands in a round the accept rule rejects anyway, and then taking the LAST
+    window, or the maximum, instead of the fastest stays green. Two positions,
+    because a stalled small window is what tempts "any window clears the floor"
+    and a stalled last large window is what "take the last window" would read.
     """
     real = time.perf_counter
-    state = {"calls": 0, "stalled": False, "armed": False}
+    state = {"calls": 0, "stalls": 0, "armed": False}
     make = _FILLERS["sudo"]
     small, large = make(_N), make(_N * 2)
 
     def stalled_clock():
         now = real()
-        # Windows alternate small, large; each reads the clock twice. The 4th
-        # reading is the end of the first large window. Every reading is
+        # Windows alternate small, large; each reads the clock twice, so one
+        # round of three pairs is twelve readings. Reading 2 ends the first
+        # small window, reading 12 the last large one. Every reading is
         # counted: the accept rule below is pinned by the count.
         if state["armed"]:
             state["calls"] += 1
-            if state["calls"] == 4 and not state["stalled"]:
-                state["stalled"] = True
+            if state["calls"] % 12 in (2, 0):
+                state["stalls"] += 1
                 return now + 0.030
         return now
 
@@ -444,19 +464,21 @@ def test_the_calibrator_survives_one_stalled_window(monkeypatch):
     # The band below is met by an unstalled calibrator too, so first prove the
     # stall reached the code under test — a refactor that reads another clock
     # would otherwise pass this vacuously.
-    assert state["stalled"], "the stall was never injected"
-    # The stalled window cleared the floor on its own. Accepting it would have
-    # ended the scan at n=64 after one round of three window pairs, i.e. twelve
-    # clock readings; requiring the FASTEST small window to clear the floor
-    # forces at least a second round at a larger n.
+    assert state["stalls"] >= 2, f"only {state['stalls']} stalls were injected"
+    # The stalled small window cleared the floor on its own. Accepting it would
+    # have ended the scan at n=64 after one round of three window pairs, i.e.
+    # twelve clock readings; requiring the FASTEST small window to clear the
+    # floor forces at least a second round at a larger n.
     assert state["calls"] >= 24, (
         f"the scan stopped after {state['calls']} clock readings: an undersized "
         "window was accepted because one stalled window cleared the floor"
     )
+    assert ratio is not None, "the stalled calibrator could not be timed at all"
     lo, hi = _CALIBRATOR_BAND
-    assert ratio is not None and lo < ratio < hi, (
-        f"one 30 ms stall moved the calibrator to {ratio:.2f}; a linear scan on "
-        "doubled input is ~2.0, and this value would be cached for every pattern"
+    assert lo < ratio < hi, (
+        f"a 30 ms stall per window pair moved the calibrator to {ratio:.2f}; a "
+        "linear scan on doubled input is ~2.0, and this value would be cached "
+        "for every pattern"
     )
 
 
