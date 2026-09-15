@@ -296,25 +296,34 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   the band for one of the fifty-two input pairs, and the remaining gap — a bad divisor
   on another pair has no red of its own — is #233's measurement redesign, not a guard.
   Which test went red, read from the attempt logs on 2026-09-15: eleven of the thirteen
-  were `test_the_gate_still_fires_on_the_real_defect_class`, a single measurement per
-  pattern at 1.11–1.47 with no divisor printed; two printed the divisor. Two of the eleven
-  had several patterns under the threshold at once, which points at the shared divisor;
-  the single-pattern reds cannot be attributed either way from the logs. That test now
-  re-measures a miss with more repetitions and at a second doubling — a different input
-  pair, so a different divisor — before it fails, the shape the parametrized cases have
-  had since #210. The calibrator mechanism is pinned by one test on a fully virtual
-  clock — a probe pattern advances it, so the verdict is exact on every runner — with a
-  stall inside the first small and the last large window of every round, run at two
-  floors so that both the doubling floor and the estimate decide a round size. It is red
-  under "take the last window", "take the slowest window", "take the mean", "any small
-  window clears the floor", "accept once the LARGE window clears the floor", "no accept
-  rule" and a wrong round size, and green under a refactor that shares one clock reading
-  between adjacent windows; its exact `seen` sequence also pins the interleaving. The
-  flake itself is not reproducible on a laptop — the divisor stayed at 1.66–2.02 over 60
+  were `test_the_gate_still_fires_on_the_real_defect_class`, one reading per pattern at
+  1.11–1.47 with no divisor printed; two printed the divisor. Two of the eleven had
+  several patterns under the threshold at once, which points at the shared divisor; the
+  single-pattern reds cannot be attributed from the logs. **That test keeps its single
+  reading.** The gate itself flags a pattern only when three readings in a row clear 1.5,
+  so one reading under it is a necessary condition for the gate to be blind, and the test
+  reporting it is the test doing its job; a re-measuring variant that passed if any
+  reading cleared was tried in review and reverted, because it is green on exactly the
+  runner profiles where the gate lets a defect through. What this PR fixes is the divisor
+  path; whether the single-pattern reds were the divisor or the pattern side under load
+  is the question the CI record now answers, because every red prints the divisor: a
+  divisor near 2 beside a calibrated value under 1.5 is the gate's margin (27 % under the
+  idle defective minimum, see `_MAX_RATIO`), not the calibrator, and belongs to a
+  threshold decision (#234). The calibrator mechanism is pinned by one test on a fully
+  virtual clock — a probe pattern advances it, so the verdict is exact on every runner —
+  with a stall inside the first small and the last large window of every round, run at
+  two floors that divide the work: floor 100 (doubling floor decides the round size) is
+  the one red under "accept once the LARGE window clears the floor", floor 400 (estimate
+  decides) the one red under a wrong estimate; both are red under "take the last window",
+  "take the slowest window", "take the mean", "any small window clears the floor" and
+  "no accept rule", and green under a refactor that shares one clock reading between
+  adjacent windows. The exact `seen` sequence also pins the interleaving. The flake
+  itself is not reproducible on a laptop — the divisor stayed at 1.66–2.02 over 60
   samples under eightfold load — and green CI reruns are weak evidence at this rate:
   p < 0.05 needs 19 consecutive greens (0.85^18 = 0.054, 0.85^19 = 0.046). So the
-  mechanism proof is the deterministic test and the field check is the CI record over
-  the following weeks, read with attempts expanded.
+  mechanism proof is the deterministic test, and the field check is the CI record over
+  the following weeks, read with attempts expanded and the printed divisor deciding
+  which of the two causes each red belongs to.
 
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`

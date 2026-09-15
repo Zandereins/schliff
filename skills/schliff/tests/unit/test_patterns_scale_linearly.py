@@ -133,9 +133,9 @@ _N = 2000                 # base size; the comparison runs at 2*_N
 # review measured a real defective sample at 1.96, a false negative on an idle
 # machine. 1.5 sits 43 % above the healthy median and 27 % under the defective
 # minimum — nearer the defective side, so a loaded runner reaches it from that
-# side first. That is why the defect-class test below re-measures before it
-# fails, the same way the parametrized cases do; for a security gate, crying
-# wolf once beats letting one defect through.
+# side first, and the defect-class test below reports exactly that when it
+# happens. For a security gate, crying wolf once beats letting one defect
+# through.
 #
 # Raising this is NOT how to fix a flake: past ~2.4 it stops separating the
 # classes at all.
@@ -369,22 +369,19 @@ def test_the_gate_still_fires_on_the_real_defect_class():
     also not linear against an all-`a` input — it is itself a member of the defect
     class. The healthy side is already covered by the 224 parametrized cases.
 
-    Two-stage like the parametrized cases, and for the same reason: this test
-    was the red one in eleven of the thirteen attempts the spec amendment
-    counts, each a single measurement at 1.11-1.47 that nothing re-checked. A
-    stage-1 miss is re-measured with more repetitions and at a second doubling
-    — a different input pair, so a different cached divisor — and only counts
-    if BOTH re-measurements are under the threshold too.
+    ONE reading per pattern, on purpose. The gate flags a pattern only when
+    three readings in a row clear the threshold (stage 1, then both stage-2
+    doublings), so a single reading under it is a necessary condition for the
+    gate to be blind — and this test was the red one in eleven of the thirteen
+    attempts the spec amendment counts, at 1.11-1.47. A version that re-measured
+    a miss and passed if ANY reading cleared was tried in review and reverted:
+    it is green on exactly the runner profiles where the gate lets a defect
+    through. Since every red prints the divisor, the CI record can now say
+    whether such a reading came from the calibrator (this PR) or from the
+    pattern side under load, which is a threshold-margin question — see the
+    spec amendment.
     """
     make = lambda n: "a" * n                       # noqa: E731
-
-    def describe(ratio, t_small, t_large, cal):
-        if ratio is None:
-            return (f"unmeasured, under the timing floor "
-                    f"({t_small * 1000:.2f}ms -> {t_large * 1000:.2f}ms)")
-        return (f"{ratio:.2f} (raw {t_large / t_small:.2f} = {t_small * 1000:.1f}ms -> "
-                f"{t_large * 1000:.1f}ms, calibrator {cal:.2f})")
-
     defects = {
         "[\\w/]+:": re.compile(r"[\w/]+:"),
         "[a-z]+@": re.compile(r"[a-z]+@"),
@@ -395,18 +392,14 @@ def test_the_gate_still_fires_on_the_real_defect_class():
         # 2000, not 600: at 600 two of these three run in under _MIN_ABS_SECONDS
         # and _ratio returns None, so the test would report "unmeasured" for the
         # very patterns it exists to catch. Measured at 2000: 8.4ms, 33ms, 71ms.
-        stage1 = _ratio(rx, make, 2000, reps=3)
-        if stage1[0] is not None and stage1[0] >= _MAX_RATIO:
-            continue
-        again = _ratio(rx, make, 2000, reps=5)
-        doubled = _ratio(rx, make, 4000, reps=5)
-        if any(r[0] is not None and r[0] >= _MAX_RATIO for r in (again, doubled)):
-            continue
-        missed.append(
-            f"{label}: under the {_MAX_RATIO} threshold three times — "
-            f"{describe(*stage1)}; again {describe(*again)}; "
-            f"at the second doubling {describe(*doubled)}"
-        )
+        ratio, t_small, t_large, cal = _ratio(rx, make, 2000, reps=3)
+        if ratio is None:
+            missed.append(f"{label}: fell under the timing floor, unmeasured "
+                          f"({t_small * 1000:.2f}ms -> {t_large * 1000:.2f}ms)")
+        elif ratio < _MAX_RATIO:
+            missed.append(f"{label}: {ratio:.2f}, under the {_MAX_RATIO} threshold "
+                          f"(raw {t_large / t_small:.2f} = {t_small * 1000:.1f}ms -> "
+                          f"{t_large * 1000:.1f}ms, calibrator {cal:.2f})")
     assert not missed, (
         "the gate would not catch a known-defective pattern:\n  " + "\n  ".join(missed)
     )
@@ -456,8 +449,10 @@ def test_pattern_scales_linearly(path, rx):
     )
 
 
-@pytest.mark.parametrize("target", [100.0, 400.0], ids=["doubling-floor", "estimate"])
-def test_the_calibrator_survives_stalled_windows(monkeypatch, target):
+@pytest.mark.parametrize(
+    "target,second", [(100.0, 128), (400.0, 500)], ids=["doubling-floor", "estimate"]
+)
+def test_the_calibrator_survives_stalled_windows(monkeypatch, target, second):
     """One scheduler stall must not become the divisor for 224 patterns.
 
     The field record — 13 red attempts in 88, a divisor of 7.29 and one of 0.19
@@ -478,10 +473,13 @@ def test_the_calibrator_survives_stalled_windows(monkeypatch, target):
 
     An unstalled 64-scan small window measures 64 and is rejected for either
     floor; the stalled one clears it and must not be accepted. The second
-    round's size is the documented formula: at floor 100 the doubling floor
-    wins (128), at floor 400 the estimate does (500). The single assertion on
-    `seen` pins the interleaving order, both round sizes and the exit; the pair
-    assertion pins the divisor.
+    round's size is the documented formula, stated here as its two outcomes:
+    at floor 100 the doubling floor wins (128), at floor 400 the estimate does
+    (500). The floors divide the work: only floor 100 catches "accept once the
+    LARGE window clears the floor" (at 400 the large side rejects round one
+    too), and only floor 400 catches a wrong estimate (at 100 the doubling
+    floor hides it). The single assertion on `seen` pins the interleaving
+    order, both round sizes and the exit; the pair assertion pins the divisor.
     """
     windows = 3
     period = 2 * windows  # windows per round: one small and one large per pair
@@ -507,9 +505,7 @@ def test_the_calibrator_survives_stalled_windows(monkeypatch, target):
     per_small, per_large = _paired_scans(
         Probe(), small, large, target_seconds=target, windows=windows
     )
-    assert clock["stalls"] >= 4, f"only {clock['stalls']} stalls were injected"
     first = 64
-    second = min(_CALIBRATOR_MAX_SCANS, max(first * 2, math.ceil(first * target / first * 1.25)))
     expected = ([10] * first + [20] * first) * windows + ([10] * second + [20] * second) * windows
     assert seen == expected, (
         f"{len(seen)} scans in {clock['window'] + 1} windows, expected "
@@ -521,3 +517,6 @@ def test_the_calibrator_survives_stalled_windows(monkeypatch, target):
         f"the stalled windows reached the divisor: {per_small} -> {per_large} "
         "per scan, where only the fastest window per side gives 1.0 -> 2.0"
     )
+    # Two rounds, two stalls each: proves the stalls reached the code under
+    # test, so a calibrator reading another clock cannot pass the above vacuously.
+    assert clock["stalls"] == 4, f"{clock['stalls']} stalls were injected"
