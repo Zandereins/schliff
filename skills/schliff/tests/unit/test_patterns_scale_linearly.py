@@ -125,14 +125,17 @@ _N = 2000                 # base size; the comparison runs at 2*_N
 # 3.9x-4.1x shapes — not with a strawman:
 #
 #     healthy (rm -r+)        calibrated  1.05 median, 1.08 max
-#     defective ([\w/]+:)     calibrated  2.82 median, 2.40 MIN
+#     defective, idle, 7 samples each via `_ratio` at n=2000 (2026-09-15):
+#         [\w/]+:   2.05-2.28    [a-z]+@   2.15-2.25    a*b   2.12-2.16
 #
 # A first version of this threshold was 2.0, chosen against `a*a*b`. That pattern
 # is CUBIC (raw ~7.6 against the real class's ~3.9), so it flattered the margin:
 # review measured a real defective sample at 1.96, a false negative on an idle
-# machine. 1.5 sits between the classes with 39% headroom below and 60% above,
-# and leans toward the healthy side on purpose — for a security gate, crying wolf
-# once beats letting one defect through.
+# machine. 1.5 sits 43 % above the healthy median and 27 % under the defective
+# minimum — nearer the defective side, so a loaded runner reaches it from that
+# side first. That is why the defect-class test below re-measures before it
+# fails, the same way the parametrized cases do; for a security gate, crying
+# wolf once beats letting one defect through.
 #
 # Raising this is NOT how to fix a flake: past ~2.4 it stops separating the
 # classes at all.
@@ -230,6 +233,10 @@ _CALIBRATOR_CACHE: dict = {}
 # sixteen busy processes). Outside this band the divisor would distort every
 # pattern; the plausibility test asserts it for the one pair it measures.
 _CALIBRATOR_BAND = (0.5, 5.0)
+# Scans per window past which a window is accepted whether or not it cleared the
+# floor — the only exit on a clock that never advances. Used by the accept
+# check and by the clamp on the next-round estimate; they must agree.
+_CALIBRATOR_MAX_SCANS = 1_000_000
 
 
 def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_SECONDS,
@@ -241,23 +248,26 @@ def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_S
     other measurement because below it noise dominates. So each timing is a
     window of `n` scans, `n` grown until a window clears the floor.
 
-    Two defences, both measured on CI before they existed. The first version
-    took ONE window per size and returned as soon as it cleared the floor — which
-    a scheduler stall does by itself, so a stall in the accepted window became
-    the divisor for every pattern (calibrator read 7.29 once and, back-computed,
-    0.19 once, on a linear scan). Now each size is the FASTEST of `windows`
-    windows, for the same reason `_best_of` takes a minimum: a stall only ever
-    adds time; and `n` is accepted only once the fastest small window clears the
-    floor, so a stall cannot make an undersized window look long enough either.
+    Two defences against the field record in the spec's 2026-09-05/07 amendment
+    (docs/specs/2026-07-30-redos-audit-fixes.md). The first version took ONE
+    window per size and returned as soon as it cleared the floor — which a
+    scheduler stall does by itself, so a stall in the accepted window became the
+    divisor for every pattern. Now each size is the FASTEST of `windows` windows,
+    for the same reason `_best_of` takes a minimum: a stall only ever adds time;
+    and `n` is accepted only once the fastest small window clears the floor, so
+    a stall cannot make an undersized window look long enough either.
 
     Second, the small and large windows are INTERLEAVED (small, large, small,
     large, ...) rather than all-small then all-large. The minimum is still taken
     per side, so the windows are not paired: what interleaving buys is that a
-    burst shorter than a round leaves each side one clean window with equal
-    probability, where the sequential order left one side none. It is not a
-    defence against contention that covers most of a round: a burst that leaves
-    a side no clean window moves the divisor in either order. That residual is
-    the field's 7.29 class, and it is what the plausibility band is for.
+    burst shorter than a round can leave each side a clean window, where the
+    sequential order left one side none. Both sides run `n` scans, so a large
+    window is about twice as long as a small one and a short burst is that much
+    likelier to land in one — sizing the large side to the floor on its own is
+    a companion of #233. Interleaving is not a defence against contention that
+    covers most of a round: a burst that leaves a side no clean window moves
+    the divisor in either order, and that residual is what the plausibility
+    band is for.
     """
     n = 64
     while True:
@@ -272,7 +282,7 @@ def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_S
                     best_small = min(best_small, elapsed)
                 else:
                     best_large = min(best_large, elapsed)
-        if best_small >= target_seconds or n >= 1_000_000:
+        if best_small >= target_seconds or n >= _CALIBRATOR_MAX_SCANS:
             return best_small / n, best_large / n
         # Size the next round from this one instead of growing blindly: `n *= 8`
         # overshot the 4 ms floor about sixfold (24 ms windows), which is
@@ -288,7 +298,7 @@ def _paired_scans(rx, small: str, large: str, target_seconds: float = _MIN_ABS_S
             estimate = math.ceil(n * target_seconds / best_small * 1.25)
         else:
             estimate = n * 8
-        n = min(1_000_000, max(n * 2, estimate))
+        n = min(_CALIBRATOR_MAX_SCANS, max(n * 2, estimate))
 
 
 def _calibrator_ratio(small: str, large: str):
@@ -358,8 +368,23 @@ def test_the_gate_still_fires_on_the_real_defect_class():
     `_ratio` returned None every time and the assertion never executed. `a*b` is
     also not linear against an all-`a` input — it is itself a member of the defect
     class. The healthy side is already covered by the 224 parametrized cases.
+
+    Two-stage like the parametrized cases, and for the same reason: this test
+    was the red one in eleven of the thirteen attempts the spec amendment
+    counts, each a single measurement at 1.11-1.47 that nothing re-checked. A
+    stage-1 miss is re-measured with more repetitions and at a second doubling
+    — a different input pair, so a different cached divisor — and only counts
+    if BOTH re-measurements are under the threshold too.
     """
     make = lambda n: "a" * n                       # noqa: E731
+
+    def describe(ratio, t_small, t_large, cal):
+        if ratio is None:
+            return (f"unmeasured, under the timing floor "
+                    f"({t_small * 1000:.2f}ms -> {t_large * 1000:.2f}ms)")
+        return (f"{ratio:.2f} (raw {t_large / t_small:.2f} = {t_small * 1000:.1f}ms -> "
+                f"{t_large * 1000:.1f}ms, calibrator {cal:.2f})")
+
     defects = {
         "[\\w/]+:": re.compile(r"[\w/]+:"),
         "[a-z]+@": re.compile(r"[a-z]+@"),
@@ -370,14 +395,18 @@ def test_the_gate_still_fires_on_the_real_defect_class():
         # 2000, not 600: at 600 two of these three run in under _MIN_ABS_SECONDS
         # and _ratio returns None, so the test would report "unmeasured" for the
         # very patterns it exists to catch. Measured at 2000: 8.4ms, 33ms, 71ms.
-        ratio, t_small, t_large, cal = _ratio(rx, make, 2000, reps=3)
-        if ratio is None:
-            missed.append(f"{label}: fell under the timing floor, unmeasured "
-                          f"({t_small * 1000:.2f}ms -> {t_large * 1000:.2f}ms)")
-        elif ratio < _MAX_RATIO:
-            missed.append(f"{label}: {ratio:.2f}, under the {_MAX_RATIO} threshold "
-                          f"(raw {t_large / t_small:.2f} = {t_small * 1000:.1f}ms -> "
-                          f"{t_large * 1000:.1f}ms, calibrator {cal:.2f})")
+        stage1 = _ratio(rx, make, 2000, reps=3)
+        if stage1[0] is not None and stage1[0] >= _MAX_RATIO:
+            continue
+        again = _ratio(rx, make, 2000, reps=5)
+        doubled = _ratio(rx, make, 4000, reps=5)
+        if any(r[0] is not None and r[0] >= _MAX_RATIO for r in (again, doubled)):
+            continue
+        missed.append(
+            f"{label}: under the {_MAX_RATIO} threshold three times — "
+            f"{describe(*stage1)}; again {describe(*again)}; "
+            f"at the second doubling {describe(*doubled)}"
+        )
     assert not missed, (
         "the gate would not catch a known-defective pattern:\n  " + "\n  ".join(missed)
     )
@@ -427,33 +456,32 @@ def test_pattern_scales_linearly(path, rx):
     )
 
 
-def test_the_calibrator_survives_stalled_windows(monkeypatch):
+@pytest.mark.parametrize("target", [100.0, 400.0], ids=["doubling-floor", "estimate"])
+def test_the_calibrator_survives_stalled_windows(monkeypatch, target):
     """One scheduler stall must not become the divisor for 224 patterns.
 
-    Measured on CI between 2026-08-25 and 2026-09-05: 13 red attempts of this
-    file in 88 (ten on macOS, three on ubuntu, one of those on `main`). Two of
-    them printed the divisor — a calibrator of 7.29, and a second doubling
-    reported as 4.96x calibrated on a 0.93x raw doubling, i.e. 0.19 — on a
-    literal scan that is linear by construction; the other eleven printed one
-    calibrated number and are consistent with a divisor of 2.7-3.5. The value is
-    cached per input pair, so a single stalled timing window distorted every
-    pattern measured against that pair.
+    The field record — 13 red attempts in 88, a divisor of 7.29 and one of 0.19
+    on a scan that is linear by construction, cached for every pattern of the
+    pair — is in the spec's 2026-09-05/07 amendment. This pins the mechanism
+    that answers it, on a fully virtual clock so the verdict is exact and the
+    same on every runner.
 
-    The clock is fully virtual, so the verdict is exact and the same on every
-    runner: a probe "pattern" advances it by 1.0 per scan of the small text and
+    A probe "pattern" advances the clock by 1.0 per scan of the small text and
     2.0 per scan of the large one — a linear scan, divisor exactly 2.0 — and
-    adds a 50-unit stall inside the first small window and inside the last
-    large window of EVERY round of `windows` pairs. Every round, because the round
-    the calibrator accepts is the one whose windows become the divisor. Two
-    positions, because a stalled small window is what tempts "any window
-    clears the floor", and a stalled last large window is what "take the last
-    window" would read; a stall on both sides is what a mean or a maximum
-    would average in, and only the fastest window per side ignores it.
+    adds a stall the size of the floor inside the first small window and inside
+    the last large window of EVERY round of `windows` pairs. Every round,
+    because the round the calibrator accepts is the one whose windows become
+    the divisor. Two positions, because a stalled small window is what tempts
+    "any window clears the floor", and a stalled last large window is what
+    "take the last window" would read; a stall on both sides is what a mean or
+    a maximum would average in, and only the fastest window per side ignores it.
 
-    With the floor at 100: an unstalled 64-scan small window measures 64 and
-    is rejected, the stalled one measures 114 and must not be accepted; the
-    next round is sized to 128 and accepted on its fastest small window. The
-    assertions pin exactly that scan count and the exact per-scan pair.
+    An unstalled 64-scan small window measures 64 and is rejected for either
+    floor; the stalled one clears it and must not be accepted. The second
+    round's size is the documented formula: at floor 100 the doubling floor
+    wins (128), at floor 400 the estimate does (500). The single assertion on
+    `seen` pins the interleaving order, both round sizes and the exit; the pair
+    assertion pins the divisor.
     """
     windows = 3
     period = 2 * windows  # windows per round: one small and one large per pair
@@ -471,42 +499,25 @@ def test_the_calibrator_survives_stalled_windows(monkeypatch):
                     clock["window"] += 1
                 clock["last"] = len(text)
                 if clock["window"] % period in (0, period - 1):
-                    clock["now"] += 50.0
+                    clock["now"] += target
                     clock["stalls"] += 1
             seen.append(len(text))
             clock["now"] += len(text) / 10
 
     per_small, per_large = _paired_scans(
-        Probe(), small, large, target_seconds=100.0, windows=windows
+        Probe(), small, large, target_seconds=target, windows=windows
     )
     assert clock["stalls"] >= 4, f"only {clock['stalls']} stalls were injected"
-    assert len(seen) == period * 64 + period * 128, (
-        f"{len(seen)} scans: one round of 64 and one of 128 is what accepting on "
-        "the FASTEST SMALL window produces; fewer means a stalled or undersized "
-        "window was accepted, more means the accept rule is gone"
+    first = 64
+    second = min(_CALIBRATOR_MAX_SCANS, max(first * 2, math.ceil(first * target / first * 1.25)))
+    expected = ([10] * first + [20] * first) * windows + ([10] * second + [20] * second) * windows
+    assert seen == expected, (
+        f"{len(seen)} scans in {clock['window'] + 1} windows, expected "
+        f"{len(expected)} in {2 * period}: one round of {first} and one of {second}, "
+        "small and large alternating, is what accepting on the FASTEST SMALL window "
+        "and sizing the next round from the fastest small window produces"
     )
     assert (per_small, per_large) == (1.0, 2.0), (
         f"the stalled windows reached the divisor: {per_small} -> {per_large} "
         "per scan, where only the fastest window per side gives 1.0 -> 2.0"
     )
-
-
-def test_the_calibrator_interleaves_small_and_large_windows():
-    """Contention that outlasts one window cannot be removed by a minimum; it can
-    only be made to weigh on both sides of the ratio. That needs the small and
-    large windows to alternate, which this pins structurally: a probe pattern
-    records which text each scan saw."""
-    seen = []
-
-    class Probe:
-        def search(self, text):
-            seen.append(len(text))
-
-    small, large = "a" * 10, "a" * 20
-    _paired_scans(Probe(), small, large, target_seconds=0.0, windows=3)
-    # target 0 accepts n=64 at once: three pairs of 64-scan windows.
-    assert len(seen) == 6 * 64, len(seen)
-    windows = [seen[i * 64] for i in range(6)]
-    assert windows == [10, 20, 10, 20, 10, 20], windows
-    assert all(seen[i * 64:(i + 1) * 64] == [windows[i]] * 64 for i in range(6))
-

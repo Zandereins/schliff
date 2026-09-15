@@ -295,19 +295,26 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   of that input pair). The divisor is cached as measured; the plausibility test asserts
   the band for one of the fifty-two input pairs, and the remaining gap — a bad divisor
   on another pair has no red of its own — is #233's measurement redesign, not a guard.
-  Pinned by two tests. One runs on a fully virtual clock — a probe pattern advances it,
-  so the verdict is exact on every runner — with a stall inside the first small and the
-  last large window of every round (red under "take the last window", "take the slowest
-  window", "take the mean", "any small window clears the floor", "accept once the LARGE
-  window clears the floor" and "no accept rule"; green under a refactor that shares one
-  clock reading between adjacent windows). The other is a structural check of the
-  interleaving on the real clock, which reaches one round only because its floor is
-  zero. Not
-  reproducible on a laptop (60 samples under eightfold load: 1.66–2.02), and green CI
-  reruns are weak evidence at this rate — p < 0.05 needs 19 consecutive greens
-  (0.85^18 = 0.054, 0.85^19 = 0.046) — so the mechanism proof is the deterministic test
-  and the field check is the CI record over the following weeks, read with attempts
-  expanded.
+  Which test went red, read from the attempt logs on 2026-09-15: eleven of the thirteen
+  were `test_the_gate_still_fires_on_the_real_defect_class`, a single measurement per
+  pattern at 1.11–1.47 with no divisor printed; two printed the divisor. Two of the eleven
+  had several patterns under the threshold at once, which points at the shared divisor;
+  the single-pattern reds cannot be attributed either way from the logs. That test now
+  re-measures a miss with more repetitions and at a second doubling — a different input
+  pair, so a different divisor — before it fails, the shape the parametrized cases have
+  had since #210. The calibrator mechanism is pinned by one test on a fully virtual
+  clock — a probe pattern advances it, so the verdict is exact on every runner — with a
+  stall inside the first small and the last large window of every round, run at two
+  floors so that both the doubling floor and the estimate decide a round size. It is red
+  under "take the last window", "take the slowest window", "take the mean", "any small
+  window clears the floor", "accept once the LARGE window clears the floor", "no accept
+  rule" and a wrong round size, and green under a refactor that shares one clock reading
+  between adjacent windows; its exact `seen` sequence also pins the interleaving. The
+  flake itself is not reproducible on a laptop — the divisor stayed at 1.66–2.02 over 60
+  samples under eightfold load — and green CI reruns are weak evidence at this rate:
+  p < 0.05 needs 19 consecutive greens (0.85^18 = 0.054, 0.85^19 = 0.046). So the
+  mechanism proof is the deterministic test and the field check is the CI record over
+  the following weeks, read with attempts expanded.
 
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
