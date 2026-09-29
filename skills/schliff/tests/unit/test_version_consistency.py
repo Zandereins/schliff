@@ -36,13 +36,14 @@ def test_all_versions_match():
 
 
 def test_skill_md_pins_the_current_version():
-    """Every `schliff@X` / `schliff==X` pin in SKILL.md, allowed-tools included, names this release.
+    """Every exact `schliff` version pin in SKILL.md, allowed-tools included, names this release.
 
-    SKILL.md once told users to pin 8.8.2 while 8.12.0 was released. The lookbehind skips
-    `Zandereins/schliff@v1`, the GitHub Action's float tag.
+    SKILL.md once told users to pin 8.8.2 while 8.12.0 was released. Covers `@`, `@v`, `==`,
+    `===`, `~=` and extras (`schliff[judge]==`). A pin needs a dotted version, so the
+    GitHub Action's float tag `Zandereins/schliff@v1` is not one.
     """
     text = SKILL_MD.read_text(encoding="utf-8")
-    pattern = r"(?<![\w/])schliff(?:@v?|[=~]=v?)([0-9][0-9A-Za-z.+-]*)"
+    pattern = r"schliff(?:\[[^\]]*\])?(?:@v?|===?v?|~=v?)([0-9]+\.[0-9][0-9A-Za-z.+-]*)"
     pins = [pin.rstrip(".") for pin in re.findall(pattern, text)]
     assert pins, "SKILL.md no longer pins a version; drop this test only if that is intended"
     assert set(pins) == {_package_version()}, f"stale pin(s) in SKILL.md: {sorted(set(pins))}"

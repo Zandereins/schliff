@@ -15,7 +15,7 @@ description: >
   SQL tuning, or runtime behaviour testing.
 license: MIT
 compatibility: Requires uv, which provides uvx.
-allowed-tools: Bash(uvx schliff@8.12.0 *)
+allowed-tools: Bash(uvx schliff *), Bash(uvx schliff@8.12.0 *)
 ---
 
 # schliff — deterministic instruction-file linter
@@ -83,7 +83,7 @@ reported `unknown`, never as a defect.
 
 Only with the full plugin from schliff's own marketplace (`/plugin marketplace add
 Zandereins/schliff`, then `/plugin install schliff@schliff`). A skill-only mirror
-and the `uvx` path above do not ship these commands:
+and the `uvx` path above do not ship these commands, which also need `python3` >= 3.10:
 `/schliff:analyze` · `/schliff:doctor` · `/schliff:init` · `/schliff:bench` ·
 `/schliff:eval` · `/schliff:report` · `/schliff:mesh` · `/schliff:triage` ·
 `/schliff:auto`
@@ -94,10 +94,10 @@ Produces per-dimension scores, a composite grade, and a gate-usable exit code.
 
 ## Error Handling
 
-- A gate result exits 1 with the finding on stdout and nothing on stderr: `verify`
-  below the threshold, or `check-commands` finding a dangling command.
-- Anything else that fails exits non-zero and says why on stderr, such as
-  `Error: file not found: …` or an argparse usage error (exit 2).
+A gate result exits 1 with the finding on stdout: `verify` below the threshold or
+with `--regression`, and `check-commands` finding a dangling command. Other
+failures exit 1 or 2, depending on the command, and print the cause on stdout or
+stderr.
 
 ## Scope
 
@@ -112,8 +112,8 @@ behaviour testing. schliff measures — it does not write.
 - Score plateaus after the suggested fixes → then use a skill-authoring or
   writing skill; the remaining gap is content, not structure.
 - `check-commands` reports `dangling` → fix the file or the repo, re-run it.
-- Any non-zero exit → report stderr verbatim, or for a gate result the stdout
-  finding; it names the cause.
+- Any non-zero exit → report stdout and stderr verbatim; one of them names the
+  cause.
 
 ## Resources
 
