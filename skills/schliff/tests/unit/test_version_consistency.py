@@ -27,8 +27,8 @@ def _skill_version() -> str:
     import manifest  # the frontmatter parser doctor reads with; scripts/ is on sys.path via conftest
 
     version = manifest.parse_frontmatter(SKILL_MD).get("version")
-    assert version, f"{SKILL_MD} frontmatter has no version: field"
-    return str(version).strip("\"'")
+    assert version, f"no version in {SKILL_MD} frontmatter (field missing, or frontmatter unreadable)"
+    return str(version)
 
 
 def _cli_reported_version() -> str:
@@ -46,7 +46,7 @@ def test_all_versions_match():
 def test_skill_md_pins_the_current_version():
     """Every `schliff@X` / `schliff==X` pin in SKILL.md must name this release (it once said 8.8.2 at 8.12.0)."""
     text = SKILL_MD.read_text(encoding="utf-8")
-    pins = [pin.rstrip(".") for pin in re.findall(r"schliff(?:@|==)([0-9][0-9A-Za-z.+-]*)", text)]
+    pins = [pin.rstrip(".") for pin in re.findall(r"schliff(?:@v?|[=~]=v?)([0-9][0-9A-Za-z.+-]*)", text)]
     assert pins, "SKILL.md no longer pins a version; drop this test only if that is intended"
     assert set(pins) == {_package_version()}, f"stale pin(s) in SKILL.md: {sorted(set(pins))}"
 

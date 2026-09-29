@@ -17,7 +17,7 @@ version: 8.12.0
 license: MIT
 author: Zandereins
 tags: [linter, scoring, skill-md, agents-md, ci]
-compatibility: Requires uv (for uvx); uv provisions Python >= 3.10 if none is present. No API key. Scoring a local file needs no network; the first uvx run fetches the package from PyPI.
+compatibility: Requires uv (for uvx). See Prerequisites.
 allowed-tools: Bash(uvx schliff *), Bash(uvx schliff@*)
 ---
 
@@ -25,21 +25,19 @@ allowed-tools: Bash(uvx schliff *), Bash(uvx schliff@*)
 
 ## Overview
 
-No install step beyond `uv`, no API key, no model in the loop — the same bytes score the same
-everywhere.
+No model in the loop: the same bytes score the same everywhere.
 
 ## Prerequisites
 
-`uv` on PATH (it provides `uvx`); uv provisions Python >= 3.10 itself if the
-machine has none. The first `uvx` run downloads schliff from PyPI; after that a
-local file scores offline (`score --url` fetches over HTTPS). No API key, no
-runtime dependencies. Expects one instruction-file path for most commands;
-`compare` takes two, `doctor` takes `--skill-dirs <dir>`, and `demo` takes none.
+`uv` on PATH (it provides `uvx`, and fetches Python >= 3.10 if needed). No API
+key. uv downloads each schliff version once and caches it; scoring a local file
+then needs no network, while `score --url` fetches over HTTPS. Expects an
+instruction-file path for most commands; see each command's `--help`.
 
 ## Commands
 
-These run anywhere `uv` is available: no plugin, no checkout. Add `--json` to any
-of them for machine-readable output.
+These run anywhere `uv` is available: no plugin, no checkout. All except `badge`
+and `demo` accept `--json` for machine-readable output.
 
 - `uvx schliff score <file>` — score one instruction file, per-dimension breakdown
 - `uvx schliff doctor --skill-dirs <dir>` — grade every skill in a directory
@@ -98,15 +96,13 @@ and the `uvx` path above do not ship these commands:
 ## Output
 
 Produces per-dimension scores, a composite grade, and a gate-usable exit code.
-`--json` emits the same data in machine-readable form.
 
 ## Error Handling
 
-- `verify` below the threshold exits 1. The `FAIL` line and the weak dimensions
-  are on stdout, and stderr is empty.
-- Any other failure exits non-zero (1 or 2, depending on the command) and prints
-  one line to stderr that names the cause, such as `Error: file not found: …`.
-- A usage error exits 2 and prints the argparse usage block to stderr.
+- A gate result exits 1 with the finding on stdout and nothing on stderr: `verify`
+  below the threshold, or `check-commands` finding a dangling command.
+- Anything else that fails exits non-zero and says why on stderr, such as
+  `Error: file not found: …` or an argparse usage error (exit 2).
 
 ## Scope
 
@@ -121,8 +117,8 @@ behaviour testing. schliff measures — it does not write.
 - Score plateaus after the suggested fixes → then use a skill-authoring or
   writing skill; the remaining gap is content, not structure.
 - `check-commands` reports `dangling` → fix the file or the repo, re-run it.
-- Any non-zero exit → report stderr verbatim (for a `verify` miss, the stdout
-  `FAIL` line instead); it names the cause.
+- Any non-zero exit → report stderr verbatim, or for a gate result the stdout
+  finding; it names the cause.
 
 ## Resources
 
