@@ -865,39 +865,39 @@ the confirmatory scalar did not move at all.
 happen on its date; that is an operational miss recorded in #198, not an amendment to this
 document.
 
-### 2026-09-29 — an integration landing is named in advance, and Gate 1 is not changed
+### 2026-09-29 — landings are noted beside the verdict, and Gate 1 is not changed
 
 *Why this is written before D0:* Gate 1 reads `mergedAt` of the submission PR. The one in-scope
-channel does not always merge the PR it was sent. Both new outside catalog entries it gained
-between 2026-08-11 and 2026-09-28 landed through the maintainer's own PR, and the submission
-was closed unmerged:
+channel does not always merge the PR it was sent. Its `sources.yaml` history from 2026-08-11 to
+2026-09-28 shows two new outside entries, and both landed through the maintainer's own PR while
+the submitter's PR was closed unmerged. Entries added by other routes were not searched.
 
-| Source | First submission | PR that was integrated | Landing PR, `mergedAt` | Day, from first submission |
+| Source | Submission PR opened | Landing PR, `mergedAt` | Day, from that PR | Earlier submission |
 | --- | --- | --- | --- | --- |
-| skillcrossroads | PR #1080, 2026-07-17 | #1125 | #1460, `2026-09-09T00:39:38Z` | 54 |
-| HOL Guard | issue #1193, 2026-08-15 | #1314 | #1476, `2026-09-22T23:19:03Z` | 38 |
+| skillcrossroads | #1125, 2026-07-24 | #1460, `2026-09-09T00:39:38Z` | 47 | PR #1080, 2026-07-17 |
+| HOL Guard | #1314, 2026-08-24 | #1476, `2026-09-22T23:19:03Z` | 29 | issue #1193, 2026-08-15 |
 
-Days are counted in whole UTC days with the opening day as day 0, as in *The clock*. Both land
-outside a 21-day window.
+Days are whole UTC days with the PR's opening day as day 0, as in *The clock*. #1125 was closed
+after its landing PR merged. #1314 was closed before its landing PR merged.
 
-*What changes:* nothing in Gate 1, A0 or any date. A merge of schliff's own submission PR on or
-before 23:59 UTC on D0+21 remains the only GREEN. Widening the gate to count integrations was
-drafted and dropped: every precise version of that rule (catalog pickaxe, author and reference
-conditions) failed review on cases the channel really produces, such as local-path catalog
-entries, batched direct pushes and case-normalised owners. A gate rewritten the day before D0
-would be the weaker pre-registration.
+*What changes:* nothing in Gate 1, A0, Gate 2, any date, or any discretionary call in *How it
+will be judged*. A merge of schliff's own submission PR on or before 23:59 UTC on D0+21 remains
+the only GREEN. A widening that counted integrations was drafted and dropped. Every precise
+version of it failed review on cases this channel really produces, such as local-path catalog
+entries, batched direct pushes and case-normalised owners.
 
-*What is added — a label, not a route to GREEN:* if the submission PR is closed unmerged and a
-different merged PR in the same repo adds schliff to its catalog on or before D0+21, the verdict
-stays `RED-DISTRIBUTION` and is recorded as **`RED-DISTRIBUTION (integrated)`**, naming the
-landing PR and its `mergedAt`. That keeps a maintainer integration from being read as a
-rejection. It also keeps the gate from counting one. Gate 2 is then still `NOT-REACHED`.
+*What is added — a note, never a verdict:* if schliff lands in a qualified repo's catalog by any
+route and at any time, including after D0+21, that landing is recorded beside the verdict for
+that repo. The record names the evidence (a PR, commit or catalog URL) and its timestamp. The
+note never changes Gate 1, A0 or Gate 2, and it is not a discretionary call. It exists so that
+a maintainer integration is not reported as a rejection.
 
-*Expectation, recorded so neither outcome can be reinterpreted later:* both precedents took
-longer than 21 days. A `RED-DISTRIBUTION`, labelled or not, is the expected outcome, and a GREEN
-would be a surprise. E-4's 35 % base rate stands and is read against this table. A low base rate
-is not a reason to withhold the submission: submitting remains the pre-registered action, and
-`ABANDONED-UNSUBMITTED` is reserved for not submitting.
+*Expectation, recorded so neither outcome can be reinterpreted later:* both landings took longer
+than 21 days. Neither came through the submitter's own PR. E-4's 35 % base rate counts all
+outside PRs, not catalog additions. The table suggests that catalog additions merge through the
+submitter's PR less often, but two cases do not measure a rate. A `RED-DISTRIBUTION` is the
+expected outcome. A low rate is not a reason to withhold the submission: submitting remains the
+pre-registered action, and `ABANDONED-UNSUBMITTED` is reserved for not submitting.
 
 *The repo was renamed, not replaced:* `jeremylongshore/claude-code-plugins-plus-skills` is now
 `jeremylongshore/tons-of-skills-marketplace`, repository id `1073337396` under both names. Git
@@ -906,10 +906,10 @@ search on the old name returns an empty list with exit 0 for `gh pr list --searc
 from the search API. Every reading uses the new name. `distributors.md` keeps the old name as a
 historical record, and N is unchanged.
 
-*A stale table, named rather than edited:* the E-4 date table lists D0 (planned) 2026-09-18 and
-Gate 1 resolving 2026-10-09. D0 did not happen on 2026-09-18. Every derived date follows the
-actual D0 through *The clock* and is recorded in the clock table when D0 is opened. The rows are
-left as written, since they show what was planned.
+*Planned dates superseded:* D0 did not happen on its planned date, 2026-09-18. That date, and
+every date derived from it in earlier amendments (the E-4 table, *D0 stays 2026-09-18*, *A0 ≈
+09-19*), is superseded by the actual D0 through *The clock*. The actual dates go into the clock
+table when D0 is opened. The earlier text is left as written, since it shows what was planned.
 
 *Unchanged:* every date rule, threshold and window, including the abandonment deadline of 23:59
 UTC on 2026-09-30.
