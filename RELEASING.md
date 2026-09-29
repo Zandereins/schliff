@@ -16,9 +16,11 @@ Run through this list before creating a new tag. Skipping a step has burned us b
 10. **No web surfaces to redeploy.** The playground, the leaderboard and the hosted
     badge endpoint were retired on 2026-08-04 (see `docs/adr/0008-retire-hosted-surfaces.md`).
     Their code and tests stay in the tree, but nothing is deployed and no engine pin
-    needs to move with a release. There are **six** version surfaces, not eight:
+    needs to move with a release. There are **seven** version surfaces:
     `pyproject.toml`, `.claude-plugin/plugin.json`, `skills/schliff/__init__.py`,
-    the README references, `docs/README.md`, and the git tag.
+    the `version:` field and the `uvx schliff@X.Y.Z` pin in `skills/schliff/SKILL.md`
+    (the marketplace mirror requires the field; `test_version_consistency.py` guards
+    both), the README references, `docs/README.md`, and the git tag.
 11. **Re-point the `v1` float tag** to the release commit (`git tag -f v1 <sha> && git push origin v1 --force`).
 12. **Post-release:** close milestone, update memory entries that reference version.
 

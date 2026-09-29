@@ -1,4 +1,4 @@
-"""Fail on version drift across the three places a version is declared."""
+"""Fail on version drift across the places a version is declared."""
 import json
 import re
 from pathlib import Path
@@ -22,15 +22,29 @@ def _package_version() -> str:
     return schliff.__version__
 
 
+def _skill_version() -> str:
+    text = (ROOT / "skills" / "schliff" / "SKILL.md").read_text(encoding="utf-8")
+    frontmatter = text.split("\n---\n", 1)[0]
+    return re.search(r"^version:\s*(\S+)\s*$", frontmatter, re.MULTILINE).group(1)
+
+
+def test_skill_md_pins_the_current_version():
+    """A pinned `uvx schliff@X.Y.Z` in SKILL.md must name this release (it once said 8.8.2 at 8.12.0)."""
+    text = (ROOT / "skills" / "schliff" / "SKILL.md").read_text(encoding="utf-8")
+    pins = re.findall(r"schliff@(\d+\.\d+\.\d+)", text)
+    assert pins, "SKILL.md no longer pins a version; drop this test only if that is intended"
+    assert set(pins) == {_package_version()}, f"stale pin(s) in SKILL.md: {sorted(set(pins))}"
+
+
 def _cli_reported_version() -> str:
     import cli  # scripts/ is on sys.path via conftest
     return cli._resolve_version()
 
 
 def test_all_versions_match():
-    assert _pyproject_version() == _plugin_version() == _package_version(), (
-        f"version drift: pyproject={_pyproject_version()} "
-        f"plugin={_plugin_version()} package={_package_version()}"
+    assert _pyproject_version() == _plugin_version() == _package_version() == _skill_version(), (
+        f"version drift: pyproject={_pyproject_version()} plugin={_plugin_version()} "
+        f"package={_package_version()} skill={_skill_version()}"
     )
 
 

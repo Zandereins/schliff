@@ -13,12 +13,25 @@ description: >
   explicit instructions. Do NOT use for authoring a file from scratch — use a
   skill-creator first, then schliff. Do NOT use for application-code linting,
   SQL tuning, or runtime behaviour testing.
+version: 8.12.0
+license: MIT
+author: Zandereins
+tags: [linter, scoring, skill-md, agents-md, ci]
+compatibility: Requires uv (for uvx) and Python >= 3.10. No API key, no network while scoring.
+allowed-tools: Bash(uvx schliff:*)
 ---
 
 # schliff — deterministic instruction-file linter
 
+## Overview
+
 Zero install, no API key, no model in the loop — the same bytes score the same
 everywhere.
+
+## Prerequisites
+
+`uv` on PATH (it provides `uvx`) and Python >= 3.10. Nothing else: schliff has
+zero runtime dependencies and needs no API key.
 
 ## Commands
 
@@ -34,7 +47,7 @@ of them for machine-readable output.
 - `uvx schliff compare <a> <b>` — two files side by side
 - `uvx schliff demo` — score a built-in bad skill to see the output shape
 
-Pin the version in CI: `uvx schliff@8.8.2 verify <file> --min-score 75`.
+Pin the version in CI: `uvx schliff@8.12.0 verify <file> --min-score 75`.
 
 ## Examples
 
@@ -77,11 +90,17 @@ Only inside a Claude Code plugin install — unavailable on the `uvx` path above
 `/schliff:eval` · `/schliff:report` · `/schliff:mesh` · `/schliff:triage` ·
 `/schliff:auto`
 
-## Contract
+## Output
 
 Expects one instruction-file path, or `--skill-dirs <dir>` for `doctor`. Produces
-per-dimension scores, a composite grade, and a gate-usable exit code. Errors go
-to stderr as one line with a non-zero exit.
+per-dimension scores, a composite grade, and a gate-usable exit code. `--json`
+emits the same data in machine-readable form.
+
+## Error Handling
+
+Errors go to stderr as one line with a non-zero exit. `verify` exits 1 below the
+threshold. A command that cannot be resolved is reported `unknown`, never as a
+defect.
 
 ## Scope
 
@@ -97,3 +116,9 @@ behaviour testing. schliff measures — it does not write.
   writing skill; the remaining gap is content, not structure.
 - `check-commands` reports `dangling` → fix the file or the repo, re-run it.
 - Any non-zero exit → report the stderr line verbatim; it names the cause.
+
+## Resources
+
+- [Scoring methodology](https://github.com/Zandereins/schliff/blob/main/docs/SCORING.md)
+- [Source and issues](https://github.com/Zandereins/schliff)
+- [PyPI package](https://pypi.org/project/schliff/)
