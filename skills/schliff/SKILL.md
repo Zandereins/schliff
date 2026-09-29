@@ -17,8 +17,8 @@ version: 8.12.0
 license: MIT
 author: Zandereins
 tags: [linter, scoring, skill-md, agents-md, ci]
-compatibility: Requires uv (for uvx) and Python >= 3.10. No API key, no network while scoring.
-allowed-tools: Bash(uvx schliff:*)
+compatibility: Requires uv (for uvx); uv provisions Python >= 3.10 if none is present. No API key, no network while scoring.
+allowed-tools: Bash(uvx schliff *), Bash(uvx schliff@*)
 ---
 
 # schliff — deterministic instruction-file linter
@@ -30,8 +30,10 @@ everywhere.
 
 ## Prerequisites
 
-`uv` on PATH (it provides `uvx`) and Python >= 3.10. Nothing else: schliff has
-zero runtime dependencies and needs no API key.
+`uv` on PATH (it provides `uvx`); uv provisions Python >= 3.10 itself if the
+machine has none. Nothing else: schliff has zero runtime dependencies and needs
+no API key. Expects one instruction-file path, or `--skill-dirs <dir>` for
+`doctor`.
 
 ## Commands
 
@@ -94,15 +96,12 @@ and the `uvx` path above do not ship these commands:
 
 ## Output
 
-Expects one instruction-file path, or `--skill-dirs <dir>` for `doctor`. Produces
-per-dimension scores, a composite grade, and a gate-usable exit code. `--json`
-emits the same data in machine-readable form.
+Produces per-dimension scores, a composite grade, and a gate-usable exit code.
+`--json` emits the same data in machine-readable form.
 
 ## Error Handling
 
-Errors go to stderr as one line with a non-zero exit. `verify` exits 1 below the
-threshold. A command that cannot be resolved is reported `unknown`, never as a
-defect.
+Errors go to stderr as one line with a non-zero exit.
 
 ## Scope
 

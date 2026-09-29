@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]  # unit→tests→schliff→skills→repo root
+SKILL_MD = ROOT / "skills" / "schliff" / "SKILL.md"
 
 
 def _pyproject_version() -> str:
@@ -23,17 +24,10 @@ def _package_version() -> str:
 
 
 def _skill_version() -> str:
-    text = (ROOT / "skills" / "schliff" / "SKILL.md").read_text(encoding="utf-8")
-    frontmatter = text.split("\n---\n", 1)[0]
-    return re.search(r"^version:\s*(\S+)\s*$", frontmatter, re.MULTILINE).group(1)
-
-
-def test_skill_md_pins_the_current_version():
-    """A pinned `uvx schliff@X.Y.Z` in SKILL.md must name this release (it once said 8.8.2 at 8.12.0)."""
-    text = (ROOT / "skills" / "schliff" / "SKILL.md").read_text(encoding="utf-8")
-    pins = re.findall(r"schliff@(\d+\.\d+\.\d+)", text)
-    assert pins, "SKILL.md no longer pins a version; drop this test only if that is intended"
-    assert set(pins) == {_package_version()}, f"stale pin(s) in SKILL.md: {sorted(set(pins))}"
+    frontmatter = SKILL_MD.read_text(encoding="utf-8").split("\n---\n", 1)[0]
+    match = re.search(r"^version:[ \t]*[\"']?([^\s\"']+)[\"']?[ \t]*$", frontmatter, re.MULTILINE)
+    assert match, f"{SKILL_MD} frontmatter has no version: field"
+    return match.group(1)
 
 
 def _cli_reported_version() -> str:
@@ -46,6 +40,14 @@ def test_all_versions_match():
         f"version drift: pyproject={_pyproject_version()} plugin={_plugin_version()} "
         f"package={_package_version()} skill={_skill_version()}"
     )
+
+
+def test_skill_md_pins_the_current_version():
+    """Every `schliff@X` / `schliff==X` pin in SKILL.md must name this release (it once said 8.8.2 at 8.12.0)."""
+    text = SKILL_MD.read_text(encoding="utf-8")
+    pins = [pin.rstrip(".") for pin in re.findall(r"schliff(?:@|==)([0-9][0-9A-Za-z.+-]*)", text)]
+    assert pins, "SKILL.md no longer pins a version; drop this test only if that is intended"
+    assert set(pins) == {_package_version()}, f"stale pin(s) in SKILL.md: {sorted(set(pins))}"
 
 
 def test_reported_version_describes_the_loaded_code_not_the_installed_dist(monkeypatch):
