@@ -85,7 +85,9 @@ reported `unknown`, never as a defect.
 
 ## If the schliff plugin is installed
 
-Only inside a Claude Code plugin install — unavailable on the `uvx` path above:
+Only with the full plugin from schliff's own marketplace (`/plugin marketplace add
+Zandereins/schliff`, then `/plugin install schliff@schliff`). A skill-only mirror
+and the `uvx` path above do not ship these commands:
 `/schliff:analyze` · `/schliff:doctor` · `/schliff:init` · `/schliff:bench` ·
 `/schliff:eval` · `/schliff:report` · `/schliff:mesh` · `/schliff:triage` ·
 `/schliff:auto`
