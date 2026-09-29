@@ -57,8 +57,8 @@ The clock is not "when Franz decides to start" — it is an event with a public 
 
 | Field | Value |
 | --- | --- |
-| D0 (first submission PR opened, UTC) | *not yet submitted — record here when it happens* |
-| First submission PR URL | *not yet submitted* |
+| D0 (first submission PR opened, UTC) | **2026-09-29** (`createdAt` `2026-09-29T18:31:59Z`) |
+| First submission PR URL | <https://github.com/jeremylongshore/tons-of-skills-marketplace/pull/1588> (submission issue #1587) |
 | Second submission PR URL (if any) | *not yet submitted* |
 
 **Precondition on opening it at all** *(amended 2026-08-20 — see [Amendments](#amendments))*: no
