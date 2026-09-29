@@ -1,4 +1,4 @@
-"""Fail on version drift across the places a version is declared."""
+"""Fail on version drift across the three places a version is declared."""
 import json
 import re
 from pathlib import Path
@@ -23,30 +23,27 @@ def _package_version() -> str:
     return schliff.__version__
 
 
-def _skill_version() -> str:
-    import manifest  # the frontmatter parser doctor reads with; scripts/ is on sys.path via conftest
-
-    version = manifest.parse_frontmatter(SKILL_MD).get("version")
-    assert version, f"no version in {SKILL_MD} frontmatter (field missing, or frontmatter unreadable)"
-    return str(version)
-
-
 def _cli_reported_version() -> str:
     import cli  # scripts/ is on sys.path via conftest
     return cli._resolve_version()
 
 
 def test_all_versions_match():
-    assert _pyproject_version() == _plugin_version() == _package_version() == _skill_version(), (
-        f"version drift: pyproject={_pyproject_version()} plugin={_plugin_version()} "
-        f"package={_package_version()} skill={_skill_version()}"
+    assert _pyproject_version() == _plugin_version() == _package_version(), (
+        f"version drift: pyproject={_pyproject_version()} "
+        f"plugin={_plugin_version()} package={_package_version()}"
     )
 
 
 def test_skill_md_pins_the_current_version():
-    """Every `schliff@X` / `schliff==X` pin in SKILL.md must name this release (it once said 8.8.2 at 8.12.0)."""
+    """Every `schliff@X` / `schliff==X` pin in SKILL.md, allowed-tools included, names this release.
+
+    SKILL.md once told users to pin 8.8.2 while 8.12.0 was released. The lookbehind skips
+    `Zandereins/schliff@v1`, the GitHub Action's float tag.
+    """
     text = SKILL_MD.read_text(encoding="utf-8")
-    pins = [pin.rstrip(".") for pin in re.findall(r"schliff(?:@v?|[=~]=v?)([0-9][0-9A-Za-z.+-]*)", text)]
+    pattern = r"(?<![\w/])schliff(?:@v?|[=~]=v?)([0-9][0-9A-Za-z.+-]*)"
+    pins = [pin.rstrip(".") for pin in re.findall(pattern, text)]
     assert pins, "SKILL.md no longer pins a version; drop this test only if that is intended"
     assert set(pins) == {_package_version()}, f"stale pin(s) in SKILL.md: {sorted(set(pins))}"
 

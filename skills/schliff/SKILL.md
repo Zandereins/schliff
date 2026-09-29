@@ -13,26 +13,21 @@ description: >
   explicit instructions. Do NOT use for authoring a file from scratch — use a
   skill-creator first, then schliff. Do NOT use for application-code linting,
   SQL tuning, or runtime behaviour testing.
-version: 8.12.0
 license: MIT
-author: Zandereins
-tags: [linter, scoring, skill-md, agents-md, ci]
-compatibility: Requires uv (for uvx). See Prerequisites.
-allowed-tools: Bash(uvx schliff *), Bash(uvx schliff@*)
+compatibility: Requires uv, which provides uvx.
+allowed-tools: Bash(uvx schliff@8.12.0 *)
 ---
 
 # schliff — deterministic instruction-file linter
 
 ## Overview
 
-No model in the loop: the same bytes score the same everywhere.
+Scores one instruction file per dimension and turns that score into a CI gate.
 
 ## Prerequisites
 
-`uv` on PATH (it provides `uvx`, and fetches Python >= 3.10 if needed). No API
-key. uv downloads each schliff version once and caches it; scoring a local file
-then needs no network, while `score --url` fetches over HTTPS. Expects an
-instruction-file path for most commands; see each command's `--help`.
+`uv` on PATH (it provides `uvx`). No API key. Expects an instruction-file path
+for most commands; see each command's `--help`.
 
 ## Commands
 

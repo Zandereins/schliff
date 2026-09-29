@@ -66,7 +66,7 @@ wiring is broken — check `SCORER_REGISTRY["agents.md"]`.
 
 - **Never run blanket `ruff --fix`** on existing modules: F401 "unused" imports in `skills/schliff/scripts/` are real re-exports — removing them breaks the CLI (23 tests). Fix only files you authored.
 - **Never lint or reformat scorer input** — `benchmarks/`, `demo/`, test fixtures and the corpora are controlled inputs whose scores are asserted; `.markdownlint-cli2.jsonc` excludes them for that reason.
-- The version lives in **lockstep sources** gated by `test_version_consistency.py`: `pyproject.toml`, `.claude-plugin/plugin.json`, `skills/schliff/__init__.py`, and the `version:` field plus the `uvx schliff@X.Y.Z` pin in `skills/schliff/SKILL.md`. Bump them together.
+- The version lives in **three lockstep sources** (`pyproject.toml`, `.claude-plugin/plugin.json`, `skills/schliff/__init__.py`), gated by `test_version_consistency.py`. Bump all three together.
 - Changing any scorer re-baselines the corpus golden tests (`test_agents_md_profile.py` pins mean/median/band counts on 30 real files). Re-derive the numbers from the engine — never hand-tweak them.
 - `playground/public/index.html` has its inline `<script>` pinned by a CSP `sha256-…` hash in `playground/vercel.json`. Any edit to the inline script requires recomputing the hash, or the deployed page breaks silently.
 - Playground deploys are manual (`cd playground && vercel --prod`); the committed `playground/uv.lock` is the deploy source of truth. A daily drift workflow asserts live engine == pinned version.

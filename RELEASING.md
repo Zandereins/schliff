@@ -4,8 +4,7 @@
 
 Run through this list before creating a new tag. Skipping a step has burned us before (see v7.1.1 badge hotfix).
 
-1. **Bump the version on every surface listed in step 10.** `test_version_consistency.py`
-   fails on drift in the code and SKILL.md ones.
+1. **Bump version in `pyproject.toml`** (single source of truth).
 2. **Verify `install.sh` VERSION** — it reads `pyproject.toml` dynamically; run `bash install.sh --help` and confirm.
 3. **Update `CHANGELOG.md`** — use Keep-a-Changelog format, include date.
 4. **Bump README PyPI badge cache-bust** — update `?v=X.Y.Z` query param in the PyPI version badge URL (GitHub camo caches for 3h).
@@ -19,9 +18,9 @@ Run through this list before creating a new tag. Skipping a step has burned us b
     Their code and tests stay in the tree, but nothing is deployed and no engine pin
     needs to move with a release. The version surfaces are:
     `pyproject.toml`, `.claude-plugin/plugin.json`, `skills/schliff/__init__.py`,
-    the `version:` field and the `uvx schliff@X.Y.Z` pin in `skills/schliff/SKILL.md`
-    (the marketplace mirror requires the field; `test_version_consistency.py` guards
-    both), the README references, `docs/README.md`, and the git tag.
+    the README references, `docs/README.md`, and the git tag. The `uvx schliff@X.Y.Z`
+    pins in `skills/schliff/SKILL.md` (Commands and `allowed-tools`) move too;
+    `test_version_consistency.py` fails until they do.
 11. **Re-point the `v1` float tag** to the release commit (`git tag -f v1 <sha> && git push origin v1 --force`).
 12. **Post-release:** close milestone, update memory entries that reference version.
 
