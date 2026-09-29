@@ -423,6 +423,7 @@ against the same artifacts, on the stated dates:
 
 - Gate 1: `gh pr view <submission-PR-URL> --json createdAt,mergedAt,state` against each of the two
   qualified repos, checking `mergedAt` against 23:59 UTC on D0+21 as fixed in *The clock* above.
+  The landing note of the 2026-09-29 amendment is written beside this verdict and never changes it.
   No other repo counts toward N, regardless of how promising it looks once visited — the qualified
   list is fixed by `distributors.md` and is not expanded after Gate 1 opens. The verdict names the
   per-repo outcome and the in-scope/out-of-scope split, never a bare fraction of 2.
@@ -867,8 +868,8 @@ document.
 
 ### 2026-09-29 — landings are noted beside the verdict, and Gate 1 is not changed
 
-*Why:* Gate 1 reads `mergedAt` of the submission PR. The one in-scope channel does not always
-merge the PR it was sent. Its `sources.yaml` history from 2026-08-11 to 2026-09-28 shows two new
+*Why:* Gate 1 reads `mergedAt` of the submission PR. In the one in-scope channel, neither of the
+two observed submitter PRs was merged. Its `sources.yaml` history from 2026-08-11 to 2026-09-28 shows two new
 outside entries. Both landed through the maintainer's own PR, and the submitter's PR was closed
 unmerged. Other routes into the catalog were not searched.
 
@@ -877,21 +878,24 @@ unmerged. Other routes into the catalog were not searched.
 | skillcrossroads | #1125, 2026-07-24 | #1460, `2026-09-09T00:39:38Z` | 47 | PR #1080, 2026-07-17 |
 | HOL Guard | #1314, 2026-08-24 | #1476, `2026-09-22T23:19:03Z` | 29 | issue #1193, 2026-08-15 |
 
-Days are counted as in *The clock*. #1125 was closed after its landing PR merged. #1314 was
-closed on its day 21, while #1476 was open and not yet merged.
+Days are whole UTC days, with the opening day of the named submission PR as day 0. Counted from
+the earlier submission, skillcrossroads took 54 days and HOL Guard 38. #1125 was closed after
+its landing PR merged. #1314 was closed on its day 21, while #1476 was open and not yet merged.
 
 *The rule:* Gate 1, A0, Gate 2 and every pre-registered date and threshold are unchanged. When
 the Gate 1 verdict is written, and once more at 23:59 UTC on D0+60, a note is added for each
 qualified repo. The note records whether schliff is in that repo's catalog on its default branch
 (`sources.yaml`, `.claude-plugin/marketplace*.json`), and whether an open PR there would add it.
-Each item names its URL and timestamp. For a merged PR the timestamp is `mergedAt`. Otherwise it
-is the commit's committer date in UTC. The note never changes a verdict. It exists so that a
+Each item names its URL and timestamp: `mergedAt` for a merged PR, `createdAt` for an open one,
+and otherwise the commit's committer date in UTC. The note never changes a verdict or its
+label, including E-4's censored label. The collector keeps running at least until D0+60, so a
+landing's traffic is on record, though it is not read as Gate 2. It exists so that a
 maintainer integration, landed or pending, is not reported as a rejection. A widening that
 counted integrations as GREEN was drafted and dropped: every precise version of it failed
 review on cases this channel really produces.
 
-*Expectation:* both landings took longer than 21 days. A `RED-DISTRIBUTION` is the expected
-outcome. That is not a reason to withhold the submission. Submitting remains the pre-registered
+*Expectation:* 0 of the 2 observed submitter PRs merged, and both landings took longer than
+21 days. A `RED-DISTRIBUTION` is the expected outcome. That is not a reason to withhold the submission. Submitting remains the pre-registered
 action, and `ABANDONED-UNSUBMITTED` is reserved for not submitting.
 
 *Rename:* `jeremylongshore/claude-code-plugins-plus-skills`, the qualified repo in
@@ -903,5 +907,6 @@ API. Every reading uses the new name.
 
 *Planning dates:* D0 did not happen on its planned date, 2026-09-18. That date, and the dates
 derived from it (*D0 stays 2026-09-18*, *A0 ≈ 09-19*, and the two dated rows of the table under
-"Dates after 2026-09-30"), were planning values. D0 is an event, set by *The clock*. The fixed dates named in the Amendments
-preamble are unaffected, including the abandonment deadline of 23:59 UTC on 2026-09-30.
+"Dates after 2026-09-30"), were planning values. D0 is an event, set by *The clock*. The fixed
+dates named in the Amendments preamble are unaffected, including the abandonment deadline of
+23:59 UTC on 2026-09-30.

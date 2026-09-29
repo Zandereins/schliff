@@ -1,5 +1,9 @@
 # Qualified distributors — plugin-channel experiment
 
+> **Renamed 2026-09:** `jeremylongshore/claude-code-plugins-plus-skills` is now
+> `jeremylongshore/tons-of-skills-marketplace` (same repository id `1073337396`). GitHub search does
+> not follow the old name, so every reading uses the new one. See the spec's 2026-09-29 amendment.
+
 Measured 2026-08-11. Establishes N for Gate 1 of
 `docs/specs/2026-08-11-plugin-channel-experiment.md`.
 
