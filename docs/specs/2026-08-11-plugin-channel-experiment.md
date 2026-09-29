@@ -422,7 +422,9 @@ The repository owner judges both gates by running the same commands anyone else 
 against the same artifacts, on the stated dates:
 
 - Gate 1: `gh pr view <submission-PR-URL> --json createdAt,mergedAt,state` against each of the two
-  qualified repos, checking `mergedAt` against 23:59 UTC on D0+21 as fixed in *The clock* above.
+  qualified repos, checking `mergedAt` against 23:59 UTC on D0+21 as fixed in *The clock* above
+  — or, if the submission PR was closed, the integration PR that qualifies under
+  [the 2026-09-29 amendment](#2026-09-29--gate-1-counts-a-maintainers-integration-merge-written-before-d0).
   No other repo counts toward N, regardless of how promising it looks once visited — the qualified
   list is fixed by `distributors.md` and is not expanded after Gate 1 opens. The verdict names the
   per-repo outcome and the in-scope/out-of-scope split, never a bare fraction of 2.
@@ -567,6 +569,14 @@ Gate 2 data existed, and it removes a route to GREEN rather than adding one — 
 changed") was accurate when written and is corrected here rather than quietly deleted, per the
 `distributors.md` precedent stated above. See
 [the 2026-08-25 amendment](#2026-08-25--four-measurement-defects-named-dates-after-2026-09-30-fixed-and-one-gate-narrowed).
+
+**One gate criterion HAS been widened, on 2026-09-29, before D0:** Gate 1 also counts a merge
+that lands the submission through a maintainer's own integration PR, because that is how the one
+in-scope channel was measured to accept outside work. Unlike the 2026-08-25 change, this one
+**adds** a route to GREEN, so it is stated here with its direction rather than left for the
+reader to infer. It was written before any submission existed and before any Gate 1 data
+existed. See
+[the 2026-09-29 amendment](#2026-09-29--gate-1-counts-a-maintainers-integration-merge-written-before-d0).
 
 One *operating* threshold did change, and saying "no threshold changed" would have hidden it:
 the collector's cadence floor went from 14 days to 12 on 2026-08-21. It governs how the
@@ -864,3 +874,49 @@ the confirmatory scalar did not move at all.
 *Unchanged:* every threshold and date. Step 2 of #198 (release 8.12.0, 2026-09-14) did not
 happen on its date; that is an operational miss recorded in #198, not an amendment to this
 document.
+
+### 2026-09-29 — Gate 1 counts a maintainer's integration merge, written before D0
+
+*The defect:* Gate 1 and A0 read `mergedAt` of the submission PR itself (*The clock*, and
+*How it will be judged*). The one in-scope channel does not always merge outside PRs. Its closest
+precedent to schliff, `skillcrossroads` (another skill grader), was submitted as #1125, opened
+`2026-07-24T05:33:18Z`, and **closed unmerged** on `2026-09-09T22:54:03Z`; its content landed
+through the maintainer's own PR #1460, "integrate SkillCrossroads contribution (#1125)", merged
+`2026-09-09T00:39:38Z` by `jeremylongshore`. Under the original wording that acceptance reads as a
+non-merge. The gate would have scored the channel's actual acceptance path as `RED-DISTRIBUTION`.
+
+*The rule:* a submission also counts as merged under Gate 1 when a PR in the same qualified repo
+meets **all three** of these:
+
+1. It is merged, and its author is that repo's owner or a maintainer, not the submitter.
+2. Its title or body names the submission PR by number (`#N`) or by URL.
+3. Its diff adds schliff to the catalog, meaning a `sources.yaml` entry or a plugin directory
+   whose mirrored content comes from `Zandereins/schliff`.
+
+That PR's `mergedAt` is the merge time. It is checked against 23:59 UTC on D0+21 like any other,
+and it sets A0 for Gate 2. A PR that meets only some of the three does not count. Neither does a
+listing that appears without referencing the submission, because nothing then ties it to the
+intervention.
+
+*Direction, stated plainly:* this widens Gate 1. It is a correction of the instrument to the
+channel's measured behaviour, not a softening chosen after seeing a result. No submission PR
+exists on the date of this amendment, so no Gate 1 datum can have informed it.
+
+*Expectation, recorded before D0 so neither verdict can be reinterpreted later:* the precedent
+took **47 days** from submission to integration, against a 21-day window. Since the channel
+qualified on 2026-08-11, merged outside work has also thinned: of 335 PRs merged there from
+2026-08-11 to 2026-09-28, 3 came from non-owner, non-bot authors (`FaintFlower`, `samuelbushi`,
+`sgharlow`), against 15 distinct authors in the 90-day qualification window. A `RED-DISTRIBUTION`
+is therefore the expected outcome and is not a surprise. A GREEN would be one. These figures sit
+beside E-4's 35 % base rate (2026-08-25 amendment) and do not replace it. E-4 counted `mergedAt` of
+the outside PRs themselves, so it inherits the defect named above and undercounts acceptances.
+A low base rate is not a reason to withhold the submission. Submitting remains the pre-registered
+action, and `ABANDONED-UNSUBMITTED` is reserved for not submitting.
+
+*The repo was renamed, not replaced:* `jeremylongshore/claude-code-plugins-plus-skills` is now
+`jeremylongshore/tons-of-skills-marketplace`. Both names resolve to repository id `1073337396`.
+The qualified list in `distributors.md` still names it by its old name, and the old name
+redirects. N and the qualified list are unchanged.
+
+*Unchanged:* every date, threshold and window, including the abandonment deadline of 23:59 UTC
+on 2026-09-30.
