@@ -17,7 +17,7 @@ version: 8.12.0
 license: MIT
 author: Zandereins
 tags: [linter, scoring, skill-md, agents-md, ci]
-compatibility: Requires uv (for uvx); uv provisions Python >= 3.10 if none is present. No API key, no network while scoring.
+compatibility: Requires uv (for uvx); uv provisions Python >= 3.10 if none is present. No API key. Scoring a local file needs no network; the first uvx run fetches the package from PyPI.
 allowed-tools: Bash(uvx schliff *), Bash(uvx schliff@*)
 ---
 
@@ -25,15 +25,16 @@ allowed-tools: Bash(uvx schliff *), Bash(uvx schliff@*)
 
 ## Overview
 
-Zero install, no API key, no model in the loop — the same bytes score the same
+No install step beyond `uv`, no API key, no model in the loop — the same bytes score the same
 everywhere.
 
 ## Prerequisites
 
 `uv` on PATH (it provides `uvx`); uv provisions Python >= 3.10 itself if the
-machine has none. Nothing else: schliff has zero runtime dependencies and needs
-no API key. Expects one instruction-file path, or `--skill-dirs <dir>` for
-`doctor`.
+machine has none. The first `uvx` run downloads schliff from PyPI; after that a
+local file scores offline (`score --url` fetches over HTTPS). No API key, no
+runtime dependencies. Expects one instruction-file path for most commands;
+`compare` takes two, `doctor` takes `--skill-dirs <dir>`, and `demo` takes none.
 
 ## Commands
 
@@ -101,7 +102,11 @@ Produces per-dimension scores, a composite grade, and a gate-usable exit code.
 
 ## Error Handling
 
-Errors go to stderr as one line with a non-zero exit.
+- `verify` below the threshold exits 1. The `FAIL` line and the weak dimensions
+  are on stdout, and stderr is empty.
+- Any other failure exits non-zero (1 or 2, depending on the command) and prints
+  one line to stderr that names the cause, such as `Error: file not found: …`.
+- A usage error exits 2 and prints the argparse usage block to stderr.
 
 ## Scope
 
@@ -116,7 +121,8 @@ behaviour testing. schliff measures — it does not write.
 - Score plateaus after the suggested fixes → then use a skill-authoring or
   writing skill; the remaining gap is content, not structure.
 - `check-commands` reports `dangling` → fix the file or the repo, re-run it.
-- Any non-zero exit → report the stderr line verbatim; it names the cause.
+- Any non-zero exit → report stderr verbatim (for a `verify` miss, the stdout
+  `FAIL` line instead); it names the cause.
 
 ## Resources
 

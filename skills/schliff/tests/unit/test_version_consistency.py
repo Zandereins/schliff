@@ -24,10 +24,11 @@ def _package_version() -> str:
 
 
 def _skill_version() -> str:
-    frontmatter = SKILL_MD.read_text(encoding="utf-8").split("\n---\n", 1)[0]
-    match = re.search(r"^version:[ \t]*[\"']?([^\s\"']+)[\"']?[ \t]*$", frontmatter, re.MULTILINE)
-    assert match, f"{SKILL_MD} frontmatter has no version: field"
-    return match.group(1)
+    import manifest  # the frontmatter parser doctor reads with; scripts/ is on sys.path via conftest
+
+    version = manifest.parse_frontmatter(SKILL_MD).get("version")
+    assert version, f"{SKILL_MD} frontmatter has no version: field"
+    return str(version).strip("\"'")
 
 
 def _cli_reported_version() -> str:
