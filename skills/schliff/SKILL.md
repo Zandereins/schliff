@@ -13,17 +13,26 @@ description: >
   explicit instructions. Do NOT use for authoring a file from scratch — use a
   skill-creator first, then schliff. Do NOT use for application-code linting,
   SQL tuning, or runtime behaviour testing.
+license: MIT
+compatibility: Requires uv, which provides uvx.
+allowed-tools: Bash(uvx schliff *), Bash(uvx schliff@8.12.0 *)
 ---
 
 # schliff — deterministic instruction-file linter
 
-Zero install, no API key, no model in the loop — the same bytes score the same
-everywhere.
+## Overview
+
+Scores one instruction file per dimension and turns that score into a CI gate.
+
+## Prerequisites
+
+`uv` on PATH (it provides `uvx`). No API key. Expects an instruction-file path
+for most commands; see each command's `--help`.
 
 ## Commands
 
-These run anywhere `uv` is available: no plugin, no checkout. Add `--json` to any
-of them for machine-readable output.
+These run anywhere `uv` is available: no plugin, no checkout. All except `badge`
+and `demo` accept `--json` for machine-readable output.
 
 - `uvx schliff score <file>` — score one instruction file, per-dimension breakdown
 - `uvx schliff doctor --skill-dirs <dir>` — grade every skill in a directory
@@ -34,7 +43,7 @@ of them for machine-readable output.
 - `uvx schliff compare <a> <b>` — two files side by side
 - `uvx schliff demo` — score a built-in bad skill to see the output shape
 
-Pin the version in CI: `uvx schliff@8.8.2 verify <file> --min-score 75`.
+Pin the version in CI: `uvx schliff@8.12.0 verify <file> --min-score 75`.
 
 ## Examples
 
@@ -72,16 +81,23 @@ reported `unknown`, never as a defect.
 
 ## If the schliff plugin is installed
 
-Only inside a Claude Code plugin install — unavailable on the `uvx` path above:
+Only with the full plugin from schliff's own marketplace (`/plugin marketplace add
+Zandereins/schliff`, then `/plugin install schliff@schliff`). A skill-only mirror
+and the `uvx` path above do not ship these commands, which also need `python3` >= 3.10:
 `/schliff:analyze` · `/schliff:doctor` · `/schliff:init` · `/schliff:bench` ·
 `/schliff:eval` · `/schliff:report` · `/schliff:mesh` · `/schliff:triage` ·
 `/schliff:auto`
 
-## Contract
+## Output
 
-Expects one instruction-file path, or `--skill-dirs <dir>` for `doctor`. Produces
-per-dimension scores, a composite grade, and a gate-usable exit code. Errors go
-to stderr as one line with a non-zero exit.
+Produces per-dimension scores, a composite grade, and a gate-usable exit code.
+
+## Error Handling
+
+A gate result exits 1 with the finding on stdout: `verify` below the threshold or
+with `--regression`, and `check-commands` finding a dangling command. Other
+failures exit 1 or 2, depending on the command, and print the cause on stdout or
+stderr.
 
 ## Scope
 
@@ -96,4 +112,11 @@ behaviour testing. schliff measures — it does not write.
 - Score plateaus after the suggested fixes → then use a skill-authoring or
   writing skill; the remaining gap is content, not structure.
 - `check-commands` reports `dangling` → fix the file or the repo, re-run it.
-- Any non-zero exit → report the stderr line verbatim; it names the cause.
+- Any non-zero exit → report stdout and stderr verbatim; one of them names the
+  cause.
+
+## Resources
+
+- [Scoring methodology](https://github.com/Zandereins/schliff/blob/main/docs/SCORING.md)
+- [Source and issues](https://github.com/Zandereins/schliff)
+- [PyPI package](https://pypi.org/project/schliff/)

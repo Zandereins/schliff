@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]  # unit→tests→schliff→skills→repo root
+SKILL_MD = ROOT / "skills" / "schliff" / "SKILL.md"
 
 
 def _pyproject_version() -> str:
@@ -32,6 +33,20 @@ def test_all_versions_match():
         f"version drift: pyproject={_pyproject_version()} "
         f"plugin={_plugin_version()} package={_package_version()}"
     )
+
+
+def test_skill_md_pins_the_current_version():
+    """Every exact `schliff` version pin in SKILL.md, allowed-tools included, names this release.
+
+    SKILL.md once told users to pin 8.8.2 while 8.12.0 was released. Covers `@`, `@v`, `==`,
+    `===`, `~=` and extras (`schliff[judge]==`). A pin needs a dotted version, so the
+    GitHub Action's float tag `Zandereins/schliff@v1` is not one.
+    """
+    text = SKILL_MD.read_text(encoding="utf-8")
+    pattern = r"schliff(?:\[[^\]]*\])?(?:@v?|===?v?|~=v?)([0-9]+\.[0-9][0-9A-Za-z.+-]*)"
+    pins = [pin.rstrip(".") for pin in re.findall(pattern, text)]
+    assert pins, "SKILL.md no longer pins a version; drop this test only if that is intended"
+    assert set(pins) == {_package_version()}, f"stale pin(s) in SKILL.md: {sorted(set(pins))}"
 
 
 def test_reported_version_describes_the_loaded_code_not_the_installed_dist(monkeypatch):
