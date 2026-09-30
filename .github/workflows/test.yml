@@ -119,7 +119,9 @@ jobs:
       # gate can still see the defect class on THIS runner right now. Loaded
       # runners make it red in about one attempt in six (7 of 41, 2026-09-15 to
       # 09-29) without any change in the code under test, so it runs as a
-      # non-blocking monitor in gate-power.yml. The gate itself stays here.
+      # non-blocking monitor in gate-power.yml. The gate itself stays here, and so
+      # does a deterministic check of its logic (virtual clock). The exact form of
+      # this line is pinned by test_gate_power_wiring.py.
       - name: Run unit tests
         working-directory: skills/schliff
         run: python3 -m pytest tests/unit/ -m "not gate_power" -v

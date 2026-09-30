@@ -15,11 +15,15 @@ The ratio is therefore CALIBRATED: divided by the ratio of a known-linear scan o
 the same input, measured in the same process, so runner speed divides out. On that
 scale healthy patterns measure ~1.05 (max 1.08) and the defect class 2.05-2.28 idle,
 and the threshold is 1.5x — see `_MAX_RATIO`. An absolute floor still applies. A
-loaded runner can make one reading of the defect class dip under the threshold. The
-gate needs three readings in a row, so it was never red in the CI record; its
-self-check takes one reading and was red in 7 of 41 attempts (2026-09-15 to 09-29).
-That self-check is marked `gate_power` and runs as a non-blocking monitor in
-`gate-power.yml`; see the spec's 2026-09-30 amendment, #233 and #234.
+loaded runner can still make readings dip under the threshold. The gate needs three
+readings in a row, which makes it far less exposed but not immune: from 2026-09-15 to
+09-29 it was not red once, while its one-reading self-check was red in 7 of 41
+attempts (earlier, 11 of 13 reds were the self-check, the other two not). Under
+sixteen busy processes the divisor spread 1.6-4.5. The self-check is marked
+`gate_power` and runs as a non-blocking monitor in `gate-power.yml`. The required
+jobs check the gate's logic deterministically instead
+(`test_the_gate_logic_separates_the_classes_on_a_virtual_clock`). See the spec's
+2026-09-30 amendment, #233 and #234.
 
 Known limit, stated rather than glossed: this gate reaches exactly as far as its filler
 alphabet. That is not hypothetical — `manifest._FM` was quadratic on a frontmatter-shaped
@@ -39,6 +43,7 @@ See docs/specs/2026-07-30-redos-audit-fixes.md (D6).
 import importlib
 import math
 import re
+import sys
 import time
 
 import pytest
@@ -419,6 +424,40 @@ def test_the_gate_still_fires_on_the_real_defect_class():
                           f"{t_large * 1000:.1f}ms, calibrator {cal:.2f})")
     assert not missed, (
         "the gate would not catch a known-defective pattern:\n  " + "\n  ".join(missed)
+    )
+
+
+@pytest.mark.parametrize("power,flagged", [(2, True), (1, False)], ids=["quadratic", "linear"])
+def test_the_gate_logic_separates_the_classes_on_a_virtual_clock(monkeypatch, power, flagged):
+    """The required jobs' own proof that the gate can fire.
+
+    `test_the_gate_still_fires_on_the_real_defect_class` measures the gate on the
+    runner at hand, so it is a load-dependent monitor (`gate_power`) and the
+    required jobs deselect it. Without this test they would then pass a change
+    that blinds the gate outright: review measured `_MAX_RATIO = 50.0` green
+    under `-m "not gate_power"`. Here the clock is virtual and probes advance it,
+    so the reading is exact on every runner. A pattern costing the square of its
+    input length gives a calibrated 2.0 against the linear calibrator, and must
+    be flagged. One costing its length gives 1.0, and must not be.
+    """
+    module = sys.modules[__name__]
+    clock = {"now": 0.0}
+    monkeypatch.setattr(time, "perf_counter", lambda: clock["now"])
+
+    class Probe:
+        def __init__(self, seconds_at_10, exponent):
+            self.seconds_at_10, self.exponent = seconds_at_10, exponent
+
+        def search(self, text):
+            clock["now"] += self.seconds_at_10 * (len(text) / 10) ** self.exponent
+
+    monkeypatch.setattr(module, "_CALIBRATOR", Probe(0.0001, 1))
+    monkeypatch.setattr(module, "_CALIBRATOR_CACHE", {})
+    ratio, *_ = _ratio(Probe(0.005, power), lambda n: "a" * n, 10, reps=3)
+    assert ratio == pytest.approx(2.0 if flagged else 1.0), ratio
+    assert (ratio >= _MAX_RATIO) is flagged, (
+        f"calibrated {ratio:.2f} against the {_MAX_RATIO} threshold: the gate would "
+        + ("miss a quadratic pattern" if flagged else "flag a linear one")
     )
 
 

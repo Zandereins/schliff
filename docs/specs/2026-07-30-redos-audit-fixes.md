@@ -350,14 +350,26 @@ rule with an allowlist; that design was prototyped and rejected on measurement â
   filters it. A virtual-clock test with a smooth, shared burst favoured the median and was
   green; it modelled the wrong noise, and it was not merged. **Decision (owner,
   2026-09-30):** the threshold stays at 1.5 and the measurement stays as built. The
-  self-check carries the pytest marker `gate_power`. The required jobs deselect it
-  (`-m "not gate_power"`), and `.github/workflows/gate-power.yml` runs it on ubuntu and
-  macOS on every PR, on main and daily. That workflow is not a required status check. The
-  self-check reports how often the gate is blind on a loaded runner, and that rate is a
-  runner property no PR can act on, so it is kept as a monitor rather than as a merge gate.
-  `test_gate_power_wiring.py` is red if the marker selects anything other than the
-  self-check, if a required unit run stops deselecting it or deselects more, or if the
-  monitor stops running it. All five mutations were checked.
+  self-check carries the pytest marker `gate_power`. Every required path deselects it:
+  the unit runs in `test.yml`, the release test-gate in `publish.yml`, and `make
+  test-unit`. `.github/workflows/gate-power.yml` runs it on ubuntu and macOS on every PR,
+  on main and daily. That workflow is not a required status check, and it never fails the
+  job. A blind reading is a warning annotation and a job-summary line, because a monitor
+  that paints commits red gets re-run, and the re-run overwrites the reading. Its reading
+  is isolated (a fresh process on 3.12), so its rate is not comparable to the in-suite
+  7/41. The self-check measures how often the runner leaves the gate blind, and no PR can
+  act on that.
+  Review of #241 found that deselecting it also removed the required jobs' only check that
+  the gate can fire at all: `_MAX_RATIO = 50.0` was green under `-m "not gate_power"`. So
+  `test_the_gate_logic_separates_the_classes_on_a_virtual_clock` now runs in the required
+  jobs. On a virtual clock, a quadratic probe must read 2.0 and be flagged, and a linear
+  one must read 1.0 and must not be. It is red for `_MAX_RATIO` 50.0 or 0.9 and for a
+  `_ratio` that divides by the calibrator zero times or twice.
+  `test_gate_power_wiring.py` pins every pytest invocation in the workflows and the
+  Makefile to its exact text. It is red on `-k`, on `--deselect`, on an unfiltered
+  required path, on a new workflow that runs the suite, on a wrong monitor selection, and
+  if the marker leaves the self-check or spreads to the gate. All nine mutations were
+  checked.
 
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`

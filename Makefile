@@ -7,7 +7,7 @@ help: ## Show available targets
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 test-unit: ## Run the pytest unit suite (1100+ tests)
-	/usr/bin/python3 -m pytest skills/schliff/tests -q
+	/usr/bin/python3 -m pytest skills/schliff/tests -m "not gate_power" -q
 
 test: test-unit ## Run unit tests (pytest) then integration tests
 	cd $(SKILL_DIR) && bash scripts/test-integration.sh --no-runtime-auto

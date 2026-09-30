@@ -9,10 +9,13 @@ name: Gate power (monitor)
 # three readings in a row, was never red. A measurement redesign was tried and
 # measured, and it did not lower the rate (#233, #234).
 #
-# This job is deliberately NOT a required status check, so a red here never
-# blocks a merge. It keeps reporting the gate's blindness rate: read it with
-# attempts expanded (`gh api .../runs/<id>/attempts/<n>/jobs`), because a
-# re-run overwrites a run's conclusion.
+# This job is deliberately NOT a required status check, and it never fails: a
+# blind reading shows as a warning annotation and a job-summary line. It is an
+# ISOLATED reading (a fresh process on 3.12), not the in-suite load the required
+# jobs run under, so its rate is not comparable to the 7/41 above. It says how
+# often a runner of this kind leaves the gate blind at that moment. The gate's
+# logic is checked deterministically in the required jobs
+# (`test_the_gate_logic_separates_the_classes_on_a_virtual_clock`).
 # See docs/specs/2026-07-30-redos-audit-fixes.md (D6, 2026-09-30 amendment).
 
 on:
@@ -52,6 +55,15 @@ jobs:
       - name: Install pytest
         run: pip install "pytest>=8,<9"
 
+      # Never fails the job: a monitor that paints commits red gets re-run, and a
+      # re-run overwrites the reading it exists to record. A blind reading is a
+      # warning annotation plus a job-summary line, and the readings are in the log.
       - name: Run the gate's self-check
         working-directory: skills/schliff
-        run: python3 -m pytest tests/unit/ -m gate_power -v
+        run: |
+          if python3 -m pytest tests/unit/ -m gate_power -v; then
+            echo "gate_power: the gate saw the defect class on ${{ matrix.os }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning title=ReDoS gate blind on this runner::the self-check read the defect class under the threshold on ${{ matrix.os }}; the readings are in this step's log"
+            echo "gate_power: BLIND on ${{ matrix.os }} (see the step log for the readings)" >> "$GITHUB_STEP_SUMMARY"
+          fi

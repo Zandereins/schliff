@@ -35,7 +35,9 @@ jobs:
 
       - name: Run unit tests
         working-directory: skills/schliff
-        run: python3 -m pytest tests/unit/ -q
+        # Same selection as the required jobs in test.yml: the gate_power
+        # self-check is load-dependent and must not block a release.
+        run: python3 -m pytest tests/unit/ -m "not gate_power" -q
 
       - name: Run integration tests
         working-directory: skills/schliff
