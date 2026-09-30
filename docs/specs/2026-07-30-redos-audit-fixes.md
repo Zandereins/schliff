@@ -331,6 +331,53 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   with attempts expanded and the printed divisor deciding which of the two causes each red
   belongs to.
 
+  *Amendment 2026-09-30 (#233, #234):* the CI record answered the question above. From
+  2026-09-15 to 09-29 the Tests workflow ran 39 times with 41 attempts. Seven attempts were
+  red on this file, all of them `test_the_gate_still_fires_on_the_real_defect_class`. Every
+  one printed a divisor of 1.83–2.08, inside the healthy band, beside a raw ratio of
+  2.24–2.89 where the idle defect class reads about 4. So none was the calibrator. The gate
+  itself, which needs three readings in a row, was never red.
+  Two measurement redesigns from #233 were built and measured on a laptop. Each run was a
+  fresh process running only the self-check.
+
+  | load | as built | per-round median, no cache | per-side minimum, interleaved, no cache |
+  | --- | --- | --- | --- |
+  | 16 busy loops, 10 cores | 16/60 | 30/60 | 16/60 |
+  | 16 procs, 40 ms on / 40 ms off | 2/120 | — | 2/120 |
+
+  Neither lowers the rate, and the median is worse. Under oversubscription the noise is
+  additive per timing, and a per-round ratio of single timings loses the minimum that
+  filters it. A virtual-clock test with a smooth, shared burst favoured the median and was
+  green; it modelled the wrong noise, and it was not merged. **Decision (owner,
+  2026-09-30):** the threshold stays at 1.5 and the measurement stays as built. The
+  self-check carries the pytest marker `gate_power`. Every required path deselects it:
+  the unit runs in `test.yml`, the release test-gate in `publish.yml`, and `make
+  test-unit`. `.github/workflows/gate-power.yml` runs it on ubuntu and macOS on every PR,
+  on main and daily. That workflow is not a required status check. A blind reading (pytest
+  exit 1) is a warning annotation and a job-summary line, not a failed job, because a
+  monitor that paints commits red gets re-run, and the re-run overwrites the reading. Any
+  other exit (collection error, nothing selected) fails the job, so a broken monitor
+  cannot pass for a blind gate. It has no concurrency group, since GitHub cancels pending
+  runs in a group. Readings are counted from the annotations; the workflow's header gives
+  the command. Its reading
+  is isolated (a fresh process on 3.12), so its rate is not comparable to the in-suite
+  7/41. The self-check measures how often the runner leaves the gate blind, and no PR can
+  act on that.
+  Review of #241 found that deselecting it also removed the required jobs' only check that
+  the gate can fire at all: `_MAX_RATIO = 50.0` was green under `-m "not gate_power"`. So
+  `test_the_gate_logic_separates_the_classes_on_a_virtual_clock` now runs in the required
+  jobs. On a virtual clock, probes read exactly 2.0, 1.55, 1.45 and 1.0, and the first
+  two must be flagged. That pins the threshold to (1.45, 1.55]. It is red for
+  `_MAX_RATIO` at 1.01, 1.44, 1.56, 1.99, 2.0, 50.0 and 0.9, and for a `_ratio` that
+  divides by the calibrator zero times or twice. **Named residual:** the gate's stage-2
+  decision inside `test_pattern_scales_linearly` has no deterministic test. The
+  self-check never exercised it either, so this PR does not open that gap.
+  `test_gate_power_wiring.py` pins every pytest invocation in `.github/workflows/*.y*ml`,
+  the Makefile and `pyproject.toml` to its exact text. It forbids `PYTEST_ADDOPTS`,
+  `addopts`, `--deselect`, `--ignore` and `-k` there, and it checks by a static scan of
+  every test file that the marker sits only on the self-check. Twelve mutations were
+  checked. It guards against accidental drift, not against a determined edit.
+
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
 (measured on `main`); the refinement "…with no

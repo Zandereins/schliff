@@ -115,9 +115,16 @@ jobs:
       - name: Install pytest
         run: pip install "pytest>=8,<9"
 
+      # `-m "not gate_power"`: the ReDoS gate's self-check reports whether the
+      # gate can still see the defect class on THIS runner right now. Loaded
+      # runners make it red in about one attempt in six (7 of 41, 2026-09-15 to
+      # 09-29) without any change in the code under test, so it runs as a
+      # non-blocking monitor in gate-power.yml. The gate itself stays here, and so
+      # does a deterministic check of its logic (virtual clock). The exact form of
+      # this line is pinned by test_gate_power_wiring.py.
       - name: Run unit tests
         working-directory: skills/schliff
-        run: python3 -m pytest tests/unit/ -v
+        run: python3 -m pytest tests/unit/ -m "not gate_power" -v
 
       # Dogfood: schliff holds its own AGENTS.md to the dangling-command gate.
       # Fails CI if any setup/build/test command in AGENTS.md stops resolving
@@ -147,7 +154,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: skills/schliff
-        run: python3 -m pytest tests/unit/ -q
+        run: python3 -m pytest tests/unit/ -m "not gate_power" -q
 
   test-report:
     runs-on: ubuntu-latest
