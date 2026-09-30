@@ -353,23 +353,30 @@ rule with an allowlist; that design was prototyped and rejected on measurement â
   self-check carries the pytest marker `gate_power`. Every required path deselects it:
   the unit runs in `test.yml`, the release test-gate in `publish.yml`, and `make
   test-unit`. `.github/workflows/gate-power.yml` runs it on ubuntu and macOS on every PR,
-  on main and daily. That workflow is not a required status check, and it never fails the
-  job. A blind reading is a warning annotation and a job-summary line, because a monitor
-  that paints commits red gets re-run, and the re-run overwrites the reading. Its reading
+  on main and daily. That workflow is not a required status check. A blind reading (pytest
+  exit 1) is a warning annotation and a job-summary line, not a failed job, because a
+  monitor that paints commits red gets re-run, and the re-run overwrites the reading. Any
+  other exit (collection error, nothing selected) fails the job, so a broken monitor
+  cannot pass for a blind gate. It has no concurrency group, since GitHub cancels pending
+  runs in a group. Readings are counted from the annotations; the workflow's header gives
+  the command. Its reading
   is isolated (a fresh process on 3.12), so its rate is not comparable to the in-suite
   7/41. The self-check measures how often the runner leaves the gate blind, and no PR can
   act on that.
   Review of #241 found that deselecting it also removed the required jobs' only check that
   the gate can fire at all: `_MAX_RATIO = 50.0` was green under `-m "not gate_power"`. So
   `test_the_gate_logic_separates_the_classes_on_a_virtual_clock` now runs in the required
-  jobs. On a virtual clock, a quadratic probe must read 2.0 and be flagged, and a linear
-  one must read 1.0 and must not be. It is red for `_MAX_RATIO` 50.0 or 0.9 and for a
-  `_ratio` that divides by the calibrator zero times or twice.
-  `test_gate_power_wiring.py` pins every pytest invocation in the workflows and the
-  Makefile to its exact text. It is red on `-k`, on `--deselect`, on an unfiltered
-  required path, on a new workflow that runs the suite, on a wrong monitor selection, and
-  if the marker leaves the self-check or spreads to the gate. All nine mutations were
-  checked.
+  jobs. On a virtual clock, probes read exactly 2.0, 1.55, 1.45 and 1.0, and the first
+  two must be flagged. That pins the threshold to (1.45, 1.55]. It is red for
+  `_MAX_RATIO` at 1.01, 1.44, 1.56, 1.99, 2.0, 50.0 and 0.9, and for a `_ratio` that
+  divides by the calibrator zero times or twice. **Named residual:** the gate's stage-2
+  decision inside `test_pattern_scales_linearly` has no deterministic test. The
+  self-check never exercised it either, so this PR does not open that gap.
+  `test_gate_power_wiring.py` pins every pytest invocation in `.github/workflows/*.y*ml`,
+  the Makefile and `pyproject.toml` to its exact text. It forbids `PYTEST_ADDOPTS`,
+  `addopts`, `--deselect`, `--ignore` and `-k` there, and it checks by a static scan of
+  every test file that the marker sits only on the self-check. Twelve mutations were
+  checked. It guards against accidental drift, not against a determined edit.
 
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`

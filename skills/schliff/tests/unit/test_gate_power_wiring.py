@@ -3,21 +3,19 @@
 `test_the_gate_still_fires_on_the_real_defect_class` is load-dependent, so every
 required path deselects the `gate_power` marker and `gate-power.yml` runs it without
 blocking (docs/specs/2026-07-30-redos-audit-fixes.md, D6, 2026-09-30). The gate's
-logic stays checked in the required jobs by a deterministic test. Three silent
-failures are possible, and each is a red here:
+threshold and `_ratio` stay checked in the required jobs by a deterministic test.
 
-- the monitor stops running the self-check, so its blindness rate is never reported;
-- the marker spreads to the gate itself, so the gate leaves the required jobs;
-- a required path drops tests some other way (`-k`, `--deselect`, `--ignore`) or a
-  new entry point runs the unit suite unfiltered.
+This guards against the accidental ways the split could drift: the monitor stops
+running the self-check, the marker spreads to the gate, or a required path drops
+tests by an option or a new entry point. It is not a defence against a determined
+edit; a change to these files is visible in review.
 """
 import re
-import subprocess
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]  # unit→tests→schliff→skills→repo root
-SELF_CHECK = "tests/unit/test_patterns_scale_linearly.py::test_the_gate_still_fires_on_the_real_defect_class"
+TESTS = ROOT / "skills" / "schliff" / "tests"
+WORKFLOWS = ROOT / ".github" / "workflows"
 
 REQUIRED_V = 'python3 -m pytest tests/unit/ -m "not gate_power" -v'
 REQUIRED_Q = 'python3 -m pytest tests/unit/ -m "not gate_power" -q'
@@ -29,28 +27,54 @@ EXPECTED = {
     ".github/workflows/test.yml": [REQUIRED_V, REQUIRED_Q],
     "Makefile": ['/usr/bin/python3 -m pytest skills/schliff/tests -m "not gate_power" -q'],
 }
+# Ways to drop tests that do not show in an invocation's own text.
+FORBIDDEN = ("PYTEST_ADDOPTS", "addopts", "--deselect", "--ignore", " -k ")
 
 
-def _pytest_invocations() -> dict:
-    files = sorted((ROOT / ".github" / "workflows").glob("*.yml")) + [ROOT / "Makefile"]
-    found = {}
-    for path in files:
-        runs = re.findall(r"\S*python3? -m pytest[^;\n]*", path.read_text(encoding="utf-8"))
-        if runs:
-            found[path.relative_to(ROOT).as_posix()] = [run.strip() for run in runs]
-    return found
+def _entry_points() -> list:
+    return sorted(WORKFLOWS.glob("*.y*ml")) + [ROOT / "Makefile", ROOT / "pyproject.toml"]
 
 
 def test_every_pytest_invocation_is_the_expected_one():
-    assert _pytest_invocations() == EXPECTED
+    found = {}
+    for path in _entry_points():
+        # Drop comments: YAML `#` lines and the Makefile's `## help` text.
+        text = re.sub(r"\s##.*", "", path.read_text(encoding="utf-8"))
+        lines = [
+            line for line in text.splitlines()
+            if re.search(r"\bpytest\b", line) and not re.search(r"pip install|^\s*#|pytest\.ini_options", line)
+        ]
+        runs = []
+        for line in lines:
+            match = re.search(r"\S*(?:python[\d.]*\s+-m\s+)?pytest\b[^;\n]*", line)
+            if match and ("tests" in match.group(0) or "-m pytest" in match.group(0)):
+                runs.append(match.group(0).strip())
+        if runs:
+            found[path.relative_to(ROOT).as_posix()] = runs
+    assert found == EXPECTED
 
 
-def test_the_marker_selects_the_self_check_and_nothing_else():
-    out = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/unit/", "-m", "gate_power", "--collect-only", "-q"],
-        cwd=ROOT / "skills" / "schliff", capture_output=True, text=True, check=False,
-    ).stdout
-    selected = [line for line in out.splitlines() if "::" in line]
-    # Node ids are relative to pytest's rootdir, which depends on where it is
-    # invoked from, so compare the part below skills/schliff.
-    assert len(selected) == 1 and selected[0].endswith(SELF_CHECK), f"`-m gate_power` selects {selected}"
+def test_no_entry_point_drops_tests_out_of_band():
+    hits = [
+        f"{path.relative_to(ROOT)}: {token.strip()}"
+        for path in _entry_points()
+        for token in FORBIDDEN
+        if token in path.read_text(encoding="utf-8")
+    ]
+    assert not hits, hits
+
+
+def test_the_marker_sits_on_the_self_check_and_nowhere_else():
+    uses = []
+    for path in sorted(TESTS.rglob("*.py")):
+        if path.name == Path(__file__).name:
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for i, line in enumerate(lines):
+            if "gate_power" in line and "mark" in line:
+                following = next((ln for ln in lines[i + 1:] if ln.strip().startswith("def ")), "")
+                uses.append((path.relative_to(TESTS).as_posix(), following.strip()))
+    assert uses == [(
+        "unit/test_patterns_scale_linearly.py",
+        "def test_the_gate_still_fires_on_the_real_defect_class():",
+    )], uses

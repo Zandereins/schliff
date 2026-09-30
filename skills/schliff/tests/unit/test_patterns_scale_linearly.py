@@ -389,7 +389,7 @@ def test_the_gate_still_fires_on_the_real_defect_class():
     dead code: `a*b` on 600 chars runs in 0.2ms, under _MIN_ABS_SECONDS, so
     `_ratio` returned None every time and the assertion never executed. `a*b` is
     also not linear against an all-`a` input — it is itself a member of the defect
-    class. The healthy side is already covered by the 224 parametrized cases.
+    class. The healthy side is already covered by the parametrized cases.
 
     ONE reading per pattern, on purpose. The gate flags a pattern only when
     three readings in a row clear the threshold (stage 1, then both stage-2
@@ -427,8 +427,12 @@ def test_the_gate_still_fires_on_the_real_defect_class():
     )
 
 
-@pytest.mark.parametrize("power,flagged", [(2, True), (1, False)], ids=["quadratic", "linear"])
-def test_the_gate_logic_separates_the_classes_on_a_virtual_clock(monkeypatch, power, flagged):
+@pytest.mark.parametrize(
+    "calibrated,flagged",
+    [(2.0, True), (1.55, True), (1.45, False), (1.0, False)],
+    ids=["quadratic", "just-over", "just-under", "linear"],
+)
+def test_the_gate_logic_separates_the_classes_on_a_virtual_clock(monkeypatch, calibrated, flagged):
     """The required jobs' own proof that the gate can fire.
 
     `test_the_gate_still_fires_on_the_real_defect_class` measures the gate on the
@@ -436,9 +440,13 @@ def test_the_gate_logic_separates_the_classes_on_a_virtual_clock(monkeypatch, po
     required jobs deselect it. Without this test they would then pass a change
     that blinds the gate outright: review measured `_MAX_RATIO = 50.0` green
     under `-m "not gate_power"`. Here the clock is virtual and probes advance it,
-    so the reading is exact on every runner. A pattern costing the square of its
-    input length gives a calibrated 2.0 against the linear calibrator, and must
-    be flagged. One costing its length gives 1.0, and must not be.
+    so the reading is exact on every runner. A probe's cost grows with its input
+    length to the power `1 + log2(calibrated)`, so against the linear calibrator
+    it reads exactly `calibrated`. Quadratic (2.0) and linear (1.0) must land on
+    their sides, and the two probes just either side of 1.5 pin the threshold
+    itself: moving `_MAX_RATIO` out of (1.45, 1.55] is a red here, not a silent
+    loss of margin. What this does not reach is the gate's stage-2 decision in
+    `test_pattern_scales_linearly`; the self-check never exercised that either.
     """
     module = sys.modules[__name__]
     clock = {"now": 0.0}
@@ -453,11 +461,11 @@ def test_the_gate_logic_separates_the_classes_on_a_virtual_clock(monkeypatch, po
 
     monkeypatch.setattr(module, "_CALIBRATOR", Probe(0.0001, 1))
     monkeypatch.setattr(module, "_CALIBRATOR_CACHE", {})
-    ratio, *_ = _ratio(Probe(0.005, power), lambda n: "a" * n, 10, reps=3)
-    assert ratio == pytest.approx(2.0 if flagged else 1.0), ratio
+    ratio, *_ = _ratio(Probe(0.005, 1 + math.log2(calibrated)), lambda n: "a" * n, 10, reps=3)
+    assert ratio == pytest.approx(calibrated), ratio
     assert (ratio >= _MAX_RATIO) is flagged, (
         f"calibrated {ratio:.2f} against the {_MAX_RATIO} threshold: the gate would "
-        + ("miss a quadratic pattern" if flagged else "flag a linear one")
+        + ("miss a super-linear pattern" if flagged else "flag one under the threshold")
     )
 
 

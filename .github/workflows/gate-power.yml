@@ -16,6 +16,13 @@ name: Gate power (monitor)
 # often a runner of this kind leaves the gate blind at that moment. The gate's
 # logic is checked deterministically in the required jobs
 # (`test_the_gate_logic_separates_the_classes_on_a_virtual_clock`).
+#
+# The job is green whether or not the gate was blind, so count readings from the
+# annotations, not from conclusions. Per run:
+#   gh api repos/OWNER/REPO/commits/<sha>/check-runs --jq '.check_runs[]
+#     | select(.name|startswith("gate-power")) | .id'
+#   gh api repos/OWNER/REPO/check-runs/<id>/annotations --jq '.[].title'
+# A title "ReDoS gate blind on this runner" is one blind reading.
 # See docs/specs/2026-07-30-redos-audit-fixes.md (D6, 2026-09-30 amendment).
 
 on:
@@ -30,9 +37,8 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: gate-power-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+# No concurrency group: GitHub cancels a PENDING run in a group whenever a newer
+# one queues, and every reading this monitor takes is a data point worth keeping.
 
 jobs:
   gate-power:
@@ -55,15 +61,26 @@ jobs:
       - name: Install pytest
         run: pip install "pytest>=8,<9"
 
-      # Never fails the job: a monitor that paints commits red gets re-run, and a
-      # re-run overwrites the reading it exists to record. A blind reading is a
-      # warning annotation plus a job-summary line, and the readings are in the log.
+      # A blind reading (pytest exit 1: the self-check failed) does not fail the
+      # job: a monitor that paints commits red gets re-run, and the re-run
+      # overwrites the reading it exists to record. It becomes a warning
+      # annotation plus a job-summary line, with the readings in the log. Any
+      # other non-zero exit (2 collection error, 3 internal, 4 usage, 5 nothing
+      # selected) means the monitor itself is broken, and that DOES fail the job,
+      # so a broken monitor cannot pass for a blind gate.
       - name: Run the gate's self-check
         working-directory: skills/schliff
         run: |
-          if python3 -m pytest tests/unit/ -m gate_power -v; then
+          set +e
+          python3 -m pytest tests/unit/ -m gate_power -v
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
             echo "gate_power: the gate saw the defect class on ${{ matrix.os }}" >> "$GITHUB_STEP_SUMMARY"
-          else
+          elif [ "$rc" -eq 1 ]; then
             echo "::warning title=ReDoS gate blind on this runner::the self-check read the defect class under the threshold on ${{ matrix.os }}; the readings are in this step's log"
             echo "gate_power: BLIND on ${{ matrix.os }} (see the step log for the readings)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error title=gate-power monitor broken::pytest exited $rc (not a reading); the monitor measured nothing"
+            exit "$rc"
           fi
