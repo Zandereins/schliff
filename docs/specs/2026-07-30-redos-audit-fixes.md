@@ -331,6 +331,34 @@ rule with an allowlist; that design was prototyped and rejected on measurement �
   with attempts expanded and the printed divisor deciding which of the two causes each red
   belongs to.
 
+  *Amendment 2026-09-30 (#233, #234):* the CI record answered the question above. From
+  2026-09-15 to 09-29 the Tests workflow ran 39 times with 41 attempts. Seven attempts were
+  red on this file, all of them `test_the_gate_still_fires_on_the_real_defect_class`. Every
+  one printed a divisor of 1.83–2.08, inside the healthy band, beside a raw ratio of
+  2.24–2.89 where the idle defect class reads about 4. So none was the calibrator. The gate
+  itself, which needs three readings in a row, was never red.
+  Two measurement redesigns from #233 were built and measured on a laptop. Each run was a
+  fresh process running only the self-check.
+
+  | load | as built | per-round median, no cache | per-side minimum, interleaved, no cache |
+  | --- | --- | --- | --- |
+  | 16 busy loops, 10 cores | 16/60 | 30/60 | 16/60 |
+  | 16 procs, 40 ms on / 40 ms off | 2/120 | — | 2/120 |
+
+  Neither lowers the rate, and the median is worse. Under oversubscription the noise is
+  additive per timing, and a per-round ratio of single timings loses the minimum that
+  filters it. A virtual-clock test with a smooth, shared burst favoured the median and was
+  green; it modelled the wrong noise, and it was not merged. **Decision (owner,
+  2026-09-30):** the threshold stays at 1.5 and the measurement stays as built. The
+  self-check carries the pytest marker `gate_power`. The required jobs deselect it
+  (`-m "not gate_power"`), and `.github/workflows/gate-power.yml` runs it on ubuntu and
+  macOS on every PR, on main and daily. That workflow is not a required status check. The
+  self-check reports how often the gate is blind on a loaded runner, and that rate is a
+  runner property no PR can act on, so it is kept as a monitor rather than as a merge gate.
+  `test_gate_power_wiring.py` is red if the marker selects anything other than the
+  self-check, if a required unit run stops deselecting it or deselects more, or if the
+  monitor stops running it. All five mutations were checked.
+
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
 (measured on `main`); the refinement "…with no

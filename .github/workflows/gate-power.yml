@@ -1,0 +1,57 @@
+name: Gate power (monitor)
+
+# Non-blocking monitor for the ReDoS gate's self-check,
+# `test_the_gate_still_fires_on_the_real_defect_class` (pytest marker
+# `gate_power`). The check asks whether the gate can see the known defect class
+# on this runner right now. That depends on the runner's load, not on the change
+# under review: 7 of 41 Tests attempts from 2026-09-15 to 09-29 were red on it,
+# each with a healthy divisor (1.83-2.08), while the gate itself, which needs
+# three readings in a row, was never red. A measurement redesign was tried and
+# measured, and it did not lower the rate (#233, #234).
+#
+# This job is deliberately NOT a required status check, so a red here never
+# blocks a merge. It keeps reporting the gate's blindness rate: read it with
+# attempts expanded (`gh api .../runs/<id>/attempts/<n>/jobs`), because a
+# re-run overwrites a run's conclusion.
+# See docs/specs/2026-07-30-redos-audit-fixes.md (D6, 2026-09-30 amendment).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '37 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-power-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  gate-power:
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both runner families produced reds in the record (ubuntu 3.10-3.12, macOS).
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        run: pip install "pytest>=8,<9"
+
+      - name: Run the gate's self-check
+        working-directory: skills/schliff
+        run: python3 -m pytest tests/unit/ -m gate_power -v

@@ -15,11 +15,11 @@ The ratio is therefore CALIBRATED: divided by the ratio of a known-linear scan o
 the same input, measured in the same process, so runner speed divides out. On that
 scale healthy patterns measure ~1.05 (max 1.08) and the defect class 2.05-2.28 idle,
 and the threshold is 1.5x — see `_MAX_RATIO`. An absolute floor still applies. A
-loaded runner CAN still flake it: the divisor is measured apart from the pattern, so
-sustained contention does not divide out (13 of 88 CI attempts in 2026-08/09; under
-sixteen busy processes the divisor spreads 1.6-4.5 and the defect class reads under
-1.5 in about one reading in twelve) — see the spec's 2026-09-05/07 amendment, #233
-and #234.
+loaded runner can make one reading of the defect class dip under the threshold. The
+gate needs three readings in a row, so it was never red in the CI record; its
+self-check takes one reading and was red in 7 of 41 attempts (2026-09-15 to 09-29).
+That self-check is marked `gate_power` and runs as a non-blocking monitor in
+`gate-power.yml`; see the spec's 2026-09-30 amendment, #233 and #234.
 
 Known limit, stated rather than glossed: this gate reaches exactly as far as its filler
 alphabet. That is not hypothetical — `manifest._FM` was quadratic on a frontmatter-shaped
@@ -362,8 +362,16 @@ def _ratio(rx, make, n, reps):
     return (t_large / t_small) / calibrator_ratio, t_small, t_large, calibrator_ratio
 
 
+@pytest.mark.gate_power
 def test_the_gate_still_fires_on_the_real_defect_class():
     """A calibrated threshold is only worth having if it still fires.
+
+    Marked `gate_power`: it measures whether the gate can see the defect class on
+    this runner right now. That depends on the runner's load, not on the change
+    under review, so the required jobs deselect it and `gate-power.yml` runs it on
+    every PR, on main and daily, without blocking a merge. Its reds are the gate's
+    blindness rate, which a monitor should keep reporting and a merge gate cannot
+    act on.
 
     Measured against the shapes this gate exists for — an unbounded run before a
     required literal, the module docstring's 3.9x-4.1x defects — not against a
