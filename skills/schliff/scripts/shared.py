@@ -166,7 +166,15 @@ def read_skill_safe(skill_path: str) -> str:
         raise ValueError(f"Skill path is a directory, not a file: {skill_path}")
     if not p.is_file():
         raise ValueError(f"Skill path is not a regular file: {skill_path}")
-    content = p.read_text(encoding="utf-8", errors="replace")
+    data = p.read_bytes()
+    # The limit is in bytes, as the message says: measure before decoding.
+    if len(data) > MAX_SKILL_SIZE:
+        raise ValueError(
+            f"file too large: {len(data):,} bytes "
+            f"exceeds the {MAX_SKILL_SIZE:,} byte limit"
+        )
+    # Same text read_text produced: invalid UTF-8 replaced, universal newlines.
+    content = data.decode("utf-8", "replace").replace("\r\n", "\n").replace("\r", "\n")
     # Strip ALL leading UTF-8 BOMs (U+FEFF) once, at the read boundary, so no
     # downstream scorer ever sees one. A leading BOM is an invisible encoding
     # artifact; left in place it defeats every `startswith("---")` frontmatter
@@ -177,11 +185,6 @@ def read_skill_safe(skill_path: str) -> str:
     # where the obfuscation detector still flags it. Root-cause fix; per-scorer
     # strips remain as defense for direct callers.
     content = content.lstrip("﻿")
-    if len(content) > MAX_SKILL_SIZE:
-        raise ValueError(
-            f"file too large: {len(content):,} bytes "
-            f"exceeds the {MAX_SKILL_SIZE:,} byte limit"
-        )
     if len(_file_cache) >= MAX_CACHE_ENTRIES:
         _file_cache.pop(next(iter(_file_cache)))
     _file_cache[key] = content

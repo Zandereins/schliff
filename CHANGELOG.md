@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed
+
+- **`scripts/dashboard.py` is gone.** It had no command, no documented entry point and no
+  caller outside its own tests, and run on a missing file it crashed with a traceback
+  instead of an error message (#212). Plugin installs ship `scripts/`, so it was reachable
+  by direct path; its dimension scores and ranked fixes are what `schliff score` and
+  `schliff suggest` print. The unreferenced `demo/dashboard-output.txt` sample goes with it.
+
 ### Fixed
 
 - **The anti-gaming gate no longer counts an unmeasured target as caught.** `caught` read the

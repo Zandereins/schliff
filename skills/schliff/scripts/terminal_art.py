@@ -2,8 +2,7 @@
 """Schliff — Shared Terminal Art Library
 
 Centralized render functions for grades, heatmaps, banners, and score cards.
-Imported by dashboard.py, generate-report.py, auto-improve.py, init-skill.py,
-and achievements.py.
+Imported by the CLI and by the scripts that render grades, reports and banners.
 
 Pattern: ANSI only when is_color_tty(), NO_COLOR respected, returns str.
 """
