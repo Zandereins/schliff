@@ -27,12 +27,12 @@ Establish or update a quality baseline benchmark for the target skill.
    bash scripts/analyze-skill.sh /path/to/SKILL.md
    ```
 
-4. Run the Python scorer to get all 7 dimensions:
+4. Run the Python scorer to get all 7 dimensions (it picks up `eval-suite.json` next to
+   the SKILL.md on its own, and scores without one when there is none):
 
    ```bash
    python3 scripts/score-skill.py \
      /path/to/SKILL.md \
-     --eval-suite /path/to/skill/eval-suite.json \
      --json
    ```
 
