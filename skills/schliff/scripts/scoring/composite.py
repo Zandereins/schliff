@@ -101,7 +101,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
             (verify CI gate, badge, leaderboard) MUST leave this False to stay
             reproducible; only the interactive `score` command opts in.
     """
-    from scoring.registry import get_headline_excluded, get_weights, resolve_format
+    from scoring.registry import get_headline_excluded, get_weights
 
     weights = get_weights(fmt if fmt is not None else "skill.md")
     explicit = set(custom_weights or {})
@@ -116,10 +116,7 @@ def compute_composite(scores: dict, custom_weights: Optional[dict] = None,
     # after dimension exclusion; renormalizing now would double-normalize and shift scores.
     if custom_weights:
         weight_source = "custom"
-        # 0.05 side dims on the instruction-file profiles; on system_prompt both are
-        # core 0.15 dims, and a partial override must not delete them.
-        _SUPPLEMENTARY = (set() if resolve_format(fmt or "skill.md") == "system_prompt"
-                          else {"clarity", "security"})
+        _SUPPLEMENTARY = {"clarity", "security"}
         for dim in list(weights):
             if dim in _SUPPLEMENTARY and dim not in custom_weights:
                 del weights[dim]

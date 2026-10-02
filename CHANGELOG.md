@@ -13,12 +13,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   detected format; SKILL.md output is unchanged. `--weights` accepts the format's own
   dimension names and rejects names it would ignore (including `runtime`, which no profile
   weighs). `--no-clarity` keeps clarity on `.prompt` files, where it is a core dimension.
-- **Custom weights on a system prompt no longer delete clarity and security.**
-  `compute_composite` dropped both whenever custom weights were given; on the system_prompt
-  profile they are core 0.15 dimensions, so even `--weights clarity=0.15`, the registry value,
-  lowered the composite. Only system prompts with custom weights are affected, and only upward.
-- **A non-UTF-8 `eval-suite.json` no longer ends a run.** `score-skill.py`, `text_gradient.py`
-  and `init-skill.py` load the suite through the shared owner instead of their own copies.
+- **A non-UTF-8 `eval-suite.json` no longer ends a run.** `score-skill.py` and `text_gradient.py`
+  load the suite through the shared owner instead of their own copies; `init-skill.py` takes
+  the suite path from it.
 - **Fix deltas and doctor composites follow the scorer.** The two regex patches report their
   gradient's delta instead of a hardcoded one, and `doctor` weights the composite by format.
 

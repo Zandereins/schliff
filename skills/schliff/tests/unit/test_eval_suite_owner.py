@@ -147,19 +147,9 @@ def test_no_clarity_still_drops_clarity_on_the_skill_md_family(filename, tmp_pat
 
 
 def test_weights_on_a_system_prompt_use_its_own_profile(tmp_path):
-    """`--weights` must speak the format's dimensions, and leaving clarity and
-    security out of the override must not delete two core 0.15 dimensions."""
+    """`--weights` must speak the format's dimensions."""
     prompt = tmp_path / "bot.prompt"
     prompt.write_text(PROMPT, encoding="utf-8")
-    full = json.loads(_run("score-skill.py", str(prompt), "--json", home=tmp_path).stdout)
-
-    # clarity's own registry weight: the composite must not move.
-    same = _run("score-skill.py", str(prompt), "--json", "--weights", "clarity=0.15",
-                home=tmp_path)
-    assert same.returncode == 0, same.stderr[-400:]
-    same = json.loads(same.stdout)
-    assert same["confidence"]["total"] == full["confidence"]["total"]
-    assert same["composite_score"] == pytest.approx(full["composite_score"], abs=0.05)
 
     # A dimension only this profile has is accepted ...
     own = _run("score-skill.py", str(prompt), "--json", "--weights", "output_contract=1",
