@@ -92,8 +92,11 @@ If the user approves, copy the eval-suite-template.json and customize it for the
 ### 2. Run the Python scorer (unless --quick mode)
 
 ```bash
-python3 scripts/score-skill.py <SKILL.md> --eval-suite <eval-suite.json> --json
+python3 scripts/score-skill.py <SKILL.md> --json
 ```
+
+The scorer picks up `<skill_dir>/eval-suite.json` on its own and scores without one when
+the user declined to generate it; naming a suite that does not exist is an error.
 
 This produces:
 

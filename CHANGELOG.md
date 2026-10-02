@@ -43,6 +43,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **An auto-discovered non-UTF-8 `eval-suite.json` no longer ends a run.** `score-skill.py` and `text_gradient.py`
   load the suite through the shared owner instead of their own copies; `init-skill.py` takes
   the suite path from it. An explicit `--eval-suite` that exists but cannot be read still exits 1.
+- **A named `--eval-suite` is never silently replaced** (#250). In `score-skill.py` and
+  `text_gradient.py` a missing path fell back to the auto-discovered sibling suite with exit 0,
+  and a suite that is not a JSON object was ignored. Both now read a named suite through the
+  same code as `schliff score`: missing, unreadable or wrongly shaped means exit 1 with a message.
 - **Fix deltas and doctor composites follow the scorer.** The two regex patches report their
   gradient's delta instead of a hardcoded one, and `doctor` weights the composite by format.
 
