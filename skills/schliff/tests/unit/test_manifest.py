@@ -110,6 +110,94 @@ def test_disabled_plugin_contributes_nothing(install: Path):
     assert not any("acme" in f.subject for f in m.findings)
 
 
+def _installed(install: Path, key: str, entries: list[dict] | str) -> None:
+    """Write `plugins/installed_plugins.json` with `entries` for `key` (or raw text)."""
+    target = install / "plugins" / "installed_plugins.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    text = entries if isinstance(entries, str) else json.dumps(
+        {"version": 2, "plugins": {key: entries}})
+    target.write_text(text, encoding="utf-8")
+
+
+def _two_revisions(install: Path) -> tuple[Path, Path]:
+    """An installed revision and an orphaned one whose directory is NEWER by mtime.
+
+    The live shape behind #229: Claude Code writes `.orphaned_at` into the old
+    revision after installing the new one, which bumps the old directory's mtime.
+    """
+    import os
+    (install / "settings.json").write_text(
+        json.dumps({"enabledPlugins": {"acme@some-market": True}}), encoding="utf-8")
+    pkg = install / "plugins" / "cache" / "some-market" / "acme"
+    new = _skill(pkg / "new" / "skills", "widget").parents[1]
+    old = _skill(pkg / "old" / "skills", "widget").parents[1]
+    os.utime(new, (1_000_000, 1_000_000))
+    os.utime(old, (2_000_000, 2_000_000))
+    return new, old
+
+
+def _widget_path(m) -> str:
+    [path] = [a.path for a in m.loaded if a.name == "acme:widget"]
+    return path
+
+
+def test_installed_revision_wins_over_a_newer_orphan(install: Path):
+    """#229: `installed_plugins.json` owns which revision is installed, not mtime."""
+    new, _ = _two_revisions(install)
+    _installed(install, "acme@some-market", [{"scope": "user", "installPath": str(new)}])
+    m = build_manifest(claude_dir=install)
+    assert "/new/" in _widget_path(m)
+
+
+def test_project_scope_entry_wins_only_for_its_own_project(install: Path, tmp_path: Path):
+    new, old = _two_revisions(install)
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    _installed(install, "acme@some-market", [
+        {"scope": "project", "projectPath": str(proj), "installPath": str(old)},
+        {"scope": "user", "installPath": str(new)},
+    ])
+    assert "/old/" in _widget_path(build_manifest(claude_dir=install, project_dir=proj))
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install))
+    other = tmp_path / "other"
+    other.mkdir()
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=other))
+
+
+def test_installed_plugin_without_skills_or_commands_is_not_a_finding(install: Path):
+    """An MCP-only plugin (playwright) is present with zero artifacts, not 'never loads'."""
+    (install / "settings.json").write_text(
+        json.dumps({"enabledPlugins": {"mcp@some-market": True}}), encoding="utf-8")
+    payload = install / "plugins" / "cache" / "some-market" / "mcp" / "abc123"
+    payload.mkdir(parents=True)
+    (payload / ".mcp.json").write_text("{}", encoding="utf-8")
+    _installed(install, "mcp@some-market", [{"scope": "user", "installPath": str(payload)}])
+    m = build_manifest(claude_dir=install)
+    assert not any(f.subject == "mcp@some-market" for f in m.findings), m.findings
+
+
+@pytest.mark.parametrize("raw", [
+    "{not json",
+    json.dumps(["not", "a", "dict"]),
+    # Each shape below names a usable decoy directory; only the guard keeps it out.
+    json.dumps({"version": 1, "plugins": {"acme@some-market": [
+        {"scope": "user", "installPath": "{decoy}"}]}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [
+        {"scope": "user", "installPath": "{decoy}/missing"}]}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": "nope"}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [{"scope": "user"}]}}),
+])
+def test_unusable_installed_plugins_falls_back_to_the_disk_layout(install: Path, raw: str):
+    (install / "settings.json").write_text(
+        json.dumps({"enabledPlugins": {"acme@some-market": True}}), encoding="utf-8")
+    _skill(install / "plugins" / "cache" / "some-market" / "acme" / "1.2.3" / "skills",
+           "widget")
+    decoy = _skill(install / "decoy" / "skills", "widget").parents[1]
+    _installed(install, "acme@some-market", raw.replace("{decoy}", str(decoy)))
+    m = build_manifest(claude_dir=install)
+    assert "/1.2.3/" in _widget_path(m)
+
+
 def test_output_is_renderable_and_serialisable(install: Path):
     m = build_manifest(claude_dir=install)
     assert "resident every turn" in format_manifest(m)

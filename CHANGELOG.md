@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`schliff manifest` resolves the installed plugin revision, not the newest directory**
+  (#229). With several version directories of one plugin on disk it picked the newest by
+  mtime — and Claude Code bumps the mtime of an orphaned revision when it marks it, so the
+  orphan won. It now reads the installPath from `plugins/installed_plugins.json` (this
+  project's project-scope entry, else the user-scope one) and falls back to the old disk
+  heuristic when that file is missing, malformed or not version 2. Enablement is still decided
+  by `settings.json` alone. A recorded installPath with neither `skills/` nor `commands/` (an
+  MCP-only plugin such as playwright) now counts as present with zero artifacts instead of
+  "never loads". On a live install: 3 of 14 enabled plugins disagreed with
+  `installed_plugins.json` before, 0 after.
+
 ## [8.12.0] - 2026-09-15
 
 ### Added

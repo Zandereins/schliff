@@ -139,14 +139,14 @@ def _manifest_inputs() -> list[Path]:
     settings = CORPUS_ROOT / "settings.json"
     out = [settings] if settings.exists() else []
     outside = []
-    # Which of several coexisting version directories is active is decided by
-    # `_resolve_plugin_dir` on directory MTIME, and mtime is not content. Three
-    # plugins here have two directories sharing one mtime, so the winner falls to
-    # `iterdir()` order. Red proof, flipping nothing but an mtime: the resolved
-    # supabase description went 790 -> 498 characters, which moves `resident`
-    # directly — while every frozen path stayed present and unchanged, because
-    # BOTH versions are in the freeze. Recording which paths were resolved is the
-    # only thing that makes that flip visible.
+    # Which of several coexisting version directories is active is decided by the
+    # installPath in `installed_plugins.json` — a file outside the freeze — and,
+    # where that file is missing or unreadable, by directory MTIME, which is not
+    # content (#229). Red proof from the mtime era, flipping nothing but an mtime:
+    # the resolved supabase description went 790 -> 498 characters, which moves
+    # `resident` directly — while every frozen path stayed present and unchanged,
+    # because BOTH versions are in the freeze. Recording which paths were resolved
+    # is the only thing that makes such a flip visible.
     for artifact in manifest_mod.build_manifest(CORPUS_ROOT).loaded:
         # expanduser, not a replace: `manifest._tilde` only abbreviates a LEADING
         # home prefix and returns anything else untouched, so an unanchored
