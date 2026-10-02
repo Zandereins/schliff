@@ -172,6 +172,12 @@ def test_project_scope_entry_wins_only_for_its_own_project(install: Path, tmp_pa
     ])
     assert "/old/" in _widget_path(build_manifest(claude_dir=install, project_dir=proj))
     assert "/new/" in _widget_path(build_manifest(claude_dir=install))
+    # Precedence, not list order: a user entry listed first must not shadow it.
+    _installed(install, "acme@some-market", [
+        {"scope": "user", "installPath": str(new)},
+        {"scope": scope, "projectPath": str(proj), "installPath": str(old)},
+    ])
+    assert "/old/" in _widget_path(build_manifest(claude_dir=install, project_dir=proj))
     other = tmp_path / "other"
     other.mkdir()
     assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=other))
