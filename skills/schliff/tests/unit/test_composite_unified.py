@@ -422,7 +422,8 @@ def test_a_mistyped_target_dimension_reddens_the_gate(bench_module, monkeypatch,
     The same hole kept `keyword-stuffing.md` permanently caught while it targeted
     the eval-suite-gated `triggers` dimension.
 
-    The mutation: drop the `0 <=` lower bound in `caught`, and this goes green.
+    The mutation: drop the `0 <=` lower bound in `caught`, and the gate goes
+    green again (exit 0), so this test fails.
     """
     typo = [dict(b) for b in bench_module.BENCHMARKS]
     typo[0]["target_dimension"] = "strucutre"

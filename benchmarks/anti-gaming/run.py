@@ -281,13 +281,16 @@ def main():
     # row does not prove the stuffing detector. Its `keyword_stuffing` issue is
     # what keeps it caught if that floor ever rises.
     #
-    # It CAN fire on a scorer IMPROVEMENT. `bloated-preamble.md` is caught purely
-    # by the `target_score < 80` threshold — the information-density curve emits
-    # no issue at all (efficiency 63, empty issue list) — so raising efficiency
-    # above 80 reddens every required context while separation is untouched
-    # (composite 26.4 against a clean control of 31.9). Measured. The other
-    # threshold-caught vectors are shielded by an issue keyword; this one is not,
-    # and correcting its declared detection string does not change that — only
+    # It CAN fire on a scorer IMPROVEMENT. Two vectors are caught purely by the
+    # `target_score < 80` threshold, with no issue keyword to shield them, so
+    # raising their target dimension above 80 reddens the gate:
+    # `bloated-preamble.md` (efficiency 63, and the information-density curve
+    # emits no issue at all) and `no-scope.md` (composability 20; its issues
+    # name missing contracts, none matches a `caught` keyword). For
+    # bloated-preamble that red comes while separation is untouched (composite
+    # 26.4 against a clean control of 31.9). Measured. The other five vectors
+    # are shielded by an issue keyword. Correcting bloated-preamble's declared
+    # detection string does not change this — with no issue to match, only
     # retiring the vector would.
     #
     # That red is not false — a declared detection really did stop penalising —
