@@ -33,6 +33,8 @@ SCRIPT_DIR = Path(__file__).parent
 # Import terminal_art for grade system and score cards
 from terminal_art import colored_bar, grade_colored, score_to_grade  # noqa: E402
 
+import shared  # noqa: E402
+
 # Action verb phrases extracted from imperative sentences in descriptions
 _ACTION_VERBS = [
     "improve", "optimize", "audit", "benchmark", "harden", "analyze",
@@ -878,8 +880,7 @@ def main() -> None:
     if args.output:
         eval_suite_path = str(Path(args.output).resolve())
     else:
-        skill_dir = Path(skill_path).parent
-        eval_suite_path = str(skill_dir / "eval-suite.json")
+        eval_suite_path = str(shared.eval_suite_path(skill_path))
 
     suite_json = json.dumps(suite, indent=2, ensure_ascii=False)
 
