@@ -146,8 +146,7 @@ python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR/SKILL.md" --eval-suite "$BAD_JS
 if [[ $? -ne 0 ]]; then
     pass "Malformed eval suite JSON → non-zero exit"
 else
-    # It might still work with auto-discovered eval suite, that's ok
-    pass "Malformed eval suite JSON → handled (auto-discovery fallback)"
+    fail "Malformed eval suite JSON" "a named suite must not fall back to the auto-discovered one"
 fi
 
 ##############################################################################
@@ -1315,18 +1314,18 @@ else
     fail "Unknown assertion type regression" "total=$_UNKNOWN_TOTAL, expected 0 (should be skipped)"
 fi
 
-# Test: text-gradient.py handles invalid eval-suite JSON structure gracefully
-# An array [] is valid JSON but not a valid eval-suite schema; must not crash
+# Test: text-gradient.py rejects a named eval-suite with the wrong structure
+# An array [] is valid JSON but not a valid eval-suite schema: exit 1 with a
+# message, like `schliff score`, and no traceback (#250)
 _BAD_SUITE="$TMPDIR_BASE/bad-suite.json"
 echo '[]' > "$_BAD_SUITE"
-_GRADIENT_RESULT=$(python3 "$SCRIPT_DIR/text-gradient.py" "$SKILL_DIR/SKILL.md" \
-    --json --eval-suite "$_BAD_SUITE" 2>/dev/null)
-_GRADIENT_VALID=$(echo "$_GRADIENT_RESULT" | \
-    python3 -c "import sys,json; json.load(sys.stdin); print('ok')" 2>/dev/null)
-if [[ "$_GRADIENT_VALID" == "ok" ]]; then
-    pass "text-gradient.py: invalid eval-suite schema → valid JSON output (no crash)"
+_GRADIENT_ERR=$(python3 "$SCRIPT_DIR/text-gradient.py" "$SKILL_DIR/SKILL.md" \
+    --json --eval-suite "$_BAD_SUITE" 2>&1 >/dev/null)
+_GRADIENT_RC=$?
+if [[ $_GRADIENT_RC -eq 1 && "$_GRADIENT_ERR" == *"eval-suite"* && "$_GRADIENT_ERR" != *Traceback* ]]; then
+    pass "text-gradient.py: invalid eval-suite schema → exit 1 with a message (no crash)"
 else
-    fail "text-gradient bad eval-suite" "output not valid JSON or script crashed"
+    fail "text-gradient bad eval-suite" "expected exit 1 and a message, got rc=$_GRADIENT_RC"
 fi
 
 # Test: parallel-runner.py --dry-run produces valid JSON without spawning processes

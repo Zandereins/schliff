@@ -18,7 +18,6 @@ Outputs composite score and per-dimension breakdown.
 import argparse
 import json
 import sys
-from pathlib import Path
 
 from scoring import (
     compute_composite,
@@ -28,7 +27,7 @@ from scoring import (
 )
 from scoring.formats import detect_format
 from scoring.registry import get_weights
-from shared import build_scores, load_eval_suite
+from shared import build_scores
 from shared import invalidate_cache as _shared_invalidate_cache
 
 
@@ -56,15 +55,10 @@ def main():
                              "Values are normalized to sum to 1.0.")
     args = parser.parse_args()
 
-    eval_suite = None
-    if args.eval_suite and Path(args.eval_suite).exists():
-        try:
-            eval_suite = json.loads(Path(args.eval_suite).read_text(encoding="utf-8"))
-        except json.JSONDecodeError as e:
-            print(f"Error: malformed eval-suite JSON '{args.eval_suite}': {e}", file=sys.stderr)
-            sys.exit(1)
-    else:
-        eval_suite = load_eval_suite(args.skill_path)
+    # The CLI owns how a named suite is read: a missing or unusable one is an
+    # error, never silently replaced by the auto-discovered sibling (#250).
+    from cli import _load_eval_suite_from_args
+    eval_suite = _load_eval_suite_from_args(args)
 
     # The registry owns which dimensions a format has. A hand-listed SKILL.md set
     # scored an AGENTS.md without operational_coverage, its heaviest dimension.

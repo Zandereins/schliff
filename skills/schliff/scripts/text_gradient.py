@@ -26,7 +26,7 @@ import score_skill as scorer  # noqa: E402
 from nlp import tokenize_meaningful  # noqa: E402
 from scoring.operational_coverage import _COMMAND_WEIGHTS as _OPCOV_COMMAND_WEIGHTS  # noqa: E402
 from scoring.operational_coverage import _DIRECTIVE_WEIGHTS as _OPCOV_DIRECTIVE_WEIGHTS  # noqa: E402
-from shared import extract_description, load_eval_suite, read_skill_safe, strip_frontmatter  # noqa: E402
+from shared import extract_description, read_skill_safe, strip_frontmatter  # noqa: E402
 
 # --- Effort classification ---
 EFFORT_SIMPLE = 1    # Add/remove a line or keyword
@@ -1247,15 +1247,10 @@ def main():
     )
     args = parser.parse_args()
 
-    eval_suite = None
-    if args.eval_suite and Path(args.eval_suite).exists():
-        try:
-            eval_suite = json.loads(Path(args.eval_suite).read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
-            print(f"Error: could not read eval-suite '{args.eval_suite}': {e}", file=sys.stderr)
-            sys.exit(1)
-    else:
-        eval_suite = load_eval_suite(args.skill_path)
+    # The CLI owns how a named suite is read: a missing or unusable one is an
+    # error, never silently replaced by the auto-discovered sibling (#250).
+    from cli import _load_eval_suite_from_args
+    eval_suite = _load_eval_suite_from_args(args)
 
     # Validate eval-suite structure before processing
     if eval_suite is not None:

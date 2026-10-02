@@ -177,3 +177,23 @@ def test_text_output_handles_a_dimension_without_issues(tmp_path):
     result = _run("score-skill.py", str(agents), home=tmp_path)
     assert result.returncode == 0, result.stderr[-400:]
     assert "Issues found" in result.stdout
+
+
+@pytest.mark.parametrize("script,extra", [("score-skill.py", ["--json"]), ("text_gradient.py", [])])
+@pytest.mark.parametrize("case", ["missing", "not-an-object", "a-directory"])
+def test_an_explicit_suite_that_cannot_be_used_ends_the_run(script, extra, case, tmp_path):
+    """#250: a suite the user named is never silently replaced by the sibling
+    one. Both scripts go through `cli._load_eval_suite_from_args`, like `schliff score`."""
+    skill = tmp_path / "s" / "SKILL.md"
+    skill.parent.mkdir()
+    skill.write_text(SKILL, encoding="utf-8")
+    (skill.parent / "eval-suite.json").write_text('{"triggers": []}', encoding="utf-8")
+    named = tmp_path / "named.json"
+    if case == "not-an-object":
+        named.write_text("[1, 2]", encoding="utf-8")
+    elif case == "a-directory":
+        named.mkdir()
+    result = _run(script, str(skill), "--eval-suite", str(named), *extra, home=tmp_path)
+    assert result.returncode == 1, result.stdout[-400:]
+    assert "Traceback" not in result.stderr, result.stderr[-400:]
+    assert "eval-suite" in result.stderr

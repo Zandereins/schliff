@@ -105,6 +105,9 @@ def _load_eval_suite_from_args(args: argparse.Namespace) -> "dict | None":
         except json.JSONDecodeError as e:
             print(f"Error: malformed eval-suite: {e}", file=sys.stderr)
             sys.exit(1)
+        except (UnicodeDecodeError, OSError) as e:
+            print(f"Error: could not read eval-suite '{args.eval_suite}': {e}", file=sys.stderr)
+            sys.exit(1)
         if not isinstance(suite, dict):
             print(
                 "Error: eval-suite must be a JSON object with triggers/quality/edges keys",
