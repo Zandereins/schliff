@@ -67,10 +67,8 @@ something a script should make quietly. `freeze_corpus.py verify` runs the same 
 without taking a measurement. The choice after a refusal is made deliberately and outside the command: re-freeze and say so in the
 case study, or restore the corpus to the frozen state and re-run. What it will not do is produce a
 number whose corpus is unknown. Add `--rehearsal` to try the run without writing a file that looks
-like the pre-registered one. `freeze_corpus.py write` refuses an empty corpus and a corpus smaller
-than the fullest manifest beside it, the guard against a run under the wrong `HOME`; its only
-escape is deleting that manifest, which contradicts keeping every manifest a record names. That
-contradiction, and the fact that `write` overwrites an existing manifest in place, are #230.
+like the pre-registered one. Manifests are append-only: a re-freeze writes a new dated manifest,
+and `freeze_corpus.py write` never overwrites an existing one.
 
 The file list comes from `skill_mesh.discover_skills`, which owns the question of which files count.
 The hashes do not: they are full sha256 over raw bytes, not that module's `content_hash`, which is
