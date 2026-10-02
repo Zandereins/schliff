@@ -15,7 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   weighs). `--no-clarity` keeps clarity on `.prompt` files, where it is a core dimension.
 - **An auto-discovered non-UTF-8 `eval-suite.json` no longer ends a run.** `score-skill.py` and `text_gradient.py`
   load the suite through the shared owner instead of their own copies; `init-skill.py` takes
-  the suite path from it. An explicit `--eval-suite` that cannot be read still exits 1.
+  the suite path from it. An explicit `--eval-suite` that exists but cannot be read still exits 1.
 - **Fix deltas and doctor composites follow the scorer.** The two regex patches report their
   gradient's delta instead of a hardcoded one, and `doctor` weights the composite by format.
 
