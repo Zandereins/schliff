@@ -163,18 +163,15 @@ def test_the_eval_suite_path_has_one_home():
     That is the #209 shape: the defect is not the expression, it is the number of
     homes. A caller outside the module needed it as a seventh, which surfaced it.
 
-    Keyed on the construction, not on wording: rebuild the path in either of
-    these two modules instead of calling `shared.eval_suite_path` and this goes
-    red.
+    Keyed on the construction, not on wording: rebuild the path anywhere under
+    `scripts/` instead of calling `shared.eval_suite_path` and this goes red.
 
-    **Scope, stated exactly.** This covers `shared.py` and `doctor.py`, the two
-    modules consolidated here. It is NOT a repository-wide uniqueness claim:
-    when this gate was first written repo-wide it immediately found five more
-    derivations — in `achievements.py`, `dashboard.py`, `init-skill.py`,
-    `score-skill.py` and `text_gradient.py` — which is precisely why a
-    consolidation needs a gate rather than an assertion that it is complete.
-    Those five are a separate, mechanical change; widening this list is what
-    closes them.
+    **Scope, stated exactly.** The whole `scripts/` tree except `dashboard.py`.
+    Written first for `shared.py` and `doctor.py` alone, the repo-wide run found
+    five more derivations; #225 routed `achievements.py`, `init-skill.py`,
+    `score-skill.py` and `text_gradient.py` through the owner. `dashboard.py`
+    keeps its copy until PR D deletes the module, and is skipped by name until
+    then.
     """
     import re
     from pathlib import Path as _P
@@ -190,15 +187,17 @@ def test_the_eval_suite_path_has_one_home():
     # obvious thing, not that it cannot be evaded.
     construction = re.compile(r"""(?:/\s*|,\s*)["']eval-suite\.json["']""")
     sites = []
-    for name in ("shared.py", "doctor.py"):
-        source = scripts / name
+    for source in sorted(scripts.rglob("*.py")):
+        if source.name == "dashboard.py":
+            continue
+        name = source.relative_to(scripts).as_posix()
         for n, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
             if construction.search(line):
                 sites.append(f"{name}:{n}")
 
     assert len(sites) == 1, (
-        f"the eval-suite path is derived in {len(sites)} places across "
-        f"shared.py and doctor.py, not one: {sites}"
+        f"the eval-suite path is derived in {len(sites)} places under "
+        f"scripts/, not one: {sites}"
     )
     assert sites[0].startswith("shared.py"), f"its one home should be shared.py, found {sites[0]}"
 
