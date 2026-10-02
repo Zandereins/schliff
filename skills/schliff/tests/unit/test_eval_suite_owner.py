@@ -172,6 +172,12 @@ def test_weights_on_a_system_prompt_use_its_own_profile(tmp_path):
     assert foreign.returncode == 1
     assert "unknown dimension 'structure'" in foreign.stderr
 
+    # runtime is headline-excluded on every profile: a weight for it can never count.
+    inert = _run("score-skill.py", str(prompt), "--json", "--weights", "runtime=0.1",
+                 home=tmp_path)
+    assert inert.returncode == 1
+    assert "unknown dimension 'runtime'" in inert.stderr
+
 
 def test_text_output_handles_a_dimension_without_issues(tmp_path):
     """operational_coverage returns no `issues` key; the text report read it

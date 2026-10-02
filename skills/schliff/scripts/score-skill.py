@@ -85,7 +85,7 @@ def main():
     if args.weights:
         # The format's profile owns its dimension names: a fixed list rejected
         # every system_prompt-only dimension and accepted names it then ignored.
-        valid_dimensions = set(get_weights(fmt)) | {"runtime"}
+        valid_dimensions = set(get_weights(fmt))
         custom_weights = {}
         for pair in args.weights.split(","):
             pair = pair.strip()

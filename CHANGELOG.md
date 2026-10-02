@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`score-skill.py` scores every format through the same path as `schliff score`.** It
+  detected no format and kept its own dimension list, so an AGENTS.md scored 34.5 where
+  `schliff score` gives 95.6. It now calls `build_scores` and `compute_composite` with the
+  detected format; SKILL.md output is unchanged. `--weights` accepts the format's own
+  dimension names and rejects names it would ignore (including `runtime`, which no profile
+  weighs). `--no-clarity` keeps clarity on `.prompt` files, where it is a core dimension.
+- **Custom weights on a system prompt no longer delete clarity and security.**
+  `compute_composite` dropped both whenever custom weights were given; on the system_prompt
+  profile they are core 0.15 dimensions, so even `--weights clarity=0.15`, the registry value,
+  lowered the composite. Only system prompts with custom weights are affected, and only upward.
+- **A non-UTF-8 `eval-suite.json` no longer ends a run.** `score-skill.py`, `text_gradient.py`
+  and `init-skill.py` load the suite through the shared owner instead of their own copies.
+- **Fix deltas and doctor composites follow the scorer.** The two regex patches report their
+  gradient's delta instead of a hardcoded one, and `doctor` weights the composite by format.
+
+### Removed
+
+- The standalone CLI of `achievements.py` (no command, doc or workflow called it).
+
 ## [8.12.0] - 2026-09-15
 
 ### Added
