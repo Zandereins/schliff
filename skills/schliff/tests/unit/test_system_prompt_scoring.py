@@ -214,7 +214,6 @@ class TestStructurePrompt:
         try:
             result = score_structure_prompt(path)
             # Dead content penalty should reduce score
-            details = result.get("details", {})
             issues = result.get("issues", [])
             # Either score is reduced or issues list mentions dead content
             assert result["score"] < 80 or any("todo" in i.lower() or "dead" in i.lower() for i in issues)

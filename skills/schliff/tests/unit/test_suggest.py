@@ -82,12 +82,7 @@ class TestSuggestRankingByImpact:
 
         assert len(gradients) > 0, "Expected at least one gradient for a bad skill"
 
-        # Verify sorted by delta descending (primary sort key is priority, which is
-        # derived from delta — so we verify the priority order holds for delta too)
-        deltas = [g["delta"] for g in gradients]
-        # Each delta must be >= the next (sorted descending by priority/delta)
-        # Allow ties — just verify no delta is strictly less than an earlier one
-        # by more than a floating point epsilon when priorities are equal
+        # Verify sorted by priority descending (ties allowed)
         for i in range(len(gradients) - 1):
             priority_a = gradients[i]["priority"]
             priority_b = gradients[i + 1]["priority"]
