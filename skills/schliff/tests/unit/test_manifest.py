@@ -231,21 +231,29 @@ def test_installed_plugin_without_skills_or_commands_is_not_a_finding(install: P
     json.dumps({"version": 2, "plugins": {"acme@some-market": ["{decoy}"]}}),
     json.dumps({"version": 2, "plugins": {"acme@some-market": [
         {"scope": "project", "projectPath": 7, "installPath": "{decoy}"}]}}),
+    # A relative or empty installPath would resolve against the working directory.
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [
+        {"scope": "user", "installPath": ""}]}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [
+        {"scope": "user", "installPath": "relative"}]}}),
 ])
 def test_unusable_installed_plugins_falls_back_to_the_disk_layout(install: Path, raw: str,
-                                                                   tmp_path: Path):
+                                                                   tmp_path: Path, monkeypatch):
     (install / "settings.json").write_text(
         json.dumps({"enabledPlugins": {"acme@some-market": True}}), encoding="utf-8")
     _skill(install / "plugins" / "cache" / "some-market" / "acme" / "1.2.3" / "skills",
            "widget")
     decoy = _skill(install / "decoy" / "skills", "widget").parents[1]
     _installed(install, "acme@some-market", raw.replace("{decoy}", str(decoy)))
+    _skill(tmp_path / "skills", "widget")
+    _skill(tmp_path / "relative" / "skills", "widget")
+    monkeypatch.chdir(tmp_path)
     # A project is set so a project-scope entry is considered at all.
     m = build_manifest(claude_dir=install, project_dir=tmp_path)
     assert "/1.2.3/" in _widget_path(m)
 
 
-@pytest.mark.parametrize("shape", ["symlink-loop", "nul-byte"])
+@pytest.mark.parametrize("shape", ["symlink-loop", "nul-byte", "project-dir-loop"])
 def test_an_unresolvable_project_path_skips_only_that_entry(install: Path, tmp_path: Path,
                                                             shape: str):
     """A recorded projectPath that cannot be resolved is not this project; it must not
@@ -255,13 +263,20 @@ def test_an_unresolvable_project_path_skips_only_that_entry(install: Path, tmp_p
         (tmp_path / "a").symlink_to(tmp_path / "b")
         (tmp_path / "b").symlink_to(tmp_path / "a")
         recorded = str(tmp_path / "a")
-    else:
+    elif shape == "nul-byte":
         recorded = "/a\x00b"
+    else:
+        recorded = str(tmp_path)
+    given = tmp_path
+    if shape == "project-dir-loop":
+        (tmp_path / "la").symlink_to(tmp_path / "lb")
+        (tmp_path / "lb").symlink_to(tmp_path / "la")
+        given = tmp_path / "la"
     _installed(install, "acme@some-market", [
         {"scope": "local", "projectPath": recorded, "installPath": str(old)},
         {"scope": "user", "installPath": str(new)},
     ])
-    assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=tmp_path))
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=given))
 
 
 def test_output_is_renderable_and_serialisable(install: Path):
