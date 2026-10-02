@@ -170,10 +170,10 @@ def test_the_eval_suite_path_has_one_home():
     **Scope, stated exactly.** This covers `shared.py` and `doctor.py`, the two
     modules consolidated here. It is NOT a repository-wide uniqueness claim:
     when this gate was first written repo-wide it immediately found five more
-    derivations — in `achievements.py`, `dashboard.py`, `init-skill.py`,
-    `score-skill.py` and `text_gradient.py` — which is precisely why a
-    consolidation needs a gate rather than an assertion that it is complete.
-    Those five are a separate, mechanical change; widening this list is what
+    derivations — in `achievements.py`, `dashboard.py` (since removed),
+    `init-skill.py`, `score-skill.py` and `text_gradient.py` — which is
+    precisely why a consolidation needs a gate rather than an assertion that
+    it is complete. The remaining four are a separate, mechanical change; widening this list is what
     closes them.
     """
     import re
