@@ -19,12 +19,14 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 
 REQUIRED_V = 'python3 -m pytest tests/unit/ -m "not gate_power" -v'
 REQUIRED_Q = 'python3 -m pytest tests/unit/ -m "not gate_power" -q'
+# macOS runners only: wall-clock ratio tests are enforced by every Ubuntu path.
+REQUIRED_MACOS = 'python3 -m pytest tests/unit/ -m "not gate_power and not wall_clock" -q'
 # Every pytest invocation in CI and in the Makefile, exactly. A new one, or an
 # extra option on an existing one, has to be added here on purpose.
 EXPECTED = {
     ".github/workflows/gate-power.yml": ["python3 -m pytest tests/unit/ -m gate_power -v"],
     ".github/workflows/publish.yml": [REQUIRED_Q],
-    ".github/workflows/test.yml": [REQUIRED_V, REQUIRED_Q],
+    ".github/workflows/test.yml": [REQUIRED_V, REQUIRED_MACOS],
     "Makefile": ['/usr/bin/python3 -m pytest skills/schliff/tests -m "not gate_power" -q'],
 }
 # Ways to drop tests that do not show in an invocation's own text.
@@ -78,3 +80,35 @@ def test_the_marker_sits_on_the_self_check_and_nowhere_else():
         "unit/test_patterns_scale_linearly.py",
         "def test_the_gate_still_fires_on_the_real_defect_class():",
     )], uses
+
+
+def test_wall_clock_sits_on_the_measured_flakes_and_nowhere_else():
+    """Only tests whose wall-clock ratio was measured flaking on macOS carry it.
+
+    Adding it elsewhere silently removes a test from the macOS job, so a new use
+    has to be added here on purpose, with its measurement.
+    """
+    uses = []
+    for path in sorted(TESTS.rglob("*.py")):
+        if path.name == Path(__file__).name:
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for i, line in enumerate(lines):
+            if "mark.wall_clock" in line:
+                following = next((ln for ln in lines[i + 1:] if ln.strip().startswith("def ")), "")
+                uses.append((path.relative_to(TESTS).as_posix(), following.strip()))
+    assert uses == [
+        ("unit/test_manifest.py",
+         "def test_unterminated_frontmatter_parses_in_linear_time(self, tmp_path):"),
+        ("unit/test_patterns_scale_linearly.py", "def test_pattern_scales_linearly(path, rx):"),
+    ], uses
+
+
+def test_only_the_macos_job_deselects_wall_clock():
+    """Every Ubuntu path, publish and the Makefile still run the wall-clock tests."""
+    for entry, runs in EXPECTED.items():
+        for run in runs:
+            assert ("wall_clock" in run) == (run == REQUIRED_MACOS), (entry, run)
+    workflow = (WORKFLOWS / "test.yml").read_text(encoding="utf-8")
+    macos_job = workflow.split("  test-macos:", 1)[1].split("\n  test-report:", 1)[0]
+    assert "runs-on: macos-latest" in macos_job and REQUIRED_MACOS in macos_job

@@ -86,4 +86,5 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "security: marks security-specific tests",
     "gate_power: checks that the ReDoS gate can still fire; load-dependent, run by gate-power.yml, not by the required jobs",
+    "wall_clock: asserts a ratio of wall-clock timings; required on every Ubuntu job, deselected on macOS runners only",
 ]
