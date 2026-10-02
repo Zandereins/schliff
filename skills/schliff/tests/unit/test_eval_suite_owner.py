@@ -118,26 +118,59 @@ def test_an_explicit_non_utf8_suite_is_an_error_not_a_traceback(
     assert "could not read eval-suite" in result.stderr
 
 
+PROMPT = (
+    "You are a helpful assistant.\n\nAlways cite sources.\n"
+    "Never invent a citation.\n\nReturn JSON with a `result` key.\n"
+)
+
+
 def test_no_clarity_does_not_zero_a_headline_dimension(tmp_path):
     """The composite uses a full denominator, so a popped dimension counts as
-    zero. On system_prompt clarity weighs 0.15; on SKILL.md the opt-out keeps
-    dropping it, as it always has."""
+    zero. On system_prompt clarity weighs 0.15, so the opt-out leaves it in."""
     prompt = tmp_path / "bot.prompt"
-    prompt.write_text(
-        "You are a helpful assistant.\n\nAlways cite sources.\n"
-        "Never invent a citation.\n\nReturn JSON with a `result` key.\n",
-        encoding="utf-8",
-    )
+    prompt.write_text(PROMPT, encoding="utf-8")
     full = json.loads(_run("score-skill.py", str(prompt), "--json", home=tmp_path).stdout)
     opted = json.loads(_run("score-skill.py", str(prompt), "--json", "--no-clarity",
                             home=tmp_path).stdout)
     assert opted["composite_score"] == pytest.approx(full["composite_score"], abs=0.05)
 
-    skill = tmp_path / "SKILL.md"
-    skill.write_text(SKILL, encoding="utf-8")
-    opted = json.loads(_run("score-skill.py", str(skill), "--json", "--no-clarity",
+
+@pytest.mark.parametrize("filename", ["SKILL.md", "CLAUDE.md", ".cursorrules"])
+def test_no_clarity_still_drops_clarity_on_the_skill_md_family(filename, tmp_path):
+    """Each format in the guard is pinned on its own: dropping one from the
+    tuple would silently keep clarity for that format."""
+    path = tmp_path / filename
+    path.write_text(SKILL, encoding="utf-8")
+    opted = json.loads(_run("score-skill.py", str(path), "--json", "--no-clarity",
                             home=tmp_path).stdout)
     assert "clarity" not in opted["dimensions"]
+
+
+def test_weights_on_a_system_prompt_use_its_own_profile(tmp_path):
+    """`--weights` must speak the format's dimensions, and leaving clarity and
+    security out of the override must not delete two core 0.15 dimensions."""
+    prompt = tmp_path / "bot.prompt"
+    prompt.write_text(PROMPT, encoding="utf-8")
+    full = json.loads(_run("score-skill.py", str(prompt), "--json", home=tmp_path).stdout)
+
+    # clarity's own registry weight: the composite must not move.
+    same = _run("score-skill.py", str(prompt), "--json", "--weights", "clarity=0.15",
+                home=tmp_path)
+    assert same.returncode == 0, same.stderr[-400:]
+    same = json.loads(same.stdout)
+    assert same["confidence"]["total"] == full["confidence"]["total"]
+    assert same["composite_score"] == pytest.approx(full["composite_score"], abs=0.05)
+
+    # A dimension only this profile has is accepted ...
+    own = _run("score-skill.py", str(prompt), "--json", "--weights", "output_contract=1",
+               home=tmp_path)
+    assert own.returncode == 0, own.stderr[-400:]
+
+    # ... and a skill.md name the profile does not score is rejected, not ignored.
+    foreign = _run("score-skill.py", str(prompt), "--json", "--weights", "structure=0.3",
+                   home=tmp_path)
+    assert foreign.returncode == 1
+    assert "unknown dimension 'structure'" in foreign.stderr
 
 
 def test_text_output_handles_a_dimension_without_issues(tmp_path):

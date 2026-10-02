@@ -27,7 +27,8 @@ from scoring import (
     score_runtime,
 )
 from scoring.formats import detect_format
-from shared import VALID_DIMENSIONS, build_scores, load_eval_suite
+from scoring.registry import get_weights
+from shared import build_scores, load_eval_suite
 from shared import invalidate_cache as _shared_invalidate_cache
 
 
@@ -82,14 +83,17 @@ def main():
     # Parse custom weights if provided
     custom_weights = None
     if args.weights:
+        # The format's profile owns its dimension names: a fixed list rejected
+        # every system_prompt-only dimension and accepted names it then ignored.
+        valid_dimensions = set(get_weights(fmt)) | {"runtime"}
         custom_weights = {}
         for pair in args.weights.split(","):
             pair = pair.strip()
             if "=" in pair:
                 k, v = pair.split("=", 1)
                 dim_name = k.strip()
-                if dim_name not in VALID_DIMENSIONS:
-                    print(f"Error: unknown dimension '{dim_name}' — valid: {', '.join(sorted(VALID_DIMENSIONS))}", file=sys.stderr)
+                if dim_name not in valid_dimensions:
+                    print(f"Error: unknown dimension '{dim_name}' — valid: {', '.join(sorted(valid_dimensions))}", file=sys.stderr)
                     sys.exit(1)
                 try:
                     custom_weights[dim_name] = float(v.strip())
