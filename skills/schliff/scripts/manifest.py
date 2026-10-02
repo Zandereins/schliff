@@ -284,6 +284,15 @@ def _installed_plugins(claude_dir: Path) -> dict:
     return plugins if isinstance(plugins, dict) else {}
 
 
+def _resolved(path: str) -> Path | None:
+    """`path` resolved, or None when it cannot be: a symlink loop (RuntimeError
+    before 3.13) or an embedded NUL (ValueError) is not any project's path."""
+    try:
+        return Path(path).resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
 def _installed_plugin_dir(entries: object, project_dir: Path | None) -> Path | None:
     """The recorded installPath: this project's project/local entry, else a user/managed one."""
     project = Path(project_dir).resolve() if project_dir else None
@@ -293,7 +302,7 @@ def _installed_plugin_dir(entries: object, project_dir: Path | None) -> Path | N
             continue
         if (e.get("scope") in ("project", "local") and project is not None
                 and isinstance(e.get("projectPath"), str)
-                and Path(e["projectPath"]).resolve() == project):
+                and _resolved(e["projectPath"]) == project):
             chosen = e["installPath"]
             break
         if e.get("scope") in ("user", "managed") and chosen is None:

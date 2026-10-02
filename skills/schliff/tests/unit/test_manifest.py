@@ -245,6 +245,25 @@ def test_unusable_installed_plugins_falls_back_to_the_disk_layout(install: Path,
     assert "/1.2.3/" in _widget_path(m)
 
 
+@pytest.mark.parametrize("shape", ["symlink-loop", "nul-byte"])
+def test_an_unresolvable_project_path_skips_only_that_entry(install: Path, tmp_path: Path,
+                                                            shape: str):
+    """A recorded projectPath that cannot be resolved is not this project; it must not
+    end the run (3.10-3.12 raise RuntimeError on a loop, every version ValueError on NUL)."""
+    new, old = _two_revisions(install)
+    if shape == "symlink-loop":
+        (tmp_path / "a").symlink_to(tmp_path / "b")
+        (tmp_path / "b").symlink_to(tmp_path / "a")
+        recorded = str(tmp_path / "a")
+    else:
+        recorded = "/a\x00b"
+    _installed(install, "acme@some-market", [
+        {"scope": "local", "projectPath": recorded, "installPath": str(old)},
+        {"scope": "user", "installPath": str(new)},
+    ])
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=tmp_path))
+
+
 def test_output_is_renderable_and_serialisable(install: Path):
     m = build_manifest(claude_dir=install)
     assert "resident every turn" in format_manifest(m)
