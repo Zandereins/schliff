@@ -57,24 +57,30 @@ def test_a_changed_reference_is_drift(corpus, tmp_path):
     assert fc.verify(manifest) == 1, "a reference the token cost reads must count as drift"
 
 
-def test_write_refuses_an_empty_or_shrinking_corpus(corpus, tmp_path, capsys):
-    """`discover_skills` skips a missing directory, so a wrong HOME truncated the artifact."""
-    root, fc = corpus
-    manifest = tmp_path / "m.jsonl"
-    fc.write(manifest)
-
+def test_write_refuses_an_empty_corpus(corpus, tmp_path, capsys):
+    """`discover_skills` skips a missing directory, so a wrong HOME found nothing."""
+    _, fc = corpus
     fc.CORPUS_ROOT = tmp_path / "nowhere"
     with pytest.raises(SystemExit) as empty:
-        fc.write(tmp_path / "other.jsonl")
+        fc.write(tmp_path / "m.jsonl")
     assert empty.value.code == fc.EXIT_BROKEN
     assert "empty manifest" in capsys.readouterr().err
 
-    fc.CORPUS_ROOT = root
-    (root / "skills" / "demo" / "references" / "notes.md").unlink()
-    with pytest.raises(SystemExit) as shrink:
+
+def test_write_never_overwrites_a_manifest(corpus, tmp_path, capsys):
+    """Manifests are append-only: a record names one, so rewriting it in place breaks that record."""
+    root, fc = corpus
+    manifest = tmp_path / "m.jsonl"
+    fc.write(manifest)
+    frozen = manifest.read_bytes()
+
+    # A grown corpus: nothing about the new freeze looks suspicious, and it still must not land here.
+    (root / "skills" / "demo" / "references" / "more.md").write_text("# more\n", encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
         fc.write(manifest)
-    assert shrink.value.code == fc.EXIT_BROKEN
-    assert "refusing to write" in capsys.readouterr().err
+    assert exc.value.code == fc.EXIT_BROKEN
+    assert "already exists" in capsys.readouterr().err
+    assert manifest.read_bytes() == frozen
 
 
 def test_write_refuses_a_file_it_cannot_freeze(corpus, tmp_path, monkeypatch, capsys):
