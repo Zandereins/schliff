@@ -46,6 +46,25 @@ class TestReadSkillSafe:
         result = read_skill_safe(str(f))
         assert result == "modified"
 
+    def test_size_limit_counts_bytes_not_characters(self, tmp_path):
+        """#219a: the limit and its message are in bytes. A multibyte file over
+        the limit in bytes but under it in characters must be rejected."""
+        f = tmp_path / "multibyte.md"
+        n_chars = MAX_SKILL_SIZE * 3 // 5
+        f.write_text("é" * n_chars, encoding="utf-8")  # 2 bytes per char
+        size = f.stat().st_size
+        assert n_chars < MAX_SKILL_SIZE < size
+        with pytest.raises(ValueError, match=f"{size:,} bytes"):
+            read_skill_safe(str(f))
+
+    def test_newlines_and_invalid_bytes_match_read_text(self, tmp_path):
+        """Reading bytes must hand scorers the same text Path.read_text did:
+        CRLF and lone CR become LF, invalid UTF-8 becomes U+FFFD."""
+        f = tmp_path / "crlf.md"
+        f.write_bytes(b"---\r\nname: x\r\n---\r\nold mac\rline\r\n\xff end\n")
+        expected = f.read_text(encoding="utf-8", errors="replace")
+        assert read_skill_safe(str(f)) == expected
+
 
 class TestExtractDescription:
     def test_inline_description(self):
