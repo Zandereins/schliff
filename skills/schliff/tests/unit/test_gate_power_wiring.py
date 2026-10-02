@@ -102,9 +102,15 @@ def test_wall_clock_selects_exactly_the_measured_flakes():
     # read as "the marker is not there".
     assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
     ids = [line for line in proc.stdout.splitlines() if "::" in line]
-    names = {i.split("::")[-1].split("[")[0] for i in ids}
-    assert names == {"test_pattern_scales_linearly",
-                     "test_unterminated_frontmatter_parses_in_linear_time"}, sorted(names)
+    # Full node ids (relative to the rootdir, the repo root holding pyproject.toml),
+    # parametrization stripped: a copy of a marked test under the same name in
+    # another file or class is a different node and fails here.
+    nodes = {i.split("[")[0] for i in ids}
+    assert nodes == {
+        "skills/schliff/tests/unit/test_manifest.py::TestFrontmatterParseIsBoundedAndLinear"
+        "::test_unterminated_frontmatter_parses_in_linear_time",
+        "skills/schliff/tests/unit/test_patterns_scale_linearly.py::test_pattern_scales_linearly",
+    }, sorted(nodes)
     assert sum("test_unterminated_frontmatter" in i for i in ids) == 1, ids
 
 

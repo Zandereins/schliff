@@ -380,7 +380,8 @@ rule with an allowlist; that design was prototyped and rejected on measurement â
 
   *Amendment 2026-10-02:* deselecting the self-check did not end the macOS reds. After
   #241, from 2026-09-30 to 10-02, the Tests workflow ran 48 times. `test-macos` was red in
-  2 of 50 attempts and the five Ubuntu jobs in 0 of 250. Both macOS reds came from a
+  2 of 50 attempts and the five Ubuntu jobs in 0 of 240 runs (the API lists 250, but
+  "re-run failed jobs" copies the green Ubuntu jobs into attempt 2 without running them). Both macOS reds came from a
   ratio of wall-clock timings. One was `test_pattern_scales_linearly[base._RE_SPECIFIC_REF]`
   at 1.51x and 1.53x against 1.5, with the calibrator at 1.73 and 1.98, inside its band.
   The other was `test_manifest.py`'s frontmatter linearity check at 4.31x against 3.0 on
