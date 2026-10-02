@@ -393,11 +393,9 @@ retiring a vector should require. It lives in `run.py` as `MIN_VECTORS`, with ex
 in the gate itself and not only in a test, because the guidance above tells contributors to check a
 new vector with `run.py --json`, and that invocation has to be the one that refuses.
 
-Still open, and NOT what blocks a new vector: `pyproject.toml`'s `testpaths` excludes
-`benchmarks/`, so no default run collects `test_benchmark.py`. (Its two `== 6` assertions against
-seven benchmarks were fixed on 2026-08-29 and the file passes — an earlier version of this
-paragraph still called it red, which was a false claim about the commit correcting it.) What actually blocks adding a vector is the opposite of what this
-paragraph assumed — it is not that nobody would run it, it is that everybody does: a vector whose
+`benchmarks/anti-gaming/test_benchmark.py`, which no default run collected, was deleted under #221:
+its checks are covered by the gate itself and by `test_composite_unified.py`. What actually
+blocks adding a vector is the opposite of what an earlier version of this paragraph assumed — it is not that nobody would run it, it is that everybody does: a vector whose
 composite reaches the clean control makes `violations` non-empty and reddens five required contexts,
 with `enforce_admins: true` and no override. Score every new vector locally with `run.py --json`
 before committing it. The SSH-address vector (Amendment 2026-08-25) is gated on that, not on CI
