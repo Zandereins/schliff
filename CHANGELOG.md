@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The anti-gaming gate no longer counts an unmeasured target as caught.** `caught` read the
+  -1 "not measured" sentinel as a score below 80, so a typo in one `target_dimension` still
+  reported 7/7 and exit 0, and `keyword-stuffing.md`, aimed at the eval-suite-gated `triggers`,
+  was caught permanently. `caught` now requires `0 <= target_score`, and the vector targets
+  `efficiency`. Its 38 there is the zero-signal floor, not a stuffing penalty, and its
+  declared detection now says so; `bloated-preamble.md`'s now names the information-density
+  curve that actually lowers it. The uncollected `benchmarks/anti-gaming/test_benchmark.py`
+  is removed (#221).
+
 ## [8.12.0] - 2026-09-15
 
 ### Added

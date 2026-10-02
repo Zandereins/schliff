@@ -410,3 +410,29 @@ def test_a_duplicate_declaration_fails_even_without_a_removal(bench_module, monk
     out = capsys.readouterr().out
     assert "DECLARED MORE THAN ONCE" in out, out[-300:]
     assert "inflated by duplicate declarations" in out, "the headline must not overstate coverage"
+
+
+def test_a_mistyped_target_dimension_reddens_the_gate(bench_module, monkeypatch, capsys):
+    """An unmeasured target must not read as a penalised one.
+
+    `run_benchmarks` looks the target up with a -1 default, and `caught` used to
+    be `target_score < 80`, so the sentinel counted as caught. Measured at
+    c7f63fa: a typo in one `target_dimension` left the run at "7/7 gaming
+    attempts detected" and exit 0 — the vector was no longer measured at all.
+    The same hole kept `keyword-stuffing.md` permanently caught while it targeted
+    the eval-suite-gated `triggers` dimension.
+
+    The mutation: drop the `0 <=` lower bound in `caught`, and this goes green.
+    """
+    typo = [dict(b) for b in bench_module.BENCHMARKS]
+    typo[0]["target_dimension"] = "strucutre"
+    monkeypatch.setattr(bench_module, "BENCHMARKS", typo)
+    monkeypatch.setattr(sys, "argv", ["run.py"])
+
+    with pytest.raises(SystemExit) as exc:
+        bench_module.main()
+
+    assert exc.value.code == 1, "a target the scorer never measured must not pass as caught"
+    out = capsys.readouterr().out
+    assert "VECTORS NO LONGER CAUGHT" in out, out[-400:]
+    assert typo[0]["file"] in out
