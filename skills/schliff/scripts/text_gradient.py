@@ -1250,8 +1250,8 @@ def main():
     eval_suite = None
     if args.eval_suite and Path(args.eval_suite).exists():
         try:
-            eval_suite = json.loads(Path(args.eval_suite).read_text())
-        except (json.JSONDecodeError, OSError) as e:
+            eval_suite = json.loads(Path(args.eval_suite).read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
             print(f"Error: could not read eval-suite '{args.eval_suite}': {e}", file=sys.stderr)
             sys.exit(1)
     else:

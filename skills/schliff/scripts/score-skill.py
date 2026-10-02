@@ -72,8 +72,11 @@ def main():
     # Not in any registry list, but this script's JSON has always carried it.
     scores["runtime"] = score_runtime(args.skill_path, eval_suite, enabled=args.runtime)
 
-    # Clarity dimension (default on, opt-out with --no-clarity)
-    if args.no_clarity:
+    # Clarity dimension (default on, opt-out with --no-clarity). Only for the
+    # skill.md family, where it weighs 0.05: the composite uses a full
+    # denominator, so a popped dimension counts as zero; on system_prompt the
+    # flag would zero a 0.15-weight dimension. Same guard as dashboard.py.
+    if args.no_clarity and fmt in ("skill.md", "claude.md", "cursorrules"):
         scores.pop("clarity", None)
 
     # Parse custom weights if provided

@@ -104,3 +104,47 @@ def test_score_skill_agrees_with_schliff_score_on_agents_md(tmp_path):
     theirs = json.loads(_run("cli.py", "score", str(agents), "--json", home=tmp_path).stdout)
     assert "operational_coverage" in ours["dimensions"]
     assert ours["composite_score"] == pytest.approx(theirs["composite_score"], abs=0.05)
+
+
+def test_an_explicit_non_utf8_suite_is_an_error_not_a_traceback(
+        skill_with_binary_suite, tmp_path):
+    """An explicit `--eval-suite` the user named should still stop the run, but
+    with a message: UnicodeDecodeError is not a JSONDecodeError."""
+    suite = skill_with_binary_suite.parent / "eval-suite.json"
+    result = _run("text_gradient.py", str(skill_with_binary_suite),
+                  "--eval-suite", str(suite), "--json", home=tmp_path)
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr, result.stderr[-400:]
+    assert "could not read eval-suite" in result.stderr
+
+
+def test_no_clarity_does_not_zero_a_headline_dimension(tmp_path):
+    """The composite uses a full denominator, so a popped dimension counts as
+    zero. On system_prompt clarity weighs 0.15; on SKILL.md the opt-out keeps
+    dropping it, as it always has."""
+    prompt = tmp_path / "bot.prompt"
+    prompt.write_text(
+        "You are a helpful assistant.\n\nAlways cite sources.\n"
+        "Never invent a citation.\n\nReturn JSON with a `result` key.\n",
+        encoding="utf-8",
+    )
+    full = json.loads(_run("score-skill.py", str(prompt), "--json", home=tmp_path).stdout)
+    opted = json.loads(_run("score-skill.py", str(prompt), "--json", "--no-clarity",
+                            home=tmp_path).stdout)
+    assert opted["composite_score"] == pytest.approx(full["composite_score"], abs=0.05)
+
+    skill = tmp_path / "SKILL.md"
+    skill.write_text(SKILL, encoding="utf-8")
+    opted = json.loads(_run("score-skill.py", str(skill), "--json", "--no-clarity",
+                            home=tmp_path).stdout)
+    assert "clarity" not in opted["dimensions"]
+
+
+def test_text_output_handles_a_dimension_without_issues(tmp_path):
+    """operational_coverage returns no `issues` key; the text report read it
+    with `[]` and ended with `Error: 'issues'`."""
+    agents = tmp_path / "AGENTS.md"
+    agents.write_text(BARE_AGENTS, encoding="utf-8")
+    result = _run("score-skill.py", str(agents), home=tmp_path)
+    assert result.returncode == 0, result.stderr[-400:]
+    assert "Issues found" in result.stdout
