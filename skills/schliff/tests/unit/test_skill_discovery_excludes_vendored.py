@@ -166,13 +166,12 @@ def test_the_eval_suite_path_has_one_home():
     Keyed on the construction, not on wording: rebuild the path anywhere under
     `scripts/` instead of calling `shared.eval_suite_path` and this goes red.
 
-    **Scope, stated exactly.** The whole `scripts/` tree except `dashboard.py`.
-    Written first for `shared.py` and `doctor.py` alone, the repo-wide run found
-    five more derivations; #225 routed `init-skill.py`, `score-skill.py` and
+    **Scope, stated exactly.** The whole `scripts/` tree. Written first for
+    `shared.py` and `doctor.py` alone, the repo-wide run found five more
+    derivations; #225 routed `init-skill.py`, `score-skill.py` and
     `text_gradient.py` through the owner and deleted the standalone CLI of
-    `achievements.py` that held the fourth. `dashboard.py`
-    keeps its copy until PR D deletes the module, and is skipped by name until
-    then.
+    `achievements.py` that held the fourth. The fifth went with `dashboard.py`
+    (#212).
     """
     import re
     from pathlib import Path as _P
@@ -189,8 +188,6 @@ def test_the_eval_suite_path_has_one_home():
     construction = re.compile(r"""(?:/\s*|,\s*)["']eval-suite\.json["']""")
     sites = []
     for source in sorted(scripts.rglob("*.py")):
-        if source.name == "dashboard.py":
-            continue
         name = source.relative_to(scripts).as_posix()
         for n, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
             if construction.search(line):

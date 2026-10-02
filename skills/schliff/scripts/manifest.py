@@ -267,11 +267,57 @@ def _enabled_plugins(claude_dir: Path) -> dict[str, bool]:
     return raw if isinstance(raw, dict) else {}
 
 
+def _installed_plugins(claude_dir: Path) -> dict:
+    """`installed_plugins.json` is the authority on WHICH revision is installed.
+
+    Only that — whether a plugin is on is `_enabled_plugins`' question. Anything but
+    the version-2 shape returns {}, and the caller falls back to the disk layout.
+    """
+    try:
+        data = json.loads((claude_dir / "plugins" / "installed_plugins.json")
+                          .read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict) or data.get("version") != 2:
+        return {}
+    plugins = data.get("plugins")
+    return plugins if isinstance(plugins, dict) else {}
+
+
+def _resolved(path: str) -> Path | None:
+    """`path` resolved, or None when it cannot be: a symlink loop (RuntimeError
+    before 3.13) or an embedded NUL (ValueError) names no project."""
+    try:
+        return Path(path).resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
+def _installed_plugin_dir(entries: object, project_dir: Path | None) -> Path | None:
+    """The recorded installPath: this project's project/local entry, else a user/managed one."""
+    project = _resolved(str(project_dir)) if project_dir else None
+    chosen = None
+    for e in entries if isinstance(entries, list) else []:
+        if not isinstance(e, dict) or not isinstance(e.get("installPath"), str):
+            continue
+        if (e.get("scope") in ("project", "local") and project is not None
+                and isinstance(e.get("projectPath"), str)
+                and _resolved(e["projectPath"]) == project):
+            chosen = e["installPath"]
+            break
+        if e.get("scope") in ("user", "managed") and chosen is None:
+            chosen = e["installPath"]
+    # Relative (or empty) would resolve against the working directory, not the install.
+    if chosen is None or not Path(chosen).is_absolute() or not Path(chosen).is_dir():
+        return None
+    return Path(chosen)
+
+
 def _resolve_plugin_dir(plugins_root: Path, package: str,
                         marketplace: str) -> Path | None:
     """Locate an enabled plugin's payload directory on disk.
 
-    The layout is not `plugins/<package>` — that guess reported thirteen working
+    The fallback for when `installed_plugins.json` names no usable installPath. The layout is not `plugins/<package>` — that guess reported thirteen working
     plugins as missing on a live install. It is `plugins/cache/<marketplace>/<package>`,
     sometimes with one extra version or content-hash segment beneath it
     (`cache/openai-codex/codex/1.0.1/`, `cache/vault-sync/vault-sync/9904d91688b1/`),
@@ -330,13 +376,17 @@ def build_manifest(claude_dir: Path | None = None,
         _scan_command_root(proj / "commands", "", "project", out)
 
     enabled = _enabled_plugins(claude_dir)
+    installed = _installed_plugins(claude_dir)
     plugins_root = claude_dir / "plugins"
     seen_packages: dict[str, str] = {}
     for key, on in sorted(enabled.items()):
         if on is not True:
             continue
         package, _, marketplace = key.partition("@")
-        pdir = _resolve_plugin_dir(plugins_root, package, marketplace)
+        # The recorded installPath first: it may hold neither skills/ nor commands/
+        # (an MCP-only plugin) and is then present with 0 artifacts, not a finding.
+        pdir = (_installed_plugin_dir(installed.get(key), project_dir)
+                or _resolve_plugin_dir(plugins_root, package, marketplace))
         if pdir is None:
             # Enabled in settings but absent on disk — a real, silent no-op.
             out.findings.append(Finding(

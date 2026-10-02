@@ -1329,20 +1329,6 @@ else
     fail "text-gradient bad eval-suite" "output not valid JSON or script crashed"
 fi
 
-# Test: dashboard.py produces valid JSON with expected top-level keys
-_DASHBOARD_RESULT=$(python3 "$SCRIPT_DIR/dashboard.py" "$SKILL_DIR/SKILL.md" --json 2>/dev/null)
-_DASHBOARD_VALID=$(echo "$_DASHBOARD_RESULT" | python3 -c "
-import sys,json
-d=json.load(sys.stdin)
-assert 'composite_score' in d or 'skill_name' in d
-print('ok')
-" 2>/dev/null)
-if [[ "$_DASHBOARD_VALID" == "ok" ]]; then
-    pass "dashboard.py: produces valid JSON with expected keys"
-else
-    fail "dashboard.py output" "missing composite_score/skill_name or invalid JSON"
-fi
-
 # Test: parallel-runner.py --dry-run produces valid JSON without spawning processes
 _PARALLEL_RESULT=$(python3 "$SCRIPT_DIR/parallel-runner.py" "$SKILL_DIR/SKILL.md" \
     --dry-run --json 2>/dev/null)
@@ -1459,21 +1445,6 @@ fi
 
 section "18. New Features Tests"
 
-# Dashboard: gauge bars present
-DASH_OUT=$(python3 "$SCRIPT_DIR/dashboard.py" "$SKILL_DIR/SKILL.md" 2>/dev/null)
-if echo "$DASH_OUT" | grep -q "█"; then
-    pass "dashboard.py: gauge bars rendered in text output"
-else
-    fail "dashboard.py gauges" "no gauge bars found"
-fi
-
-# Dashboard: achievements section present
-if echo "$DASH_OUT" | grep -q "Achievements:"; then
-    pass "dashboard.py: achievements section present"
-else
-    fail "dashboard.py achievements" "no achievements section"
-fi
-
 # Auto-improve: JSON has elapsed_seconds and sparkline fields
 AI_OUT=$(python3 "$SCRIPT_DIR/auto-improve.py" "$SKILL_DIR/SKILL.md" --dry-run --max-iterations 0 --json 2>/dev/null)
 if echo "$AI_OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'elapsed_seconds' in d and 'sparkline' in d" 2>/dev/null; then
@@ -1586,14 +1557,6 @@ if [[ "$GRADE_FAILED" == "0" ]]; then
     pass "terminal_art.py: $GRADE_PASSED tests passed (grades, heatmap, bars, sparkline, banner)"
 else
     fail "terminal_art.py" "$GRADE_PASSED passed, $GRADE_FAILED failed"
-fi
-
-# Dashboard: grade badge present
-DASH_GRADE=$(python3 "$SCRIPT_DIR/dashboard.py" "$SKILL_DIR/SKILL.md" 2>/dev/null)
-if echo "$DASH_GRADE" | grep -qE "\[S\]|\[A\]|\[B\]|\[C\]|\[D\]|\[F\]"; then
-    pass "dashboard.py: grade badge present in output"
-else
-    fail "dashboard.py grade" "no grade badge found"
 fi
 
 # Auto-improve: grade badge in banner

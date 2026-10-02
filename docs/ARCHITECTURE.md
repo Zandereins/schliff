@@ -74,7 +74,6 @@ skills/schliff/scripts/
 ├── track.py                  # history tracking
 ├── sync.py                   # skill discovery / sync
 ├── skill_mesh.py / skill-mesh.py           # cross-skill trigger-overlap + scope-collision mesh
-├── dashboard.py              # single-skill health dashboard (gauges, bars, recommendations)
 ├── progress.py               # convergence / progress analysis
 ├── report.py                 # report rendering helpers
 ├── generate-report.py        # shareable Markdown report + heatmap
@@ -263,7 +262,7 @@ flowchart TD
     E --> G["composite score + coverage + warnings"]
     F --> G
     G --> H["score_to_grade()<br/>S/A/B/C/D/E/F"]
-    H --> I["Output:<br/>CLI text / JSON / badge /<br/>dashboard / Markdown report"]
+    H --> I["Output:<br/>CLI text / JSON / badge /<br/>Markdown report"]
 ```
 
 Key points reflected in the diagram:

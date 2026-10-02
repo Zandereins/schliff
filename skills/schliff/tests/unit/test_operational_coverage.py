@@ -456,25 +456,45 @@ def test_E_inline_useful(tmp_path):
     assert _comp(tmp_path, E_inline_useful) > _comp(tmp_path, D_fence_gaming)
 
 
-@pytest.mark.skipif(not _CORPUS.is_dir(), reason="corpus fixtures not present")
-def test_recall_pnnl_code_style():
-    path = _CORPUS / "PNNL-CIM-Tools__CIM-Graph__AGENTS.md.md"
-    r = score_operational_coverage(str(path))
-    assert r["details"]["categories"]["code_style"]["credited"] is True
+# The three recall excerpts below are the triggering lines copied verbatim from
+# the corpus files (PNNL-CIM-Tools/CIM-Graph, AdventDevInc/kudu,
+# Brendonovich/MacroGraph). The corpus is gitignored, so reading it would skip
+# these tests on CI.
+
+_PNNL_EXCERPT = """## 6. No Blanket Try/Catch as a Safety Blanket
+
+- Catch exceptions **only where they can be handled meaningfully**.
+- Avoid blanket `catch (Exception)` / `try/except` sprinkled around every function.
+"""
+
+_KUDU_EXCERPT = """## Before Committing
+
+- Run `npm test` to ensure all tests pass.
+- Run `npm run validate:rules` if rule JSON files were changed.
+"""
+
+_MACROGRAPH_EXCERPT = """## Checking your code
+- **Formatting**: Run `pnpm format`
+- **Linting**: Don't bother
+- **Type Checking**: Use the TypeScript LSP if available, otherwise don't bother
+"""
+
+
+def test_recall_pnnl_code_style(tmp_path):
+    r = _op(tmp_path, _PNNL_EXCERPT)
+    cs = r["details"]["categories"]["code_style"]
+    assert cs["credited"] is True
+    assert cs["reason"].startswith("content fallback")
     assert r["score"] >= 15
 
 
-@pytest.mark.skipif(not _CORPUS.is_dir(), reason="corpus fixtures not present")
-def test_recall_kudu_test():
-    path = _CORPUS / "AdventDevInc__kudu__AGENTS.md.md"
-    r = score_operational_coverage(str(path))
+def test_recall_kudu_test(tmp_path):
+    r = _op(tmp_path, _KUDU_EXCERPT)
     assert r["details"]["categories"]["test"]["credited"] is True
 
 
-@pytest.mark.skipif(not _CORPUS.is_dir(), reason="corpus fixtures not present")
-def test_recall_macrograph_test_via_positive_format():
-    path = _CORPUS / "Brendonovich__MacroGraph__AGENTS.md.md"
-    r = score_operational_coverage(str(path))
+def test_recall_macrograph_test_via_positive_format(tmp_path):
+    r = _op(tmp_path, _MACROGRAPH_EXCERPT)
     assert r["details"]["categories"]["test"]["credited"] is True
 
 

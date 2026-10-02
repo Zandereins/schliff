@@ -42,37 +42,6 @@ def agents_md(tmp_path):
     return str(p)
 
 
-def test_dashboard_scores_the_dimensions_the_format_actually_has(agents_md):
-    dashboard = _load("dashboard_mod", "dashboard.py")
-    data = dashboard.generate_dashboard(agents_md)
-    assert "operational_coverage" in data["dimensions"], (
-        "dashboard scores an AGENTS.md without its heaviest dimension"
-    )
-    assert not (set(g["issue"] for g in data["top_gradients"]) & SKILL_ONLY_ISSUES), (
-        "dashboard shows SKILL-only advice for an AGENTS.md"
-    )
-
-
-def test_dashboard_composite_uses_the_format_profile(agents_md):
-    """The other half. Passing fmt to build_scores but not to compute_composite
-    leaves the dimensions right and the headline number wrong, which reads as a
-    low score rather than a bug — so `dimensions` alone cannot pin this."""
-    import score_skill as scorer
-
-    from shared import build_scores
-
-    dashboard = _load("dashboard_mod2", "dashboard.py")
-    reported = dashboard.generate_dashboard(agents_md)["composite_score"]
-
-    scores = build_scores(agents_md, None, include_runtime=False, fmt="agents.md")
-    expected = scorer.compute_composite(scores, fmt="agents.md")["score"]
-    wrong = scorer.compute_composite(scores)["score"]
-    assert expected != wrong, "fixture no longer distinguishes the two profiles"
-    assert reported == pytest.approx(expected, abs=0.05), (
-        f"dashboard reports {reported}; the agents.md profile gives {expected}"
-    )
-
-
 def test_auto_improve_scores_the_dimensions_the_format_actually_has(agents_md):
     auto = _load("auto_improve_mod", "auto-improve.py")
     result = auto._score_skill(agents_md)
@@ -177,29 +146,6 @@ def test_skill_md_still_gets_the_frontmatter_advice(tmp_path):
         for g in text_gradient.compute_gradients(str(p), None, include_clarity=True, fmt="skill.md")
     }
     assert "no_frontmatter" in issues
-
-
-def test_no_clarity_does_not_zero_a_headline_dimension(tmp_path):
-    """The composite uses a full denominator, so a popped dimension counts as
-    ZERO rather than being renormalized away. On system_prompt clarity weighs
-    0.15, and the opt-out turned 51.4 into 36.4."""
-    from scoring.registry import get_weights
-
-    dashboard = _load("dashboard_clarity", "dashboard.py")
-    p = tmp_path / "sys.prompt"
-    p.write_text(
-        "You are a helpful assistant.\n\nAlways cite sources.\n"
-        "Never invent a citation.\n\nReturn JSON with a `result` key.\n",
-        encoding="utf-8",
-    )
-    weight = get_weights("system_prompt").get("clarity")
-    assert weight and weight > 0.05, "fixture assumes clarity is a headline dim here"
-
-    full = dashboard.generate_dashboard(str(p))["composite_score"]
-    opted_out = dashboard.generate_dashboard(str(p), include_clarity=False)["composite_score"]
-    assert opted_out == pytest.approx(full, abs=0.05), (
-        f"--no-clarity dropped a 0.15-weight dimension to zero: {full} -> {opted_out}"
-    )
 
 
 def test_format_flag_rejects_a_typo():

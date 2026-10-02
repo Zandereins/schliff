@@ -5,8 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed
+
+- **`scripts/dashboard.py` is gone.** It had no command, no documented entry point and no
+  caller outside its own tests, and run on a missing file it crashed with a traceback
+  instead of an error message (#212). Plugin installs ship `scripts/`, so it was reachable
+  by direct path; its dimension scores and ranked fixes are what `schliff score` and
+  `schliff suggest` print. The unreferenced `demo/dashboard-output.txt` sample goes with it.
+- The standalone CLI of `achievements.py` (no command, doc or workflow called it).
+
 ### Fixed
 
+- **The anti-gaming gate no longer counts an unmeasured target as caught.** `caught` read the
+  -1 "not measured" sentinel as a score below 80, so a typo in one `target_dimension` still
+  reported 7/7 and exit 0, and `keyword-stuffing.md`, aimed at the eval-suite-gated `triggers`,
+  was caught permanently. `caught` now requires `0 <= target_score`, and the vector targets
+  `efficiency`. Its 38 there is the zero-signal floor, not a stuffing penalty, and its
+  declared detection now says so; `bloated-preamble.md`'s now names the information-density
+  curve that actually lowers it. The uncollected `benchmarks/anti-gaming/test_benchmark.py`
+  is removed (#221).
+- **`schliff manifest` resolves the installed plugin revision, not the newest directory**
+  (#229). With several version directories of one plugin on disk it picked the newest by
+  mtime — and Claude Code bumps the mtime of an orphaned revision when it marks it, so the
+  orphan won. It now reads the installPath from `plugins/installed_plugins.json` (this
+  project's `project` or `local` entry, else a `user` or `managed` one) and falls back to the old disk
+  heuristic when that file is missing, malformed or not version 2. Enablement is still decided
+  by `settings.json` alone. A recorded installPath with neither `skills/` nor `commands/` (an
+  MCP-only plugin such as playwright) now counts as present with zero artifacts instead of
+  "never loads". On a live install: 3 of 14 enabled plugins disagreed with
+  `installed_plugins.json` before, 0 after.
 - **`score-skill.py` scores every format through the same path as `schliff score`.** It
   detected no format and kept its own dimension list, so an AGENTS.md scored 34.5 where
   `schliff score` gives 95.6. It now calls `build_scores` and `compute_composite` with the
@@ -18,10 +45,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   the suite path from it. An explicit `--eval-suite` that exists but cannot be read still exits 1.
 - **Fix deltas and doctor composites follow the scorer.** The two regex patches report their
   gradient's delta instead of a hardcoded one, and `doctor` weights the composite by format.
-
-### Removed
-
-- The standalone CLI of `achievements.py` (no command, doc or workflow called it).
 
 ## [8.12.0] - 2026-09-15
 

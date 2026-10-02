@@ -139,14 +139,14 @@ def _manifest_inputs() -> list[Path]:
     settings = CORPUS_ROOT / "settings.json"
     out = [settings] if settings.exists() else []
     outside = []
-    # Which of several coexisting version directories is active is decided by
-    # `_resolve_plugin_dir` on directory MTIME, and mtime is not content. Three
-    # plugins here have two directories sharing one mtime, so the winner falls to
-    # `iterdir()` order. Red proof, flipping nothing but an mtime: the resolved
-    # supabase description went 790 -> 498 characters, which moves `resident`
-    # directly — while every frozen path stayed present and unchanged, because
-    # BOTH versions are in the freeze. Recording which paths were resolved is the
-    # only thing that makes that flip visible.
+    # Which of several coexisting version directories is active is decided by the
+    # installPath in `installed_plugins.json` — a file outside the freeze — and,
+    # where that file is missing or unreadable, by directory MTIME, which is not
+    # content (#229). Red proof from the mtime era, flipping nothing but an mtime:
+    # the resolved supabase description went 790 -> 498 characters, which moves
+    # `resident` directly — while every frozen path stayed present and unchanged,
+    # because BOTH versions are in the freeze. Recording which paths were resolved
+    # is the only thing that makes such a flip visible.
     for artifact in manifest_mod.build_manifest(CORPUS_ROOT).loaded:
         # expanduser, not a replace: `manifest._tilde` only abbreviates a LEADING
         # home prefix and returns anything else untouched, so an unanchored
@@ -221,35 +221,11 @@ def _entries() -> list[dict]:
 
 
 def write(target: Path) -> int:
+    if target.exists():
+        _fail(f"{target} already exists; a re-freeze writes a new dated manifest")
     entries = _entries()
     if not entries:
         _fail(f"refusing to write an empty manifest: no skills found under {CORPUS_ROOT}")
-    # Compare against the newest existing freeze in the directory, not against
-    # `target`: the manifests are date-stamped, so a re-freeze writes a NEW path
-    # and a guard keyed on `target.exists()` never fires for the workflow this
-    # repository actually prescribes — which is every re-freeze.
-    # The target itself counts as a baseline too. Keying only on the date-stamped
-    # siblings narrowed the guard: a re-freeze to the same path under any other
-    # name was unprotected, which is the case the original `target.exists()`
-    # check covered before it was replaced.
-    candidates = list(target.parent.glob("corpus-*.jsonl")) if target.parent.exists() else []
-    if target.exists() and target not in candidates:
-        candidates.append(target)
-    # Largest by ENTRY COUNT, not by name. Appending the target to a list ranked
-    # by filename left it unprotected whenever its name sorted below `corpus-…`:
-    # measured, a 50-entry freeze was overwritten with 3 entries at exit 0, which
-    # is the failure this guard exists for.
-    counts = {p: sum(1 for line in p.read_text(encoding="utf-8").splitlines() if line.strip())
-              for p in candidates}
-    baseline = max(counts, key=counts.get, default=None)
-    if baseline is not None:
-        previous = counts[baseline]
-        if len(entries) < previous:
-            # `discover_skills` skips a missing directory silently, so a run under
-            # a different HOME would otherwise truncate the reproducibility
-            # artifact and exit 0.
-            _fail(f"refusing to write {len(entries)} entries when {baseline.name} holds "
-                  f"{previous}; delete that file deliberately if the corpus really got smaller")
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", encoding="utf-8") as fh:
         for e in entries:

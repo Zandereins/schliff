@@ -67,10 +67,8 @@ something a script should make quietly. `freeze_corpus.py verify` runs the same 
 without taking a measurement. The choice after a refusal is made deliberately and outside the command: re-freeze and say so in the
 case study, or restore the corpus to the frozen state and re-run. What it will not do is produce a
 number whose corpus is unknown. Add `--rehearsal` to try the run without writing a file that looks
-like the pre-registered one. `freeze_corpus.py write` refuses an empty corpus and a corpus smaller
-than the fullest manifest beside it, the guard against a run under the wrong `HOME`; its only
-escape is deleting that manifest, which contradicts keeping every manifest a record names. That
-contradiction, and the fact that `write` overwrites an existing manifest in place, are #230.
+like the pre-registered one. Manifests are append-only: a re-freeze writes a new dated manifest,
+and `freeze_corpus.py write` never overwrites an existing one.
 
 The file list comes from `skill_mesh.discover_skills`, which owns the question of which files count.
 The hashes do not: they are full sha256 over raw bytes, not that module's `content_hash`, which is
@@ -220,13 +218,14 @@ which is gated by what `settings.json` enables. The headline moved by three arti
 tokens: 0.48.0 adds three skills and rewrites the `description:` of four carried-over ones, so the
 237 is not the sum of the three new descriptions.
 
-**Known defect, #229:** the record was taken with a reader that resolves an orphaned plugin
+**Reader defect, #229 — since fixed:** the record was taken with a reader that resolves an orphaned plugin
 revision (`ed404106fcd8` instead of the installed `0120fb83da5d`, for `frontend-design` and
 `skill-creator`; the first freeze had the same defect with `0620a687ddd5`). `resident` is
 unaffected, the descriptions being identical; `invoke_tokens` is understated by 282, and a fixed
 reader reports 373,094 on an untouched corpus, with `verify` showing the two rows flip. The fix was
-deliberately not made before the run, so that rehearsal and run stay comparable; it needs a new
-rehearsal beside it.
+deliberately not made before the run, so that rehearsal and run stay comparable. It has since
+landed (the reader now takes the installed revision from `installed_plugins.json`); the record
+above remains as taken, and no new rehearsal was run.
 
 The headline decision above was taken on the 2026-09-01 values and is not reopened by the
 re-freeze, for the reason given under that table.

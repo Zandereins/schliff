@@ -261,8 +261,8 @@ def test_the_benchmark_corpus_and_its_declarations_agree(bench_module):
     `incomplete` catches a file that vanished while its BENCHMARKS entry stayed.
     Drop the entry as well — an ordinary edit — and the headline reads 6/6 with
     an empty `incomplete` and exit 0: verified. The only assertion pinning the
-    count lives in benchmarks/anti-gaming/test_benchmark.py, which is red and
-    which `testpaths` excludes from every run, so no enforced check saw it.
+    count lived in a test file under benchmarks/anti-gaming/ that was red and
+    that no run collected, so no enforced check saw it (that file is gone).
 
     Pinned against the directory rather than a literal count: `== 6` against
     seven benchmarks is the drift this file must not repeat. Both directions
@@ -394,10 +394,10 @@ def test_a_duplicate_declaration_fails_even_without_a_removal(bench_module, monk
     declarations over seven vectors at exit 0, with the headline reading "8/8":
     measured, and it is the case the code comment claimed to cover.
 
-    This assertion lives here and not in `benchmarks/anti-gaming/test_benchmark.py`,
-    which holds the other duplicate check: `testpaths` excludes that directory and
-    CI runs `pytest tests/unit/`, so nothing collects it. A guard enforced nowhere
-    is a guard that exists only in the repository.
+    This assertion lives here because CI runs `pytest tests/unit/`; the test file
+    that used to sit under benchmarks/anti-gaming/ was collected by nothing and
+    has been deleted. A guard enforced nowhere is a guard that exists only in
+    the repository.
     """
     monkeypatch.setattr(bench_module, "BENCHMARKS",
                         bench_module.BENCHMARKS + [dict(bench_module.BENCHMARKS[0])])
@@ -410,3 +410,30 @@ def test_a_duplicate_declaration_fails_even_without_a_removal(bench_module, monk
     out = capsys.readouterr().out
     assert "DECLARED MORE THAN ONCE" in out, out[-300:]
     assert "inflated by duplicate declarations" in out, "the headline must not overstate coverage"
+
+
+def test_a_mistyped_target_dimension_reddens_the_gate(bench_module, monkeypatch, capsys):
+    """An unmeasured target must not read as a penalised one.
+
+    `run_benchmarks` looks the target up with a -1 default, and `caught` used to
+    be `target_score < 80`, so the sentinel counted as caught. Measured at
+    c7f63fa: a typo in one `target_dimension` left the run at "7/7 gaming
+    attempts detected" and exit 0 — the vector was no longer measured at all.
+    The same hole kept `keyword-stuffing.md` permanently caught while it targeted
+    the eval-suite-gated `triggers` dimension.
+
+    The mutation: drop the `0 <=` lower bound in `caught`, and the gate goes
+    green again (exit 0), so this test fails.
+    """
+    typo = [dict(b) for b in bench_module.BENCHMARKS]
+    typo[0]["target_dimension"] = "strucutre"
+    monkeypatch.setattr(bench_module, "BENCHMARKS", typo)
+    monkeypatch.setattr(sys, "argv", ["run.py"])
+
+    with pytest.raises(SystemExit) as exc:
+        bench_module.main()
+
+    assert exc.value.code == 1, "a target the scorer never measured must not pass as caught"
+    out = capsys.readouterr().out
+    assert "VECTORS NO LONGER CAUGHT" in out, out[-400:]
+    assert typo[0]["file"] in out
