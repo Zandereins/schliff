@@ -95,3 +95,11 @@ def test_the_post_never_presents_itself_as_the_reported_verdict():
     assert "not the reported verdict" in text
     assert "1 in-scope channel plus 1 out-of-scope channel" in text
     assert "Mechanical verdict" not in text
+
+
+def test_a_green_with_a_second_pr_still_open_is_not_marked_censored():
+    """Censoring qualifies a RED; a GREEN carried by one merge is not censored by the other PR."""
+    prs = [_pr("2026-10-12T09:00:00Z", "2026-10-12T09:00:00Z"),
+           _pr(url="https://github.com/c/d/pull/2")]
+    sentence = g1.outcome_sentence(g1.judge(prs, CUTOFF))
+    assert "GREEN" in sentence and "censored" not in sentence
