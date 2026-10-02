@@ -168,8 +168,9 @@ def test_the_eval_suite_path_has_one_home():
 
     **Scope, stated exactly.** The whole `scripts/` tree except `dashboard.py`.
     Written first for `shared.py` and `doctor.py` alone, the repo-wide run found
-    five more derivations; #225 routed `achievements.py`, `init-skill.py`,
-    `score-skill.py` and `text_gradient.py` through the owner. `dashboard.py`
+    five more derivations; #225 routed `init-skill.py`, `score-skill.py` and
+    `text_gradient.py` through the owner and deleted the standalone CLI of
+    `achievements.py` that held the fourth. `dashboard.py`
     keeps its copy until PR D deletes the module, and is skipped by name until
     then.
     """
