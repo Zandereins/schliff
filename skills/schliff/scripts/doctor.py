@@ -103,7 +103,7 @@ def _score_single_skill(skill_path: str) -> dict:
     except (OSError, ValueError):
         credentials = None
 
-    composite = scorer.compute_composite(scores)
+    composite = scorer.compute_composite(scores, fmt=detect_format(skill_path))
 
     # Collect all issues
     all_issues = []
