@@ -177,6 +177,28 @@ def test_project_scope_entry_wins_only_for_its_own_project(install: Path, tmp_pa
     assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=other))
 
 
+@pytest.mark.parametrize("shape", ["relative-project-dir", "symlinked-project-path"])
+def test_project_scope_entry_matches_a_non_canonical_spelling(install: Path, tmp_path: Path,
+                                                              monkeypatch, shape: str):
+    """`schliff manifest --project .` passes Path('.'); the recorded projectPath is absolute."""
+    new, old = _two_revisions(install)
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    recorded, given = str(proj), proj
+    if shape == "relative-project-dir":
+        monkeypatch.chdir(proj)
+        given = Path(".")
+    else:
+        link = tmp_path / "link"
+        link.symlink_to(proj)
+        recorded = str(link)
+    _installed(install, "acme@some-market", [
+        {"scope": "project", "projectPath": recorded, "installPath": str(old)},
+        {"scope": "user", "installPath": str(new)},
+    ])
+    assert "/old/" in _widget_path(build_manifest(claude_dir=install, project_dir=given))
+
+
 def test_installed_plugin_without_skills_or_commands_is_not_a_finding(install: Path):
     """An MCP-only plugin (playwright) is present with zero artifacts, not 'never loads'."""
     (install / "settings.json").write_text(
