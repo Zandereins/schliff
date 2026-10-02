@@ -82,26 +82,30 @@ def test_the_marker_sits_on_the_self_check_and_nowhere_else():
     )], uses
 
 
-def test_wall_clock_sits_on_the_measured_flakes_and_nowhere_else():
+def test_wall_clock_selects_exactly_the_measured_flakes():
     """Only tests whose wall-clock ratio was measured flaking on macOS carry it.
 
-    Adding it elsewhere silently removes a test from the macOS job, so a new use
+    Asked of pytest's own collection, not of a source scan: a marker on a class, a
+    module's `pytestmark` or a conftest hook selects tests a decorator scan cannot
+    see. Adding it elsewhere silently removes tests from the macOS job, so a new use
     has to be added here on purpose, with its measurement.
     """
-    uses = []
-    for path in sorted(TESTS.rglob("*.py")):
-        if path.name == Path(__file__).name:
-            continue
-        lines = path.read_text(encoding="utf-8").splitlines()
-        for i, line in enumerate(lines):
-            if "mark.wall_clock" in line:
-                following = next((ln for ln in lines[i + 1:] if ln.strip().startswith("def ")), "")
-                uses.append((path.relative_to(TESTS).as_posix(), following.strip()))
-    assert uses == [
-        ("unit/test_manifest.py",
-         "def test_unterminated_frontmatter_parses_in_linear_time(self, tmp_path):"),
-        ("unit/test_patterns_scale_linearly.py", "def test_pattern_scales_linearly(path, rx):"),
-    ], uses
+    import subprocess
+    import sys
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/unit/", "-m", "wall_clock",
+         "--collect-only", "-q", "-p", "no:cacheprovider"],
+        cwd=TESTS.parent, capture_output=True, text=True, timeout=120,
+    )
+    # A collection error drops a module's tests from the listing; it must not
+    # read as "the marker is not there".
+    assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+    ids = [line for line in proc.stdout.splitlines() if "::" in line]
+    names = {i.split("::")[-1].split("[")[0] for i in ids}
+    assert names == {"test_pattern_scales_linearly",
+                     "test_unterminated_frontmatter_parses_in_linear_time"}, sorted(names)
+    assert sum("test_unterminated_frontmatter" in i for i in ids) == 1, ids
 
 
 def test_only_the_macos_job_deselects_wall_clock():

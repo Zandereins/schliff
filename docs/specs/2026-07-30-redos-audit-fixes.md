@@ -389,8 +389,9 @@ rule with an allowlist; that design was prototyped and rejected on measurement â
   the macOS job deselects it (`-m "not gate_power and not wall_clock"`). Every Ubuntu
   job, `publish.yml` and `make test-unit` still run them. The threshold and the
   measurement are unchanged. `test_gate_power_wiring.py` pins the new invocation, checks
-  that only the macOS job deselects the marker, and checks that the marker sits on
-  exactly these two tests.
+  that only the macOS job deselects the marker, and asks pytest's own collection
+  (`-m wall_clock --collect-only`, which must exit 0) that the marker selects exactly
+  these two tests, so a marker on a class or a module is caught too.
 
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
