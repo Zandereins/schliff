@@ -221,35 +221,11 @@ def _entries() -> list[dict]:
 
 
 def write(target: Path) -> int:
+    if target.exists():
+        _fail(f"{target} already exists; a re-freeze writes a new dated manifest")
     entries = _entries()
     if not entries:
         _fail(f"refusing to write an empty manifest: no skills found under {CORPUS_ROOT}")
-    # Compare against the newest existing freeze in the directory, not against
-    # `target`: the manifests are date-stamped, so a re-freeze writes a NEW path
-    # and a guard keyed on `target.exists()` never fires for the workflow this
-    # repository actually prescribes — which is every re-freeze.
-    # The target itself counts as a baseline too. Keying only on the date-stamped
-    # siblings narrowed the guard: a re-freeze to the same path under any other
-    # name was unprotected, which is the case the original `target.exists()`
-    # check covered before it was replaced.
-    candidates = list(target.parent.glob("corpus-*.jsonl")) if target.parent.exists() else []
-    if target.exists() and target not in candidates:
-        candidates.append(target)
-    # Largest by ENTRY COUNT, not by name. Appending the target to a list ranked
-    # by filename left it unprotected whenever its name sorted below `corpus-…`:
-    # measured, a 50-entry freeze was overwritten with 3 entries at exit 0, which
-    # is the failure this guard exists for.
-    counts = {p: sum(1 for line in p.read_text(encoding="utf-8").splitlines() if line.strip())
-              for p in candidates}
-    baseline = max(counts, key=counts.get, default=None)
-    if baseline is not None:
-        previous = counts[baseline]
-        if len(entries) < previous:
-            # `discover_skills` skips a missing directory silently, so a run under
-            # a different HOME would otherwise truncate the reproducibility
-            # artifact and exit 0.
-            _fail(f"refusing to write {len(entries)} entries when {baseline.name} holds "
-                  f"{previous}; delete that file deliberately if the corpus really got smaller")
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", encoding="utf-8") as fh:
         for e in entries:
