@@ -12,9 +12,11 @@ Everything it decides comes from the spec, docs/specs/2026-08-11-plugin-channel-
   RED-DISTRIBUTION with Gate 2 NOT-REACHED, and a PR still open at the deadline is
   recorded as censored (open, not rejected) per E-4.
 
-It prints a Markdown report. Only a resolved reading (now past the deadline) carries
-the marker the workflow keys on, so a preview can never be posted as the verdict.
-The landing note and the spec amendment stay with the owner: they are not mechanical.
+It prints the deciding reading and the rule's label, with E-4's censoring in the same
+sentence. That is not the reported verdict: the spec requires the verdict to carry the
+per-repo outcome and the N = 2 caveat, and the landing note, so the owner writes it as
+the Gate 1 amendment. Only a resolved reading (now past the deadline) carries the marker
+the workflow keys on, so a preview can never be posted.
 
 Usage:
     python3 scripts/experiment/gate1_verdict.py
@@ -82,20 +84,34 @@ def judge(prs: list[dict], cutoff: datetime) -> dict:
     return {"verdict": "RED-DISTRIBUTION", "rows": rows, "a0": None, "gate2": "NOT-REACHED"}
 
 
+def outcome_sentence(result: dict) -> str:
+    """The rule's label, with E-4's censoring in the same sentence when it applies."""
+    sentence = f"Rule outcome: **{result['verdict']}**"
+    censored = [u for u, _, s in result["rows"] if s.startswith("open at the deadline")]
+    if result["verdict"] != "GREEN" and censored:
+        sentence += (", censored (open, not rejected): "
+                     + ", ".join(censored) + " was open at the deadline")
+    return sentence + f". Gate 2: {result['gate2']}."
+
+
 def render(result: dict, cutoff: datetime, now: datetime, raw: list[dict]) -> str:
     resolved = now > cutoff
-    head = (f"{MARKER}\n**Gate 1 reading, taken {now:%Y-%m-%dT%H:%M:%SZ}** "
+    head = (f"{MARKER}\n**Gate 1 deciding reading, taken {now:%Y-%m-%dT%H:%M:%SZ}** "
             f"(deadline {cutoff:%Y-%m-%dT%H:%M:%SZ})" if resolved else
-            f"**PREVIEW, not a verdict: the deadline {cutoff:%Y-%m-%dT%H:%M:%SZ} has not passed "
+            f"**PREVIEW, not a reading: the deadline {cutoff:%Y-%m-%dT%H:%M:%SZ} has not passed "
             f"(now {now:%Y-%m-%dT%H:%M:%SZ}).**")
-    label = "Mechanical verdict" if resolved else "Verdict if it resolved now"
-    lines = [head, "", f"{label}: **{result['verdict']}**. Gate 2: {result['gate2']}.", ""]
+    lines = [head, "", outcome_sentence(result), "",
+             "This is the deciding reading and the label the spec's rule gives it, not the "
+             "reported verdict. The spec requires the verdict to name the per-repo outcome as "
+             "1 in-scope channel plus 1 out-of-scope channel, never a bare fraction of 2, and to "
+             "carry the N = 2 caveat; that report is the Gate 1 amendment in "
+             "docs/specs/2026-08-11-plugin-channel-experiment.md.", ""]
     lines += ["| Submission PR | created_at | status at the deadline |", "| --- | --- | --- |"]
     lines += [f"| {u} | {c} | {s} |" for u, c, s in result["rows"]]
     lines += ["", "Raw reading (GitHub REST):", "", "```json",
               json.dumps(raw, indent=2), "```", "",
-              "The landing note and the spec amendment are written by the owner; "
-              "`merged_at` is immutable, so they can follow this reading at any time."]
+              "The landing note (2026-09-29 amendment) is written when the verdict is written and "
+              "records each qualified repo's catalog state at that time; it never changes the label."]
     return "\n".join(lines) + "\n"
 
 

@@ -73,3 +73,25 @@ def test_only_a_resolved_reading_carries_the_marker(now, marked):
     raw = [_pr()]
     text = g1.render(g1.judge(raw, CUTOFF), CUTOFF, now, raw)
     assert (g1.MARKER in text) is marked
+
+
+@pytest.mark.parametrize("merged,closed,censored", [
+    (None, None, True),
+    ("2026-10-21T00:05:00Z", "2026-10-21T00:05:00Z", True),
+    (None, "2026-10-10T00:00:00Z", False),
+    ("2026-10-20T23:55:00Z", "2026-10-20T23:55:00Z", False),
+])
+def test_censoring_is_in_the_same_sentence_as_the_label(merged, closed, censored):
+    """E-4: an open-at-the-deadline RED is recorded as censored in the same sentence."""
+    sentence = g1.outcome_sentence(g1.judge([_pr(merged, closed)], CUTOFF))
+    assert ("censored (open, not rejected)" in sentence) is censored
+    assert sentence.count(".") >= 1 and sentence.index("Rule outcome") == 0
+
+
+def test_the_post_never_presents_itself_as_the_reported_verdict():
+    """The spec forbids a bare RED or GREEN: the post defers the report to the amendment."""
+    raw = [_pr()]
+    text = g1.render(g1.judge(raw, CUTOFF), CUTOFF, datetime(2026, 10, 21, tzinfo=timezone.utc), raw)
+    assert "not the reported verdict" in text
+    assert "1 in-scope channel plus 1 out-of-scope channel" in text
+    assert "Mechanical verdict" not in text
