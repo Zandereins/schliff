@@ -393,8 +393,9 @@ retiring a vector should require. It lives in `run.py` as `MIN_VECTORS`, with ex
 in the gate itself and not only in a test, because the guidance above tells contributors to check a
 new vector with `run.py --json`, and that invocation has to be the one that refuses.
 
-`benchmarks/anti-gaming/test_benchmark.py`, which no default run collected, was deleted under #221:
-its checks are covered by the gate itself and by `test_composite_unified.py`. What actually
+`benchmarks/anti-gaming/test_benchmark.py`, which no default run collected, was deleted under #221.
+The gate enforces each vector's `caught` verdict; the file's stricter per-vector thresholds, its
+issue-name checks and its report-format checks were dropped with it, deliberately. What actually
 blocks adding a vector is the opposite of what an earlier version of this paragraph assumed — it is not that nobody would run it, it is that everybody does: a vector whose
 composite reaches the clean control makes `violations` non-empty and reddens five required contexts,
 with `enforce_admins: true` and no override. Score every new vector locally with `run.py --json`
