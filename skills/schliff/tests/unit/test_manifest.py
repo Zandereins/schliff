@@ -149,12 +149,25 @@ def test_installed_revision_wins_over_a_newer_orphan(install: Path):
     assert "/new/" in _widget_path(m)
 
 
-def test_project_scope_entry_wins_only_for_its_own_project(install: Path, tmp_path: Path):
+def test_managed_scope_entry_is_honoured_like_a_user_one(install: Path):
+    new, _ = _two_revisions(install)
+    _installed(install, "acme@some-market", [{"scope": "managed", "installPath": str(new)}])
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install))
+
+
+@pytest.mark.parametrize("scope", ["project", "local"])
+def test_project_scope_entry_wins_only_for_its_own_project(install: Path, tmp_path: Path,
+                                                           scope: str):
     new, old = _two_revisions(install)
     proj = tmp_path / "proj"
     proj.mkdir()
+    # The orphan `old` is the newer directory, so only the entry can pick `new`.
     _installed(install, "acme@some-market", [
-        {"scope": "project", "projectPath": str(proj), "installPath": str(old)},
+        {"scope": scope, "projectPath": str(proj), "installPath": str(new)},
+    ])
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=proj))
+    _installed(install, "acme@some-market", [
+        {"scope": scope, "projectPath": str(proj), "installPath": str(old)},
         {"scope": "user", "installPath": str(new)},
     ])
     assert "/old/" in _widget_path(build_manifest(claude_dir=install, project_dir=proj))
@@ -186,15 +199,21 @@ def test_installed_plugin_without_skills_or_commands_is_not_a_finding(install: P
         {"scope": "user", "installPath": "{decoy}/missing"}]}}),
     json.dumps({"version": 2, "plugins": {"acme@some-market": "nope"}}),
     json.dumps({"version": 2, "plugins": {"acme@some-market": [{"scope": "user"}]}}),
+    json.dumps({"version": 2, "plugins": ["acme@some-market"]}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": ["{decoy}"]}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [
+        {"scope": "project", "projectPath": 7, "installPath": "{decoy}"}]}}),
 ])
-def test_unusable_installed_plugins_falls_back_to_the_disk_layout(install: Path, raw: str):
+def test_unusable_installed_plugins_falls_back_to_the_disk_layout(install: Path, raw: str,
+                                                                   tmp_path: Path):
     (install / "settings.json").write_text(
         json.dumps({"enabledPlugins": {"acme@some-market": True}}), encoding="utf-8")
     _skill(install / "plugins" / "cache" / "some-market" / "acme" / "1.2.3" / "skills",
            "widget")
     decoy = _skill(install / "decoy" / "skills", "widget").parents[1]
     _installed(install, "acme@some-market", raw.replace("{decoy}", str(decoy)))
-    m = build_manifest(claude_dir=install)
+    # A project is set so a project-scope entry is considered at all.
+    m = build_manifest(claude_dir=install, project_dir=tmp_path)
     assert "/1.2.3/" in _widget_path(m)
 
 

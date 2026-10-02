@@ -11,7 +11,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   (#229). With several version directories of one plugin on disk it picked the newest by
   mtime — and Claude Code bumps the mtime of an orphaned revision when it marks it, so the
   orphan won. It now reads the installPath from `plugins/installed_plugins.json` (this
-  project's project-scope entry, else the user-scope one) and falls back to the old disk
+  project's `project` or `local` entry, else a `user` or `managed` one) and falls back to the old disk
   heuristic when that file is missing, malformed or not version 2. Enablement is still decided
   by `settings.json` alone. A recorded installPath with neither `skills/` nor `commands/` (an
   MCP-only plugin such as playwright) now counts as present with zero artifacts instead of
