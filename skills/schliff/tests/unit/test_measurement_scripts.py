@@ -96,11 +96,13 @@ def test_write_refuses_a_file_it_cannot_freeze(corpus, tmp_path, monkeypatch, ca
 
 
 def test_a_resolution_flip_is_drift_even_when_no_file_changed(corpus, tmp_path):
-    """Which plugin version is active is decided by mtime, which is not content.
+    """Which plugin version is active is not decided by any frozen file's content.
 
-    Both versions sit in the freeze, so every path stays present and unchanged
-    when the active one flips — measured on the real corpus, the resolved
-    description went 790 to 498 characters with `verify` reporting no drift.
+    It comes from `installed_plugins.json`, or from directory mtime as the
+    fallback. Both versions sit in the freeze, so every path stays present and
+    unchanged when the active one flips — measured on the real corpus (mtime
+    era), the resolved description went 790 to 498 characters with `verify`
+    reporting no drift.
     """
     root, fc = corpus
     manifest = tmp_path / "m.jsonl"

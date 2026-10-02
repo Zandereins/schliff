@@ -218,13 +218,14 @@ which is gated by what `settings.json` enables. The headline moved by three arti
 tokens: 0.48.0 adds three skills and rewrites the `description:` of four carried-over ones, so the
 237 is not the sum of the three new descriptions.
 
-**Known defect, #229:** the record was taken with a reader that resolves an orphaned plugin
+**Reader defect, #229 — since fixed:** the record was taken with a reader that resolves an orphaned plugin
 revision (`ed404106fcd8` instead of the installed `0120fb83da5d`, for `frontend-design` and
 `skill-creator`; the first freeze had the same defect with `0620a687ddd5`). `resident` is
 unaffected, the descriptions being identical; `invoke_tokens` is understated by 282, and a fixed
 reader reports 373,094 on an untouched corpus, with `verify` showing the two rows flip. The fix was
-deliberately not made before the run, so that rehearsal and run stay comparable; it needs a new
-rehearsal beside it.
+deliberately not made before the run, so that rehearsal and run stay comparable. It has since
+landed (the reader now takes the installed revision from `installed_plugins.json`); the record
+above remains as taken, and no new rehearsal was run.
 
 The headline decision above was taken on the 2026-09-01 values and is not reopened by the
 re-freeze, for the reason given under that table.

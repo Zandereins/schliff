@@ -110,6 +110,175 @@ def test_disabled_plugin_contributes_nothing(install: Path):
     assert not any("acme" in f.subject for f in m.findings)
 
 
+def _installed(install: Path, key: str, entries: list[dict] | str) -> None:
+    """Write `plugins/installed_plugins.json` with `entries` for `key` (or raw text)."""
+    target = install / "plugins" / "installed_plugins.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    text = entries if isinstance(entries, str) else json.dumps(
+        {"version": 2, "plugins": {key: entries}})
+    target.write_text(text, encoding="utf-8")
+
+
+def _two_revisions(install: Path) -> tuple[Path, Path]:
+    """An installed revision and an orphaned one whose directory is NEWER by mtime.
+
+    The live shape behind #229: Claude Code writes `.orphaned_at` into the old
+    revision after installing the new one, which bumps the old directory's mtime.
+    """
+    import os
+    (install / "settings.json").write_text(
+        json.dumps({"enabledPlugins": {"acme@some-market": True}}), encoding="utf-8")
+    pkg = install / "plugins" / "cache" / "some-market" / "acme"
+    new = _skill(pkg / "new" / "skills", "widget").parents[1]
+    old = _skill(pkg / "old" / "skills", "widget").parents[1]
+    os.utime(new, (1_000_000, 1_000_000))
+    os.utime(old, (2_000_000, 2_000_000))
+    return new, old
+
+
+def _widget_path(m) -> str:
+    [path] = [a.path for a in m.loaded if a.name == "acme:widget"]
+    return path
+
+
+def test_installed_revision_wins_over_a_newer_orphan(install: Path):
+    """#229: `installed_plugins.json` owns which revision is installed, not mtime."""
+    new, _ = _two_revisions(install)
+    _installed(install, "acme@some-market", [{"scope": "user", "installPath": str(new)}])
+    m = build_manifest(claude_dir=install)
+    assert "/new/" in _widget_path(m)
+
+
+def test_managed_scope_entry_is_honoured_like_a_user_one(install: Path):
+    new, _ = _two_revisions(install)
+    _installed(install, "acme@some-market", [{"scope": "managed", "installPath": str(new)}])
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install))
+
+
+@pytest.mark.parametrize("scope", ["project", "local"])
+def test_project_scope_entry_wins_only_for_its_own_project(install: Path, tmp_path: Path,
+                                                           scope: str):
+    new, old = _two_revisions(install)
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    # The orphan `old` is the newer directory, so only the entry can pick `new`.
+    _installed(install, "acme@some-market", [
+        {"scope": scope, "projectPath": str(proj), "installPath": str(new)},
+    ])
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=proj))
+    _installed(install, "acme@some-market", [
+        {"scope": scope, "projectPath": str(proj), "installPath": str(old)},
+        {"scope": "user", "installPath": str(new)},
+    ])
+    assert "/old/" in _widget_path(build_manifest(claude_dir=install, project_dir=proj))
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install))
+    # Precedence, not list order: a user entry listed first must not shadow it.
+    _installed(install, "acme@some-market", [
+        {"scope": "user", "installPath": str(new)},
+        {"scope": scope, "projectPath": str(proj), "installPath": str(old)},
+    ])
+    assert "/old/" in _widget_path(build_manifest(claude_dir=install, project_dir=proj))
+    other = tmp_path / "other"
+    other.mkdir()
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=other))
+
+
+@pytest.mark.parametrize("shape", ["relative-project-dir", "symlinked-project-path"])
+def test_project_scope_entry_matches_a_non_canonical_spelling(install: Path, tmp_path: Path,
+                                                              monkeypatch, shape: str):
+    """`schliff manifest --project .` passes Path('.'); the recorded projectPath is absolute."""
+    new, old = _two_revisions(install)
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    recorded, given = str(proj), proj
+    if shape == "relative-project-dir":
+        monkeypatch.chdir(proj)
+        given = Path(".")
+    else:
+        link = tmp_path / "link"
+        link.symlink_to(proj)
+        recorded = str(link)
+    _installed(install, "acme@some-market", [
+        {"scope": "project", "projectPath": recorded, "installPath": str(old)},
+        {"scope": "user", "installPath": str(new)},
+    ])
+    assert "/old/" in _widget_path(build_manifest(claude_dir=install, project_dir=given))
+
+
+def test_installed_plugin_without_skills_or_commands_is_not_a_finding(install: Path):
+    """An MCP-only plugin (playwright) is present with zero artifacts, not 'never loads'."""
+    (install / "settings.json").write_text(
+        json.dumps({"enabledPlugins": {"mcp@some-market": True}}), encoding="utf-8")
+    payload = install / "plugins" / "cache" / "some-market" / "mcp" / "abc123"
+    payload.mkdir(parents=True)
+    (payload / ".mcp.json").write_text("{}", encoding="utf-8")
+    _installed(install, "mcp@some-market", [{"scope": "user", "installPath": str(payload)}])
+    m = build_manifest(claude_dir=install)
+    assert not any(f.subject == "mcp@some-market" for f in m.findings), m.findings
+
+
+@pytest.mark.parametrize("raw", [
+    "{not json",
+    json.dumps(["not", "a", "dict"]),
+    # Each shape below names a usable decoy directory; only the guard keeps it out.
+    json.dumps({"version": 1, "plugins": {"acme@some-market": [
+        {"scope": "user", "installPath": "{decoy}"}]}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [
+        {"scope": "user", "installPath": "{decoy}/missing"}]}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": "nope"}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [{"scope": "user"}]}}),
+    json.dumps({"version": 2, "plugins": ["acme@some-market"]}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": ["{decoy}"]}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [
+        {"scope": "project", "projectPath": 7, "installPath": "{decoy}"}]}}),
+    # A relative or empty installPath would resolve against the working directory.
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [
+        {"scope": "user", "installPath": ""}]}}),
+    json.dumps({"version": 2, "plugins": {"acme@some-market": [
+        {"scope": "user", "installPath": "relative"}]}}),
+])
+def test_unusable_installed_plugins_falls_back_to_the_disk_layout(install: Path, raw: str,
+                                                                   tmp_path: Path, monkeypatch):
+    (install / "settings.json").write_text(
+        json.dumps({"enabledPlugins": {"acme@some-market": True}}), encoding="utf-8")
+    _skill(install / "plugins" / "cache" / "some-market" / "acme" / "1.2.3" / "skills",
+           "widget")
+    decoy = _skill(install / "decoy" / "skills", "widget").parents[1]
+    _installed(install, "acme@some-market", raw.replace("{decoy}", str(decoy)))
+    _skill(tmp_path / "skills", "widget")
+    _skill(tmp_path / "relative" / "skills", "widget")
+    monkeypatch.chdir(tmp_path)
+    # A project is set so a project-scope entry is considered at all.
+    m = build_manifest(claude_dir=install, project_dir=tmp_path)
+    assert "/1.2.3/" in _widget_path(m)
+
+
+@pytest.mark.parametrize("shape", ["symlink-loop", "nul-byte", "project-dir-loop"])
+def test_an_unresolvable_project_path_skips_only_that_entry(install: Path, tmp_path: Path,
+                                                            shape: str):
+    """A recorded projectPath that cannot be resolved is not this project; it must not
+    end the run (3.10-3.12 raise RuntimeError on a loop, every version ValueError on NUL)."""
+    new, old = _two_revisions(install)
+    if shape == "symlink-loop":
+        (tmp_path / "a").symlink_to(tmp_path / "b")
+        (tmp_path / "b").symlink_to(tmp_path / "a")
+        recorded = str(tmp_path / "a")
+    elif shape == "nul-byte":
+        recorded = "/a\x00b"
+    else:
+        recorded = str(tmp_path)
+    given = tmp_path
+    if shape == "project-dir-loop":
+        (tmp_path / "la").symlink_to(tmp_path / "lb")
+        (tmp_path / "lb").symlink_to(tmp_path / "la")
+        given = tmp_path / "la"
+    _installed(install, "acme@some-market", [
+        {"scope": "local", "projectPath": recorded, "installPath": str(old)},
+        {"scope": "user", "installPath": str(new)},
+    ])
+    assert "/new/" in _widget_path(build_manifest(claude_dir=install, project_dir=given))
+
+
 def test_output_is_renderable_and_serialisable(install: Path):
     m = build_manifest(claude_dir=install)
     assert "resident every turn" in format_manifest(m)
