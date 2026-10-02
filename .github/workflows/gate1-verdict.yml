@@ -1,0 +1,67 @@
+name: Gate 1 verdict
+
+# Takes the plugin-channel experiment's Gate 1 reading and posts the mechanical
+# verdict on #198, once. The rule, the deadline and the submission URLs all come
+# from docs/specs/2026-08-11-plugin-channel-experiment.md via
+# scripts/experiment/gate1_verdict.py; nothing about the outcome is decided here.
+#
+# Why a workflow and not the cloud routine: a probe on 2026-10-02 showed the Claude
+# Code cloud environment gets 403 on GraphQL and on any other repository, so it
+# cannot read the submission PR. A GitHub runner can, with the default token.
+#
+# Daily from Oct 21 to Oct 31 rather than once: GitHub drops scheduled runs under
+# load, and `merged_at` is immutable, so a later reading is the same reading. The
+# marker check makes every run after the first a no-op, and a preview (before the
+# deadline) carries no marker, so it can never be posted as the verdict.
+
+on:
+  schedule:
+    - cron: '41 0 21-31 10 *'
+  workflow_dispatch:
+    inputs:
+      post:
+        description: Post on #198 (only a resolved reading is ever posted)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: gate1-verdict
+  cancel-in-progress: false
+
+jobs:
+  verdict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read and judge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/experiment/gate1_verdict.py > verdict.md
+          cat verdict.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post on #198, once
+        if: github.event_name == 'schedule' || inputs.post
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          marker='<!-- gate1-verdict -->'
+          if ! grep -qF "$marker" verdict.md; then
+            echo "::notice::Deadline not passed: preview only, nothing posted."
+            exit 0
+          fi
+          # Read first, then search: `grep -q` stops at the first hit, and under
+          # pipefail the SIGPIPE to `gh` would read a found marker as absent.
+          bodies=$(gh api "repos/${GITHUB_REPOSITORY}/issues/198/comments" --paginate --jq '.[].body')
+          if grep -qF "$marker" <<< "$bodies"; then
+            echo "::notice::The Gate 1 verdict is already on #198."
+            exit 0
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/issues/198/comments" -F body=@verdict.md --jq '.html_url'
