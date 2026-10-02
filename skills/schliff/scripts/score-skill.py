@@ -23,17 +23,12 @@ from pathlib import Path
 from scoring import (
     compute_composite,
     explain_score_change,  # noqa: F401  # re-exported: integration tests load this module and call it
-    score_clarity,
-    score_composability,
     score_diff,
-    score_edges,
-    score_efficiency,
-    score_quality,
     score_runtime,
-    score_structure,
-    score_triggers,
 )
-from shared import VALID_DIMENSIONS
+from scoring.formats import detect_format
+from scoring.registry import get_weights
+from shared import build_scores, load_eval_suite
 from shared import invalidate_cache as _shared_invalidate_cache
 
 
@@ -69,40 +64,36 @@ def main():
             print(f"Error: malformed eval-suite JSON '{args.eval_suite}': {e}", file=sys.stderr)
             sys.exit(1)
     else:
-        # Auto-discover eval-suite.json as sibling of SKILL.md
-        skill_dir = Path(args.skill_path).parent
-        auto_path = skill_dir / "eval-suite.json"
-        if auto_path.exists():
-            try:
-                eval_suite = json.loads(auto_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError as e:
-                print(f"Warning: malformed eval-suite.json: {e}", file=sys.stderr)
+        eval_suite = load_eval_suite(args.skill_path)
 
-    scores = {
-        "structure": score_structure(args.skill_path),
-        "triggers": score_triggers(args.skill_path, eval_suite),
-        "quality": score_quality(args.skill_path, eval_suite),
-        "edges": score_edges(args.skill_path, eval_suite),
-        "efficiency": score_efficiency(args.skill_path),
-        "composability": score_composability(args.skill_path),
-        "runtime": score_runtime(args.skill_path, eval_suite, enabled=args.runtime),
-    }
+    # The registry owns which dimensions a format has. A hand-listed SKILL.md set
+    # scored an AGENTS.md without operational_coverage, its heaviest dimension.
+    fmt = detect_format(args.skill_path)
+    scores = build_scores(args.skill_path, eval_suite, fmt=fmt)
+    # Not in any registry list, but this script's JSON has always carried it.
+    scores["runtime"] = score_runtime(args.skill_path, eval_suite, enabled=args.runtime)
 
-    # Clarity dimension (default on, opt-out with --no-clarity)
-    if not args.no_clarity:
-        scores["clarity"] = score_clarity(args.skill_path)
+    # Clarity dimension (default on, opt-out with --no-clarity). Only for the
+    # skill.md family, where it weighs 0.05: the composite uses a full
+    # denominator, so a popped dimension counts as zero; on system_prompt the
+    # flag would zero a 0.15-weight dimension. Same guard as dashboard.py.
+    if args.no_clarity and fmt in ("skill.md", "claude.md", "cursorrules"):
+        scores.pop("clarity", None)
 
     # Parse custom weights if provided
     custom_weights = None
     if args.weights:
+        # The format's profile owns its dimension names: a fixed list rejected
+        # every system_prompt-only dimension and accepted names it then ignored.
+        valid_dimensions = set(get_weights(fmt))
         custom_weights = {}
         for pair in args.weights.split(","):
             pair = pair.strip()
             if "=" in pair:
                 k, v = pair.split("=", 1)
                 dim_name = k.strip()
-                if dim_name not in VALID_DIMENSIONS:
-                    print(f"Error: unknown dimension '{dim_name}' — valid: {', '.join(sorted(VALID_DIMENSIONS))}", file=sys.stderr)
+                if dim_name not in valid_dimensions:
+                    print(f"Error: unknown dimension '{dim_name}' — valid: {', '.join(sorted(valid_dimensions))}", file=sys.stderr)
                     sys.exit(1)
                 try:
                     custom_weights[dim_name] = float(v.strip())
@@ -110,7 +101,7 @@ def main():
                     print(f"Error: invalid weight value for '{dim_name}': '{v.strip()}' — expected a number", file=sys.stderr)
                     sys.exit(1)
 
-    composite_result = compute_composite(scores, custom_weights)
+    composite_result = compute_composite(scores, custom_weights, fmt=fmt)
 
     result = {
         "skill_path": args.skill_path,
@@ -127,7 +118,7 @@ def main():
         "dimensions": {k: round(v["score"], 1) if isinstance(v["score"], float) else v["score"] for k, v in scores.items()},
         "trigger_precision": scores.get("triggers", {}).get("precision"),
         "trigger_recall": scores.get("triggers", {}).get("recall"),
-        "issues": {k: v["issues"] for k, v in scores.items() if v["issues"]},
+        "issues": {k: v["issues"] for k, v in scores.items() if v.get("issues")},
         "details": {k: v["details"] for k, v in scores.items() if v["details"]},
     }
 
@@ -173,7 +164,7 @@ def main():
             glyph = "\u2139" if "eval suite" in warning.lower() else "\u26a0"
             print(f"\n  {glyph}  {warning}")
 
-        all_issues = [i for v in scores.values() for i in v["issues"]]
+        all_issues = [i for v in scores.values() for i in v.get("issues", [])]
         if all_issues:
             print("\n  Issues found:")
             for issue in all_issues:

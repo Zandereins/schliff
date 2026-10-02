@@ -4,15 +4,13 @@
 Checks improvement history and skill state against achievement conditions.
 Achievements are persistent across sessions via ~/.schliff/meta/achievements.json.
 
-Usage:
-    python3 achievements.py SKILL.md [--json] [--check-only]
+A library module: callers use check_achievements and format_achievements. It has
+no command line of its own.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -216,71 +214,3 @@ def format_achievements(result: dict[str, Any]) -> str:
 
     return "\n".join(lines)
 
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Schliff Achievements")
-    parser.add_argument("skill_path", help="Path to SKILL.md")
-    parser.add_argument("--json", action="store_true", help="Output as JSON")
-    parser.add_argument("--check-only", action="store_true", help="Don't persist new unlocks")
-    args = parser.parse_args()
-
-    try:
-        import score_skill as scorer
-    except (ImportError, ModuleNotFoundError) as e:
-        print(f"Error: cannot import score_skill module: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    skill_path = str(Path(args.skill_path).resolve())
-    skill_dir = Path(skill_path).parent
-
-    # Load state
-    state_path = skill_dir / ".schliff" / "auto-improve-state.jsonl"
-    state: list[dict] = []
-    if state_path.exists():
-        for line in state_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line:
-                try:
-                    state.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-
-    # Current score
-    eval_suite = None
-    eval_path = skill_dir / "eval-suite.json"
-    if eval_path.exists():
-        try:
-            eval_suite = json.loads(eval_path.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    scores = {
-        "structure": scorer.score_structure(skill_path),
-        "triggers": scorer.score_triggers(skill_path, eval_suite),
-        "quality": scorer.score_quality(skill_path, eval_suite),
-        "edges": scorer.score_edges(skill_path, eval_suite),
-        "efficiency": scorer.score_efficiency(skill_path),
-        "composability": scorer.score_composability(skill_path),
-    }
-    composite = scorer.compute_composite(scores)
-    current_score = {
-        "composite": composite["score"],
-        "dimensions": {k: v["score"] for k, v in scores.items()},
-    }
-
-    # Extract skill name
-    import re
-    content = Path(skill_path).read_text(encoding="utf-8")
-    name_match = re.search(r"^name:\s*(.+?)$", content, re.MULTILINE)
-    skill_name = name_match.group(1).strip() if name_match else Path(skill_path).parent.name
-
-    result = check_achievements(state, current_score, skill_name, check_only=args.check_only)
-
-    if args.json:
-        print(json.dumps(result, indent=2))
-    else:
-        print(format_achievements(result))
-
-
-if __name__ == "__main__":
-    main()

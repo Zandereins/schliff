@@ -1445,14 +1445,6 @@ fi
 
 section "18. New Features Tests"
 
-# Achievements: produces valid JSON
-ACH_OUT=$(python3 "$SCRIPT_DIR/achievements.py" "$SKILL_DIR/SKILL.md" --json 2>/dev/null)
-if echo "$ACH_OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'total_unlocked' in d and 'total_available' in d" 2>/dev/null; then
-    pass "achievements.py: produces valid JSON with expected keys"
-else
-    fail "achievements.py JSON" "missing expected keys"
-fi
-
 # Auto-improve: JSON has elapsed_seconds and sparkline fields
 AI_OUT=$(python3 "$SCRIPT_DIR/auto-improve.py" "$SKILL_DIR/SKILL.md" --dry-run --max-iterations 0 --json 2>/dev/null)
 if echo "$AI_OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'elapsed_seconds' in d and 'sparkline' in d" 2>/dev/null; then
@@ -1479,14 +1471,6 @@ if echo "$REPORT_OUT" | grep -q "## Share"; then
     pass "generate-report.py: share badge + share snippet present in report"
 else
     fail "generate-report.py share" "share snippet not found"
-fi
-
-# Achievements: nonexistent SKILL.md → non-zero exit
-python3 "$SCRIPT_DIR/achievements.py" /nonexistent/SKILL.md --json 2>/dev/null
-if [[ $? -ne 0 ]]; then
-    pass "achievements.py: nonexistent SKILL.md → non-zero exit"
-else
-    fail "achievements.py nonexistent" "expected non-zero exit"
 fi
 
 ##############################################################################

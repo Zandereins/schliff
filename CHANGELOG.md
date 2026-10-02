@@ -12,6 +12,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   instead of an error message (#212). Plugin installs ship `scripts/`, so it was reachable
   by direct path; its dimension scores and ranked fixes are what `schliff score` and
   `schliff suggest` print. The unreferenced `demo/dashboard-output.txt` sample goes with it.
+- The standalone CLI of `achievements.py` (no command, doc or workflow called it).
 
 ### Fixed
 
@@ -33,6 +34,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   MCP-only plugin such as playwright) now counts as present with zero artifacts instead of
   "never loads". On a live install: 3 of 14 enabled plugins disagreed with
   `installed_plugins.json` before, 0 after.
+- **`score-skill.py` scores every format through the same path as `schliff score`.** It
+  detected no format and kept its own dimension list, so an AGENTS.md scored 34.5 where
+  `schliff score` gives 95.6. It now calls `build_scores` and `compute_composite` with the
+  detected format; SKILL.md output is unchanged. `--weights` accepts the format's own
+  dimension names and rejects names it would ignore (including `runtime`, which no profile
+  weighs). `--no-clarity` keeps clarity on `.prompt` files, where it is a core dimension.
+- **An auto-discovered non-UTF-8 `eval-suite.json` no longer ends a run.** `score-skill.py` and `text_gradient.py`
+  load the suite through the shared owner instead of their own copies; `init-skill.py` takes
+  the suite path from it. An explicit `--eval-suite` that exists but cannot be read still exits 1.
+- **Fix deltas and doctor composites follow the scorer.** The two regex patches report their
+  gradient's delta instead of a hardcoded one, and `doctor` weights the composite by format.
 
 ## [8.12.0] - 2026-09-15
 

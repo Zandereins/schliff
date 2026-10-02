@@ -26,7 +26,7 @@ import score_skill as scorer  # noqa: E402
 from nlp import tokenize_meaningful  # noqa: E402
 from scoring.operational_coverage import _COMMAND_WEIGHTS as _OPCOV_COMMAND_WEIGHTS  # noqa: E402
 from scoring.operational_coverage import _DIRECTIVE_WEIGHTS as _OPCOV_DIRECTIVE_WEIGHTS  # noqa: E402
-from shared import extract_description, read_skill_safe, strip_frontmatter  # noqa: E402
+from shared import extract_description, load_eval_suite, read_skill_safe, strip_frontmatter  # noqa: E402
 
 # --- Effort classification ---
 EFFORT_SIMPLE = 1    # Add/remove a line or keyword
@@ -1074,7 +1074,7 @@ def generate_patches(skill_path: str, gradients: list[dict]) -> list[dict]:
                 "gradient_id": f"efficiency:{g['issue']}",
                 "dimension": "efficiency",
                 "issue": g["issue"],
-                "delta": 1.5,
+                "delta": g["delta"],
                 "confidence": "high",
             })
         elif g["issue"].startswith("filler_phrases"):
@@ -1085,7 +1085,7 @@ def generate_patches(skill_path: str, gradients: list[dict]) -> list[dict]:
                 "gradient_id": f"efficiency:{g['issue']}",
                 "dimension": "efficiency",
                 "issue": g["issue"],
-                "delta": 1.0,
+                "delta": g["delta"],
                 "confidence": "high",
             })
 
@@ -1250,20 +1250,12 @@ def main():
     eval_suite = None
     if args.eval_suite and Path(args.eval_suite).exists():
         try:
-            eval_suite = json.loads(Path(args.eval_suite).read_text())
-        except (json.JSONDecodeError, OSError) as e:
+            eval_suite = json.loads(Path(args.eval_suite).read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
             print(f"Error: could not read eval-suite '{args.eval_suite}': {e}", file=sys.stderr)
             sys.exit(1)
     else:
-        # Auto-discover eval-suite.json
-        skill_dir = Path(args.skill_path).parent
-        auto_path = skill_dir / "eval-suite.json"
-        if auto_path.exists():
-            try:
-                eval_suite = json.loads(auto_path.read_text())
-            except (json.JSONDecodeError, OSError) as e:
-                print(f"Error: could not read eval-suite '{auto_path}': {e}", file=sys.stderr)
-                sys.exit(1)
+        eval_suite = load_eval_suite(args.skill_path)
 
     # Validate eval-suite structure before processing
     if eval_suite is not None:
