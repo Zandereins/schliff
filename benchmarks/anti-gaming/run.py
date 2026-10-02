@@ -47,9 +47,10 @@ BENCHMARKS = [
     },
     {
         "file": "keyword-stuffing.md",
-        "target_dimension": "triggers",
+        "target_dimension": "efficiency",
         "gaming_vector": "Repeating the same keyword 50+ times",
-        "detection": "TF-IDF weighting: repeated terms get diminishing returns",
+        "detection": "No actionable signal floors efficiency; the repeated keyword "
+                     "is flagged as a keyword_stuffing issue",
     },
     {
         "file": "fake-examples.md",
@@ -67,7 +68,7 @@ BENCHMARKS = [
         "file": "bloated-preamble.md",
         "target_dimension": "efficiency",
         "gaming_vector": "200 lines of filler, 10 lines of instructions",
-        "detection": "Signal-to-noise ratio: hedging/filler language penalized",
+        "detection": "Information-density curve: low signal per word lowers efficiency",
     },
     {
         "file": "no-scope.md",
@@ -150,7 +151,9 @@ def run_benchmarks() -> list[dict]:
             "all_scores": {k: v["score"] for k, v in dim_scores.items()},
             # A gaming attempt is "caught" if the targeted dimension
             # scores below 80 (penalized) or has anti-gaming issues flagged.
-            "caught": target_score < 80 or any(
+            # A negative score is the unmeasured sentinel (as in composite.py),
+            # not a penalty: a mistyped or suite-gated target must not count.
+            "caught": 0 <= target_score < 80 or any(
                 "contradiction" in str(i) or "empty" in str(i)
                 or "stuffing" in str(i) or "duplicate" in str(i)
                 for i in target_issues
@@ -267,26 +270,32 @@ def main():
     # What gating on `caught` can and cannot do, stated precisely, because the
     # first version of this comment claimed "never a false red" and that is wrong.
     #
-    # It cannot mask a regression on six of the seven vectors: a detector that
-    # stops firing turns those red. NOT on `keyword-stuffing.md`, whose target
-    # dimension `triggers` is eval-suite-gated and returns the -1 sentinel with
-    # no suite — so `target_score < 80` is satisfied by UNMEASURED rather than by
-    # penalised, and `caught` is permanently True. Measured: replacing that file
-    # with the clean control verbatim, so that it games nothing at all, still
-    # reports caught. Its declared TF-IDF detection is never exercised. Fixing it
-    # means retargeting the vector at a dimension measurable without a suite,
-    # which turns the gate red until it is done, so it is in the follow-up issue
-    # and named here rather than covered by a claim of full coverage.
-    # It CAN fire on a scorer IMPROVEMENT. `bloated-preamble.md` is caught purely
-    # by the `target_score < 80` threshold — its declared filler mechanism emits
-    # no issue at all (efficiency 63, empty issue list) — so raising efficiency
-    # above 80 reddens every required context while separation is untouched
-    # (composite 26.4 against a clean control of 31.9). Measured. The other
-    # threshold-caught vectors are shielded by an issue keyword; this one is not.
+    # A target the scorer did not measure is not caught: `caught` requires
+    # `0 <= target_score`, so the -1 sentinel — a suite-gated dimension, or a
+    # mistyped `target_dimension` — reddens here instead of reading as penalised.
+    # Before that bound, a typo in one target left the run at 7/7 and exit 0, and
+    # `keyword-stuffing.md`, then aimed at the suite-gated `triggers`, was caught
+    # permanently. It now targets `efficiency`. Its 38 there comes from the
+    # density curve's zero-signal floor (40, then the whitespace and scope terms;
+    # the file has no actionable line at all), not from a stuffing penalty, so the
+    # row does not prove the stuffing detector. Its `keyword_stuffing` issue is
+    # what keeps it caught if that floor ever rises.
+    #
+    # It CAN fire on a scorer IMPROVEMENT. Two vectors are caught purely by the
+    # `target_score < 80` threshold, with no issue keyword to shield them, so
+    # raising their target dimension above 80 reddens the gate:
+    # `bloated-preamble.md` (efficiency 63, and the information-density curve
+    # emits no issue at all) and `no-scope.md` (composability 20; its issues
+    # name missing contracts, none matches a `caught` keyword). For
+    # bloated-preamble that red comes while separation is untouched (composite
+    # 26.4 against a clean control of 31.9). Measured. The other five vectors
+    # are shielded by an issue keyword. Correcting bloated-preamble's declared
+    # detection string does not change this — with no issue to match, only
+    # retiring the vector would.
     #
     # That red is not false — a declared detection really did stop penalising —
-    # but it fires on an improvement, so it is a real cost and it is named in the
-    # follow-up issue rather than hidden behind a claim that it cannot happen.
+    # but it fires on an improvement, so it is a real cost and it is named here
+    # rather than hidden behind a claim that it cannot happen.
     uncaught = [r["file"] for r in results if "error" not in r and not r.get("caught")]
 
     violations = []
