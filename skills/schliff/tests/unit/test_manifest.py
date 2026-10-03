@@ -310,6 +310,7 @@ class TestFrontmatterParseIsBoundedAndLinear:
     fix reads a bounded HEAD rather than capping a full read nobody needed.
     """
 
+    @pytest.mark.wall_clock
     def test_unterminated_frontmatter_parses_in_linear_time(self, tmp_path):
         """Best-of-N per size, not a single sample.
 

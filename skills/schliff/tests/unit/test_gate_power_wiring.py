@@ -19,12 +19,14 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 
 REQUIRED_V = 'python3 -m pytest tests/unit/ -m "not gate_power" -v'
 REQUIRED_Q = 'python3 -m pytest tests/unit/ -m "not gate_power" -q'
+# macOS runners only: wall-clock ratio tests are enforced by every Ubuntu path.
+REQUIRED_MACOS = 'python3 -m pytest tests/unit/ -m "not gate_power and not wall_clock" -q'
 # Every pytest invocation in CI and in the Makefile, exactly. A new one, or an
 # extra option on an existing one, has to be added here on purpose.
 EXPECTED = {
     ".github/workflows/gate-power.yml": ["python3 -m pytest tests/unit/ -m gate_power -v"],
     ".github/workflows/publish.yml": [REQUIRED_Q],
-    ".github/workflows/test.yml": [REQUIRED_V, REQUIRED_Q],
+    ".github/workflows/test.yml": [REQUIRED_V, REQUIRED_MACOS],
     "Makefile": ['/usr/bin/python3 -m pytest skills/schliff/tests -m "not gate_power" -q'],
 }
 # Ways to drop tests that do not show in an invocation's own text.
@@ -78,3 +80,45 @@ def test_the_marker_sits_on_the_self_check_and_nowhere_else():
         "unit/test_patterns_scale_linearly.py",
         "def test_the_gate_still_fires_on_the_real_defect_class():",
     )], uses
+
+
+def test_wall_clock_selects_exactly_the_measured_flakes():
+    """Only tests whose wall-clock ratio was measured flaking on macOS carry it.
+
+    Asked of pytest's own collection, not of a source scan: a marker on a class, a
+    module's `pytestmark` or a conftest hook selects tests a decorator scan cannot
+    see. Adding it elsewhere silently removes tests from the macOS job, so a new use
+    has to be added here on purpose, with its measurement.
+    """
+    import subprocess
+    import sys
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/unit/", "-m", "wall_clock",
+         "--collect-only", "-q", "-p", "no:cacheprovider"],
+        cwd=TESTS.parent, capture_output=True, text=True, timeout=120,
+    )
+    # A collection error drops a module's tests from the listing; it must not
+    # read as "the marker is not there".
+    assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+    ids = [line for line in proc.stdout.splitlines() if "::" in line]
+    # Full node ids (relative to the rootdir, the repo root holding pyproject.toml),
+    # parametrization stripped: a copy of a marked test under the same name in
+    # another file or class is a different node and fails here.
+    nodes = {i.split("[")[0] for i in ids}
+    assert nodes == {
+        "skills/schliff/tests/unit/test_manifest.py::TestFrontmatterParseIsBoundedAndLinear"
+        "::test_unterminated_frontmatter_parses_in_linear_time",
+        "skills/schliff/tests/unit/test_patterns_scale_linearly.py::test_pattern_scales_linearly",
+    }, sorted(nodes)
+    assert sum("test_unterminated_frontmatter" in i for i in ids) == 1, ids
+
+
+def test_only_the_macos_job_deselects_wall_clock():
+    """Every Ubuntu path, publish and the Makefile still run the wall-clock tests."""
+    for entry, runs in EXPECTED.items():
+        for run in runs:
+            assert ("wall_clock" in run) == (run == REQUIRED_MACOS), (entry, run)
+    workflow = (WORKFLOWS / "test.yml").read_text(encoding="utf-8")
+    macos_job = workflow.split("  test-macos:", 1)[1].split("\n  test-report:", 1)[0]
+    assert "runs-on: macos-latest" in macos_job and REQUIRED_MACOS in macos_job

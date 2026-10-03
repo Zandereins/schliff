@@ -469,9 +469,14 @@ def test_the_gate_logic_separates_the_classes_on_a_virtual_clock(monkeypatch, ca
     )
 
 
+@pytest.mark.wall_clock
 @pytest.mark.parametrize("path,rx", _PATTERNS, ids=[p for p, _ in _PATTERNS])
 def test_pattern_scales_linearly(path, rx):
     """Two-stage so a loaded runner cannot flake it.
+
+    It still went red on a loaded macOS runner (2026-10-02: 1.51x against 1.5, with
+    the calibrator in its normal band), so it carries `wall_clock`: the five Ubuntu
+    jobs enforce it, and a regex scales the same on every platform.
 
     Stage 1 is a cheap sweep over every filler. Anything it flags is re-measured in
     stage 2 with more repetitions AND at a second doubling, and only counts if BOTH

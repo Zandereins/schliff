@@ -152,9 +152,15 @@ jobs:
       - name: Install pytest
         run: pip install "pytest>=8,<9"
 
+      # `not wall_clock` on macOS only: tests that assert a RATIO of wall-clock
+      # timings went red on loaded macOS runners in 2 of 50 attempts after #241
+      # (2026-09-30 to 10-02) and in 0 of 240 Ubuntu job runs, with no code
+      # change. Super-linear scaling is a property of the code, not the platform,
+      # so the five Ubuntu jobs above keep enforcing them. Pinned by
+      # test_gate_power_wiring.py.
       - name: Run unit tests
         working-directory: skills/schliff
-        run: python3 -m pytest tests/unit/ -m "not gate_power" -q
+        run: python3 -m pytest tests/unit/ -m "not gate_power and not wall_clock" -q
 
   test-report:
     runs-on: ubuntu-latest

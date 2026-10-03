@@ -378,6 +378,22 @@ rule with an allowlist; that design was prototyped and rejected on measurement â
   every test file that the marker sits only on the self-check. Twelve mutations were
   checked. It guards against accidental drift, not against a determined edit.
 
+  *Amendment 2026-10-02:* deselecting the self-check did not end the macOS reds. After
+  #241, from 2026-09-30 to 10-02, the Tests workflow ran 48 times. `test-macos` was red in
+  2 of 50 attempts and the five Ubuntu jobs in 0 of 240 runs (the API lists 250, but
+  "re-run failed jobs" copies the green Ubuntu jobs into attempt 2 without running them). Both macOS reds came from a
+  ratio of wall-clock timings. One was `test_pattern_scales_linearly[base._RE_SPECIFIC_REF]`
+  at 1.51x and 1.53x against 1.5, with the calibrator at 1.73 and 1.98, inside its band.
+  The other was `test_manifest.py`'s frontmatter linearity check at 4.31x against 3.0 on
+  0.14 ms. Super-linear scaling is a property of the pattern, not the platform, so a
+  second runner adds no detection. Both tests carry the marker `wall_clock`, and only
+  the macOS job deselects it (`-m "not gate_power and not wall_clock"`). Every Ubuntu
+  job, `publish.yml` and `make test-unit` still run them. The threshold and the
+  measurement are unchanged. `test_gate_power_wiring.py` pins the new invocation, checks
+  that only the macOS job deselects the marker, and asks pytest's own collection
+  (`-m wall_clock --collect-only`, which must exit 0) that the marker selects exactly
+  these two tests, so a marker on a class or a module is caught too.
+
 **Rejected, with the measurement:** a repo-wide static rule flagging "any unbounded
 quantifier on a character class" marked 47 of the 102 patterns in `scoring/patterns/*`
 (measured on `main`); the refinement "â€¦with no
