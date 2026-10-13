@@ -28,6 +28,8 @@ updates:
     # mock=True, so a green check on an anthropic major bump proves nothing about
     # the judge. Widening that range is a decision to make by hand, after the
     # extra is actually exercised in CI — not a PR to merge on a green tick.
+    # A version range, not update-types: Dependabot did not treat 0.x -> 1.x as
+    # semver-major and opened #222 and #236 after the update-types rule landed.
     ignore:
       - dependency-name: "anthropic"
-        update-types: ["version-update:semver-major"]
+        versions: [">=1.0"]
