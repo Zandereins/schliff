@@ -1,6 +1,9 @@
 .PHONY: test test-unit test-self test-proof test-all score lint install install-dev clean help collect-traffic
 
 SKILL_DIR := skills/schliff
+# CI pins ruff==0.15.8 (.github/workflows/test.yml). For the exact CI version:
+#   make lint RUFF="uvx ruff@0.15.8"
+RUFF ?= ruff
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -27,9 +30,11 @@ score-json: ## Score with JSON output
 	cd $(SKILL_DIR) && python3 scripts/score-skill.py SKILL.md --json
 
 lint: ## Run ruff on scripts + markdownlint on tracked docs (same as CI)
-	ruff check $(SKILL_DIR)/scripts/ || echo "Install ruff: pip install ruff"
-	git ls-files '*.md' | xargs npx --yes markdownlint-cli2@0.23.2 \
-	  || echo "markdown lint needs node (npx); see .markdownlint-cli2.jsonc"
+	@command -v $(firstword $(RUFF)) >/dev/null || { \
+	  echo "lint: '$(firstword $(RUFF))' not found. CI uses ruff==0.15.8: pip install ruff==0.15.8, or with uv installed: make lint RUFF=\"uvx ruff@0.15.8\""; exit 127; }
+	@command -v npx >/dev/null || { echo "lint: npx not found; markdownlint needs Node"; exit 127; }
+	$(RUFF) check $(SKILL_DIR)/scripts/
+	git ls-files '*.md' | xargs npx --yes markdownlint-cli2@0.23.2
 
 collect-traffic: ## Snapshot GitHub traffic (spacing: see THE CADENCE RULE in the experiment spec)
 	bash scripts/collect-traffic.sh
