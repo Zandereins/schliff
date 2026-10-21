@@ -56,7 +56,7 @@ skills/schliff/scripts/
 │   ├── coherence.py          # returns {bonus, details}; consumed internally by quality.py
 │   │
 │   ├── diff.py               # score_diff / explain_score_change (used by `diff` command)
-│   ├── guards.py             # anti-gaming / adversarial-input detection
+│   ├── guards.py             # helpers for the frozen LLM-judge layer (no score uses them)
 │   └── patterns/             # pre-compiled regex pattern data
 │       ├── base.py           # shared patterns
 │       ├── skill_md.py       # skill.md-family patterns
@@ -164,9 +164,10 @@ Token estimation is the stdlib-only `len(content) // 4` heuristic.
 
 ### Anti-gaming
 
-Adversarial-input and gaming detection is part of the engine, not a bolt-on: `guards.py`
-plus per-scorer logic detect padding, keyword stuffing, and other attempts to inflate a
-dimension without real improvement.
+Adversarial-input and gaming detection is part of the engine, not a bolt-on: per-scorer
+logic (chiefly `efficiency.py` and `operational_coverage.py`) detects padding, keyword
+stuffing, and other attempts to inflate a dimension without real improvement. Two known
+gaps are documented in [SCORING.md](SCORING.md#known-gaming-limits).
 
 ---
 
@@ -286,7 +287,7 @@ flowchart LR
         COMP["composite.py<br/>full-denominator + gate"]
         FMT["formats.py<br/>detect / normalize / budgets"]
         DIMS["dimension modules<br/>structure…security…runtime<br/>+ system_prompt set"]
-        GUARDS["guards.py<br/>anti-gaming"]
+        GUARDS["guards.py<br/>judge helpers (not wired)"]
         PAT["patterns/<br/>base · skill_md · system_prompt"]
     end
 
@@ -299,7 +300,6 @@ flowchart LR
     ORCH --> DIMS
     ORCH --> COMP
     DIMS --> REG
-    DIMS --> GUARDS
     DIMS --> PAT
     DIMS --> SHARED
     COMP --> REG

@@ -85,7 +85,7 @@ Config linters tell you whether the file is *valid* — a list of pass/fail rule
 
 - **Reproducible.** The headline composite is computed from a canonical, versioned weight registry. Calibration is **off by default**, so `verify` and `badge` return the same score on your laptop and in CI.
 - **Auditable.** Every dimension is a readable scorer in [`scripts/scoring/`](skills/schliff/scripts/scoring/). The weights are a dict you can open. There is no hidden judge prompt.
-- **Anti-gaming, precisely scoped.** A dedicated guard layer ([`guards.py`](skills/schliff/scripts/scoring/guards.py)) detects and floors padding, junk fences, platitude farms, and keyword stuffing — worthless text cannot outrank operational text. A *plausible lie* about your repo is out of reach of any static scorer (see [What the score does not measure](#what-the-score-does-not-measure)).
+- **Anti-gaming, precisely scoped.** The scorers discount padding, repeated lines, and keyword stuffing ([`efficiency.py`](skills/schliff/scripts/scoring/efficiency.py)) and reject junk commands and platitudes ([`operational_coverage.py`](skills/schliff/scripts/scoring/operational_coverage.py)). Two counters that can still be inflated are [disclosed with their measured gain](docs/SCORING.md#known-gaming-limits). A *plausible lie* about your repo is out of reach of any static scorer (see [What the score does not measure](#what-the-score-does-not-measure)).
 - **Zero core dependencies.** Core Schliff is stdlib-only and runs on **Python ≥ 3.10**. (Optional `[evolve]` / `[judge]` extras pull in LLM clients for an opt-in smoke-test only — never for scoring.)
 
 Because the number is stable, it does real work: gate pull requests on it [in CI](#use-it-in-ci), or diff and compare it across commits with the [CLI](#cli).
@@ -356,7 +356,7 @@ LLM extras power this optional layer only; they are never used for scoring.
 
 ## Under the hood
 
-The full methodology — scorer internals, the full-denominator composite, the anti-gaming guards, and the calibration model — lives in [`docs/SCORING.md`](docs/SCORING.md).
+The full methodology — scorer internals, the full-denominator composite, anti-gaming and its known limits, and the calibration model — lives in [`docs/SCORING.md`](docs/SCORING.md).
 
 ```text
 scripts/
@@ -365,7 +365,7 @@ scripts/
 │   ├── registry.py         # canonical weights, scorer lists, headline exclusions
 │   ├── composite.py        # full-denominator composite model
 │   ├── formats.py          # format detection + token budgets
-│   ├── guards.py           # anti-gaming detection
+│   ├── guards.py           # LLM-judge helpers (not used in scoring)
 │   └── structure.py · triggers.py · quality.py · edges.py · …
 ├── text_gradient.py        # deterministic patch gradients (apply gate)
 ├── episodic_store.py       # cross-session episodic memory
