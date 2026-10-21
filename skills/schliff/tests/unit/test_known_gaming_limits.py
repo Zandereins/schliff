@@ -8,7 +8,8 @@ These tests pin that the gain EXISTS. When a future change closes a vector, its 
 red — that is intended: update SCORING.md and the spec in the same change, then delete
 or invert the test. Do not loosen the assertion to keep it green.
 
-Expected values are literals measured on the unmodified bases, not derived at run time.
+Pinned values are literals measured on the unmodified bases. The efficiency checks compare
+against the run-time base by design: that base also earns example credit (see the second test).
 """
 from pathlib import Path
 

@@ -18,8 +18,8 @@ by two multi-agent workflows (`wf_b4c0a515-b2e`, `wf_cf333929-bea`) and the opti
 grilled with the owner.
 
 `SCORING.md` promised protection against "repeating near-duplicate instructions".
-Efficiency deduplicates on the first 80 characters, so identical lines are caught.
-Lines that differ only in a digit or a word are not.
+Efficiency deduplicates on the first 80 characters, lowercased, so lines identical there
+are caught. Lines that differ within them, even by one digit, are not.
 
 ## The vectors
 
@@ -30,13 +30,25 @@ Re-measured on this branch through the scorer functions:
 | `e.g. e.g.` appended to `benchmarks/anti-gaming/skills/clean-reference.md` | structure 85, efficiency 95, composite 31.9 | structure 95, efficiency 100, composite 34.1 |
 | 10 lines `- Check item i` appended to `benchmarks/corpus/v1/phase0-snapshot/01-webapp-testing.SKILL.md` | efficiency 86 | efficiency 100 |
 
-From the workflows, not re-measured here:
+Field maxima, re-measured 2026-10-21 in the PR review with `cli.py score --json`, same
+payloads appended to each file:
 
-- On an agents.md the example vector reaches +6.2 composite, because `structure`
-  weighs 0.4 there (`registry.py:60`).
-- The imperative vector averages about +1.9 composite on field skill.md files, with a
-  maximum of +7.1.
-- The benchmark suite in `benchmarks/anti-gaming/` has no vector for either one.
+| Field | Example vector (`e.g. e.g.`) | Imperative vector (10 lines) |
+| --- | --- | --- |
+| 263 unique `SKILL.md` under `~/.claude` | max +7.4, mean +1.7, 216 gain | max +6.9, mean +1.9, 244 gain |
+| 30-file AGENTS corpus (`docs/launch/corpus/agents/`) | max +15.8, mean +4.1, 23 gain | max +13.0, mean +4.1, 27 gain |
+| 21 files in `benchmarks/corpus/v1` (`--format skill`) | max +17.9, next +7.9 | max +29.7, next +6.3 |
+
+Both v1 maxima are `08-Nemp-memory.SKILL.md`, a 210-byte stub where the payload is most
+of the file. SCORING.md names the stub case separately.
+
+The minimum in the field rows is slightly negative (-0.7 to -0.2): files already at the
+ceiling lose a little density. The example gain comes mostly from `efficiency`
+(3 markers × 5 signal, `efficiency.py:154`), not from `structure`. On zixindh's AGENTS.md
+structure goes 75 → 85 (0.4 × 10 = 4 composite) and efficiency 35 → 94 (about 11.8).
+The earlier workflow figure of +6.2 on an agents.md was one file, not the maximum.
+
+The benchmark suite in `benchmarks/anti-gaming/` has no vector for either one.
 
 ## Options measured
 

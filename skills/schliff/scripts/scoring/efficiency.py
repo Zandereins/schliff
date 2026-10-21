@@ -81,7 +81,8 @@ def score_efficiency(skill_path: str) -> dict:
 
     # Actionable instructions (imperative verbs at line start)
     # Deduplicate on full line content: repeated identical instructions are noise.
-    # Truncate to 80 chars to catch near-duplicates while preserving distinct instructions.
+    # Key on the first 80 chars, lowercased: lines identical there count once; lines that
+    # differ within them (even by one digit) count separately. See SCORING.md "Known gaming limits".
     seen_actions = set()
     for line in lines:
         if _RE_ACTIONABLE_LINES.match(line.strip()):

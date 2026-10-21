@@ -264,26 +264,35 @@ python score-skill.py SKILL.md --weights "triggers=0.4,structure=0.3"
 
 ## Anti-gaming
 
-Anti-gaming detection is part of the engine, not a bolt-on. It lives in
-`scoring/guards.py` plus per-scorer logic, and it exists so a skill cannot inflate a
-dimension by, for example, padding keyword lists, stuffing trivially-passing assertions,
-or repeating identical instructions. Detected gaming patterns are discounted before
-they reach the headline.
+Anti-gaming detection is part of the engine, not a bolt-on. It lives in the scorers
+themselves (`scoring/efficiency.py` for repeated lines, keyword stuffing, whitespace
+padding and per-signal caps; `scoring/operational_coverage.py` for junk commands and
+platitudes), and it exists so a skill cannot inflate a dimension by, for example,
+padding keyword lists, stuffing trivially-passing assertions, or repeating identical
+instructions. Detected gaming patterns are discounted before they reach the headline.
+(`scoring/guards.py` holds helpers for the frozen LLM-judge layer; no score uses it.)
 
 ### Known gaming limits
 
-Two counters reward occurrence rather than content, and no guard discounts them:
+Two counters reward occurrence rather than content. Each is capped, but nothing checks
+what the counted text says:
 
 - **Example markers.** `structure` and `efficiency` credit example markers (such as
-  "e.g." or "for example") by count, so markers without an example behind them still earn
-  the examples tier. Measured gain: up to +10 `structure`, about +2 composite on a
-  skill.md, and up to +6 on an agents.md, where `structure` weighs more.
-- **Imperative lines.** `efficiency` credits each distinct imperative line, so lines
-  that differ but say nothing still raise it. Measured gain: up to the 100 ceiling on a
-  short file, which is +1 to +7 composite on a skill.md.
+  "e.g." or "for example") by count, up to 3 in `efficiency`, so markers without an
+  example behind them still earn credit. Measured gain from two bare markers: up to +10
+  `structure`, and up to about +8 composite on a skill.md and about +16 on an agents.md,
+  mostly through `efficiency`.
+- **Imperative lines.** `efficiency` credits distinct imperative lines, up to 20, so
+  lines that differ but say nothing still raise it. Measured gain from ten such lines:
+  up to the 100 ceiling on a short file, which is up to about +7 composite on a skill.md
+  and +13 on an agents.md. Files already near the ceiling gain nothing.
 
-Every fix measured so far could be bypassed by a short string and still lowered
-legitimate files, so both are disclosed instead of patched. Tests in
+On a near-empty stub, where the payload is most of the file, both gains are larger:
+a 210-byte skill.md gains +18 composite from the markers and +30 from the lines.
+
+Every option measured so far that would close a vector could be bypassed by a short
+string, and every option with an effect lowered legitimate files, so both are disclosed
+instead of patched. Tests in
 `skills/schliff/tests/unit/test_known_gaming_limits.py` pin that the gain exists; the measurements
 and the re-open condition are in `docs/specs/2026-10-19-known-gaming-limits.md`.
 
@@ -315,7 +324,7 @@ under the top-level `security` field), never folded into the skill.md-family hea
 | Composite computation (full-denominator model) | `scoring/composite.py` |
 | Grade thresholds, gauges | `terminal_art.py` |
 | Format detection, normalization, token budgets | `scoring/formats.py` |
-| Anti-gaming guards | `scoring/guards.py` + per-scorer modules |
+| Anti-gaming discounts | `scoring/efficiency.py`, `scoring/operational_coverage.py` + other per-scorer modules |
 | Valid dimension names | `shared.py` (`VALID_DIMENSIONS`) |
 | Patch-ratio measurement | `measure_patch_ratio.py` |
 
