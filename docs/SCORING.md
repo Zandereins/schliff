@@ -267,9 +267,11 @@ python score-skill.py SKILL.md --weights "triggers=0.4,structure=0.3"
 Anti-gaming detection is part of the engine, not a bolt-on. It lives in the scorers
 themselves (`scoring/efficiency.py` for repeated lines, keyword stuffing, whitespace
 padding and per-signal caps; `scoring/operational_coverage.py` for junk commands and
-platitudes), and it exists so a skill cannot inflate a dimension by, for example,
-padding keyword lists, stuffing trivially-passing assertions, or repeating identical
-instructions. Detected gaming patterns are discounted before they reach the headline.
+platitudes). It discounts a file that tries to inflate a dimension by repeating
+identical lines, over-using one keyword across the body, padding with blank lines, or
+listing junk commands and platitudes as operational content. Detected patterns are
+discounted before they reach the headline. Eval-suite assertions are not checked for
+being trivially satisfiable.
 (`scoring/guards.py` holds helpers for the frozen LLM-judge layer; no score uses it.)
 
 ### Known gaming limits
