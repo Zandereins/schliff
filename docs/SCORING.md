@@ -267,8 +267,25 @@ python score-skill.py SKILL.md --weights "triggers=0.4,structure=0.3"
 Anti-gaming detection is part of the engine, not a bolt-on. It lives in
 `scoring/guards.py` plus per-scorer logic, and it exists so a skill cannot inflate a
 dimension by, for example, padding keyword lists, stuffing trivially-passing assertions,
-or repeating near-duplicate instructions. Detected gaming patterns are discounted before
+or repeating identical instructions. Detected gaming patterns are discounted before
 they reach the headline.
+
+### Known gaming limits
+
+Two counters reward occurrence rather than content, and no guard discounts them:
+
+- **Example markers.** `structure` and `efficiency` credit example markers (such as
+  "e.g." or "for example") by count, so markers without an example behind them still earn
+  the examples tier. Measured gain: up to +10 `structure`, about +2 composite on a
+  skill.md, and up to +6 on an agents.md, where `structure` weighs more.
+- **Imperative lines.** `efficiency` credits each distinct imperative line, so lines
+  that differ but say nothing still raise it. Measured gain: up to the 100 ceiling on a
+  short file, which is +1 to +7 composite on a skill.md.
+
+Every fix measured so far could be bypassed by a short string and still lowered
+legitimate files, so both are disclosed instead of patched. Tests in
+`skills/schliff/tests/unit/test_known_gaming_limits.py` pin that the gain exists; the measurements
+and the re-open condition are in `docs/specs/2026-10-19-known-gaming-limits.md`.
 
 The full-denominator model is itself an anti-gaming property: because unmeasured
 dimensions are uncredited rather than dropped, you cannot raise the composite by simply

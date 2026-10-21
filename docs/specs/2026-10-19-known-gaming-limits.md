@@ -1,0 +1,78 @@
+# Known gaming limits: disclose, don't patch
+
+Status: decided 2026-10-19 (owner). Score-neutral: no scorer changes.
+
+## Goal
+
+Make the anti-gaming claim in `docs/SCORING.md` true again. Two gaming vectors are open,
+and every measured fix fails. So the claim is narrowed, the vectors are documented and
+tests pin them, and the conditions for revisiting are written down.
+
+## Context
+
+A review of the next step (2026-10-19) found that a probe padding a skill with
+`### Example N` blocks gained +10 `structure`. Isolated, the cause was not the headers or
+the blocks but `_RE_REAL_EXAMPLES` (`scoring/patterns/skill_md.py:42-44`), which counts
+occurrences. A second review found a sibling vector in `efficiency`. Both were measured
+by two multi-agent workflows (`wf_b4c0a515-b2e`, `wf_cf333929-bea`) and the options were
+grilled with the owner.
+
+`SCORING.md` promised protection against "repeating near-duplicate instructions".
+Efficiency deduplicates on the first 80 characters, so identical lines are caught.
+Lines that differ only in a digit or a word are not.
+
+## The vectors
+
+Re-measured on this branch through the scorer functions:
+
+| Vector | Base | Gamed |
+| --- | --- | --- |
+| `e.g. e.g.` appended to `benchmarks/anti-gaming/skills/clean-reference.md` | structure 85, efficiency 95, composite 31.9 | structure 95, efficiency 100, composite 34.1 |
+| 10 lines `- Check item i` appended to `benchmarks/corpus/v1/phase0-snapshot/01-webapp-testing.SKILL.md` | efficiency 86 | efficiency 100 |
+
+From the workflows, not re-measured here:
+
+- On an agents.md the example vector reaches +6.2 composite, because `structure`
+  weighs 0.4 there (`registry.py:60`).
+- The imperative vector averages about +1.9 composite on field skill.md files, with a
+  maximum of +7.1.
+- The benchmark suite in `benchmarks/anti-gaming/` has no vector for either one.
+
+## Options measured
+
+Field = 284 unique `SKILL.md` under `~/.claude` (sha256-deduplicated) plus the 30-file
+AGENTS corpus. Counts are from `wf_cf333929-bea`.
+
+| Counter | Option | Own bypass | Field files lowered |
+| --- | --- | --- | --- |
+| example | A1/A2: the 10-point tier needs structural examples | 49 characters of fenced lorem, or two varied 5-word blocks | 61-76 SKILL, 9 AGENTS |
+| example | B: dedupe prose markers, cap them at 5 | `Example 1: run the linter` / `Example 2: open the log file` | 53-63 SKILL |
+| example | C: a marker counts only if the text after it is distinct and has content | two throwaway sentences after `e.g.` | 0-1 |
+| imperative | A1/A2: a line needs content tokens | number words, `Check module alpha/beta` | 7-31 SKILL, 0-3 AGENTS |
+| imperative | B: novelty or a cap on credit | plausible sentences reach 100 | 1-23 SKILL |
+| imperative | E/F: tie lines to headings, or saturating credit | a heading noun; F leaves the maximum alone | 113-141 of 314 |
+
+Every option that closes a vector has a bypass of under 100 characters. Every option
+with an effect lowers legitimate files, which makes it a Major under ADR 0017. A
+lexical predicate here moves the gaming to a new string without stopping it.
+
+## Decisions
+
+1. Don't patch either counter. Narrow the claim in `SCORING.md` and add "Known gaming
+   limits", which names the class and the measured maximum. The recipes stay here.
+2. Pin both vectors in `skills/schliff/tests/unit/test_known_gaming_limits.py`. Each pin
+   is mutation-checked: removing the prose markers from `_RE_REAL_EXAMPLES` turns only
+   the example pin red. Capping actionable credit at 12 lines turns only the imperative
+   pin red. The imperative pin asserts the gain, not the base, because the base also
+   earns example credit.
+3. Park the Major track. Re-open only when gaming of either kind turns up in a real file
+   someone else wrote: the field corpus, a user issue, or Action output. A red-team
+   vector of our own doesn't count, because its value is already measured here.
+4. Any future predicate counts as a Minor only if it lowers **zero** field files, and
+   only if a fresh red-team round finds no bypass under 100 characters that keeps at
+   least half the gain.
+
+## Open questions
+
+- A content-meaning check (validity, not lexis) would be the real fix. It's out of
+  scope until the re-open condition fires.
