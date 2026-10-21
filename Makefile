@@ -31,7 +31,7 @@ score-json: ## Score with JSON output
 
 lint: ## Run ruff on scripts + markdownlint on tracked docs (same as CI)
 	@command -v $(firstword $(RUFF)) >/dev/null || { \
-	  echo "lint: '$(firstword $(RUFF))' not found. Install: pip install ruff==0.15.8, or run: make lint RUFF=\"uvx ruff@0.15.8\""; exit 127; }
+	  echo "lint: '$(firstword $(RUFF))' not found. CI uses ruff==0.15.8: pip install ruff==0.15.8, or with uv installed: make lint RUFF=\"uvx ruff@0.15.8\""; exit 127; }
 	@command -v npx >/dev/null || { echo "lint: npx not found; markdownlint needs Node"; exit 127; }
 	$(RUFF) check $(SKILL_DIR)/scripts/
 	git ls-files '*.md' | xargs npx --yes markdownlint-cli2@0.23.2

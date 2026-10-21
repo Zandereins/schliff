@@ -47,5 +47,5 @@ also pinned `uvx schliff@8.8.2` while 8.12.0 was the release, and no test caught
 - schliff's own scorer reacts to the wording of the input contract. `expects` and `produces`
   satisfy `composability`, and `the result` trips `clarity`. A placeholder pin
   (`schliff@<version>`) cost 10 composability points.
-- `make lint` exits 0 when ruff is missing ("Install ruff"). Run `uvx ruff@0.15.8 check` as CI
-  does.
+- `make lint` exited 0 when ruff was missing ("Install ruff"); fixed in #257, it now fails.
+  `make lint RUFF="uvx ruff@0.15.8"` runs the CI version.
