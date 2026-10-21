@@ -287,11 +287,8 @@ what the counted text says:
   up to the 100 ceiling on a short file, which is up to about +7 composite on a skill.md
   and +13 on an agents.md. Files already near the ceiling gain nothing.
 
-On a near-empty stub, where the payload is most of the file, both gains are larger:
-a 210-byte skill.md gains +18 composite from the markers and +30 from the lines.
-
-Every option measured so far that would close a vector could be bypassed by a short
-string, and every option with an effect lowered legitimate files, so both are disclosed
+No fix measured so far closed either vector: each was bypassed by a little added text or
+left the maximum in place, and most also lowered legitimate files. So both are disclosed
 instead of patched. Tests in
 `skills/schliff/tests/unit/test_known_gaming_limits.py` pin that the gain exists; the measurements
 and the re-open condition are in `docs/specs/2026-10-19-known-gaming-limits.md`.

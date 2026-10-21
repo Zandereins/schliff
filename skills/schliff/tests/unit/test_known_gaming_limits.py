@@ -1,7 +1,7 @@
 """DOCUMENTED LIMITS: two gaming vectors the engine does not catch.
 
-docs/SCORING.md ("Known gaming limits") names both. Every fix measured on 2026-10-19 was
-bypassed by a trivial string and still lowered real field files, so the owner chose to
+docs/SCORING.md ("Known gaming limits") names both. No fix measured on 2026-10-19
+closed either vector, and most also lowered real field files, so the owner chose to
 disclose rather than patch (spec: docs/specs/2026-10-19-known-gaming-limits.md).
 
 These tests pin that the gain EXISTS. When a future change closes a vector, its test goes

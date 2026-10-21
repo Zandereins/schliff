@@ -56,7 +56,7 @@ BENCHMARKS = [
         "file": "fake-examples.md",
         "target_dimension": "efficiency",
         "gaming_vector": "Copy-pasting identical examples 15 times",
-        "detection": "Identical-line dedup: repeated lines count once",
+        "detection": "Repeated-line noise + keyword stuffing: lines repeated 3+ times are discounted",
     },
     {
         "file": "contradiction-skill.md",

@@ -287,7 +287,7 @@ flowchart LR
         COMP["composite.py<br/>full-denominator + gate"]
         FMT["formats.py<br/>detect / normalize / budgets"]
         DIMS["dimension modules<br/>structure…security…runtime<br/>+ system_prompt set"]
-        GUARDS["guards.py<br/>anti-gaming"]
+        GUARDS["guards.py<br/>judge helpers (not wired)"]
         PAT["patterns/<br/>base · skill_md · system_prompt"]
     end
 
@@ -300,7 +300,6 @@ flowchart LR
     ORCH --> DIMS
     ORCH --> COMP
     DIMS --> REG
-    DIMS --> GUARDS
     DIMS --> PAT
     DIMS --> SHARED
     COMP --> REG

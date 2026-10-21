@@ -356,7 +356,7 @@ LLM extras power this optional layer only; they are never used for scoring.
 
 ## Under the hood
 
-The full methodology — scorer internals, the full-denominator composite, the anti-gaming guards, and the calibration model — lives in [`docs/SCORING.md`](docs/SCORING.md).
+The full methodology — scorer internals, the full-denominator composite, anti-gaming and its known limits, and the calibration model — lives in [`docs/SCORING.md`](docs/SCORING.md).
 
 ```text
 scripts/
