@@ -38,7 +38,7 @@ detected; under their corpus names they detect as `unknown` and the gains about 
 | --- | --- | --- |
 | 263 unique `SKILL.md` under `~/.claude` | max +7.4, mean +1.7, 216 gain | max +6.9, mean +1.9, 244 gain |
 | 30-file AGENTS corpus (`docs/launch/corpus/agents/`) | max +15.8, mean +4.1, 23 gain | max +13.0, mean +4.1, 27 gain |
-| 20 files in `benchmarks/corpus/v1` (`--format skill`) | max +7.9 | max +6.3 |
+| 15 `SKILL.md` files in `benchmarks/corpus/v1` (`--format skill`) | max +7.9 | max +6.3 |
 
 The v1 row leaves out `08-Nemp-memory.SKILL.md`, which is frontmatter only. Its body is
 empty, so it scores 0.0 and any body lifts it (`hello world` alone gives 23.4). Its
